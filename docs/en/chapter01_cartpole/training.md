@@ -33,7 +33,7 @@ python 2-pytorch_ppo.py \
 The run creates two local files:
 
 - `output/pytorch_ppo_cartpole.pth`: trained model parameters;
-- `output/training_metrics_seed42.csv`: unsmoothed metrics for every iteration.
+- `output/training_metrics_seed42.csv`: metrics for every iteration. `mean_episode_reward` is a rolling mean over the last 100 episodes, `mean_episode_reward_rollout` is the mean of episodes that ended in that iteration, and the other columns are unsmoothed.
 
 To use the local SwanLab dashboard, change `--swanlab-mode disabled` to `--swanlab-mode local`, then run `swanlab watch swanlog`.
 

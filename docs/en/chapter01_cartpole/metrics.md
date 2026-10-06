@@ -428,7 +428,7 @@ python plot_curves.py \
   --output-dir output
 ```
 
-The following lines are taken from that run. Every value can be checked against the CSV.
+The following lines are taken from that run. Every value can be checked against the CSV. The run predates the 100-episode rolling window, so `mean reward` here is the per-rollout mean, now logged as `mean_episode_reward_rollout`.
 
 ```text
 Iteration  1/40 | episodes: 91 | mean reward:  21.4 | KL: 0.0087 | clip: 14.5%
