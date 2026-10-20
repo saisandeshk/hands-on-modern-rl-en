@@ -206,11 +206,25 @@ then any policy that never terminates has $G_t = \infty$, making policies imposs
 
 $$G_t \leq R_{\max} \sum_{k=0}^{\infty} \gamma^k = \frac{R_{\max}}{1 - \gamma}$$
 
-| $\gamma$ | Upper bound     | Interpretation                       |
-| -------- | --------------- | ------------------------------------ |
-| 0.9      | $10 R_{\max}$   | mostly cares about ~10 future steps  |
-| 0.99     | $100 R_{\max}$  | cares about ~100 future steps        |
-| 0.999    | $1000 R_{\max}$ | almost equal-weight over ~1000 steps |
+With $\gamma=0.9$, successive rewards have weights $1, 0.9, 0.81, 0.729, \ldots$. After 10 steps, the weight falls to $0.9^{10}\approx0.349$. More distant rewards still contribute to the return, with progressively smaller weights.
+
+The sum of all discount weights is $1/(1-\gamma)$. A common effective-horizon scale $H$ uses this sum to describe how quickly discount weights decay over time:
+
+$$H=\frac{1}{1-\gamma}$$
+
+| $\gamma$ | Return upper bound | Effective horizon $H$ |
+| -------- | ------------------ | --------------------- |
+| 0.9      | $10 R_{\max}$      | 10 steps              |
+| 0.99     | $100 R_{\max}$     | 100 steps             |
+| 0.999    | $1000 R_{\max}$    | 1000 steps            |
+
+Weights decay throughout the effective horizon. For example, with $\gamma=0.999$, a reward 1,000 steps away has weight $0.999^{1000}\approx0.368$. Rewards beyond the effective horizon also remain in the discounted return.
+
+For any positive integer $n$, the first $n$ discount weights account for the following fraction of the total weight:
+
+$$\frac{\sum_{k=0}^{n-1}\gamma^k}{\sum_{k=0}^{\infty}\gamma^k}=1-\gamma^n$$
+
+With $\gamma=0.9$ and $n=10$, this fraction is about $65.13\%$; with $\gamma=0.99$ and $n=100$, it is about $63.40\%$; with $\gamma=0.999$ and $n=1000$, it is about $63.23\%$. Taking integer values of $n=H$, the fraction approaches $1-e^{-1}\approx63.21\%$ as $\gamma$ approaches 1. These percentages describe the distribution of discount weights. Actual contributions to the return also depend on the rewards' magnitudes and signs.
 
 **Economic interpretation.** Even in finite-horizon tasks, discounting can be meaningful. In economics this is the time value of money: 100 dollars today is worth more than 100 dollars next year because you can invest the money in the meantime. $\gamma$ quantifies the preference for receiving reward earlier rather than later.
 
