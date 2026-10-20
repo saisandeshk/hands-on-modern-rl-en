@@ -47,7 +47,7 @@ $$
 步。运行结束后，`output/` 目录中包含两个主要文件：
 
 - `pytorch_ppo_cartpole.pth`：训练后的模型参数；
-- `training_metrics_seed42.csv`：每一轮未经平滑的训练指标。
+- `training_metrics_seed42.csv`：每一轮的训练指标。`mean_episode_reward` 是最近 100 个回合的滑动平均，`mean_episode_reward_rollout` 是该轮结束回合的平均值，其余指标未经平滑。
 
 控制台最后还会给出 20 个确定性评估回合的平均奖励和标准差。本书保存的这次运行得到 `500.0 ± 0.0`。
 

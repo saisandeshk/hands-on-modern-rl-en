@@ -284,7 +284,7 @@ python plot_curves.py \
   --output-dir output
 ```
 
-下面摘录六轮训练日志。每个数字都可以在原始 CSV 中找到。
+下面摘录六轮训练日志。每个数字都可以在原始 CSV 中找到。这份记录生成于加入 100 回合滑动平均之前，日志里的平均奖励是该轮结束回合的平均值，对应现在的 `mean_episode_reward_rollout`。
 
 ```text
 迭代  1/40 | 回合数:  91 | 平均奖励:   21.4 | KL: 0.0087 | clip%: 14.5%
@@ -300,11 +300,11 @@ python plot_curves.py \
 
 拿到记录后，我们最先看的是回合奖励。回合奖励等于存活步数，越高表示策略让杆子保持直立的时间越长。
 
-训练脚本每轮收集 2048 步。它只统计在这一轮中结束的完整回合；跨越两轮采样边界的回合会继续累计，直到环境真正结束该回合。
+训练脚本每轮收集 2048 步。跨越两轮采样边界的回合会继续累计，直到环境真正结束该回合。控制台、CSV 的 `mean_episode_reward` 和 SwanLab 的 `rollout/ep_rew_mean` 取最近 100 个完整回合的滑动平均，与 SB3 默认的统计窗口相同，SwanLab 的横轴是累计环境步数。只统计本轮结束回合的平均值另记为 `mean_episode_reward_rollout` 和 `rollout/ep_rew_mean_rollout`。
 
 ![seed=42 的实测奖励曲线](./images/cartpole_reward_seed42.png)
 
-<div class="figure-caption">图 1-3：seed=42 的原始训练奖励。每个点表示该轮结束的完整回合的平均奖励。曲线没有平滑，虚线表示单回合 500 步上限。</div>
+<div class="figure-caption">图 1-3：seed=42 的原始训练奖励，数据来自仓库中保存的 CSV。每个点表示该轮结束的完整回合的平均奖励，即现在的 <code>mean_episode_reward_rollout</code>。曲线没有平滑，虚线表示单回合 500 步上限。</div>
 
 第一轮结束了 91 个回合，平均奖励为 21.35。策略接近随机，因此多数回合很快结束。
 
