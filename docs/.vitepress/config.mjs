@@ -784,16 +784,16 @@ const zhSidebar = {
               link: '/chapter07_dqn/from-q-to-dqn'
             },
             {
-              text: '5.2 DQN 改进方法',
-              link: '/chapter07_dqn/dqn-family'
-            },
-            {
-              text: '5.3 Distributional RL',
+              text: '5.2 DQN 的结构与实现',
               link: '/chapter07_dqn/dqn-components'
             },
             {
-              text: '5.4 动手：LunarLander 与 Atari',
+              text: '5.3 动手：LunarLander 实战',
               link: '/chapter07_dqn/lunar-lander'
+            },
+            {
+              text: '5.4 DQN 改进方法',
+              link: '/chapter07_dqn/dqn-family'
             },
             {
               text: '5.5 动手：视觉游戏项目',
@@ -1702,16 +1702,16 @@ const enSidebar = {
               link: '/en/chapter07_dqn/from-q-to-dqn'
             },
             {
-              text: '5.2 DQN Improvements',
-              link: '/en/chapter07_dqn/dqn-family'
-            },
-            {
-              text: '5.3 Distributional RL',
+              text: '5.2 DQN Architecture and Implementation',
               link: '/en/chapter07_dqn/dqn-components'
             },
             {
-              text: '5.4 Hands-on: LunarLander and Atari',
+              text: '5.3 Hands-on: LunarLander',
               link: '/en/chapter07_dqn/lunar-lander'
+            },
+            {
+              text: '5.4 DQN Improvements',
+              link: '/en/chapter07_dqn/dqn-family'
             },
             {
               text: '5.5 Hands-on: Visual Game Projects',
@@ -2527,6 +2527,13 @@ function collectEnglishRoutes(directory, relativeDirectory = '') {
 }
 
 const englishRoutes = collectEnglishRoutes(path.join(docsRoot, 'en'))
+const chineseRoutes = englishRoutes
+  .map((route) => route.replace(/^\/en(?=\/|$)/, '') || '/')
+  .filter(
+    (route) =>
+      fs.existsSync(path.join(docsRoot, `${route}.md`)) ||
+      fs.existsSync(path.join(docsRoot, route, 'index.md'))
+  )
 
 const logger = createLogger()
 const originalWarn = logger.warn
@@ -2629,6 +2636,7 @@ export default defineConfig({
       description: '现代强化学习实战——从代码到原理',
       themeConfig: {
         englishRoutes,
+        chineseRoutes,
         nav: zhNav,
         sidebar: zhSidebar,
         editLink: {
@@ -2675,6 +2683,7 @@ export default defineConfig({
         'Modern Reinforcement Learning in Practice — From Code to Theory',
       themeConfig: {
         englishRoutes,
+        chineseRoutes,
         nav: enNav,
         sidebar: enSidebar,
         editLink: {
@@ -2715,6 +2724,8 @@ export default defineConfig({
     }
   },
   themeConfig: {
+    // The custom language toggle resolves matching pages; stock menus use home.
+    i18nRouting: false,
     logo: '/readme/logo-symbol.svg',
     siteTitle: 'Hands on Modern RL',
     nav: zhNav,
