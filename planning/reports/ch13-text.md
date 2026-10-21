@@ -112,3 +112,25 @@ Reviewed all 9 pages in `docs/chapter13_rlhf/` end to end. Fixed 13 load-bearing
 - The sidebar orders 13.8 (veRL hands-on) before 13.9 (PPO loop supplement) although the PPO loop is conceptually prerequisite; left as-is for the coordinator.
 - Evaluation and extended-practice both contain a `flawed_reward` experiment by design (evaluation points to extended practice for the full version); numbers are now mutually consistent (different example strings, both correct).
 - Checklist items marked Depth/Later were intentionally left to their owning chapters (multi-turn tool credit → Ch. 19, step boundaries/process supervision → Ch. 17, transformer/SFT mechanics → LLM tracks).
+
+## Review response
+
+- Finding 1 (sidebar registration + "13.R" label): partially accepted. The sidebar entry and any retitling are out of scope (`docs/.vitepress/config.mjs` is not editable on this branch, and the task mandates the `13.R` title/H1 with the coordinator to renumber). Accepted the in-scope part: the 13.1 Roadmap table in `base-model-to-assistant.md` now uses the exact sidebar titles (13.1/13.4/13.6) and adds a `[13.R Summary and Exercises](./review)` row; the "Sidebar additions" entry for `/chapter13_rlhf/review` is retained for the coordinator.
+- Finding 2 (BT "scale is arbitrary"): accepted. Reworded in `imitation-learning-pipeline.md`, `review.md`, and the "Reward Scale" paragraph in `standard-rlhf-pipeline.md`: only the offset is unidentified; the scale is pinned by the sigmoid's unit temperature but must still be calibrated before PPO.
+- Finding 3 (`R_bad` formula): accepted. Now `$R_{bad}=0.01|y|+0.5\cdot\mathbb{1}[\text{list/bullet}]+0.5\cdot\mathbb{1}[\text{bold}]+0.3\sum_k\mathbb{1}[\text{phrase}_k]$`, matching the code and the worked table.
+- Finding 4 (`R_safe` weights): accepted. Formula now `0.4/0.35/0.15/-0.05/-0.05`, identical to `safer_reward`.
+- Finding 5 ("cannot be hacked"): accepted. Now reads deterministic against semantic manipulation but still exploitable via parser tricks; table row changed to "Deterministic, but parser tricks still apply".
+- Finding 6 ("Boundary with Chapter 9"): accepted. Retitled "Boundary with Chapters 14-16".
+- Finding 7 ("classification network in Chapter 5"): accepted. Now points at the softmax policy network from Chapter 6.
+- Finding 8 (trajectory notation in Chapter 3): accepted. Now cites Chapter 2 (Section 2.2, MDPs); verified `s_0,a_0,r_0,…` appears in `docs/chapter02_rl_basics/mdp.md` and `s_0` has no match under `docs/chapter03_value_functions/`.
+- Finding 9 (reward-design in Chapter 3): accepted. Now cites Chapter 4 (Section 4.3, Reward Design); verified the "defines 'what is worth pursuing'" sentence lives there.
+- Finding 10 (BT rounding 0.182/1.701): accepted. Both pages now print $\sigma(-1.5)\approx0.1824$, loss $\approx1.702$ (verified: $\sigma(-1.5)=0.18243$, $-\log=1.70141$; $-\log(0.1824)=1.70156\to1.702$).
+- Doubt 1 (self-rewarding numbers): kept numbers, added hedge pointing at Yuan et al. 2024 Tables 1-2 as indicative; stays in Needs external verification.
+- Doubt 2 (Claude 4 Constitution 2026): accepted in part. Dropped the year from the Further Reading entry (now "Anthropic 'Claude's Constitution' document", URL kept as-is); body already frames the description as the chapter's synthesis.
+- Doubt 3 (κ ≈ 0.4-0.6 / 0.7-0.9): accepted. Both cells now marked "illustrative range".
+- Doubt 4 (Section 13.2 split reference): accepted. Now points at the "Data Splitting: By Prompt, Not By Pair" subsection in the same page.
+- Doubt 5 (Exercise 9 `rlhf_ppo_train.py` pointer): accepted. Reworded to note the script has its own rule-based scorer rather than implying it consumes `flawed_reward`.
+- Doubt 6 (Roadmap naming): accepted. Rows 13.1/13.4/13.6 fixed plus review row added (see Finding 1).
+- Doubt 7 (Instruct as "pretraining baseline", 7,500): accepted. Now "pre-RL baseline (instruction-tuned)", "7,473 training examples", and "pre-RL starting checkpoint".
+- Doubt 8 (right-padding assumption): accepted. Comment "(assumes right padding)" added to the RM snippet.
+- Doubt 9 (truncation "must mask"): accepted. Reframed as one common policy with alternatives (drop example / train on visible prefix), applied consistently.

@@ -115,17 +115,18 @@ If you cannot trace which dataset, which checkpoint, and which evaluation produc
 
 ## Roadmap
 
-| Section                                                                | Core question                                                | Deliverable                              |
-| ---------------------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------- |
-| [13.1 From Base Model to Aligned Assistant](./base-model-to-assistant) | What does a base model miss?                                 | base vs SFT vs RLHF comparison           |
-| [13.2 Supervised Fine-Tuning](./imitation-learning-pipeline)           | How do we teach the model to follow instructions?            | SFT data, masks, and preference triplets |
-| [13.3 AI Feedback and Safety Principles](./hhh-practice)               | How do preference labels scale from humans to AI feedback?   | a constitution and the RLAIF loop        |
-| [13.4 The RLHF Pipeline](./standard-rlhf-pipeline)                     | What are the inputs/outputs of SFT -> RM -> PPO?             | artifact checklist + flow diagram        |
-| [13.5 Large-Scale Training Engineering](./scaling-to-large-models)     | How does the same pipeline scale from small to large models? | TRL/OpenRLHF/NeMo mapping + checklist    |
-| [13.6 Evaluation](./evaluation)                                        | How do we prove we improved without cheating the RM?         | evaluation gate and badcase loop         |
-| [13.7 Extended Practice: Reward Hacking](./extended-practice)          | What does reward hacking look like in a controlled setup?    | a repeatable debugging workflow          |
-| [13.8 Hands-On: veRL + GSM8K](./verl-ppo-gsm8k)                        | How does the pipeline look in an industrial framework?       | an end-to-end PPO experiment             |
-| [13.9 Supplement: The PPO-RLHF Training Loop](./ppo-rlhf-loop)         | How does one PPO update work at the token level?             | KL, advantage, and clipping mechanics    |
+| Section                                                               | Core question                                                | Deliverable                              |
+| --------------------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------- |
+| [13.1 Base Model to Instruction Alignment](./base-model-to-assistant) | What does a base model miss?                                 | base vs SFT vs RLHF comparison           |
+| [13.2 Supervised Fine-Tuning](./imitation-learning-pipeline)          | How do we teach the model to follow instructions?            | SFT data, masks, and preference triplets |
+| [13.3 AI Feedback and Safety Principles](./hhh-practice)              | How do preference labels scale from humans to AI feedback?   | a constitution and the RLAIF loop        |
+| [13.4 Reinforcement Learning Fine-Tuning](./standard-rlhf-pipeline)   | What are the inputs/outputs of SFT -> RM -> PPO?             | artifact checklist + flow diagram        |
+| [13.5 Large-Scale Training Engineering](./scaling-to-large-models)    | How does the same pipeline scale from small to large models? | TRL/OpenRLHF/NeMo mapping + checklist    |
+| [13.6 Alignment Evaluation](./evaluation)                             | How do we prove we improved without cheating the RM?         | evaluation gate and badcase loop         |
+| [13.7 Extended Practice: Reward Hacking](./extended-practice)         | What does reward hacking look like in a controlled setup?    | a repeatable debugging workflow          |
+| [13.8 Hands-On: veRL + GSM8K](./verl-ppo-gsm8k)                       | How does the pipeline look in an industrial framework?       | an end-to-end PPO experiment             |
+| [13.9 Supplement: The PPO-RLHF Training Loop](./ppo-rlhf-loop)        | How does one PPO update work at the token level?             | KL, advantage, and clipping mechanics    |
+| [13.R Summary and Exercises](./review)                                | What should you take away, and can you apply it?             | outcomes, equations, pitfalls, exercises |
 
 ## Why Evaluation Is Mandatory
 
@@ -139,7 +140,7 @@ This is why evaluation in this chapter is not optional — it is part of the RLH
 
 A qualified RLHF experiment cannot just report "reward went up." It must answer at least three questions: is the model more aligned with human preferences? Has existing capability noticeably regressed? Are high-scoring answers actually usable?
 
-## Boundary with Chapter 9
+## Boundary with Chapters 14-16
 
 This chapter covers the **classical RLHF standard pipeline**. Chapters 14-16 depart from this pipeline and explains why modern post-training has progressively simplified it:
 

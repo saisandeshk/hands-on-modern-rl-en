@@ -127,14 +127,14 @@ This step is identical to that in [Chapter 8 on PPO](../chapter08_ppo/ppo-bipeda
 
 ### RLHF vs RLAIF: Fundamental Differences
 
-| Dimension               | RLHF                                      | RLAIF                                                               |
-| ----------------------- | ----------------------------------------- | ------------------------------------------------------------------- |
-| Preference Source       | Human annotators in pairwise comparisons  | AI judge scores based on Constitution                               |
-| Annotation Cost         | \$0.5-\$5 per example, requiring millions | Only inference cost, ~\$10^{-4} per example                         |
-| Annotation Speed        | Weeks to months                           | Millions of examples per day                                        |
-| Annotation Consistency  | Cohen's κ ≈ 0.4-0.6 between annotators    | Same judge scores multiple times, κ ≈ 0.7-0.9                       |
-| Suitable Capabilities   | Values, style, common sense               | Mathematics, code, long context, expertise                          |
-| Unsuitable Capabilities | Reasoning beyond annotator level          | Open-ended questions where the model itself doesn't know the answer |
+| Dimension               | RLHF                                                        | RLAIF                                                               |
+| ----------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------- |
+| Preference Source       | Human annotators in pairwise comparisons                    | AI judge scores based on Constitution                               |
+| Annotation Cost         | \$0.5-\$5 per example, requiring millions                   | Only inference cost, ~\$10^{-4} per example                         |
+| Annotation Speed        | Weeks to months                                             | Millions of examples per day                                        |
+| Annotation Consistency  | Cohen's κ ≈ 0.4-0.6 between annotators (illustrative range) | Same judge scores multiple times, κ ≈ 0.7-0.9 (illustrative range)  |
+| Suitable Capabilities   | Values, style, common sense                                 | Mathematics, code, long context, expertise                          |
+| Unsuitable Capabilities | Reasoning beyond annotator level                            | Open-ended questions where the model itself doesn't know the answer |
 
 ::: warning Limitations of RLAIF
 The quality of RLAIF is constrained by the judge model itself. During the Claude 2 phase, when Claude 2 judges itself, a **self-preference bias** emerges — the judge tends to select responses that are more stylistically similar to itself. When the model being judged exceeds the judge's capabilities, RLAIF can actually reinforce incorrect answers. This is precisely the "sycophancy" (flattery) and "reward model over-optimization" issues discussed in [Chapter 25 on Reward Hacking](../chapter25_alignment_failures/classical-failures).
@@ -212,7 +212,7 @@ $$
 
 ### Effect of Three Iterations
 
-Meta used Llama 2-70B to perform three rounds of self-rewarding (M1 → M2 → M3), and the results were:
+Meta used Llama 2-70B to perform three rounds of self-rewarding (M1 → M2 → M3), and reported improving win rates and judge scores across rounds (see Tables 1-2 of Yuan et al. 2024 for the exact numbers; treat them as indicative of the trend, not as transferable constants):
 
 - **AlpacaEval 2 win rate:** M1 55% → M2 65% → M3 72%
 - **Judge capability (on RewardBench):** M1 75% → M2 80% → M3 83%
@@ -437,6 +437,6 @@ Shifting from human feedback to AI feedback has changed the way preference data 
 - [Yuan et al. 2024 “Self-Rewarding Language Models”](https://arxiv.org/abs/2401.10020)
 - [Askell et al. 2021 “A General Language Assistant as a Laboratory for Alignment”](https://arxiv.org/abs/2112.00861)
 - [Anthropic 2024 “Collective Constitutional AI: Aligning a Language Model with Public Input”](https://www.anthropic.com/research/collective-constitutional-ai-aligning-a-language-model-with-public-input)
-- [Anthropic 2026 “Claude 4 Constitution”](https://www.anthropic.com/research/claudes-constitution)
+- [Anthropic "Claude's Constitution" document](https://www.anthropic.com/research/claudes-constitution)
 - [Sharma et al. 2023 “Towards Understanding Sycophancy in Language Models”](https://arxiv.org/abs/2310.13548)
 - [Gao et al. 2022 “Scaling Laws for Reward Model Overoptimization”](https://arxiv.org/abs/2210.10760)

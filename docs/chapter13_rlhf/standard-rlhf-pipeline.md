@@ -206,7 +206,7 @@ flowchart LR
     style R3 fill:#e3f2fd,stroke:#1565c0
 ```
 
-**Pure rule rewards** suit tasks with objective ground truth: whether the final answer of a math problem is correct, whether code runs, whether the output format is valid. Such rewards are fully deterministic and cannot be "hacked", but they only check surface form and cannot assess semantic quality. Judge a rule verifier by **soundness** (it never accepts a wrong answer) and **completeness** (it accepts every legitimate formatting of a right answer), and test both directions explicitly: feed it correct answers in unusual formats (false negatives) and wrong answers in perfect formats (false positives). Parser boundaries -- what counts as the "final answer" -- are part of the verifier and must be versioned with it.
+**Pure rule rewards** suit tasks with objective ground truth: whether the final answer of a math problem is correct, whether code runs, whether the output format is valid. Such rewards are deterministic and cannot be gamed by _semantic_ manipulation, but they can still be exploited through parser-level tricks (false positives), so soundness, completeness and parser boundaries must be tested and versioned. Judge a rule verifier by **soundness** (it never accepts a wrong answer) and **completeness** (it accepts every legitimate formatting of a right answer), and test both directions explicitly: feed it correct answers in unusual formats (false negatives) and wrong answers in perfect formats (false positives). Parser boundaries -- what counts as the "final answer" -- are part of the verifier and must be versioned with it.
 
 **Pure model rewards** are the reward model (RM) trained in this section: given $(prompt, response)$, it outputs a scalar score. An RM understands semantics -- it knows which of "helpful but blunt" and "polite but empty" is better. But an RM carries a fundamental risk: it is itself a model, and models can be exploited adversarially. This is the reward hacking problem covered later (Sections 13.6 and 13.7).
 
@@ -216,14 +216,14 @@ $$R_{mix} = R_{RM} + \alpha \cdot R_{format} + \beta \cdot R_{length} + \gamma \
 
 where $\alpha, \beta, \gamma$ are tunable hyperparameters. $R_{format}$ checks formatting, $R_{length}$ penalizes overly long or short answers, and $R_{correctness}$ checks questions with objective answers (math, code). The trade-offs:
 
-|                    | Rule rewards                       | Model rewards (RM)                   |
-| ------------------ | ---------------------------------- | ------------------------------------ |
-| **Cost**           | Nearly zero                        | Training + inference cost            |
-| **Reliability**    | Deterministic, cannot be hacked    | Can be exploited adversarially       |
-| **Semantics**      | None, format checks only           | Understands content quality          |
-| **Generalization** | Poor, new rules per task           | Good, one RM scores many tasks       |
-| **Best for**       | Math/code/format with ground truth | Dialogue/creative/safety preferences |
-| **Typical role**   | The "floor" of a hybrid reward     | The "body" of a hybrid reward        |
+|                    | Rule rewards                                 | Model rewards (RM)                   |
+| ------------------ | -------------------------------------------- | ------------------------------------ |
+| **Cost**           | Nearly zero                                  | Training + inference cost            |
+| **Reliability**    | Deterministic, but parser tricks still apply | Can be exploited adversarially       |
+| **Semantics**      | None, format checks only                     | Understands content quality          |
+| **Generalization** | Poor, new rules per task                     | Good, one RM scores many tasks       |
+| **Best for**       | Math/code/format with ground truth           | Dialogue/creative/safety preferences |
+| **Typical role**   | The "floor" of a hybrid reward               | The "body" of a hybrid reward        |
 
 A practical rule of thumb: **use rule rewards wherever rules apply, and fill the gaps with model rewards**. Rules act as a safety net -- even if the RM is hacked, rules still guarantee basic format and correctness. In the RLVR setting of Chapter 15, rule rewards become the primary signal.
 
@@ -290,7 +290,7 @@ A prompt-level split answers the real question: on unseen new prompts, does the 
 
 ### Reward Scale: Calibrate Before PPO
 
-RM training only constrains score differences, not the absolute scale. One RM outputs $(2, 1)$, another $(20, 10)$; both order correctly, but PPO perceives completely different reward scales. This directly affects training stability:
+RM training constrains score differences through a unit-temperature sigmoid, but the score offset is unidentified and the raw output scale still has to be calibrated before PPO. One RM outputs $(2, 1)$, another $(20, 10)$; both order correctly, but PPO perceives completely different reward scales. This directly affects training stability:
 
 | RM reward scale | What may happen in PPO                                               |
 | --------------- | -------------------------------------------------------------------- |
@@ -419,7 +419,7 @@ class RewardModel(nn.Module):
             input_ids=input_ids,
             attention_mask=attention_mask,
         )
-        # Score the last non-padded token of each sequence.
+        # Score the last non-padded token of each sequence (assumes right padding).
         last_idx = attention_mask.sum(dim=1) - 1
         batch_idx = torch.arange(input_ids.shape[0], device=input_ids.device)
         last_hidden = outputs.last_hidden_state[batch_idx, last_idx, :]
@@ -585,7 +585,7 @@ This is not bureaucracy. When debugging RLHF you will often ask:
 
 If artifacts are unclear, these questions become hard to answer later.
 
-Treat every rollout as an immutable record: store the prompt, the response tokens, the decoding settings (temperature, top-$p$, top-$k$, seed), the acting checkpoint id, and the log-probabilities under the policy that generated them. Later PPO updates read those stored log-probabilities as the denominator of the importance ratio; regenerating or silently editing them breaks the on/off-policy bookkeeping. Bind versions jointly -- policy, tokenizer and chat template, reward model, verifier, and evaluation prompt set -- so a claimed win rate names the exact tuple that produced it. Training, sampling, and evaluation prompts must be disjoint by prompt id (Section 13.2), and any rollout that is refused, timed-out, invalid, or truncated gets its own outcome tag rather than being scored as an ordinary completion.
+Treat every rollout as an immutable record: store the prompt, the response tokens, the decoding settings (temperature, top-$p$, top-$k$, seed), the acting checkpoint id, and the log-probabilities under the policy that generated them. Later PPO updates read those stored log-probabilities as the denominator of the importance ratio; regenerating or silently editing them breaks the on/off-policy bookkeeping. Bind versions jointly -- policy, tokenizer and chat template, reward model, verifier, and evaluation prompt set -- so a claimed win rate names the exact tuple that produced it. Training, sampling, and evaluation prompts must be disjoint by prompt id (see "Data Splitting: By Prompt, Not By Pair" below), and any rollout that is refused, timed-out, invalid, or truncated gets its own outcome tag rather than being scored as an ordinary completion.
 
 ## Common Failure Mode Map
 

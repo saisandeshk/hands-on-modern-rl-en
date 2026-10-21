@@ -27,7 +27,7 @@ $$
 \mathcal{L}_{RM}(\phi) = -\mathbb{E}_{(x,y_w,y_l)\sim\mathcal{D}_{pref}}[\log \sigma(r_\phi(x,y_w) - r_\phi(x,y_l))]
 $$
 
-The reward model turns "chosen beats rejected" into a trainable score difference; only differences are identified, so the absolute scale must be calibrated before PPO.
+The reward model turns "chosen beats rejected" into a trainable score difference; only differences are identified, so the reward offset is arbitrary (the scale is pinned by the sigmoid but must still be calibrated before PPO).
 
 $$
 \max_\theta\ \mathbb{E}_{y\sim\pi_\theta(\cdot\mid x)}[r_\phi(x,y) - \beta D_{KL}(\pi_\theta(\cdot\mid x)\,\|\,\pi_{ref}(\cdot\mid x))]
@@ -85,7 +85,7 @@ Distribution shift: SFT trains only on states from human demonstrations. At depl
 A reward model scores the chosen response $2.0$ and the rejected response $0.5$. Compute the preference probability and the RM loss. Then compute both for the reversed (wrong) ordering.
 
 ::: details Solution
-$\Delta r = 2.0 - 0.5 = 1.5$. Preference probability $\sigma(1.5) = 1/(1+e^{-1.5}) \approx 1/1.2231 \approx 0.818$. Loss $-\log(0.818) \approx 0.201$. Reversed: $\Delta r = -1.5$, $\sigma(-1.5) \approx 0.182$, loss $-\log(0.182) \approx 1.701$. The confident correct ranking costs little; the confident wrong ranking costs about $1.5$ nats more, and its gradient pushes the chosen score up and the rejected score down.
+$\Delta r = 2.0 - 0.5 = 1.5$. Preference probability $\sigma(1.5) = 1/(1+e^{-1.5}) \approx 1/1.2231 \approx 0.818$. Loss $-\log(0.818) \approx 0.201$. Reversed: $\Delta r = -1.5$, $\sigma(-1.5) \approx 0.1824$, loss $-\log(0.1824) \approx 1.702$. The confident correct ranking costs little; the confident wrong ranking costs about $1.5$ nats more, and its gradient pushes the chosen score up and the rejected score down.
 :::
 
 ### 4. Hand-compute a token KL penalty (medium, numeric)
@@ -133,5 +133,5 @@ Implement `build_labels` from Section 13.2 for the toy sequence `input_ids = [10
 Using the `flawed_reward` from Section 13.7 (length$/100$ + list/bold bonuses $0.5$ each + $0.3$ per politeness phrase in `["I'm happy to help", "Hope this helps", "Please note", "Here are some"]`), hand-compute and then programmatically verify the scores of: (a) `""`, (b) `"OK."`, (c) `"Please note: "` followed by 200 `x` characters, (d) `"The answer is 42."`. Which response wins, and what does that tell you?
 
 ::: details Solution
-(a) Length $0 \rightarrow 0.0$; no format or politeness matches; total **0.0**. (b) Length $3 \rightarrow 0.03$; no other matches; total **0.03**. (c) Length $13 + 200 = 213 \rightarrow 2.13$; matches `"Please note"` ($+0.3$); no list/bold markers; total **2.43**. (d) Length $17 \rightarrow 0.17$; no other matches; total **0.17**. The vacuous 213-character filler (c) outscores the correct concise answer (d) by more than $14\times$. That is the lesson: the reward function encodes "longer plus polite phrasing is better," so a policy optimizing it will learn padding, not correctness. Gate reward functions with such unit tests before any PPO run -- see `code/chapter13_rlhf/rlhf_ppo_train.py` for the training loop these scores would feed.
+(a) Length $0 \rightarrow 0.0$; no format or politeness matches; total **0.0**. (b) Length $3 \rightarrow 0.03$; no other matches; total **0.03**. (c) Length $13 + 200 = 213 \rightarrow 2.13$; matches `"Please note"` ($+0.3$); no list/bold markers; total **2.43**. (d) Length $17 \rightarrow 0.17$; no other matches; total **0.17**. The vacuous 213-character filler (c) outscores the correct concise answer (d) by more than $14\times$. That is the lesson: the reward function encodes "longer plus polite phrasing is better," so a policy optimizing it will learn padding, not correctness. Gate reward functions with such unit tests before any PPO run (compare with the training loop in `code/chapter13_rlhf/rlhf_ppo_train.py`, which scores rollouts with its own rule-based scorer).
 :::

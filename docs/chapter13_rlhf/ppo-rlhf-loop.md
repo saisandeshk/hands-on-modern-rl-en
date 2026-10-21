@@ -76,7 +76,7 @@ flowchart LR
 
 ## Turning an LLM Response into a Trajectory
 
-In Chapter 3, an RL trajectory looks like:
+In Chapter 2 (Section 2.2, Markov Decision Processes), an RL trajectory looks like:
 
 $$
 s_0,a_0,r_0,s_1,a_1,r_1,\ldots
