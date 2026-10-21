@@ -204,8 +204,8 @@ A candidate is kept only when its reasoning explicitly cites perceptual features
 
 $$
 \mathcal{L}_{\mathrm{SFT}}^{(t)}
-=\mathbb{E}_{\mathcal{D}_t^{\mathrm{audio\text{-}cot}}}\!\left[\log\pi_\theta(r,a\mid x_{\mathrm{audio}},q)\right]
-+\mathbb{E}_{\mathcal{D}_{\mathrm{task}}}\!\left[\log\pi_\theta(r,a\mid q)\right].
+=-\mathbb{E}_{\mathcal{D}_t^{\mathrm{audio\text{-}cot}}}\!\left[\log\pi_\theta(r,a\mid x_{\mathrm{audio}},q)\right]
+-\mathbb{E}_{\mathcal{D}_{\mathrm{task}}}\!\left[\log\pi_\theta(r,a\mid q)\right].
 $$
 
 The mixture preserves text reasoning while acoustic grounding improves.
@@ -312,8 +312,8 @@ R1.5 restores RLHF to the pipeline so that correctness, fluency, and emotional r
 
 $$
 \mathcal{L}_{\mathrm{mid}}
-=\mathbb{E}_{(x,q,r,y)\sim\mathcal{D}_{\mathrm{audio}}}\!\left[\log\pi_\theta(r,y\mid x,q)\right]
-+\mathbb{E}_{(q,r,y)\sim\mathcal{D}_{\mathrm{text}}}\!\left[\log\pi_\theta(r,y\mid q)\right].
+=-\mathbb{E}_{(x,q,r,y)\sim\mathcal{D}_{\mathrm{audio}}}\!\left[\log\pi_\theta(r,y\mid x,q)\right]
+-\mathbb{E}_{(q,r,y)\sim\mathcal{D}_{\mathrm{text}}}\!\left[\log\pi_\theta(r,y\mid q)\right].
 $$
 
 Here $x$, $q$, $r$, and $y$ denote audio input, context, reasoning, and response.
@@ -335,7 +335,7 @@ With $c\ne\varnothing$, the evaluator can check a condition such as whether the 
 Given advantages $\hat A_t$, the paper uses a PPO-style objective with a reference-policy KL term:
 
 $$
-\mathcal{L}_{\mathrm{RLHF}}(\theta)
+\mathcal{J}_{\mathrm{RLHF}}(\theta)
 =\mathbb{E}_t\!\left[
 \min\!\left(
 \rho_t(\theta)\hat A_t,

@@ -58,7 +58,7 @@ $$
 
 $c$ is the generation condition, $v$ is the final video, and $r_\phi$ is the video reward model. This notation can be used directly for policy gradients, but it does not tell the model in which segment the error occurred.
 
-Consider first how long the decision chain is. Generating a 5-second video usually takes about 50 denoising steps, and every step makes a decision for the latent variables of 80 frames. Multiplying roughly, one video corresponds to about four thousand model forward computations. If the teleport happens in the third second, the erroneous decisions are only a small part of these, yet the terminal reward returns only a single scalar. The model cannot tell which steps should change. This is the credit assignment problem in video generation.
+Consider first how long the decision chain is. Generating a 5-second video usually takes about 50 denoising steps, and every step updates the latents for all 80 frames in a single forward pass. Counting per-frame latent updates, one video involves roughly $50 \times 80 = 4{,}000$ frame-level decisions, but the model cost is about 50 forward passes, not four thousand. If the teleport happens in the third second, the erroneous decisions are only a small part of these, yet the terminal reward returns only a single scalar. The model cannot tell which steps should change. This is the credit assignment problem in video generation.
 
 Now let's write down the gap with two candidate videos. Candidate A has good visuals and semantics but teleports in the second half. Candidate B is mediocre on every item but has no local error. The four sub-signals score them as follows, with weights $\lambda_q=\lambda_a=\lambda_t=\lambda_p=0.25$:
 
@@ -239,9 +239,7 @@ The combination of multiple rewards in the policy loss is a weighted sum of each
 
 The public measurements of inference efficiency are as follows. For a 720p, 93-frame video, dense attention plus 50 sampling steps takes 1429.5 seconds, distillation to 16 steps brings it to 244.6 seconds, and adding coarse-to-fine and block-sparse attention brings it to 116.5 seconds, a speedup of 12.3 times. A 720p, 30 fps, 189-frame video takes 142 seconds, a speedup of 10.1 times.
 
-The key implication of this route is that long-video ability must be prepared in the pretraining and architecture stages, and RLHF then adjusts human preferences and multidimensional quality. The previous version of this page described LongCat as fixed five-second chunks, overlap averaging, a story-LLM reward, and two-level diffusion. None of these details appear in the core method of the public paper, so they cannot be kept as fact.
-
-LongCat-Video comes from Meituan's team and is a different work from ByteDance's Seedance. When reading industrial papers, first check the institution, the model, and the public materials, which avoids stitching projects with similar release dates into a training chain that does not exist.
+The key implication of this route is that long-video ability must be prepared in the pretraining and architecture stages, and RLHF then adjusts human preferences and multidimensional quality. LongCat-Video comes from Meituan's team and is a different work from ByteDance's Seedance. When reading industrial papers, first check the institution, the model, and the public materials, which avoids stitching projects with similar release dates into a training chain that does not exist.
 
 ## 24.5.6 When Looking at Mainstream Products, First Separate Capability Demonstrations from Training Evidence
 
@@ -339,7 +337,7 @@ Real physical simulation is still a more distant goal. Current generative models
 
 ## Summary
 
-Video generation has one more axis than image generation, the time axis. Drawing a single frame well passes only the first layer of checks. Event order, identity preservation, and physical causality must be judged along the whole video. When a decision chain on the order of four thousand steps receives only one terminal scalar, credit assignment cannot proceed, which makes per-item rewards and per-item evaluations necessary.
+Video generation has one more axis than image generation, the time axis. Drawing a single frame well passes only the first layer of checks. Event order, identity preservation, and physical causality must be judged along the whole video. When about fifty denoising steps (roughly four thousand frame-level latent updates) receive only one terminal scalar, credit assignment cannot proceed, which makes per-item rewards and per-item evaluations necessary.
 
 VADER lets the gradient of a differentiable reward flow through the last $K$ denoising steps, trading dense gradients for sample efficiency. DanceGRPO uses black-box rewards to compare a group of videos under the same condition and merges several rewards of different scales through within-group normalization. Video RLHF learns multidimensional preferences from human pairwise comparisons. The three routes use rewards in different ways, and all need independent evaluation to keep the model from merely pleasing the proxy metric. LongCat's control experiment provides direct evidence: single-reward training pushes the model toward static pictures, and only multiple rewards constraining one another suppress this hacking behavior.
 

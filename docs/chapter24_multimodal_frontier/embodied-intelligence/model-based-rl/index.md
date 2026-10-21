@@ -266,7 +266,7 @@ Read this formula as a procedure. First randomly generate $M$ candidate action s
 The full script is in [minimal_mbrl_point_mass.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/docs/chapter24_multimodal_frontier/embodied-intelligence/model-based-rl/snippets/minimal_mbrl_point_mass.py), and can be run directly:
 
 ```bash
-python docs/chapter28_vla/embodied-intelligence/model-based-rl/snippets/minimal_mbrl_point_mass.py
+python docs/chapter24_multimodal_frontier/embodied-intelligence/model-based-rl/snippets/minimal_mbrl_point_mass.py
 ```
 
 A typical result shows the random policy pushing the system farther away, while MBRL with MPC can pull the state back near the origin:
@@ -680,7 +680,7 @@ The more likely path is hybridization: use model-free methods for stable optimiz
 | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | MDP transition probability (Chapter 2)                                      | The world model predicts next state, reward, and termination probability                 |
 | Value functions and DQN (Chapters 3 and 5)                                  | Dyna uses model-generated experience to update value functions                           |
-| Policy gradients and actor-critic (Chapters 5-6)                            | Dreamer trains actor and critic on imagined trajectories                                 |
+| Policy gradients and actor-critic (Chapters 6-7)                            | Dreamer trains actor and critic on imagined trajectories                                 |
 | Stable PPO training (Chapter 8)                                             | Embodied RL often uses PPO first to obtain a strong simulation baseline                  |
 | Embodied intelligence (main article in this section)                        | MBRL addresses expensive real interaction and the need to predict the future             |
 | [Offline RL](../../../chapter10_offline_rl/offline-data-distribution-shift) | Offline data can be used to pretrain world models before planning or policy optimization |
@@ -1018,7 +1018,7 @@ Model-free RL learns "what to do." Model-based RL also learns "what will happen 
 
 The difficulty of MBRL is also clear: models cannot be perfect, and model error can be amplified by planning. Truly effective systems usually do not choose between model-free and model-based as mutually exclusive options. They place world models, policy learning, search planning, and real feedback into one closed loop.
 
-As a next step, return to the [main embodied intelligence article](./) and connect the world-model perspective here with sim-to-real, domain randomization, and VLA models.
+As a next step, return to the [main embodied intelligence article](../) and connect the world-model perspective here with sim-to-real, domain randomization, and VLA models.
 
 ---
 

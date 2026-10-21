@@ -4,7 +4,7 @@ title: '24.3 VLA Models'
 
 # 24.3 VLA Models
 
-In the previous eight chapters, our agents lived in the "digital world" -- CartPole's inverted pendulum, Atari's pixels, LLM's tokens. These settings share a common property: trial-and-error is nearly free, `env.reset()` completes in milliseconds, and the environment is fully controllable. But the ultimate goal of RL goes far beyond this -- we want agents that can enter the real world, control robots, drive cars, and complete complex tasks in factories and hospitals.
+In earlier chapters, our agents lived in the "digital world" -- CartPole's inverted pendulum, Atari's pixels, LLM's tokens. These settings share a common property: trial-and-error is nearly free, `env.reset()` completes in milliseconds, and the environment is fully controllable. But the ultimate goal of RL goes far beyond this -- we want agents that can enter the real world, control robots, drive cars, and complete complex tasks in factories and hospitals.
 
 This is the problem **Embodied Intelligence** aims to solve: giving AI a "body" to perceive, decide, and act in the physical world.
 
@@ -540,11 +540,11 @@ This is the fundamental logic of embodied intelligence: **the physics simulator 
 
 | Concept from Previous Chapters                | Correspondence in Embodied Intelligence                                         |
 | --------------------------------------------- | ------------------------------------------------------------------------------- |
-| PPO's stability and parallel sampling (Ch. 7) | Most commonly used training algorithm, supports large-scale parallel simulation |
-| Actor-Critic architecture (Ch. 6)             | Foundation for SAC, used for efficient fine-tuning on real robots               |
-| VLM RL's multimodal fusion (Ch. 11)           | VLA models: vision + language -> action                                         |
-| Policy gradient theorem (Ch. 5)               | Mathematical foundation for continuous action space policy optimization         |
-| RLHF reward modeling (Ch. 8)                  | Human preference feedback for aligning robot behavior                           |
+| PPO's stability and parallel sampling (Ch. 8) | Most commonly used training algorithm, supports large-scale parallel simulation |
+| Actor-Critic architecture (Ch. 7)             | Foundation for SAC, used for efficient fine-tuning on real robots               |
+| VLM RL's multimodal fusion (Ch. 23)           | VLA models: vision + language -> action                                         |
+| Policy gradient theorem (Ch. 6)               | Mathematical foundation for continuous action space policy optimization         |
+| RLHF reward modeling (Ch. 13)                 | Human preference feedback for aligning robot behavior                           |
 
 <details>
 <summary>Exercise: Why is PPO more commonly used than SAC for large-scale embodied simulation training?</summary>
