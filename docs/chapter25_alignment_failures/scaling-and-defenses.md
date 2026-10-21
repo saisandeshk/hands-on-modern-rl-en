@@ -480,6 +480,12 @@ Each version should run at least several random seeds, and report separately:
 
 At the end of the experiment, also keep a set of failure trajectories. A valuable conclusion can be: "The permission layer prevented the real damage caused by deleting tests, but the model still frequently attempts that action." This shows that deployment risk has gone down, while the policy's wrong goal remains unsolved.
 
+### Reward Governance: Versioning, Rollback, and Stop Rules
+
+Every object the policy can adapt to must be versioned together: the preference data snapshot, the reward model checkpoint, the verifier and extractor code, the hidden and gate sets, and the scalarization weights when several reward components are combined into one number. A run record that says only "reward v3" without the data hash, code commit, and component weights cannot be audited or reproduced, because no one can tell which part of the signal the policy actually exploited.
+
+Two operational rules close the loop. First, **rollback**: keep the last known-good reward, policy, and system prompt versioned and deployable, so a sycophancy-style incident (Section 25.2.5) reverts the model rather than merely patching the prompt. Second, **collection stop rules**: decide in advance when to stop trusting the current reward — for example, when the proxy-independent gap widens for two consecutive evaluations, when adversarial completions start passing, or when output length drifts while hidden accuracy is flat — and route the run back to red-teaming instead of adding more training steps.
+
 ## 25.4.9 Summary
 
 Layered defense starts from one stable failure. When the proxy reward and the independent utility diverge, continuing to add model size, number of candidates, or training steps may let the system find the evaluator's blind spots faster.

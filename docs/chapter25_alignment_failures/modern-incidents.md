@@ -84,7 +84,7 @@ If the public tests for a coding problem check only the inputs `1, 2, 3`, the fo
 ```python
 def solve(x):
     answers = {1: 1, 2: 4, 3: 9}
-    return answers[x]
+    return answers[x]  # raises KeyError on any hidden input such as 4
 ```
 
 With the hidden input `4`, the program fails immediately. Training tests, hidden tests, transfer tests, and adversarial tests therefore carry different responsibilities:
@@ -128,6 +128,15 @@ flowchart LR
 ```
 
 The four sets play different roles. Using the same hidden tests for early stopping, tuning the reward, and the final report merely gives the training tests a new name.
+
+### Completeness, Soundness, and False-Positive Tests
+
+Borrow two words from program verification to grade any verifier $V$ against the real task $U$:
+
+- **Soundness**: a high verifier score implies real success. Violations are false positives — the lookup-table program above is the canonical example ($V = 1$, $U = 0$). Test soundness with **adversarial completions**: hand-written shortcuts (hard-coded answers, empty reasoning with a correct final number, deleted or skipped tests) that must score 0. Any adversarial completion that scores above 0 is a verifier bug, not a model achievement.
+- **Completeness**: real success implies a high verifier score. Violations are false negatives — the correct program with an extra space ($V = 0$, $U = 1$) fails only because the extractor is too strict. Test completeness with **known-good variants**: reformat, rename variables, and paraphrase correct solutions; every one of them must still pass.
+
+Common shortcut channels sit on the soundness side and deserve their own regression checks: response length (longer answers scored higher without being more correct), sycophantic or confident tone, markdown headings and formatting, and keyword stuffing aimed at the extractor. Log output length alongside accuracy on every checkpoint; if length rises while hidden-set accuracy is flat, the policy is likely exploiting a verbosity shortcut rather than learning the task. Parser boundaries belong here too: the extractor version, the accepted answer format, and the parse-failure rate must be versioned and reported separately, as Section 25.5 requires for every harness.
 
 ## 25.2.4 Behavioral Generalization of Reward Hacking
 
