@@ -947,6 +947,10 @@ const sidebar = {
             {
               text: '10.3 Offline RL and Preference Data',
               link: '/chapter10_offline_rl/experiments'
+            },
+            {
+              text: '10.4 Summary and Exercises',
+              link: '/chapter10_offline_rl/review'
             }
           ]
         },
