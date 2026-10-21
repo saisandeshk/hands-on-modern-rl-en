@@ -30,7 +30,7 @@ Early language models "generated one short answer at a time," so inference compu
 
 In 2024, Snell et al. answered this question systematically in the paper [Scaling LLM Test-Time Compute Optimally](https://arxiv.org/abs/2408.03314). They ran a clean set of controlled experiments:
 
-**Setup**: fix one base model (Llama-3-8B-Instruct), and compare two ways of improving on math problems of different difficulty:
+**Setup**: fix one base model (Llama-3.1-8B-Instruct), and compare two ways of improving on math problems of different difficulty:
 
 - **Path A**: keep the model but increase inference compute: have the model generate $N$ candidate solutions and then use a verifier to pick the best (best-of-N).
 - **Path B**: add no inference compute, but switch to a model with more parameters and stronger ability.
@@ -211,7 +211,7 @@ Whichever allocation method is adopted, the marginal return of extra compute eve
 - **Medium problems**: more candidates or one round of revision may correct an accidental error, and the return first rises and then falls.
 - **Hard problems beyond the base model's ability**: the model cannot produce a correct path, extra sampling only produces more similar errors, and the return is very low from the start.
 
-The coverage table above has already given a quantitative example for parallel sampling: at $p=0.2$, the marginal gain of the 16th candidate is down to only 0.6 percentage points. Sequential revision and tree search follow the same pattern: the more rounds of revision, the fewer fixable errors remain, and the deeper the search, the lower the expected value of the unexplored branches.
+The coverage table above has already given a quantitative example for parallel sampling: at $p=0.2$, the marginal gain of the 17th candidate is down to only 0.6 percentage points. Sequential revision and tree search follow the same pattern: the more rounds of revision, the fewer fixable errors remain, and the deeper the search, the lower the expected value of the unexplored branches.
 
 Inference-time compute can therefore never substitute for training compute without limit. The relationship between the two is:
 
