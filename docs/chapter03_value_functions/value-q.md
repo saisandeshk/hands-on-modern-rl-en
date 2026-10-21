@@ -1,4 +1,5 @@
 ---
+title: 3.2 Action Values and Bellman Optimality
 outline: [2, 3]
 ---
 
@@ -107,7 +108,23 @@ This simply says: at state $s$, look at the $Q$ values for all actions, and pick
 
 This “always pick the action with the highest score” rule is called a **greedy policy**. We introduce it first not because it is the only possible policy, but because it is the most direct: if $Q(s,a)$ already assigns a score to each action, the most natural behavior is to pick the highest-scoring one.
 
-Of course, in practice, a policy does not have to be defined this way. During training, to explore actions that have not been tried enough, we often add randomness on top of greedy choice. But from the standpoint of “how do we turn $Q$ values into action selection”, greedy choice is the clearest starting point.
+Of course, in practice, a policy does not have to be defined this way. During training, to explore actions that have not been tried enough, we often add randomness on top of greedy choice. But from the standpoint of “how do we turn $Q$ values into action selection”, greedy choice is the clearest starting point. When several actions share the same maximal $Q$ value, any of them is greedy; implementations must break the tie somehow (for example, the lowest action index or a random choice among the maxima), and unreachable states simply keep their initialized values until experience or a model sweep reaches them.
+
+## Advantage: How Much Better Than Average?
+
+$Q^\pi(s,a)$ scores each action on an absolute scale, but for both policy improvement and later policy-gradient methods, the more useful number is the relative one. The **advantage function** subtracts the state baseline:
+
+$$
+A^\pi(s,a) = Q^\pi(s,a) - V^\pi(s).
+$$
+
+It answers: "if I insist on action $a$ here instead of letting $\pi$ choose, how much return do I gain or lose?" A positive advantage means the action beats the policy average; a negative one means it falls short. Because $V^\pi(s) = \sum_a \pi(a \mid s)\, Q^\pi(s,a)$, the advantages average to zero under $\pi$:
+
+$$
+\sum_a \pi(a \mid s)\, A^\pi(s,a) = 0.
+$$
+
+Return to the Section 3.1 example where $Q^\pi(s,\text{right}) = 10$ and $Q^\pi(s,\text{left}) = 4$ with $\pi(\text{right} \mid s) = 0.7$. There $V^\pi(s) = 8.2$, so $A^\pi(s,\text{right}) = 10 - 8.2 = 1.8$ and $A^\pi(s,\text{left}) = 4 - 8.2 = -4.2$, and indeed $0.7 \times 1.8 + 0.3 \times (-4.2) = 0$. Subtracting $V^\pi(s)$ does not change the greedy action ($\arg\max_a A^\pi = \arg\max_a Q^\pi$), but it centers the comparison around zero, which is why actor-critic methods ([Chapter 7](/chapter07_actor_critic/actor-critic)) use the advantage rather than the raw $Q$ as the policy-update signal.
 
 **Mathematical definition**
 
@@ -318,22 +335,22 @@ for row in range(N):
     print(" ".join(cells))
 ```
 
-Run output:
+Run output (exact decimals vary slightly with the NumPy version; the ordering and the arrow pattern are what matter):
 
 ```text
 Q-values of the four actions at the start state:
-{'↑': -5.1, '→': -4.6, '↓': -4.6, '←': -5.2}
+{'↑': -4.8, '→': -4.7, '↓': -4.7, '←': -4.9}
 
 One greedy policy learned:
+→ ↓ → ↓
+↓ → → ↓
 → → → ↓
-↑ ↑ → ↓
-↑ ↑ → ↓
-↑ ↑ → G
+→ → → G
 ```
 
 ![Greedy policy learned by Q-Learning](./images/q-learning-learned-policy.svg)
 
-For example, at the start state, the learned $Q$ values for the four actions are: up $-5.1$, right $-4.6$, down $-4.6$, left $-5.2$. This indicates that, in terms of long-run return, “right” and “down” are both better than “up” and “left”.
+For example, at the start state, the learned $Q$ values are about: up $-4.8$, right $-4.7$, down $-4.7$, left $-4.9$. This indicates that, in terms of long-run return, "right" and "down" are both better than "up" and "left", which matches the optimal values ($-4.69$ for the two good moves that stay inside the grid, about $-5.22$ for the two moves that bump into the wall). When several actions tie for the maximum, `argmax` picks one of them; the figure above breaks ties toward the lower action index, so other optimal arrow patterns with the same 6-step return are equally valid.
 
 <span id="off-policy"></span>
 
@@ -354,7 +371,7 @@ The environment is a 4-row × 12-column grid. The agent starts from S at the bot
 | Hit a wall     | stay in place, reward $-1$                                      |
 | Termination    | episode ends when reaching G                                    |
 
-The shortest path from S to G hugs the cliff edge and takes 11 steps. But it is dangerous: during exploration, if the agent happens to step down by mistake, it falls off the cliff and loses 100 points.
+The shortest safe path from S to G avoids the cliff: one step up, eleven steps across, and one step back down, for 13 steps in total. Hugging the bottom row directly would step into the cliff. But it is dangerous: during exploration, if the agent happens to step down by mistake, it falls off the cliff and loses 100 points.
 
 ![CliffWalking environment illustration (Gymnasium CliffWalking-v1)](./images/cliff-walking.gif)
 
@@ -410,7 +427,7 @@ Previous section: [3.1 State Values and Bellman Expectation](./value-bellman) | 
 **Exercises**
 
 1. In the 4×4 GridWorld, if $\gamma=1$, what is the return of the shortest path? If it takes 8 steps to reach the goal, what is the return then?
-2. If we change the reward to “+10 upon reaching the goal, 0 for each step”, will the agent still prefer the shortest path? Why?
+2. Keep $\gamma=0.9$ as in this section. If we change the reward to "+10 upon reaching the goal, 0 for each step", will the agent still prefer the shortest path? Why? What changes if $\gamma=1$?
 3. In the Q-Learning update, what kind of policy tendency would we get if we replace $\max_{a'}Q(s',a')$ with the average over all actions?
 4. Why can Q-Learning learn from old experience, while SARSA depends more on new experience generated by the current policy?
 
