@@ -8,6 +8,7 @@
 - Map LLM preference data item by item onto the traditional D4RL offline datasets, and see what the state, action, and reward each are in the LLM setting.
 - See how the sequence-modeling idea pioneered by Decision Transformer extends to LLM reasoning search, in-context RL, and other directions.
 - Understand what this cross-domain analogy can explain and what it cannot, so that different objective functions are not simply equated.
+- Learn how off-policy evaluation (OPE) grades candidate policies from fixed logs alone, so that model selection never requires deploying an untested policy.
 
 In the previous section, [10.2](./sequence-modeling), we saw how Decision Transformer writes fixed trajectories as a sequence-modeling problem and leaves the Bellman equation behind entirely. You may think: this approach looks a lot like how large language models are trained today. Both use fixed data for supervised learning, and both predict the next token...
 
@@ -65,8 +66,8 @@ The full derivation needs some mathematics (starting from the optimal policy und
 
 This correspondence also helps us understand the real role of the hyperparameter $\beta$: it controls the update step size of the current policy relative to the reference policy.
 
-- If β is too large: the update steps are too big, and the model easily enters regions not covered by the preference data (OOD) and generates strange outputs
-- If β is too small: the update is too conservative, the probability gap between good and bad answers cannot be pulled apart, and the training effect is not obvious
+- If β is too small: the KL constraint is weak, the update steps are too big, and the model easily drifts into regions not covered by the preference data (OOD) and generates strange outputs
+- If β is too large: the update is too conservative — the model clings to the reference policy, the probability gap between good and bad answers cannot be pulled apart, and the training effect is not obvious
 
 So when tuning DPO's β in practice, you cannot look only at the preference accuracy on the training set. You also need to monitor the KL divergence (the gap from the reference model), the answer-length distribution, and, most importantly, the actual performance on an independent evaluation set.
 
@@ -130,6 +131,54 @@ But an important reminder is needed here: **an analogy is a tool for understandi
 
 We discuss them in the same picture in order to compare the shared problem of "how fixed data restricts policy updates", and **we absolutely cannot treat these three objective functions as one and the same algorithm**. Their mathematical forms, application settings, and practical results differ greatly.
 
+## 5. Off-Policy Evaluation: Grading a Policy You Cannot Deploy
+
+Offline training usually produces several candidate policies — different algorithms, seeds, or checkpoints — and we must pick one. Deploying each candidate to compare them is exactly what the offline setting forbids. **Off-policy evaluation (OPE)** solves this selection problem: estimate each candidate's return $J(\pi) = \mathbb{E}_\pi\left[\sum_t \gamma^t r_t\right]$ using only trajectories logged by some fixed **logging policy** $\mu$ (which plays the same role as the behavior policy $\pi_\beta$ in Section 10.1). The core difficulty is identical to the rest of this chapter: actions the candidate would take but the logger never tried are **unsupported**, and their outcomes are impossible counterfactuals that no estimator can recover — OPE can only reweight what was actually logged.
+
+### 5.1 Importance Sampling: Reweighting Logged Returns
+
+If the logger chose actions with known probabilities $\mu(a \mid s)$, each logged trajectory $\tau_i$ with return $G_i$ can be reweighted by how much more (or less) likely it is under the candidate $\pi$:
+
+$$\rho(\tau_i) = \prod_{t} \frac{\pi(a_t \mid s_t)}{\mu(a_t \mid s_t)}, \qquad \hat{J}_{\text{IS}} = \frac{1}{N}\sum_{i=1}^{N} \rho(\tau_i)\, G_i$$
+
+This ordinary importance-sampling estimator is unbiased provided $\mu$ covers $\pi$ (every action $\pi$ might take has positive probability under $\mu$), but its variance grows roughly exponentially in the horizon, because $T$ noisy ratios multiply. A three-trajectory example shows the pathology concretely. Let the logger pick $a_1/a_2$ fifty-fifty and the candidate always pick $a_1$:
+
+- $\tau_1 = (a_1, a_1)$, $G_1 = 10$: $\rho_1 = (1/0.5)\cdot(1/0.5) = 4$
+- $\tau_2 = (a_1, a_2)$, $G_2 = 2$: $\rho_2 = (1/0.5)\cdot(0/0.5) = 0$
+- $\tau_3 = (a_2, a_1)$, $G_3 = 6$: $\rho_3 = (0/0.5)\cdot(1/0.5) = 0$
+
+Then $\hat{J}_{\text{IS}} = (4\cdot10 + 0 + 0)/3 = 40/3 \approx 13.3$: a single trajectory carries the whole estimate. **Per-decision importance sampling (PDIS)** removes part of the noise by noticing that a reward at time $t$ only depends on actions up to $t$, so later ratios should not scale it:
+
+$$\hat{J}_{\text{PDIS}} = \frac{1}{N}\sum_i \sum_t \gamma^t \rho_{1:t}^{(i)}\, r_{i,t}, \qquad \rho_{1:t} = \prod_{k=1}^{t} \frac{\pi(a_k \mid s_k)}{\mu(a_k \mid s_k)}$$
+
+PDIS stays unbiased and never has higher variance than trajectory-wise IS, but long horizons still hurt.
+
+### 5.2 Taming the Variance: Clipping, Normalization, and ESS
+
+Three standard tools trade a little bias for much lower variance. **Weight clipping** caps each ratio at $[0, c]$, which bounds the influence of any single trajectory at the price of shrinking the estimate toward the logger's return. **Weighted (self-normalized) importance sampling** divides by the total weight instead of $N$:
+
+$$\hat{J}_{\text{WIS}} = \frac{\sum_i \rho_i G_i}{\sum_i \rho_i}$$
+
+On the example above, $\hat{J}_{\text{WIS}} = 40/4 = 10$: biased in general, but consistent and far steadier. Finally, always report the **effective sample size**:
+
+$$\text{ESS} = \frac{(\sum_i \rho_i)^2}{\sum_i \rho_i^2}$$
+
+For our three trajectories, $\text{ESS} = 16/16 = 1$: three logged episodes carry effectively one sample of information about $\pi$. Treat ESS as a trust meter — an ESS in the single digits means the ranking of two candidates is noise, not signal, no matter how far apart their point estimates look.
+
+### 5.3 Model-Based Correction: Doubly Robust and FQE
+
+Reweighting alone ignores everything we know about the environment's structure. The **direct method** instead learns a reward/dynamics model (or a $Q$-function) from the logs and evaluates $\pi$ inside it: low variance, but biased by model error. The **doubly robust (DR)** estimator gets the best of both by using the model as a baseline and IS-weighting only its residuals:
+
+$$\hat{J}_{\text{DR}} = \frac{1}{N}\sum_i\left[\hat{V}(s_1) + \sum_t \gamma^t \rho_{1:t}\left(r_t + \gamma\hat{V}(s_{t+1}) - \hat{Q}(s_t, a_t)\right)\right]$$
+
+Read it inside out: start from the model's guess $\hat{V}(s_1)$, then add each step's surprise (actual reward plus next-state value minus what the model predicted), reweighted onto $\pi$'s distribution. It is unbiased if *either* the model *or* the ratios are correct — hence "doubly" robust — and its variance collapses when the model is good.
+
+**Fitted Q Evaluation (FQE)** takes the regression route: fit $Q^\pi$ by iterating $Q_{k+1} = \arg\min_Q\, \mathbb{E}_{\mathcal{D}}[(Q(s,a) - (r + \gamma\,\mathbb{E}_{a' \sim \pi}[Q_k(s',a')]))^2]$ on the fixed data, then average $Q(s_0, \pi(s_0))$ over logged start states. Notice there is no $\max$ over actions anywhere — FQE evaluates the candidate's own actions, so it never queries maximizing OOD actions the way offline Q-learning does. That makes it calmer than training a full offline agent, though a candidate that strays far from the logs still forces the regressor to extrapolate.
+
+### 5.4 Selecting a Policy Without Online Feedback
+
+In practice, split the logs into a training split and a held-out selection split, train candidates on the first, and rank them on the second with two estimators that fail differently (for example WIS and FQE). Ship a policy only if they agree and the ESS is healthy; if they disagree, or the ESS is tiny, **abstain**: fall back to the logging policy and trigger fresh data collection in the states where the candidate diverges most. Any online rollouts you can afford should be reserved for **auditing the estimators** — checking that WIS/FQE rankings predict real returns on a small validation set — never for tuning the policies themselves, or the evaluation is no longer offline.
+
 ## Chapter Summary
 
 In this chapter we walked completely through the two main routes of offline reinforcement learning, and saw how it helps us understand the post-training of large language models:
@@ -139,6 +188,7 @@ In this chapter we walked completely through the two main routes of offline rein
 3. **The engineering-oriented BC-regularization route is equally effective**: TD3+BC directly adds an L2 behavior-cloning term to the Actor loss, which is simple and strong. AWAC uses advantage weighting for "non-uniform imitation" and also supports a smooth transition from offline to online. Their policy losses resemble that of IQL, and the core difference is whether OOD actions are still maxed over in the target
 4. **The sequence-modeling route leaves the Bellman framework entirely**: Decision Transformer uses return-to-go as the condition, arranges trajectories as (R,s,a) triples, and applies GPT to pure supervised learning, which is simple to implement and compatible with the LLM training stack. Trajectory Transformer does explicit planning with beam search. Diffuser generates a whole trajectory directly with a diffusion model and has stronger stitching ability
 5. **The offline RL perspective helps us understand LLM post-training**: preference data is a fixed dataset, the KL constraint to the reference model corresponds to "do not stray too far from the behavior policy", and DPO can be viewed as implicit offline Q-learning. The sequence-modeling idea of Decision Transformer also extends to PRM search, in-context RL, and other directions
+6. **Off-policy evaluation lets you choose without deploying**: reweight logged returns with trajectory-wise or per-decision importance sampling, stabilize the estimate with clipping, self-normalization, and the ESS trust meter, correct model bias with doubly robust or FQE estimators, and abstain back to the logging policy when the estimators disagree
 
 After this chapter you should have formed one concept: **any problem where "you cannot interact online and can only learn a policy from existing historical data" is essentially an offline learning problem, and needs to consider distribution shift and conservatism**. This principle is universal, whether in robot control, recommender systems, or large language model alignment.
 
