@@ -389,7 +389,7 @@ In LLM alignment, a smaller $\varepsilon$ (around 0.1 or less) is commonly used,
 
 Several common strategies are used in practice:
 
-1. **Adaptive ε**: PPO-PPG (Phasic Policy Gradient) suggests using a larger ε early in training and gradually shrinking it later, like “take big steps to explore first, then take small steps to refine.”
+1. **Adaptive ε**: a common heuristic is to use a larger ε early in training and gradually shrink it later, like "take big steps to explore first, then take small steps to refine." (This is a generic tuning trick, not to be confused with PPG — Phasic Policy Gradient — which is a different idea about separating policy and value training into alternating phases.)
 2. **More update epochs per batch**: PPO commonly performs multiple epochs (often 10) over the same batch of data. If clipping makes each step small, increasing the number of epochs can accumulate a meaningful overall update.
 3. **Early stopping based on KL divergence**: monitor the KL divergence during optimization, and stop early if KL exceeds a threshold within an epoch. This effectively combines the TRPO idea (a KL constraint) with PPO’s clipping.
 

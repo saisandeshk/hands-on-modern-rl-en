@@ -255,6 +255,8 @@ The world model is frozen. Latent state sequences $z_1, z_2, \ldots, z_H$ are sa
 
 The learned policy is used directly in the real environment, new data is collected, and the process returns to Stage 1 for the next iteration.
 
+Concretely, the world model trained in Stage 1 has three learned parts:
+
 1. **Representation model**: encodes raw observations (such as images) into latent variables $z_t$
 2. **Transition model**: learns the dynamics in latent space, $p(z_{t+1}|z_t, a_t)$
 3. **Policy model**: learns the policy in latent space, $\pi(a|z_{1:t})$
@@ -267,7 +269,7 @@ The learned policy is used directly in the real environment, new data is collect
 
 In training, the world model is first learned from real data, and then the policy is trained **entirely in the model's "imagination"**, optimizing the policy parameters by backpropagating through time steps. Because no interaction with the environment is needed, the policy can "foresee" the distant future and decide accordingly.
 
-Dreamer-V3 (published in Nature in 2023) reached SOTA performance on more than 150 different benchmark tasks with **a single set of hyperparameters**, from continuous control to Atari games to diamond collection in Minecraft, which shows the strong generalization of model-based methods. Dreamer-V3 made several key improvements over its predecessors:
+Dreamer-V3 (published in Nature in 2025; preprint arXiv 2023) reached SOTA performance on more than 150 different benchmark tasks with **a single set of hyperparameters**, from continuous control to Atari games to diamond collection in Minecraft, which shows the strong generalization of model-based methods. Dreamer-V3 made several key improvements over its predecessors:
 
 - **symlog prediction**: a symmetric logarithmic transform handles values of different magnitudes (rewards, values, and so on), so the same network can fit targets in both the $[-1, 1]$ and the $[-1000, 1000]$ range
 - **No normalization needed**: earlier Dreamer versions had to normalize rewards and states, and Dreamer-V3 handles this automatically through dynamic loss scaling
@@ -435,7 +437,7 @@ The procedure is:
 4. Add the new data to the dataset and retrain the policy $\pi_2$.
 5. Repeat until convergence.
 
-The theoretical guarantee of DAgger is strong: under suitable conditions its cumulative regret decreases at a rate of $O(1/T)$, far better than the $O(T)$ of plain BC. Its practical bottleneck is the **need for online access to the expert**: every iteration requires a human (or an expensive expert system) to label actions for the new states. In some settings (such as robot teleoperation) the cost of obtaining expert labels is very high.
+The theoretical guarantee of DAgger is a no-regret reduction: with a no-regret online learner, the average regret vanishes as the number of iterations grows, so the error compounding drops from the quadratic-in-$T$ blowup of plain BC (one early mistake ruins the whole trajectory) to near-linear in $T$. Its practical bottleneck is the **need for online access to the expert**: every iteration requires a human (or an expensive expert system) to label actions for the new states. In some settings (such as robot teleoperation) the cost of obtaining expert labels is very high.
 
 ### Adversarial Imitation Learning and GAIL
 
@@ -450,7 +452,7 @@ $$\min_\theta \max_\phi \; \mathbb{E}_{\pi_\theta}[\log(1 - D_\phi(s, a))] + \ma
 
 After training, the discriminator is discarded and only the policy is kept. The elegance of GAIL is that it **does not need to define a reward function explicitly**. The discriminator output implicitly defines a reward, $r(s, a) = \log D(s, a)$: $(s, a)$ pairs the expert has produced score high, and those the policy produces itself score low.
 
-GAIL performs well on robot manipulation, autonomous driving, and similar tasks, but its training is unstable (a common ailment of GANs) and its computational cost is high. Later work such as DAC (Deep Adversarial Control) and AIRL (Adversarial Inverse Reinforcement Learning) improved the stability of GAIL.
+GAIL performs well on robot manipulation, autonomous driving, and similar tasks, but its training is unstable (a common ailment of GANs) and its computational cost is high. Later work such as DAC (Discriminator-Actor-Critic) and AIRL (Adversarial Inverse Reinforcement Learning) improved the stability of GAIL.
 
 ::: info The relationship between imitation learning and RL
 Imitation learning and reinforcement learning are not an either-or choice. In practice the most common pattern is to **initialize the policy with BC from expert data and then fine-tune with RL**. This combination was used in both AlphaStar (the StarCraft II AI) and OpenAI Five (the Dota 2 AI): BC provides a good starting point (avoiding the long exploration of RL from scratch), and RL optimizes further from there. We will see later that the "BC initialization + RL fine-tuning" pattern also appears in LLM alignment (RLHF), where SFT corresponds to BC and PPO/DPO correspond to RL fine-tuning.

@@ -216,6 +216,7 @@ for ep in range(50):
     returns.append(total_reward)
 
 print(f"Random policy mean return: {np.mean(returns):.1f}")
+print(f"Standard deviation: {np.std(returns):.1f}")
 print(f"Best episode: {np.max(returns):.1f}")
 print(f"Worst episode: {np.min(returns):.1f}")
 ```
@@ -300,6 +301,10 @@ The action is a 4-dimensional continuous vector, with every component in $[-1, 1
 PPO handles continuous actions differently from discrete ones. In a discrete action space, the policy network outputs the probability of each action and samples from it. In a continuous action space, the policy network outputs a Gaussian distribution, with mean $\mu(s)$ and standard deviation $\sigma(s)$, and the action is sampled from $\mathcal{N}(\mu, \sigma^2)$:
 
 $$a \sim \mathcal{N}(\mu_\theta(s), \sigma_\theta(s)^2)$$
+
+For comparison, in a discrete space the policy is a categorical distribution: the network outputs one logit per action and the sampled action needs no scale parameter at all. The Gaussian above is its continuous analogue, with $\sigma_\theta(s)$ playing the role of exploration noise. SB3 learns $\sigma$ as a separate parameter vector (one per action dimension, shared across states), so entropy falls exactly when these sigmas shrink, which is what the entropy curve in Section 8.1.2 tracks.
+
+One practical subtlety: torques must stay in $[-1, 1]$, but a Gaussian sample is unbounded. SB3 simply clips out-of-range actions to the bounds when stepping the environment. Some implementations instead squash the sample through $\tanh$ and correct the log-probability for the change of variables, $\log \pi(a \mid s) = \log \mathcal{N}(u \mid s) - \sum_i \log(1 - \tanh^2(u_i))$ with $a = \tanh(u)$, so the bounded action keeps an exact density for the ratio $r_t$. Either way, the stored `old_logprobs` must use the same convention as the recomputed `new_logprobs`, or the ratio silently measures the wrong change.
 
 This means PPO does not need to discretize continuous actions into a finite set of choices. For a quantity that needs fine control, such as a joint torque, discretization loses resolution: if only the three torque levels -1, 0, +1 were allowed, the robot would be very clumsy. A continuous policy can output fine values such as 0.37 or -0.82 directly, with far higher control precision than a discretized scheme.
 
