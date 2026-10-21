@@ -67,15 +67,16 @@ def compute_gae(rewards, values, dones, gamma=0.99, lam=0.95):
     """
     rewards: [B, T]
     values:  [B, T+1]
-    dones:   [B, T]
+    dones:   [B, T]  0/1 (or bool), 1 = episode ended at t
     """
     B, T = rewards.shape
     advantages = torch.zeros_like(rewards)
-    last_adv = torch.zeros(B)
+    last_adv = torch.zeros(B, device=rewards.device, dtype=rewards.dtype)
 
     for t in reversed(range(T)):
-        delta = rewards[:, t] + gamma * values[:, t + 1] * (1 - dones[:, t]) - values[:, t]
-        last_adv = delta + gamma * lam * (1 - dones[:, t]) * last_adv
+        not_done = 1.0 - dones[:, t].float()  # dones: 0/1 or bool, 1 = episode ended
+        delta = rewards[:, t] + gamma * values[:, t + 1] * not_done - values[:, t]
+        last_adv = delta + gamma * lam * not_done * last_adv
         advantages[:, t] = last_adv
 
     returns = advantages + values[:, :T]
@@ -176,6 +177,12 @@ loss  = 0.5 * max(loss1, loss2).mean()
 
 ```python
 def ppo_value_loss(values, old_values, returns, clip_eps=0.2):
+    """
+    values/old_values/returns: [B, T]. old_values must be detached
+    (computed under torch.no_grad() at sampling time).
+    """
+    import torch
+
     loss1 = (values - returns) ** 2
     values_clipped = old_values + torch.clamp(values - old_values, -clip_eps, clip_eps)
     loss2 = (values_clipped - returns) ** 2

@@ -4,7 +4,7 @@ title: B.5 DAPO
 
 # B.5 DAPO
 
-DAPO (Decoupled Clip and Dynamic sAmpling Policy Optimization), proposed by ByteDance in 2025, improves GRPO for long-chain reasoning RL with four orthogonal tricks: decoupled clipping, dynamic sampling, token-level loss, and soft overlong punishment. Frequently asked in interviews.
+DAPO (Decoupled Clip and Dynamic Sampling Policy Optimization), proposed by ByteDance in 2025, improves GRPO for long-chain reasoning RL with four orthogonal tricks: decoupled clipping, dynamic sampling, token-level loss, and soft overlong punishment. Frequently asked in interviews.
 
 ---
 
@@ -72,6 +72,8 @@ def dapo_policy_loss(new_logp, old_logp, advantages,
     old_logp:   [T]
     advantages: [T]
     Returns token-level loss (sum divided by token count).
+    Assumes no padding; for padded batches use the masked
+    token_level_loss() below instead.
     """
     ratio = np.exp(new_logp - old_logp)
     surr1 = ratio * advantages
@@ -91,6 +93,7 @@ def dapo_policy_loss(new_logps, old_logps, advantages,
     new_logps:  [B, seq_len]
     old_logps:  [B, seq_len]
     advantages: [B, seq_len]
+    Assumes no padding; for padded batches use token_level_loss() below.
     """
     ratio = torch.exp(new_logps - old_logps)
     surr1 = ratio * advantages
@@ -128,9 +131,10 @@ if std(rewards) == 0:
 def dynamic_sampling_filter(rewards):
     """
     rewards: [B, G]  B prompts, each with G completion rewards
-    Returns bool mask [B], True = keep.
+    Returns bool mask [B], True = keep. unbiased=False matches the
+    z-score normalizer (divide by G, not G-1); G must be > 1.
     """
-    return rewards.std(dim=1) > 1e-6
+    return rewards.std(dim=1, unbiased=False) > 1e-6
 ```
 
 ---
@@ -167,7 +171,7 @@ def token_level_loss(loss_mat, loss_mask):
     loss_mask: [B, T]  1 for valid token, 0 for padding
     Returns token-level aggregated loss.
     """
-    return (loss_mat * loss_mask).sum() / loss_mask.sum()
+    return (loss_mat * loss_mask).sum() / loss_mask.sum().clamp_min(1)
 ```
 
 ---
@@ -176,7 +180,7 @@ def token_level_loss(loss_mat, loss_mask):
 
 ### Core Problem
 
-GRPO zeroes the reward of any answer exceeding the max length, leaving no gradient at the boundary — the policy only knows "I was penalized", not "shorter would be better". DAPO introduces a buffer: lengths inside `[max_len - buffer_len, max_len]` are not penalized, beyond `max_len - buffer_len` a linear deduction kicks in, capped at `-penalty_factor`, giving the policy a smooth, differentiable directional signal.
+GRPO zeroes the reward of any answer exceeding the max length, leaving no gradient at the boundary — the policy only knows "I was penalized", not "shorter would be better". DAPO introduces a buffer: lengths up to `max_len - buffer_len` are not penalized; inside the buffer zone the deduction ramps linearly from 0 at `max_len - buffer_len` to `-penalty_factor` at `max_len`, and stays at `-penalty_factor` beyond that, giving the policy a smooth, differentiable directional signal.
 
 ### One-Line Memory
 
@@ -213,25 +217,27 @@ def soft_overlong_penalty(response_length, max_len,
 ## DAPO Total Loss (Sketch)
 
 ```
-# 1. within-group z-score normalization (same as GRPO)
-advantages = (rewards - rewards.mean(dim=G)) / (rewards.std(dim=G) + eps)
+# 1. within-group z-score normalization (same as GRPO); rewards [B, G] -> advantages [B, G], one scalar per completion
+advantages = (rewards - rewards.mean(dim=1, keepdim=True)) / (rewards.std(dim=1, keepdim=True, unbiased=False) + eps)
 
 # 2. dynamic sampling filter
-valid = dynamic_sampling_filter(rewards)        # drop all-correct / all-wrong prompts
+valid = dynamic_sampling_filter(rewards)        # drop all-correct / all-wrong prompts ([B] mask; [§15.2](/chapter15_grpo/deepseek-dapo) illustrates the same idea with an accuracy-threshold sketch)
 
 # 3. decoupled clipping + token-level loss
-ratio = exp(new_logp - old_logp)
-surr1 = ratio * advantages
-surr2 = clip(ratio, 1 - eps_low, 1 + eps_high) * advantages
-loss_mat = -minimum(surr1, surr2)               # per-token
+# new_logp/old_logp: [B, G, T] (one sequence per completion); advantages expanded to [B, G, 1] so each completion's advantage is constant over its tokens
+ratio = exp(new_logp - old_logp)                # [B, G, T]
+surr1 = ratio * advantages.unsqueeze(-1)        # [B, G, 1] broadcasts over T
+surr2 = clip(ratio, 1 - eps_low, 1 + eps_high) * advantages.unsqueeze(-1)
+loss_mat = -minimum(surr1, surr2)               # per-token [B, G, T]
 
 # 4. token-level aggregation (key change: long answers not under-weighted)
-policy_loss = (loss_mat * mask)[valid].sum() / mask[valid].sum()
+# mask: [B, G, T], 1 for valid token, 0 for padding
+policy_loss = (loss_mat * mask)[valid].sum() / mask[valid].sum().clamp_min(1)
 
-# 5. KL penalty (same as GRPO)
+# 5. KL penalty (dropped in DAPO; shown here only for comparison with GRPO)
 kl = ((exp(ref_logp - new_logp) - 1) - (ref_logp - new_logp)).mean()
 
-loss = policy_loss + kl_coeff * kl
+loss = policy_loss  # DAPO objective; add + kl_coeff * kl only to recover the GRPO comparison
 ```
 
 ---

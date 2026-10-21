@@ -91,9 +91,10 @@ def grpo_loss(log_probs, old_log_probs, ref_log_probs,
     rewards:       [B, G]  group rewards
     B = num_prompts, G = group_size
     """
-    # 1. Within-group normalization (grouped by prompt)
+    # 1. Within-group normalization (grouped by prompt).
+    # unbiased=False matches the NumPy version (divide by G, not G-1).
     advantages = (rewards - rewards.mean(dim=1, keepdim=True)) \
-                 / (rewards.std(dim=1, keepdim=True) + 1e-8)   # [B, G]
+                 / (rewards.std(dim=1, keepdim=True, unbiased=False) + 1e-8)   # [B, G]
 
     # 2. Clipped policy loss (identical to PPO)
     ratio = torch.exp(log_probs - old_log_probs)
@@ -171,18 +172,18 @@ def reward_model_loss(r_chosen, r_rejected):
 | Reward source    | trained RM   | RM or verifier             | rule verifier (math/code)  |
 | Online sampling  | required     | required (G per prompt)    | required (G per prompt)    |
 
-RLVR is a special case of GRPO: rewards do not come from a learned RM but from rule-based verification of the answer (math answer equality, code test pass), so there is no reward hacking risk.
+RLVR is a special case of GRPO: rewards do not come from a learned RM but from rule-based verification of the answer (math answer equality, code test pass), which greatly reduces reward hacking from a learned proxy — though gaming the verifier (spurious solutions that pass the checks) is still possible.
 
 ---
 
 ## Common Pitfalls
 
-| Pitfall                                 | Explanation                                                                                                   |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| GRPO advantage is within-group          | Not global normalization; only compare the $G$ completions of the **same prompt**                             |
-| GRPO has no value loss                  | No critic means no value loss — the core difference from PPO                                                  |
-| Two normalizer variants exist           | Most implementations use std (z-score); some use only `rewards - mean` (no std). Note the difference          |
-| RM must be frozen during policy updates | When training the RM, rewards are differentiable; when training the policy, the RM is usually detached/frozen |
-| KL is sequence-level                    | Typically sum token log-probs per completion first, then compute KL — not per token                           |
-| Direction of the k3 KL estimator        | `log_ratio = log(π_ref/π_θ)`, samples drawn from the current policy $\pi_\theta$                              |
-| RLVR case                               | Rewards come from a rule verifier (code execution, math answer check), not from RM                            |
+| Pitfall                                 | Explanation                                                                                                                                                                                                                                                                   |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GRPO advantage is within-group          | Not global normalization; only compare the $G$ completions of the **same prompt**                                                                                                                                                                                             |
+| GRPO has no value loss                  | No critic means no value loss — the core difference from PPO                                                                                                                                                                                                                  |
+| Two normalizer variants exist           | Most implementations use std (z-score); some use only `rewards - mean` (no std). Note the difference. Population std (divide by $G$) matches NumPy; some production recipes use the Bessel-corrected default (divide by $G-1$), which rescales advantages by $\sqrt{G/(G-1)}$ |
+| RM must be frozen during policy updates | When training the RM, rewards are differentiable; when training the policy, the RM is usually detached/frozen                                                                                                                                                                 |
+| KL is sequence-level                    | Typically sum token log-probs per completion first, then compute KL — not per token                                                                                                                                                                                           |
+| Direction of the k3 KL estimator        | `log_ratio = log(π_ref/π_θ)`, samples drawn from the current policy $\pi_\theta$                                                                                                                                                                                              |
+| RLVR case                               | Rewards come from a rule verifier (code execution, math answer check), not from RM                                                                                                                                                                                            |

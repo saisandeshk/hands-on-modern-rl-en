@@ -160,8 +160,10 @@ def manual_cross_entropy(logits, targets, ignore_index=-100):
     targets: [B]
     """
     log_probs = F.log_softmax(logits, dim=-1)
-    # gather selects log-prob at target index
-    target_log_probs = log_probs.gather(1, targets.unsqueeze(1)).squeeze(1)
+    # gather selects log-prob at target index; clamp first because
+    # ignore_index (-100) is not a valid class id (negative ids wrap or error)
+    safe_targets = targets.clamp_min(0)
+    target_log_probs = log_probs.gather(1, safe_targets.unsqueeze(1)).squeeze(1)
     # mask out ignore_index
     mask = targets != ignore_index
     return -target_log_probs[mask].mean()

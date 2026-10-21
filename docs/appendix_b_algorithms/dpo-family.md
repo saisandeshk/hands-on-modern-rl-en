@@ -1,5 +1,5 @@
 ---
-title: B.3 DPO Family
+title: B.3 DPO Methods
 ---
 
 # B.3 DPO Methods
@@ -16,7 +16,7 @@ DPO loss is the single most frequently requested "handwritten code" question in 
 
 - `pi_chosen` / `pi_rejected`: log-probabilities of the chosen/rejected response under the current policy $\pi_\theta$
 - `ref_chosen` / `ref_rejected`: log-probabilities under the reference policy $\pi_{ref}$ (must `detach`)
-- `log_ratio_w` / `log_ratio_l`: $\log\frac{\pi_\theta}{\pi_{ref}}$, the implicit reward per response (divided by $\beta$)
+- `log_ratio_w` / `log_ratio_l`: $\log\frac{\pi_\theta}{\pi_{ref}}$, the implicit reward per response divided by $\beta$ (multiply by $\beta$ to get the implicit reward)
 - `beta` ($\beta$): temperature controlling how strongly the policy can drift from the reference; larger = more sensitive, typical 0.1–0.5
 
 ### One-Line Memory
@@ -28,8 +28,8 @@ $$\mathcal{L}_{DPO} = -\mathbb{E}\Big[\log\sigma\Big(\beta\Big(\log\frac{\pi_\th
 ### Pseudocode
 
 ```
-log_ratio_w = log_pi_theta(y_w|x) - log_pi_ref(y_w|x)   # implicit reward, chosen
-log_ratio_l = log_pi_theta(y_l|x) - log_pi_ref(y_l|x)   # implicit reward, rejected
+log_ratio_w = log_pi_theta(y_w|x) - log_pi_ref(y_w|x)   # log-ratio, chosen (x beta = implicit reward)
+log_ratio_l = log_pi_theta(y_l|x) - log_pi_ref(y_l|x)   # log-ratio, rejected (x beta = implicit reward)
 logits      = beta * (log_ratio_w - log_ratio_l)        # advantage × temperature
 loss        = -log_sigmoid(logits)                       # max advantage ↔ BT likelihood
 ```
@@ -63,7 +63,7 @@ import torch.nn.functional as F
 def dpo_loss(policy_chosen_logps, policy_rejected_logps,
              ref_chosen_logps, ref_rejected_logps,
              beta=0.1):
-    """All inputs: [B]"""
+    """All inputs: [B]. ref_* must be detached (compute under torch.no_grad())."""
     log_ratio_w = policy_chosen_logps - ref_chosen_logps
     log_ratio_l = policy_rejected_logps - ref_rejected_logps
     logits = beta * (log_ratio_w - log_ratio_l)
@@ -106,12 +106,12 @@ def ipo_loss(log_ratio_w, log_ratio_l, beta=0.1):
 
 ## KTO
 
-**Core problem**: DPO/IPO require chosen-rejected pairs, but real-world feedback is often single-sample binary ("user thumbs-up / thumbs-down"). KTO borrows from prospect theory to reformulate the alignment loss as a single-sample objective — no pairing required — and up-weights undesirable examples (loss aversion).
+**Core problem**: DPO/IPO require chosen-rejected pairs, but real-world feedback is often single-sample binary ("user thumbs-up / thumbs-down"). KTO borrows from prospect theory to reformulate the alignment loss as a single-sample objective — no pairing required — and up-weights undesirable examples (loss aversion). The form below is a logistic-style implementation (`-log_sigmoid`); unlike the original paper's $\lambda - \sigma(\cdot)$ value form, which saturates at $\lambda_U$ once an undesirable sample is far below the baseline, this logistic version keeps a logarithmic penalty on hopeless samples. Only the push direction is shared.
 
 **Core variables**:
 
 - `log_ratio`: $\log\frac{\pi_\theta(y|x)}{\pi_{ref}(y|x)}$ for a single sample
-- `z_ref`: baseline = EMA of the desirable logits, i.e. $z_{ref} \approx \beta \mathbb{E}[\log\frac{\pi_\theta}{\pi_{ref}}]$; must `detach`
+- `z_ref`: baseline = EMA of the desirable logits, i.e. $z_{ref} \approx \beta \mathbb{E}[\log\frac{\pi_\theta}{\pi_{ref}}]$ over desirable samples; a detached scalar, not per-sample
 - `lambda_D` / `lambda_U`: weights on desirable / undesirable samples; typically $\lambda_U > \lambda_D$ (loss aversion)
 
 ### One-Line Memory
@@ -161,7 +161,7 @@ def kto_loss(log_ratio, is_desirable, z_ref=0.0,
 - `chosen_logps` / `rejected_logps`: log-probabilities of the chosen/rejected response under the current policy (sequence-summed)
 - `chosen_lengths` / `rejected_lengths`: token counts of the two responses
 - `beta` ($\beta$): preference-gap amplifier (SimPO typical 2.0, larger than DPO)
-- `gamma` ($\gamma$): target margin, a learnable-style threshold for "how much higher the good response must beat the bad"
+- `gamma` ($\gamma$): target margin, a fixed hyperparameter (not trained) for "how much higher the good response must beat the bad"
 
 ### One-Line Memory
 
@@ -184,6 +184,7 @@ import torch.nn.functional as F
 def simpo_loss(chosen_logps, rejected_logps,
                chosen_lengths, rejected_lengths,
                beta=2.0, gamma=0.5):
+    # chosen/rejected_logps: summed log-probs [B]; lengths: token counts [B] (each >= 1)
     logp_w = chosen_logps / chosen_lengths
     logp_l = rejected_logps / rejected_lengths
     logits = beta * (logp_w - logp_l) - gamma
