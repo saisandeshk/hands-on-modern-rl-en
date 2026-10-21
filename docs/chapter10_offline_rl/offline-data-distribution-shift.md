@@ -293,7 +293,7 @@ Let's compare these three BC-regularization-based algorithms once more:
 
 | Method | Form of policy loss                     | Needs $V$ | Friendly to online fine-tuning |
 | ------ | --------------------------------------- | --------- | ------------------------------ |
-| TD3+BC | $-\lambda Q + \|\mu - a\|^2$           | No        | Medium                         |
+| TD3+BC | $-\lambda Q + \|\mu - a\|^2$            | No        | Medium                         |
 | AWAC   | $-\!w(A) \log \pi$, $w = \exp(A/\beta)$ | Yes       | Strong                         |
 | IQL    | $-\!\exp(\beta A) \log \pi$ (AWR)       | Yes       | Medium                         |
 

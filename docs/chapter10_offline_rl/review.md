@@ -35,7 +35,7 @@ After working through Sections 10.1–10.3, you should be able to:
 
 1. **Maximizing over OOD actions in an offline target.** Copying a DQN/TD3 target loop verbatim and taking $\max_{a'} Q(s', a')$ (or an unconstrained actor step toward it) replays the exact failure of Section 10.1. Every offline target must constrain, penalize, or avoid the max.
 2. **Prompting Decision Transformer with an impossible return.** A target RTG above the best returns in the dataset conditions the model on an event it never saw; outputs turn incoherent. Always pick the target from inside the dataset's return range.
-3. **Getting the DPO temperature backwards.** Larger $\beta$ means a *stronger* KL anchor to the reference model (too conservative, preferences unseparated); smaller $\beta$ means *weaker* regularization (larger drift, OOD gibberish). Tune $\beta$ while watching KL and held-out quality, not training preference accuracy alone.
+3. **Getting the DPO temperature backwards.** Larger $\beta$ means a _stronger_ KL anchor to the reference model (too conservative, preferences unseparated); smaller $\beta$ means _weaker_ regularization (larger drift, OOD gibberish). Tune $\beta$ while watching KL and held-out quality, not training preference accuracy alone.
 4. **Trusting an importance-sampling estimate with a tiny ESS.** Two candidates ranked by IS on an ESS of 2–3 are ranked by noise. Clip, self-normalize, require a healthy ESS, and demand agreement between two estimators that fail differently (e.g. WIS and FQE) before shipping.
 5. **Normalizing with the wrong statistics.** Compute state/reward normalization on the training dataset once and freeze it; recomputing statistics on deployment inputs silently shifts every Q-value and breaks the conservatism guarantees you trained for.
 
@@ -102,6 +102,7 @@ Scaling rewards by $c$ scales all Q-values by $c$: $Q \to cQ$. The weight become
 Implement the expectile loss $L_2^\tau$ in about five lines (NumPy or PyTorch). Generate 200 samples $Q \sim \mathcal{N}(0, 1)$, fit a scalar $V$ by gradient descent for $\tau \in \{0.5, 0.7, 0.9\}$, and check that (a) $\tau = 0.5$ recovers the sample mean, and (b) the fitted $V$ increases with $\tau$.
 
 ::: details Solution
+
 ```python
 import numpy as np
 
@@ -129,6 +130,7 @@ Expected behavior: at $\tau = 0.5$ the loop minimizes half-MSE, so $V$ lands on 
 Simulate a 2-armed bandit (horizon 1, so trajectory IS is exact): arm returns $r \sim \mathcal{N}(1, 1)$ and $r \sim \mathcal{N}(0, 1)$. Log $N = 50$ pulls from a uniform logger, then evaluate the deterministic candidate "always pull arm 1" with plain IS, WIS, and ESS. Repeat for 200 seeds and compare the estimators' variance; then shrink the logger to pull arm 1 only 5% of the time and explain what happens to the ESS.
 
 ::: details Solution
+
 ```python
 import numpy as np
 

@@ -171,7 +171,7 @@ Reweighting alone ignores everything we know about the environment's structure. 
 
 $$\hat{J}_{\text{DR}} = \frac{1}{N}\sum_i\left[\hat{V}(s_1) + \sum_t \gamma^t \rho_{1:t}\left(r_t + \gamma\hat{V}(s_{t+1}) - \hat{Q}(s_t, a_t)\right)\right]$$
 
-Read it inside out: start from the model's guess $\hat{V}(s_1)$, then add each step's surprise (actual reward plus next-state value minus what the model predicted), reweighted onto $\pi$'s distribution. It is unbiased if *either* the model *or* the ratios are correct — hence "doubly" robust — and its variance collapses when the model is good.
+Read it inside out: start from the model's guess $\hat{V}(s_1)$, then add each step's surprise (actual reward plus next-state value minus what the model predicted), reweighted onto $\pi$'s distribution. It is unbiased if _either_ the model _or_ the ratios are correct — hence "doubly" robust — and its variance collapses when the model is good.
 
 **Fitted Q Evaluation (FQE)** takes the regression route: fit $Q^\pi$ by iterating $Q_{k+1} = \arg\min_Q\, \mathbb{E}_{\mathcal{D}}[(Q(s,a) - (r + \gamma\,\mathbb{E}_{a' \sim \pi}[Q_k(s',a')]))^2]$ on the fixed data, then average $Q(s_0, \pi(s_0))$ over logged start states. Notice there is no $\max$ over actions anywhere — FQE evaluates the candidate's own actions, so it never queries maximizing OOD actions the way offline Q-learning does. That makes it calmer than training a full offline agent, though a candidate that strays far from the logs still forces the regressor to extrapolate.
 
