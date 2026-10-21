@@ -66,4 +66,30 @@ Read all three Chapter 12 pages fully and made targeted correctness fixes plus t
 ## Open issues
 
 - Existing ch12 pages lack the `--- title: ---` front-matter block used elsewhere; I added it only to the new `review.md` per instructions and left existing pages untouched to keep the diff scoped.
-- `marl.md` MADDPG sketch ends with a `...` stub and `value normalization: as in R2D2` assumes R2D2 context from §12.1; acceptable as sketches but a future pass could complete the optimizer lines.
+- `marl.md` MADDPG sketch ends with a `...` stub and `value normalization: as in R2D2` assumes RND/R2D2 context from §12.1; acceptable as sketches but a future pass could complete the optimizer lines.
+
+## Review response
+
+Reviewer report: `planning/reviews/ch12-text.md` (6 Errors, 10 Doubts). I re-checked each claim against the files and recomputed every number with `.venv/bin/python`. All findings below refer to edits in this worktree (uncommitted).
+
+**Errors:**
+
+1. Atoms-per-attempt off by 10¹⁴ — **accepted**. Recomputed: 10⁸⁰/10³⁹ = 10⁴¹ atoms per attempt, not 10²⁷ ("billion-billion-billion"). Fixed `intrinsic-motivation-exploration.md` to "roughly one attempt per $10^{41}$ atoms".
+2. Exercise 2(b) discount timing ($5.26$ vs $4.74$) — **accepted**. Recomputed: first bonus lands at $t=1$, so the sum is $\gamma/(1-\gamma^2) = 0.9/0.19 \approx 4.74$. Fixed `review.md` solution.
+3. $\beta$ double-counted in count bonus — **accepted**. Redefined $r^{\text{int}}_t = 1/\sqrt{N(s_t)}$ (and $1/\sqrt{\hat{N}}$ for pseudo-counts) with $\beta$ living only in $r^{\text{total}}_t$; updated the "Key Equations" entry and Exercise 2(a) stem in `review.md` (numbers unchanged: training bonus is still $2/\sqrt{N}$).
+4. Missing `super().__init__()` in ICM/RND sketches — **accepted**. Added as the first line of both `__init__` methods (consistent with the 23 other `nn.Module` sketches in the book).
+5. New `review.md` not in `config.mjs` sidebar — **accepted as valid, but out of scope**: I may not edit `docs/.vitepress/config.mjs`. Left for the coordinator (my "Sidebar additions" entry already lists `12.4 Summary and Exercises → /chapter12_exploration_marl_hierarchical/review`; the draft `12.R` label was per the task spec, which told me to use it and let the coordinator renumber).
+6. `planning/content-review-notes.md` lines 26/27/47 not marked `[x]` — **accepted as valid, but out of scope**: the file is outside my task scope and I was told to leave all other files untouched. Coordinator/notes-owner should mark them; my report's Technical-fixes section already records each fix one line per item.
+
+**Doubts:**
+
+1. "at most" bound direction — **accepted**. Rewrote as conditional on all 50 steps coming from the random branch (the per-step $1/60$ and $(1/60)^{50} \approx 10^{-89}$ numbers are unchanged and still correct under that reading).
+2. Bonus coverage guarantee / MBIE / $N(s)$ vs $N(s,a)$ — **accepted**. Softened to "acting greedily w.r.t. optimistic value estimates", expanded MBIE as Model-Based Interval Estimation, noted the state–action variant.
+3. "states the current policy would never choose" — **accepted**. Changed to "states the greedy policy would never reach".
+4. Agent57 "success coverage" — **accepted**. Changed to per-game human-normalized scores summarized by the median.
+5. §4.3 "global state and every agent's action" — **accepted**. Qualified: joint actions are MADDPG's Critic; MAPPO's centralized Critic takes only $s$.
+6. Exercise 6(b) "stationary regression target" — **accepted**. Solution now says the transition model is stationary given the joint action while the target value still drifts; also softened the question stem ("does (and does not) stabilize").
+7. HIRO candidate set + missing $\phi'$ prime — **accepted**. Formula now carries $\pi^{\text{low}}_{\phi'}$ with $\phi'$ defined; prose hedged to "sampled around the achieved displacement (typically including the originally commanded goal)".
+8. §2 intro order (building block "before" Options/FeUdal) — **accepted**. Intro rewritten to match the actual order (§§2.1–2.2, then §2.3 vocabulary, then §2.4 HIRO).
+9. "Genie went a step further" self-following — **accepted**. Reworded to credit latent-action learning to Genie (2024) itself; added no new Genie 3 claims (could not verify from solid knowledge, so per the no-fabrication rule Genie 3 stays unmentioned).
+10. Eligibility traces as uncovered term — **accepted**. Dropped the term; GAE now links to `[Chapter 8](../chapter08_ppo/gae-reward-model.md)`.

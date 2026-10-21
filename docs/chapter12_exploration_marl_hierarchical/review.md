@@ -19,7 +19,7 @@ title: 12.R Summary and Exercises
 
 - UCB action selection: $U_t(a) = \hat{\mu}_t(a) + c\sqrt{\ln t / N_t(a)}$ — act as if each arm were as good as its uncertainty allows.
 - Total training reward: $r^{\text{total}}_t = r^{\text{ext}}_t + \beta \cdot r^{\text{int}}_t$ — extrinsic score plus weighted curiosity.
-- Count-based bonus: $r^{\text{int}}_t = \beta / \sqrt{N(s_t)}$ — novelty that is used up by revisits.
+- Count-based bonus: $r^{\text{int}}_t = 1 / \sqrt{N(s_t)}$, scaled by $\beta$ in the total reward above — novelty that is used up by revisits.
 - Potential-based shaping: $F(s, s') = \gamma\Phi(s') - \Phi(s)$ — the only additive shaping that provably preserves the optimal policy.
 - ICM intrinsic reward: $r^{\text{int}}_t = \frac{1}{2}\|\Phi(s_{t+1}) - \hat{\Phi}(s_{t+1})\|^2$ with $\hat{\Phi}(s_{t+1}) = f_\psi(\Phi(s_t), a_t)$ — reward for what the forward model cannot yet predict, in action-relevant features.
 - RND intrinsic reward: $r^{\text{int}}(s) = \|f_\psi(s) - \hat{f}(s)\|^2$ — reward for what the predictor has not yet memorized about a fixed random target.
@@ -30,7 +30,7 @@ title: 12.R Summary and Exercises
 - Option SMDP value: $Q^\mu(s, \omega) = \mathbb{E}[\sum_{t=0}^{T-1}\gamma^t r_t + \gamma^T \max_{\omega'} Q^\mu(s_T, \omega')]$ — one "step" lasts $T$ primitive steps.
 - FeUdal manager loss: $\mathcal{L}_M = -\langle g_t, \hat{z}_{t+c} - \hat{z}_t\rangle$ — reward latent directions the worker actually follows.
 - HIRO low-level reward: $r^l_t = -\|s_{t+1} - (s_t + g_t)\|$ — get closer to the commanded displacement.
-- HIRO goal transition: $g' \approx \arg\max_{g \in \text{candidates}} \sum_{k=0}^{c-1} \log \pi^{\text{low}}(a_{t+k} \mid s_{t+k}, g)$ — relabel old goals to ones the current low level would obey.
+- HIRO goal transition: $g' \approx \arg\max_{g \in \text{candidates}} \sum_{k=0}^{c-1} \log \pi^{\text{low}}_{\phi'}(a_{t+k} \mid s_{t+k}, g)$ — relabel old goals to ones the current low level ($\phi'$) would obey.
 - Goal-conditioned binary reward: $r_g(s) = 0$ if $g$ achieved, $-1$ otherwise — honest but brutal, which is why HER relabels failures in hindsight.
 
 ## Common Pitfalls
@@ -58,13 +58,13 @@ Montezuma's Revenge needs at least 50 consecutive correct actions from 6 options
 
 ### Exercise 2 — Use up a count bonus; farm a bad bonus (numeric + conceptual)
 
-(a) With $r^{\text{int}} = \beta/\sqrt{N(s)}$ and $\beta = 2$, compute the bonus on the 1st, 4th, and 100th visit to the same state.
+(a) With $r^{\text{int}} = 1/\sqrt{N(s)}$ and $\beta = 2$ (so the training bonus is $\beta \cdot r^{\text{int}}$), compute the bonus on the 1st, 4th, and 100th visit to the same state.
 (b) An engineer adds $+1$ every time the agent _enters_ a particular "interesting" state $s^\star$, forever. With $\gamma = 0.9$, what extra return can the agent collect by cycling $s_0 \to s^\star \to s_0 \to \cdots$ forever instead of staying put? Explain why this differs from potential-based shaping.
 
 ::: details Solution
 (a) $2/\sqrt{1} = 2$; $2/\sqrt{4} = 1$; $2/\sqrt{100} = 0.2$. Novelty decays exactly as required by exhaustibility.
 
-(b) Each two-step cycle pays $+1$ (on entering $s^\star$), discounted by $\gamma^2 = 0.81$ per cycle: $1 + 0.81 + 0.81^2 + \cdots = 1/(1 - 0.81) \approx 5.26$ extra return — a perpetual-motion machine the optimal policy will exploit, possibly instead of the real task. Potential-based shaping $F = \gamma\Phi(s') - \Phi(s)$ telescopes over any trajectory (Exercise 4), so cycles sum to zero and cannot be farmed. That is the difference between a bonus (changes the objective) and shaping (preserves it).
+(b) Each two-step cycle pays $+1$ on entering $s^\star$ — at $t = 1, 3, 5, \dots$, since the agent starts in $s_0$ and the first bonus is discounted once: $\gamma + \gamma^3 + \gamma^5 + \cdots = \gamma/(1-\gamma^2) = 0.9/0.19 \approx 4.74$ extra return — a perpetual-motion machine the optimal policy will exploit, possibly instead of the real task. Potential-based shaping $F = \gamma\Phi(s') - \Phi(s)$ telescopes over any trajectory (Exercise 4), so cycles sum to zero and cannot be farmed. That is the difference between a bonus (changes the objective) and shaping (preserves it).
 :::
 
 ### Exercise 3 — NGU episodic novelty by hand (numeric)
@@ -95,12 +95,12 @@ With $\epsilon = 0.2$: (a) ratio $r = 1.5$, advantage $A = +2$; (b) ratio $r = 1
 ### Exercise 6 — Why CTDE, and why not one super-agent? (conceptual)
 
 (a) With 6 actions per agent and 10 agents, how many joint actions does a centralized "super-agent" face?
-(b) A skeptic says independent Q-learning is enough because "the environment transition given my action is fixed". Explain the flaw using $P(s' \mid s, a_i)$ vs. $P(s' \mid s, a_i, a_{-i})$, and why MADDPG's centralized Critic fixes the _learning target_ while keeping execution decentralized.
+(b) A skeptic says independent Q-learning is enough because "the environment transition given my action is fixed". Explain the flaw using $P(s' \mid s, a_i)$ vs. $P(s' \mid s, a_i, a_{-i})$, and what MADDPG's centralized Critic does (and does not) stabilize about the learning target while keeping execution decentralized.
 
 ::: details Solution
 (a) $6^{10} = 60{,}466{,}176 \approx 60$ million joint actions — infeasible to enumerate, let alone learn, and it must be relearned if one agent is added.
 
-(b) The environment's physics is fixed given the _joint_ action, $P(s' \mid s, a_i, a_{-i})$, but agent $i$'s marginal transition $P(s' \mid s, a_i) = \sum_{a_{-i}} P(s'\mid s,a_i,a_{-i})\,\pi_{-i}(a_{-i}\mid\cdot)$ shifts as teammates' policies $\pi_{-i}$ change — the same $(s, a_i)$ yields different outcomes in episode 1 vs. 100, so independent targets chase a moving goal. MADDPG's Critic $Q_i(o_1, a_1, \ldots, o_n, a_n)$ conditions on the joint action, restoring a stationary regression target (the remaining drift is only in the _data distribution_ over others' actions, handled by replay of recent joint behavior). Execution stays decentralized because each Actor $\mu_{\theta_i}(o_i)$ sees only its own observation.
+(b) The environment's physics is fixed given the _joint_ action, $P(s' \mid s, a_i, a_{-i})$, but agent $i$'s marginal transition $P(s' \mid s, a_i) = \sum_{a_{-i}} P(s'\mid s,a_i,a_{-i})\,\pi_{-i}(a_{-i}\mid\cdot)$ shifts as teammates' policies $\pi_{-i}$ change — the same $(s, a_i)$ yields different outcomes in episode 1 vs. 100, so independent targets chase a moving goal. MADDPG's Critic $Q_i(o_1, a_1, \ldots, o_n, a_n)$ conditions on the joint action, which makes the transition model stationary given the joint action; the target value still drifts as the other agents' policies change, which is why MARL uses replay of recent joint behavior and off-policy critics to stay stable. Execution stays decentralized because each Actor $\mu_{\theta_i}(o_i)$ sees only its own observation.
 :::
 
 ### Exercise 7 — Coding: add a count bonus to the chapter's MARL gridworld

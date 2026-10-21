@@ -33,7 +33,7 @@ It is like writing code. You do not write assembly instructions directly. You fi
 
 ## 2. Comparing Three Hierarchical Reinforcement Learning Methods
 
-The idea of hierarchy is intuitive, but how is it implemented? Before the three classic methods, we need one shared building block — goal-conditioned policies and hindsight relabeling — and then we look at three classic works: from the earliest formal framework, Options, to the end-to-end learnable FeUdal Networks, and then to the modern off-policy method HIRO.
+The idea of hierarchy is intuitive, but how is it implemented? We look at three classic works: from the earliest formal framework, Options, to the end-to-end learnable FeUdal Networks, and then to the modern off-policy method HIRO. Along the way we fix one shared piece of vocabulary — goal-conditioned policies and hindsight relabeling — right before HIRO, which is the method that needs it.
 
 ### 2.1 Options: Encapsulating a Policy Segment as a Temporally Extended Action
 
@@ -151,9 +151,11 @@ Wait, you may have noticed a problem. The high level is trained off-policy and d
 HIRO's most important technical innovation is **goal transition**, which solves this problem. When we take an old transition $(s_t, g_t, \sum r, s_{t+c})$ from the replay buffer, we do not use the old $g_t$ directly. We remap it to a "new subgoal $g'_t$" with the following property: if the **current low-level policy** starts from $s_t$ with goal $g'_t$, the endpoint it reaches is still roughly $s_{t+c}$.
 
 ::: details Bonus: How Goal Transition Works
-The concrete procedure of goal transition is as follows. For a stored high-level transition, HIRO does not blindly reuse the old goal. Instead it samples a small set of **candidate goals** — the originally commanded goal $g_t$ plus several goals centered on the actually achieved displacement $s_{t+c} - s_t$ — and selects the candidate $g'$ that maximizes the log-probability the **current** low-level policy assigns to the action sequence actually executed in the buffer:
+The concrete procedure of goal transition is as follows. For a stored high-level transition, HIRO does not blindly reuse the old goal. Instead it samples a small set of **candidate goals** around the actually achieved displacement $s_{t+c} - s_t$ (typically including the originally commanded goal $g_t$) and selects the candidate $g'$ that maximizes the log-probability the **current** low-level policy assigns to the action sequence actually executed in the buffer:
 
-$$g' \approx \arg\max_{g \in \text{candidates}} \sum_{k=0}^{c-1} \log \pi^{\text{low}}(a_{t+k} \mid s_{t+k}, g).$$
+$$g' \approx \arg\max_{g \in \text{candidates}} \sum_{k=0}^{c-1} \log \pi^{\text{low}}_{\phi'}(a_{t+k} \mid s_{t+k}, g),$$
+
+where $\phi'$ denotes the current low-level parameters.
 
 In practice the achieved displacement $s_{t+c} - s_t$ is one of the candidates and often wins the maximization, which is why summaries sometimes shorten the rule to "$g' = s_{t+c} - s_t$". But the maximizing selection is the load-bearing part: it is what guarantees the relabeled transition looks like something the current low-level policy would actually do, so old data stays compatible with the updated low level instead of going stale.
 :::
@@ -202,7 +204,7 @@ Several revolutionary changes follow:
 2. **One model can generate many environments**, generalizing across tasks. You no longer need to train a separate model for every game.
 3. **RL training can take place entirely in generated environments**, with no real physics engine. Imagine training an agent in a model-generated Super Mario and then putting it into the real game and having it work.
 
-Genie went a step further and introduced **latent action** learning: without any human-labeled action data, the model automatically discovers from video the "latent control variables that cause the next frame to change". Formally:
+Genie (Bruce et al. 2024) already introduced **latent action** learning as part of this package: without any human-labeled action data, the model automatically discovers from video the "latent control variables that cause the next frame to change". Formally:
 
 $$z_t = \text{LatentAction}(x_t, x_{t+1}),\quad x_{t+1} = \text{Decoder}(x_t, z_t)$$
 

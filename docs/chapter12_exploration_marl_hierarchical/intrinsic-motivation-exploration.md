@@ -44,13 +44,13 @@ What is the probability that it stumbles on the first reward by wandering blindl
 
 $$(1/6)^{50} \approx 1.2 \times 10^{-39}.$$
 
-That is, roughly one success in $10^{39}$ blind attempts. If the agent instead uses $\epsilon$-greedy with $\epsilon = 0.1$, the situation is even worse: the greedy branch just repeats what (little) it already knows, so only the random branch, taken with probability $0.1$, can discover an unknown sequence. The per-step success probability is then at most $0.1 \times (1/6) = 1/60$, and the 50-step success probability falls to $(1/60)^{50} \approx 10^{-89}$.
+That is, roughly one success in $10^{39}$ blind attempts. If the agent instead uses $\epsilon$-greedy with $\epsilon = 0.1$, the situation is even worse: the greedy branch just repeats what (little) it already knows, so an unknown sequence can only be discovered on steps where the random branch fires. If every one of the 50 steps has to come from the random branch, the per-step success probability on such a step is $0.1 \times (1/6) = 1/60$, and the 50-step success probability for pure random-branch discovery falls to $(1/60)^{50} \approx 10^{-89}$.
 
 How small is $10^{-39}$? Let's make it concrete:
 
 - The age of the universe is about $10^{17}$ seconds. Exploring once per second since the Big Bang gives only $10^{17}$ attempts, still a factor of $10^{22}$ short.
 - The number of grains of sand on Earth is about $10^{18}$.
-- The number of atoms in the observable universe is about $10^{80}$. You would need roughly one attempt per billion-billion-billion atoms to expect a single success.
+- The number of atoms in the observable universe is about $10^{80}$. You would need roughly one attempt per $10^{41}$ atoms to expect a single success.
 
 This is why DQN scored zero for a long time on these **hard-exploration** games. The algorithm was not bad. Against rewards this sparse, random exploration is almost impossible to succeed probabilistically.
 
@@ -59,8 +59,8 @@ Where does the difficulty come from? From the extreme sparsity of the reward sig
 It helps to distinguish three related but different difficulties, because they call for different tools:
 
 - **Sparse rewards**: the reward is zero almost everywhere, as in Montezuma's Revenge. The problem is _finding_ any signal at all. Count-based and curiosity bonuses (this section) are the direct remedy.
-- **Delayed rewards**: the reward arrives, but only long after the decisive actions, as in a chess game decided by one blunder on move 20. The problem is _credit assignment_ over a long horizon: which of the hundreds of preceding actions deserves the credit? Eligibility traces, GAE, and Retrace-style multi-step returns propagate the signal backward; hierarchy (Section 12.3) shortens the distance it must travel.
-- **Deceptive rewards**: a dense reward actively points the wrong way, as in a maze where the goal sits behind the starting position so that "move closer to the goal" walks into a wall. Greedy exploitation of the reward then converges to a local optimum, and _more_ exploration, not better exploitation, is the fix. This is why novelty-seeking objectives explicitly reward visiting states the current policy would never choose.
+- **Delayed rewards**: the reward arrives, but only long after the decisive actions, as in a chess game decided by one blunder on move 20. The problem is _credit assignment_ over a long horizon: which of the hundreds of preceding actions deserves the credit? GAE ([Chapter 8](../chapter08_ppo/gae-reward-model.md)) and Retrace-style multi-step returns propagate the signal backward; hierarchy (Section 12.3) shortens the distance it must travel.
+- **Deceptive rewards**: a dense reward actively points the wrong way, as in a maze where the goal sits behind the starting position so that "move closer to the goal" walks into a wall. Greedy exploitation of the reward then converges to a local optimum, and _more_ exploration, not better exploitation, is the fix. This is why novelty-seeking objectives explicitly reward visiting states the greedy policy would never reach.
 
 This leads to the core idea of the **intrinsic reward**: before reaching the external reward, we manufacture some "curiosity signals" for the agent ourselves, encouraging it to visit novel or hard-to-predict states, just as a human infant actively explores its surroundings. The infant does not do this to get a reward right away, but purely because "I have never seen this thing and I want to take a look."
 
@@ -94,13 +94,13 @@ where $\mathcal{H}$ is the Shannon entropy and $\alpha$ the temperature trading 
 
 **Optimism** does seek. The UCB rule above is the bandit instance of the optimism-in-the-face-of-uncertainty principle: act as if every uncertain option were as good as its confidence bound allows. In MDPs the same principle becomes a **count-based exploration bonus**
 
-$$r^{\text{int}}_t = \frac{\beta}{\sqrt{N(s_t)}},$$
+$$r^{\text{int}}_t = \frac{1}{\sqrt{N(s_t)}},$$
 
-where $N(s_t)$ counts prior visits to $s_t$ and $\beta$ scales the bonus. Unvisited states pay $\beta$, states visited 100 times pay $\beta/10$, and in the tabular setting this bonus provably drives the agent to cover the state space (it is the reward-bonus counterpart of UCB-style algorithms such as MBIE). A quick check: with $\beta = 1$, the first visit pays $1$, the 4th visit pays $1/2$, and the 100th pays $1/10$ — novelty is literally used up by revisits.
+where $N(s_t)$ counts prior visits to $s_t$ (counting state–action pairs $N(s, a)$ gives the closer analogue of Bellemare et al. 2016). The scale of the bonus is set once, by the $\beta$ in $r^{\text{total}}_t = r^{\text{ext}}_t + \beta \cdot r^{\text{int}}_t$ above, so the two formulas combine to a training bonus of $\beta/\sqrt{N(s_t)}$. Acting greedily with respect to optimistic value estimates, this bonus provably drives the agent to cover the state space in the tabular setting (it is the reward-bonus counterpart of UCB-style model-based exploration such as MBIE, Model-Based Interval Estimation). A quick check with $\beta = 1$: the first visit pays $1$, the 4th visit pays $1/2$, and the 100th pays $1/10$ — novelty is literally used up by revisits.
 
-Counts break in high-dimensional observations, where almost no raw state repeats. **Pseudo-counts** (Bellemare et al. 2016) repair the idea with a density model $\rho(s)$ trained on visited states: a state the model already assigns high probability to is "familiar", and one that surprises the model gets a high pseudo-count-novelty. Concretely, after observing $s$, the model's probability jumps from $\rho(s)$ to $\rho'(s)$, and the pseudo-count $\hat{N}(s)$ is defined as the count that would produce the same jump in a tabular frequency estimator. This turns "have I seen this?" into a question a neural network can answer, and the $\beta/\sqrt{\hat{N}}$ bonus ports directly to Atari-scale pixels.
+Counts break in high-dimensional observations, where almost no raw state repeats. **Pseudo-counts** (Bellemare et al. 2016) repair the idea with a density model $\rho(s)$ trained on visited states: a state the model already assigns high probability to is "familiar", and one that surprises the model gets a high pseudo-count-novelty. Concretely, after observing $s$, the model's probability jumps from $\rho(s)$ to $\rho'(s)$, and the pseudo-count $\hat{N}(s)$ is defined as the count that would produce the same jump in a tabular frequency estimator. This turns "have I seen this?" into a question a neural network can answer, and the $1/\sqrt{\hat{N}}$ bonus (scaled by the same $\beta$) ports directly to Atari-scale pixels.
 
-Two warnings come with every bonus. First, **a bonus is not reward shaping**. Potential-based shaping, $F(s, s') = \gamma\Phi(s') - \Phi(s)$ for an arbitrary potential $\Phi$, provably leaves the optimal policy unchanged, because the added terms telescope over a trajectory. A novelty bonus has no such guarantee: kept at full strength forever, it changes what "optimal" means, and the agent may prefer entertaining itself to solving the task. That is exactly why bonuses must satisfy the exhaustibility condition above, or be annealed away. Second, **measure coverage, not just return**. On sparse tasks the training return stays zero for a long time and says nothing; track instead the _state-action visitation_ (which regions were ever reached) and the _success coverage_ (what fraction of goals or levels was ever completed). NGU's episodic memory below is precisely a visitation tracker, and Agent57 is evaluated by per-game success coverage, not by a single averaged score.
+Two warnings come with every bonus. First, **a bonus is not reward shaping**. Potential-based shaping, $F(s, s') = \gamma\Phi(s') - \Phi(s)$ for an arbitrary potential $\Phi$, provably leaves the optimal policy unchanged, because the added terms telescope over a trajectory. A novelty bonus has no such guarantee: kept at full strength forever, it changes what "optimal" means, and the agent may prefer entertaining itself to solving the task. That is exactly why bonuses must satisfy the exhaustibility condition above, or be annealed away. Second, **measure coverage, not just return**. On sparse tasks the training return stays zero for a long time and says nothing; track instead the _state-action visitation_ (which regions were ever reached) and the _success coverage_ (what fraction of goals or levels was ever completed). NGU's episodic memory below is precisely a visitation tracker, and Agent57 reports per-game human-normalized scores, summarized by the median across the 57 games, rather than relying on a single averaged score.
 
 In the next two sections we look at the two mainstream routes for constructing intrinsic rewards: ICM, based on prediction error, and RND, based on random network distillation.
 
@@ -156,6 +156,7 @@ $$\mathcal{L} = \mathcal{L}_{\text{policy}}(\theta) + \lambda_{\text{inv}}\,\mat
 ```python
 class ICM(nn.Module):
     def __init__(self, feat_dim=256, action_dim=6):
+        super().__init__()
         self.action_dim = action_dim
         self.encoder = CNNtoMLP(out=feat_dim)              # Φ(s)
         self.inverse = nn.Linear(feat_dim * 2, action_dim) # g_φ
@@ -220,6 +221,7 @@ RND has several big advantages over ICM:
 ```python
 class RND(nn.Module):
     def __init__(self, obs_shape, feat_dim=512):
+        super().__init__()
         # Target network: frozen, never updated
         self.target = CNN(obs_shape, feat_dim)
         for p in self.target.parameters():
