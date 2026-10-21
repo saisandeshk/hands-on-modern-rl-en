@@ -21,6 +21,7 @@ How to run:
 """
 
 import os
+import re
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -64,10 +65,11 @@ def tool_search(query):
     Simulated search tool
     Returns a knowledge retrieval result
     """
-    # Simulate search quality
+    # Simulate search quality (match "RL" as a whole word so words like
+    # "CONTROL" or "GERMANY" do not trigger it)
     if "Python" in query or "python" in query:
         return {"result": "Python is a widely used high-level programming language...", "correct": True}
-    elif "RL" in query or "reinforcement learning" in query.lower():
+    elif re.search(r"\bRL\b", query) or "reinforcement learning" in query.lower():
         return {"result": "Reinforcement learning is a branch of machine learning...", "correct": True}
     else:
         correct = np.random.random() < 0.7

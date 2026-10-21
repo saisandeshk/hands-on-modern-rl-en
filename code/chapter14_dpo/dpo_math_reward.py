@@ -148,7 +148,11 @@ def create_test_data():
 # ==========================================
 
 def extract_number(text):
-    """Extract the final numeric answer from the model's response"""
+    """Extract the final numeric answer from the model's response.
+
+    Returns an int when the extracted value is integral, otherwise a float,
+    so decimal answers (e.g. "7.0", "3.5") do not raise.
+    """
     # Try English answer markers first: "Answer: X", "The answer is X", "The result is X", "equals X"
     patterns = [
         r"[Aa]nswer\s*:\s*([+-]?\d+\.?\d*)",
@@ -159,13 +163,19 @@ def extract_number(text):
     for pattern in patterns:
         match = re.findall(pattern, text)
         if match:
-            return int(match[-1])  # take the last match
+            return _to_number(match[-1])  # take the last match
 
     # If none of the above matched, try to find the last number that appears in the text
-    numbers = re.findall(r"\d+", text)
+    numbers = re.findall(r"[+-]?\d+\.?\d*", text)
     if numbers:
-        return int(numbers[-1])
+        return _to_number(numbers[-1])
     return None
+
+
+def _to_number(s):
+    """Parse a numeric string, returning an int when integral else a float."""
+    val = float(s)
+    return int(val) if val.is_integer() else val
 
 
 def evaluate_math(model, tokenizer, test_data, label="Model"):

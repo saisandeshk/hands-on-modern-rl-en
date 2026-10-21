@@ -53,12 +53,14 @@ def check_answer_correctness(response, ground_truth):
         method = "\\boxed{} extraction"
 
     # Method 2: match English answer markers like "The answer is:" / "The final answer is:"
+    # (Bare "So <number>" is intentionally NOT matched here: "So" usually
+    # introduces an intermediate computation, so matching it would grab the
+    # wrong number. Such responses fall through to the last-number fallback.)
     if extracted is None:
         answer_patterns = [
             r'[Tt]he answer is\s*:?\s*([+-]?\d+\.?\d*)',
             r'[Ff]inal answer is\s*:?\s*([+-]?\d+\.?\d*)',
             r'[Tt]he result is\s*:?\s*([+-]?\d+\.?\d*)',
-            r'[Ss]o[,.]?\s*(?:the answer is\s*)?([+-]?\d+\.?\d*)',
         ]
         for pattern in answer_patterns:
             match = re.search(pattern, response)

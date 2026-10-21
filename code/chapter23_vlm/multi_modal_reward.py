@@ -128,7 +128,10 @@ def reward_reasoning_quality(response):
         'can see', 'found', 'observ', 'total', 'altogether',
     ]
     response_lower = response.lower()
-    keyword_count = sum(1 for kw in reasoning_keywords if kw in response_lower)
+    keyword_count = sum(
+        1 for kw in reasoning_keywords
+        if re.search(r'\b' + re.escape(kw) + r'\b', response_lower)
+    )
     if keyword_count >= 3:
         score += 0.2
     elif keyword_count >= 1:
@@ -170,11 +173,14 @@ def reward_format(response):
     elif shapes_mentioned >= 2:
         score += 0.05
 
-    # Check for a summary statement (0.05 points)
+    # Check for a summary statement (0.05 points). Patterns require an explicit
+    # summary cue ("in total", a total followed by a number) so a bare word
+    # like "not total" does not earn the bonus.
     summary_patterns = [
-        r'total\s*\d*',
+        r'in total',
+        r'total\s*\d+',
         r'altogether',
-        r'in all\s*\d*',
+        r'in all',
         r'answer\s*:',
     ]
     if any(re.search(p, response_lower) for p in summary_patterns):
@@ -236,14 +242,18 @@ def reward_visual_grounding(response, image_info):
             score += 0.05
             break  # cap the bonus at 0.05
 
-    # Check for visually descriptive language (0.05 points)
+    # Check for visually descriptive language (0.05 points). Word-boundary
+    # matching avoids substring false positives (e.g. "top" in "topic").
     visual_keywords = [
         'color', 'red', 'blue', 'green', 'orange', 'purple',
         'position', 'left', 'right', 'above', 'below', 'top', 'bottom',
         'size', 'big', 'small', 'large',
         'can see', 'in the image', 'in the picture', 'on the canvas',
     ]
-    visual_count = sum(1 for kw in visual_keywords if kw in response_lower)
+    visual_count = sum(
+        1 for kw in visual_keywords
+        if re.search(r'\b' + re.escape(kw) + r'\b', response_lower)
+    )
     if visual_count >= 2:
         score += 0.05
 

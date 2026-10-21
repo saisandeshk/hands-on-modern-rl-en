@@ -232,7 +232,6 @@ class SimpleRewardModel:
         prompt_keywords = _words(prompt)
         response_words = _words(response)
         overlap = len(prompt_keywords & response_words)
-        overlap = len(prompt_keywords & response_words)
         if overlap > 0:
             score += min(overlap * 0.2, 1.0)
 

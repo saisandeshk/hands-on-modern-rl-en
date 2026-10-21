@@ -84,7 +84,8 @@ this file's code — see below). No sidebar changes needed. Build passes.
      `ValueError: empty range` for test-size canvases (e.g. 64px).
    - Correction: size adapts to canvas
      (`max(6, min(30, (w-20)//2, (h-20)//2))`); placement bounds clamped with a
-     no-margin fallback. Default 256px behavior unchanged.
+     no-margin fallback. Default 256px size range unchanged (15–30px); placement
+     margins narrowed from `size+10` to `size+5` (required so small canvases work).
    - Verified: `test_dataset_generation_offline` (64px, tmp dir) passes.
 
 6. **Module-level execution made scripts unimportable** — `dpo_hands_on.py`,
@@ -133,11 +134,14 @@ this file's code — see below). No sidebar changes needed. Build passes.
 
 ## Needs external verification
 
-- None blocking. Two softened/kept-as-is items: (a) full-model GRPO/DPO/PPO
-  training runs were not executed (need model download + GPU; covered by
-  offline tests instead); (b) `vlm_grpo_train.py` docstring line "similar to
-  Chapter 8, where we run PPO with Stable Baselines3" left as-is — Chapter 8
-  is TRPO/PPO in the current numbering, so it reads correctly.
+- None blocking. Full-model GRPO/DPO/PPO training runs were not executed
+  (need model download + GPU; covered by offline tests instead).
+- Note (review correction): the "Chapter 8, where we run PPO with Stable
+  Baselines3" sentence lives in `docs/chapter13_rlhf/verl-ppo-gsm8k.md`
+  (line 11), not in `code/chapter23_vlm/vlm_grpo_train.py` as previously
+  written here. Whether Chapter 8's `code/chapter08_ppo/ppo_bipedal_walker.py`
+  (hand-written PPO, not Stable Baselines3) matches that doc sentence is left
+  for the owner of those chapters/docs.
 
 ## Sidebar additions
 
@@ -162,6 +166,107 @@ code/chapter17_prm_search code/chapter19_agentic code/chapter23_vlm -q`:
 - `npx vitepress build docs`: success (`build complete in 20.17s`), no dead links.
 
 ## Open issues
+
+- `agentic_system/{trainer,rollout_worker}.py` were reviewed but not
+  restructured; `Policy.train_step_with_advantage` uses detached current
+  log-probs as the old policy (single-update on-policy simplification) —
+  documented in its comment, acceptable for the demo.
+- The shared 6 GB GPU was not used for verification (per task: CPU); full-mode
+  VRAM fit (0.5B fp16 + frozen ref + optional LoRA) is by construction, not
+  measured — worth one GPU run by whoever has the card free.
+- `output/` directories are created at import time by several demo scripts
+  (`os.makedirs("output", exist_ok=True)`); harmless and left as-is.
+
+## Review response (follow-up to `planning/reviews/code-llm.md`)
+
+All 11 Errors re-checked; 7 fixed in scope, 4 confirmed but out of scope
+(docs prose — this task may only touch docs lines showing a command, flag or
+path, so they are forwarded to the coordinator). Doubts: 9 accepted/partially
+accepted and fixed or documented, 1 rejected with reason.
+
+Errors:
+
+1. `dpo_math_reward.extract_number` decimals crash — accepted and fixed:
+   parse with `float()` via a `_to_number` helper (int when integral, else
+   float) for both the marker and fallback paths; fallback regex widened to
+   `[+-]?\d+\.?\d*`. Verified `extract_number("The result is 3.5") == 3.5`,
+   `"Answer: 12.0" == 12`, plus new decimal asserts in
+   `test_extract_number_english`. Full suite still passes (float `==` int
+   comparison keeps `evaluate_math` working).
+2. GRPO sampling distribution vs old-policy ratio — accepted and fixed:
+   `generate_responses` now samples at `temperature=1.0, top_p=1.0` with a
+   docstring stating the sampling distribution equals the old-policy
+   distribution used in the ratio.
+3. Format bonus that can never fire — accepted and fixed: removed the dead
+   `+0.1`/cap block; `compute_reward` is now documented as binary 0/1, which
+   the `r >= 1.0` accuracy statistic already assumes. Existing reward tests
+   pass unchanged.
+4. VRAM figure "~2-4 GB fp16" — accepted and fixed: module header and
+   `--model` help now state full fine-tune needs ~5 GB+ before activations
+   (0.5B weights + frozen reference + gradients/Adam states) and recommend
+   `--lora` on 6 GB cards.
+5. k3 docstring "k1 estimator (d itself)" — accepted and fixed: now reads
+   "the naive k1 estimator (−d)".
+6. `compute_group_advantages` std-convention over-claim — accepted and fixed:
+   docstring now says population std is a convention choice and the paper
+   does not specify G vs G-1.
+7. Duplicate `overlap = ...` line in `rlhf_ppo_train.py` — accepted and fixed:
+   deleted one line.
+8. `docs/chapter23_vlm/vlm-grpo-hands-on.md` "Recall Chapter 16" — confirmed
+   (line 222) but NOT changed: docs prose is outside this task's scope
+   (only command/flag/path lines may be edited); should read Chapter 15.
+   Forwarded to the coordinator.
+9. `docs/chapter23_vlm/qwen3-vl-reflection.md` swapped numbers — confirmed
+   (lines 222/224) but NOT changed (same scope reason); GRPO normalization
+   should point to Chapter 15, multi-dimensional RLHF rewards to Chapter 13.
+   Forwarded to the coordinator.
+10. `docs/chapter19_agentic/*` "Chapter 9" references — confirmed (3 hits) but
+    NOT changed (same scope reason); body text points at RLVR/Chapter 15 and
+    Agentic RL/Chapter 19. Forwarded to the coordinator.
+11. `docs/chapter13_rlhf/base-model-to-assistant.md` "Boundary with Chapter 9"
+    — confirmed (line 141; next line already says "Chapters 14-16") but NOT
+    changed (same scope reason); should read "Chapters 14-16". Forwarded to
+    the coordinator.
+
+Doubts:
+
+1. In-sample before/after evaluation — partially accepted: kept the same
+   3 problems (no held-out set exists in the script) but relabeled prints and
+   added a comment stating it is an in-sample demo, not a generalization test.
+2. Default `--kl-coef 0.01` vs paper β=0.04 — kept (CLI flag, not wrong), but
+   the `--kl-coef` help text now notes DeepSeekMath used 0.04.
+3. Separate prompt/completion tokenization (BPE boundary) — accepted as a
+   documented limitation: noted in the `grpo_policy_update` docstring.
+4. Report misattribution of the Stable-Baselines3 line — accepted and fixed:
+   "Needs external verification" now points at
+   `docs/chapter13_rlhf/verl-ppo-gsm8k.md` line 11 instead of
+   `vlm_grpo_train.py`, and leaves the Chapter 8 check to that chapter's owner.
+5. "Default 256px behavior unchanged" — accepted as inaccurate wording: fixed
+   above (size range unchanged; `size+10`→`size+5` margins changed
+   intentionally so small canvases work). No code change.
+6. Over-broad `[Ss]o ...` pattern shadowing the fallback — accepted and fixed:
+   removed the pattern (with an explanatory comment); verified
+   `"Step 1: 15 + 27 = 42.\nSo 15 + 27 = 42 apples."` now extracts `42` via
+   the last-number fallback instead of `15`.
+7. fp16 master weights/optimizer states — accepted and fixed: full mode now
+   loads with `torch.bfloat16` on CUDA (also removes any GradScaler need).
+8. `"RL" in query` substring — accepted and fixed: `re.search(r"\bRL\b",
+query)` (verified "PEARL" no longer triggers, "RL policy gradients"
+   still does).
+9. Loose format/visual heuristics — partially accepted and tightened:
+   summary patterns now require `in total` / `total`+digits / `altogether` /
+   `in all` / `answer:` (bare "not total" no longer matches), and both the
+   reasoning-keyword and visual-keyword lists match on word boundaries
+   ("top" no longer matches "topic"). Comparative smoke tests still pass.
+10. `agentic_system/run.py` use-before-definition layout — accepted and fixed:
+    moved `TASK_EXPECTED_OUTPUTS` / `code_reward` / `prompts` above `main()`.
+
+Follow-up verification: `.venv/bin/pytest code/chapter13_rlhf
+code/chapter14_dpo code/chapter15_grpo code/chapter17_prm_search
+code/chapter19_agentic code/chapter23_vlm -q` → **62 passed**; CJK scan →
+`CLEAN`; `npx prettier --write` on changed files (Python files have no
+prettier parser, as before; report formatted); `npx vitepress build docs`
+re-run below.
 
 - `agentic_system/{trainer,rollout_worker}.py` were reviewed but not
   restructured; `Policy.train_step_with_advantage` uses detached current

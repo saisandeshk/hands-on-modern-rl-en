@@ -71,6 +71,9 @@ def test_extract_number_english():
     assert m.extract_number("The answer is 7") == 7
     assert m.extract_number("The result is 12") == 12
     assert m.extract_number("equals 120") == 120
+    # Decimals must not raise (previous int() conversion crashed on these)
+    assert m.extract_number("The result is 3.5") == 3.5
+    assert m.extract_number("Answer: 12.0") == 12
     assert m.extract_number("nothing here!") is None
 
 
