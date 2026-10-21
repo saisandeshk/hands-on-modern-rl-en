@@ -6,7 +6,7 @@
 
 > **Code and resources**: [complete implementation](https://github.com/saisandeshk/hands-on-modern-rl-en/tree/main/code/chapter19_agentic/agentic_system) · [trainer.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter19_agentic/agentic_system/trainer.py)
 
-In Sections 19.1 and 19.2, we discussed the decision framework and environment interaction design for Agentic RL. In Sections 19.3 through 19.5, we analyzed the architectures of frameworks such as OpenRLHF, veRL, and Relax. This section starts from those discussions and turns the concepts into a runnable implementation.
+In Sections 19.1 and 19.2, we discussed the decision framework and environment interaction design for Agentic RL. Section 19.1 also surveyed training frameworks such as OpenRLHF, veRL, and Relax. This section starts from those discussions and turns the concepts into a runnable implementation.
 
 Specifically, we will train a language model agent that can autonomously solve programming problems: after reading a problem, it writes code, executes it, reads the output, and if errors occur, revises the code and re-executes until it produces a correct answer. The entire system is kept under 500 lines of code and runs on CPU.
 
@@ -313,6 +313,16 @@ Design notes:
 - `_exec_code()` starts the current Python interpreter in a subprocess and applies a timeout. It has no filesystem or network isolation, so it is suitable only for trusted teaching code.
 - The return value includes `observation` (environment feedback) and `done` (termination status), corresponding to the POMDP observation function $O(s_t)$.
 
+### Sandbox Determinism, Side Effects, and Retry Semantics
+
+Three behaviors separate a teaching sandbox from a production one.
+
+**Deterministic replay.** The sandbox above is deterministic given the code: the same action always yields the same observation. Real tool environments (search engines, live web pages) are not. Production systems separate what must be reproducible (the verifier, the reward computation, the stored trajectory) from what may vary (live tool content), and log the tool snapshot or cache key with each observation so a trajectory can be replayed and re-scored.
+
+**Side-effect boundaries.** `reset()` above is a no-op because the sandbox is stateless. A stateful environment (database, filesystem, browser session) must scope side effects per rollout: snapshot before the episode, restore or wipe afterward, and namespace artifacts (temporary directories, table prefixes, session cookies) by rollout ID so concurrent rollouts cannot overwrite each other.
+
+**Tool-error, timeout, retry, and duplicate-action semantics.** Distinguish three outcomes explicitly: a tool error returned by the environment (malformed arguments, unknown tool) becomes an observation with `done=False`, so the agent can correct itself; a timeout or resource exhaustion becomes a `TIMEOUT` observation with `done=True`, and the rollout is marked _truncated_ rather than _failed_; a repeated identical call returns the cached result with a `cached: true` flag instead of re-executing. Retries of state-changing calls need idempotency keys so that a retried "place order" does not place two orders. Log failed rollouts with their failure class (tool error, timeout, truncation, verifier failure) instead of collapsing everything into reward $0$ — otherwise debugging cannot distinguish "the agent was wrong" from "the infrastructure dropped the rollout."
+
 ## 19.10.5 Policy — Model Inference and Training
 
 The environment can execute code, but who decides what code to write? We need a Policy to generate actions. Here we use a 0.5B-parameter Qwen2.5 as the policy model.
@@ -447,6 +457,7 @@ Design notes:
 - `_token_logprobs()` keeps gradients for the training path; only the reference-model path disables gradients.
 - As in [DeepSeekMath Equations (3) and (4)](https://arxiv.org/html/2402.03300#S3.SS1), ratio, clipping, and the KL estimator are all computed per token.
 - Environment observations only condition later turns. They do not enter the action loss. The code first averages action tokens inside each trajectory, then averages trajectories.
+- Because `old_logprobs` is taken from the current weights (`detach()`), the importance ratio is $1$ by construction: this is a single on-policy REINFORCE-style step with a GRPO group baseline, not a multi-epoch clipped PPO update. Reusing the same batch for several epochs requires saving the rollout-time log-probabilities and letting the ratio move away from $1$ — that is Extension Exercise 1.
 
 ## 19.10.6 RolloutWorker — Driving the Agent Loop
 
@@ -713,6 +724,7 @@ Design notes:
 - The main loop of `fit()` follows the "producer-consumer" pattern: RolloutWorker produces trajectories, Policy consumes them for gradient updates.
 - GRPO's within-group comparison is implemented in the Reward normalization section: for multiple trajectories sharing a prompt, advantage = (reward - mean) / std.
 - Each turn stores the `context` used for generation and the model's `response`. Training covers only response tokens; an environment observation can affect later actions only through the next turn's context.
+- Prompts are sampled uniformly here. Production loops add curriculum and filtering: drop groups that are always solved or always failed (DAPO-style dynamic sampling), and evolve the prompt distribution toward the model's current frontier so rollout budget concentrates where the gradient signal is informative.
 
 ## 19.10.8 Putting It All Together
 
@@ -776,7 +788,7 @@ def code_reward(trajectory):
     """Require an execution's final line to equal the task's expected output."""
     expected = TASK_EXPECTED_OUTPUTS[trajectory["prompt"]]
     for interaction in trajectory["interactions"]:
-        obs = interaction.get("observation", "")
+        obs = interaction.get("observation", "") or ""
         output_lines = [line.strip() for line in obs.splitlines() if line.strip()]
         if output_lines and output_lines[-1] == expected:
             return 1.0
@@ -818,6 +830,18 @@ After running the code above, you have mastered the basic skeleton of an Agentic
 | Fault tolerance    | None                                   | Heartbeat monitoring, auto-restart, checkpoint recovery           |
 
 Each gap represents an independent engineering optimization direction. After understanding the skeleton, you can dive deeper into any direction as needed.
+
+### What the Minimal Loop Omits: Versions, Backpressure, Recovery, and Accounting
+
+The synchronous loop has zero staleness and no failure modes by construction. The four problems below appear the moment rollout and training run concurrently.
+
+**Policy versions and staleness.** Tag each rollout with the policy version (or step counter) that produced it. The learner logs the version gap (current step minus rollout step) per batch and, beyond a staleness budget, either corrects with an importance-sampling ratio or drops the batch. Without version tags, stale trajectories silently bias the update.
+
+**Backpressure and learner starvation.** If rollout workers produce faster than the learner consumes, an unbounded buffer fills with stale trajectories; if slower, expensive training GPUs idle. Production queues are bounded with backpressure (block producers, or drop the oldest or lowest-priority trajectories) and scale rollout workers to keep the learner's batch queue non-empty without letting staleness drift.
+
+**Checkpointing and retry deduplication.** Checkpoint four items together: model weights, optimizer state, the sampler cursor (which prompts were already consumed), and the rollout log (which trajectory IDs already contributed to an update). On restart, resume from the last committed update so failed rollouts are neither silently lost nor double-counted.
+
+**Throughput and compute accounting.** Track rollout tokens per second, verifier throughput (sandbox executions per second, scoring latency), and update utilization (fraction of wall-clock the learner spends in backward/step versus waiting for batches). Budget sample, inference, training, and total compute separately: inference usually dominates in agentic RL because every turn pays generation cost plus environment latency, so the cheapest lever is often fewer but better rollouts (result caching, early truncation of hopeless trajectories) rather than a larger learner step.
 
 ## 19.10.10 Extension Exercises
 

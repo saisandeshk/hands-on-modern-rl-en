@@ -1,6 +1,6 @@
 # 19.2 Multi-Turn Reinforcement Learning
 
-[19.1 Overview](./overview) used the example of booking a flight to illustrate the fundamental differences between Agentic RL and single-turn RL. This section formalizes these differences into precise mathematical objects—using the POMDP formulation from the [AppWorld](https://arxiv.org/abs/2407.18901) paper, which explicitly distinguishes between "model-generated tokens" and "environment-return tokens," forming the basis for subsequent discussions on action masking, step-level advantage, and credit assignment.
+[19.1 Foundations](./overview) used the example of booking a flight to illustrate the fundamental differences between Agentic RL and single-turn RL. This section formalizes these differences into precise mathematical objects—using the POMDP formulation from the [AppWorld](https://arxiv.org/abs/2407.18901) paper, which explicitly distinguishes between "model-generated tokens" and "environment-return tokens," forming the basis for subsequent discussions on action masking, step-level advantage, and credit assignment.
 
 ## Simplified Perspective of Single-Turn RL
 
@@ -133,7 +133,7 @@ class Step:
     is_terminal: bool          # Whether this is the last step
 ```
 
-This approach offers three benefits: precise step boundaries, no retokenization drift, and flexible context management strategies (append-only, sliding-window, LLM summarization, selective retention). Experiments with Agent-R1 show that **sliding-window performs better on GSM8K than append-only**—"less is more," as the model does not need to see all history to make good decisions.
+This approach offers three benefits: precise step boundaries, no retokenization drift, and flexible context management strategies (append-only, sliding-window, LLM summarization, selective retention). Experiments with Agent-R1 report that **sliding-window context management performs better than append-only on their multi-turn tool-use evaluations** — "less is more," as the model does not need to see all history to make good decisions.
 
 ## Comparison with Single-turn RL
 

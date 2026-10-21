@@ -119,11 +119,11 @@ Configuring this constraint requires balancing "allowing the policy to explore" 
 
 To encourage the model to finish a task in fewer steps, one can introduce a reward mechanism that decays with the number of steps.
 
-> **Moonshot** proposed the **Gamma-decay Reward**. When the model completes the task correctly, the reward decays exponentially with the number of steps used:
+> A length-penalty scheme used in the Kimi-Researcher line of work (sometimes called the Gamma-decay Reward) works as follows. When the model completes the task correctly, the trajectory reward decays exponentially with the number of steps used:
 >
-> $$r_i = r \times \gamma^{T-i}, \quad \gamma < 1$$
+> $$R = r \times \gamma^{T}, \quad \gamma < 1$$
 >
-> Here $T$ is the total number of steps and $i$ is the current step. This means that, for the same task, using fewer steps earns a higher reward, which guides the model to execute tasks more efficiently [\[Reference\]](https://moonshotai.github.io/Kimi-Researcher/).
+> Here $r$ is the binary task reward (1 on success) and $T$ is the number of steps the trajectory used. A successful trajectory that finishes in fewer steps keeps more of the reward (for example, with $\gamma = 0.95$, $T = 5$ gives $0.77$ while $T = 20$ gives $0.36$), which guides the model to execute tasks more efficiently [\[Reference\]](https://moonshotai.github.io/Kimi-Researcher/). This $R$ is used directly as the trajectory-level reward (e.g., compared across a GRPO group); do not apply the per-turn discounted-return decomposition of [19.3 Trajectory Credit Assignment](./credit-assignment) on top of it, since that would discount the length penalty a second time.
 
 ---
 
@@ -455,6 +455,8 @@ Agent evaluation has to examine two layers together.
 
 Process evaluation is more than a nice-to-have. Research from Berkeley RDI found that nearly every mainstream agentic benchmark can be "gamed" to near-perfect scores without actually completing the task [^benchmark-exploit]. SWE-bench, WebArena, and GAIA are no exception. Without process evaluation, you may be measuring only the model's ability to exploit loopholes.
 
+Two evaluation-design practices guard against this. First, **held-out environment shifts**: keep an evaluation slice whose environment differs from training — different sites, reworded APIs, a fresh search-index snapshot. A model whose score collapses under the shift learned environment-specific tricks, not the task. Second, **adversarial hidden tests**: for code and tool tasks, verify with tests the agent never saw during training, including edge cases and mutated variants, since visible tests invite hardcoding. SWE-bench's FAIL_TO_PASS / PASS_TO_PASS split follows the same idea: the tests that decide success are fixed and hidden from the agent at rollout time.
+
 #### Breaking "Quality" into Quantifiable Dimensions
 
 "Quality" itself cannot be quantified. But the quality of any agent task can be decomposed into several quantifiable dimensions, and different tasks have different quality dimensions.
@@ -758,7 +760,7 @@ Layers 3 and 5 need further discussion. We begin with the problem in layer 3.
 
 Layer 3 has the LLM look at a screenshot and score it directly, which has clear limitations. An LLM's judgment of visual details is unstable: the same page may receive different scores in two runs. More seriously, an LLM can be misled by surface features. A page whose functionality is entirely wrong can still score high as long as its colors look good and its alignment is neat.
 
-This concern is not hypothetical. Tests on the Omni-I2C benchmark show [^omni-i2c] that pure pixel metrics (SSIM, LPIPS) correlate with human judgment only at 0.11-0.44 (Kendall's Tau), while an LMM judge can reach 0.83. Even so, 0.83 means that nearly 2 out of every 10 judgments still disagree with humans. The web-perception question answering in the FullFront benchmark confirms this as well [^fullfront]: the strongest model, Claude 3.7 Sonnet, still has an average accuracy below 55%, while humans exceed 95%. Models' visual judgment of page details is still far from the human level.
+This concern is not hypothetical. Tests on the Omni-I2C benchmark show [^omni-i2c] that similarity metrics (SSIM, CLIP Score) correlate with human judgment only at 0.12–0.44 (Kendall's Tau), while an LMM judge can reach 0.83. A rank correlation of $\tau = 0.83$ still leaves room for substantial item-level disagreement, but that disagreement rate cannot be read off $\tau$ directly; it requires the item-level agreement statistics. The web-perception question answering in the FullFront benchmark confirms this as well [^fullfront]: the strongest model, Claude 3.7 Sonnet, still has an average accuracy below 55%, while humans exceed 95%. Models' visual judgment of page details is still far from the human level.
 
 The problem is real, but a combination of strategies can mitigate it.
 
@@ -876,7 +878,8 @@ def frontend_process_stats(trajectory):
             if s.tool_name == "browser_preview"
         ),
         "plan_exists": any(
-            s.content contains "plan" or "structure" or "layout"
+            ("plan" in s.content or "structure" in s.content
+             or "layout" in s.content)
             for s in trajectory.steps[:2]  # is there a plan in the first two steps
         ),
     }

@@ -36,7 +36,7 @@ The most critical difference lies in **heterogeneity** and **explicit communicat
     └── 6. Aggregate → Submit PR
 ```
 
-Anthropic's internal research published in 2025 measured that the **Orchestrator-Worker pattern achieves a 90.2% speedup and an 18–32% increase in success rate on SWE-bench Verified** compared to a single agent. The key reason is not "two agents are stronger than one," but rather **task decomposition prevents the context window from being overwhelmed** — a single agent handling the entire PR process must focus on "finding the file / writing code / running tests / writing documentation" all at once; decomposition allows each worker to focus on a single task.
+Unpublished internal figures reported in secondary summaries claim that an **Orchestrator-Worker pattern achieves large speedups and success-rate gains on SWE-bench Verified** compared to a single agent (one widely cited but unverified summary gives a 90.2% speedup and an 18–32% increase). The key reason is not "two agents are stronger than one," but rather **task decomposition prevents the context window from being overwhelmed** — a single agent handling the entire PR process must focus on "finding the file / writing code / running tests / writing documentation" all at once; decomposition allows each worker to focus on a single task.
 
 The policy of the Orchestrator can be formalized as a hierarchical MDP:
 
@@ -46,7 +46,7 @@ where $w_t \in \{1, \ldots, K\}$ is the worker to which the $t$-th step is assig
 
 ### Debate Mode
 
-Multiple agents **debate with each other** to converge on a more reliable answer. The theoretical foundation of this paradigm is AI Safety via Debate by Anthropic (Irving et al., 2018); DeepMind's 2024 Scaling Inference paper validates the effectiveness of LLM Debate on math problems.
+Multiple agents **debate with each other** to converge on a more reliable answer. The theoretical foundation of this paradigm is the AI Safety via Debate proposal (Irving et al., 2018); DeepMind's 2024 work on scaling inference-time debate validates the effectiveness of LLM debate on math problems.
 
 The MDP for Debate:
 
@@ -63,7 +63,7 @@ The training objective for Debate is **truth convergence**: making the honest ag
 Key differences of Swarm:
 
 - **Agent pool** rather than a fixed set of workers: the meta-controller dynamically selects agents from the pool based on the task
-- **A2A communication protocol**: agents communicate through structured protocols (e.g., Anthropic A2A, OpenAI Function Calls)
+- **A2A communication protocol**: agents communicate through structured agent-to-agent protocols (for example, Google's open A2A protocol, or function-call style structured messages)
 - **Credit assignment across agents**: which agent contributed the most? Requires SHAP or attention attribution
 
 Formalization:
@@ -73,7 +73,7 @@ $$\pi_\theta^{\text{swarm}}(a_t \mid q, \text{pool}, h_{1:t})$$
 where $a_t = (\text{select-agent}, \text{message}, \text{route-to})$.
 
 ::: warning Cost Explosion in Swarm Mode
-Swarm mode consumes 10–50 times more tokens than a single agent. Kimi K2.5 paper reports: processing a SWE-bench task on average consumes 280K tokens (single agent baseline is 18K). This is why industrial deployment in 2026 still primarily uses Orchestrator-Worker—cost-controlled, with performance close to Swarm.
+Swarm mode consumes an order of magnitude more tokens than a single agent (roughly 10–30× in reported cases). The Kimi K2.5 paper reports: processing a SWE-bench task on average consumes 280K tokens (single agent baseline is 18K, i.e. about 15.6×). This is why industrial deployment in 2026 still primarily uses Orchestrator-Worker—cost-controlled, with performance close to Swarm.
 :::
 
 ## Reinforcement Learning for Multi-Agent Systems
@@ -100,7 +100,7 @@ $$
 \left[v(S\cup\{i\})-v(S)\right]
 $$
 
-Here, $ v(S) $ is the success probability of the subset $ S $ completing the task. The term $ N! $ requires **counterfactual evaluation** — removing agent $ i $ from the team and checking whether the task can still be completed. Although this method is the fairest, it is computationally expensive.
+Here, $ v(S) $ is the success probability of the subset $ S $ completing the task. The weight $\frac{|S|!(N-|S|-1)!}{N!}$ is purely combinatorial and costs nothing to evaluate; the cost lies in evaluating the marginal contribution $v(S\cup\{i\})-v(S)$, which requires re-running the task for each of the $2^N-1$ coalitions. Here $N$ (the number of agents) is the $K$ of Approach 1. Although this method is the fairest, it is computationally expensive.
 
 **Approach 3: Heuristic Attribution via Orchestrator**
 
@@ -219,7 +219,7 @@ Orchestrator assigns Worker-C to test, discovers the new bug
 ...and so on in an infinite loop...
 ```
 
-Internal data from Anthropic: the "chain of errors" rate in multi-agent systems is 2.7 times that of single-agent systems.
+Unverified reports of Anthropic internal data describe the "chain of errors" rate in multi-agent systems as roughly 2.7 times that of single-agent systems; treat this as an anecdotal figure pending a citable source.
 
 **Countermeasure**: Each agent should output with an associated **confidence score**; low-confidence outputs trigger the Orchestrator to perform a secondary verification.
 
@@ -227,7 +227,7 @@ Internal data from Anthropic: the "chain of errors" rate in multi-agent systems 
 
 After multiple agents influence each other, the system may converge to a wrong consensus — especially in Debate mode. If one agent uses an incorrect premise, other agents may accept it based on "politeness" or "conformity."
 
-**Countermeasure**: Introduce a "devil's advocate" agent — an agent specifically tasked with challenging the mainstream view. Anthropic's Debate system enforces that at least one agent must hold a dissenting position.
+**Countermeasure**: Introduce a "devil's advocate" agent — an agent specifically tasked with challenging the mainstream view. Some debate-system designs enforce that at least one agent must hold a dissenting position.
 
 ### Free Rider
 
@@ -268,7 +268,7 @@ To reproduce multi-agent RL training, the following open-source tools are availa
 
 However, these frameworks are mostly **inference-time** tools—they define how agents converse, but do not involve RL training. **Very few open-source frameworks are capable of training multi-agent systems using RL**, mainly including:
 
-- **OpenRLHF** (ByteDance): Supports multi-agent PPO/GRPO with customizable reward allocation
+- **OpenRLHF** (open-source community): Supports multi-agent PPO/GRPO with customizable reward allocation
 - **verl** (ByteDance): A distributed RL framework supporting joint training of heterogeneous agents
 - **OpenResearcher**: Specialized for Deep Research, includes a simple Orchestrator-Worker
 
