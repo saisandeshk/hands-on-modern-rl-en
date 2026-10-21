@@ -166,5 +166,5 @@ print(torch.softmax(logits, dim=-1).detach())  # [0.4507, 0.5493]
 print(V.item())                                # 1.396
 ```
 
-Before: $P(a=1) = 0.5$, $V = 1.0$, $\delta = 1.0 + 1.98 - 1.0 = 1.98 > 0$. After: $P(a=1) \approx 0.549$ (increased, as required for positive advantage) and $V = 1.0 + 0.1 \times 2 \times 1.98 = 1.396$ (moved toward the TD target $2.98$). Removing `.detach()` would additionally route the Actor loss gradient into $V$ (via $\delta$), letting the Actor "improve" its loss by making the Critic pessimistic — the bug Pitfall 1 warns about.
+Before: $P(a=1) = 0.5$, $V = 1.0$, $\delta = 1.0 + 1.98 - 1.0 = 1.98 > 0$. After: $P(a=1) \approx 0.549$ (increased, as required for positive advantage) and $V = 1.0 + 0.1 \times 2 \times 1.98 = 1.396$ (moved toward the TD target $2.98$). Removing `.detach()` would additionally route the Actor loss gradient into $V$ (via $\delta$), letting the Actor "improve" its loss by making the Critic optimistic (it inflates $V(s)$, shrinking $\delta$ and reducing the Actor loss without improving the policy) — the bug Pitfall 1 warns about.
 :::

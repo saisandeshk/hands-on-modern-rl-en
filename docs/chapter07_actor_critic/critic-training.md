@@ -4,7 +4,7 @@ title: '7.3 Critic Training Details'
 
 # 7.3 Critic Training Details
 
-In the previous section, we defined the advantage function $A(s,a) \approx \delta = r + \gamma V(s') - V(s)$ and introduced the Critic network as an estimator of $V(s)$. This section expands on the three classic value-estimation methods from Chapter 4 -- [DP, MC, and TD](../chapter04_classical_methods/dp-mc-td) -- and shows how each one trains the Critic in practice.
+In Section 7.1, we defined the advantage function $A(s,a) \approx \delta = r + \gamma V(s') - V(s)$ and introduced the Critic network as an estimator of $V(s)$. This section expands on the three classic value-estimation methods from Chapter 4 -- [DP, MC, and TD](../chapter04_classical_methods/dp-mc-td) -- and shows how each one trains the Critic in practice.
 
 ::: tip Prerequisites
 
@@ -205,7 +205,7 @@ In a neural-network implementation, the MC method is equivalent to: run one full
 
 ## TD: One-Step Updates
 
-Temporal Difference (TD) learning updates the Critic using the [TD Error](../chapter04_classical_methods/dp-mc-td). The Critic loss is:
+Temporal Difference (TD) learning updates the Critic using the [TD Error](../chapter04_classical_methods/dp-mc-td). [^1] The Critic loss is:
 
 $$L_{\text{Critic}} = \left( r + \gamma V_\phi(s') - V_\phi(s) \right)^2 = \delta^2 \tag{7.4}$$
 
@@ -462,5 +462,3 @@ The Critic parameters $\phi$ update in the direction that makes $\delta^2$ small
 ## References
 
 [^1]: Sutton, R. S. (1988). Learning to predict by the methods of temporal differences. _Machine Learning_, 3(1), 9-44.
-
-[^2]: Mnih, V., et al. (2016). Asynchronous methods for deep reinforcement learning. _ICML_. [arXiv:1602.01783](https://arxiv.org/abs/1602.01783)

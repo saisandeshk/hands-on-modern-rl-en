@@ -4,7 +4,7 @@ title: 7.2 Actor-Critic Updates
 
 # 7.2 Actor-Critic Updates
 
-In the previous two sections we met the [advantage function](./advantage-function) $A(s,a)$ and the [training method for the Critic](./critic-training). Now let's assemble all the parts and see how the Actor and the Critic collaborate.
+In Section 7.1 we met the [advantage function](./advantage-function) $A(s,a)$, and [Section 7.3](./critic-training) details how to train the Critic. Now let's assemble all the parts and see how the Actor and the Critic collaborate.
 
 ::: tip Prerequisites for This Section
 
@@ -16,7 +16,7 @@ In the previous two sections we met the [advantage function](./advantage-functio
 
 ## From REINFORCE to Actor-Critic
 
-Recall the gradient formula of REINFORCE from Chapter 6 (review: [policy gradient theorem](../chapter06_policy_gradient/reinforce)):
+Recall the gradient formula of REINFORCE from Chapter 6 (review: [policy gradient theorem](../chapter06_policy_gradient/reinforce)): [^2]
 
 $$\nabla_\theta J \approx \nabla_\theta \log \pi_\theta(a_t|s_t) \cdot G_t$$
 
@@ -158,7 +158,7 @@ Both networks share the same input (state $s$) but perform different tasks:
 | Actor   | select actions  | state $s$ | action probabilities $\pi(a\|s)$ | maximize cumulative reward       |
 | Critic  | evaluate states | state $s$ | value estimate $V(s)$            | predict future return accurately |
 
-The Critic update $V(s) \leftarrow V(s) + \alpha\delta$ is the [TD-learning](../chapter04_classical_methods/dp-mc-td) update from Chapter 3 with a neural function approximator. The Critic learns the [value function $V(s)$](../chapter03_value_functions/value-bellman), while the Actor represents the [policy $\pi(a\mid s)$](../chapter02_rl_basics/policy-value) and changes its behavior using the Critic's evaluation.
+The Critic update $V(s) \leftarrow V(s) + \alpha\delta$ is the [TD-learning](../chapter04_classical_methods/dp-mc-td) update from Chapter 4 with a neural function approximator. The Critic learns the [value function $V(s)$](../chapter03_value_functions/value-bellman), while the Actor represents the [policy $\pi(a\mid s)$](../chapter02_rl_basics/policy-value) and changes its behavior using the Critic's evaluation.
 
 Two function approximators work in concert -- the Critic helps the Actor judge "how much better this action is than average," the Actor adjusts its policy accordingly, and the new policy generates new data that helps the Critic learn better. This is where the name Actor-Critic comes from.
 
@@ -263,7 +263,7 @@ $$
 During backpropagation, gradients flow along two paths:
 
 - **Actor path**: $\nabla_\theta L_{\text{actor}} = -\nabla_\theta \log \pi(\text{right}|s) \cdot 1.48$. Since $\delta$ is treated as a constant, it only scales and directs the gradient -- when $\delta > 0$, the probability of right increases; when $\delta < 0$, it decreases.
-- **Critic path**: $\nabla_\theta L_{\text{critic}} = 2\delta \cdot \nabla_\theta V(s) = 2 \times 1.48 \cdot \nabla_\theta V(s) = 2.96 \cdot \nabla_\theta V(s)$. Since $V(s)$ is a differentiable function of $\theta$, the gradient directly adjusts the Critic's prediction to bring it closer to the TD target.
+- **Critic path**: $\nabla_\phi L_{\text{critic}} = 2\delta \cdot \nabla_\phi V(s) = 2 \times 1.48 \cdot \nabla_\phi V(s) = 2.96 \cdot \nabla_\phi V(s)$. Since $V(s)$ is a differentiable function of the Critic parameters $\phi$ (and of the shared trunk $\theta$ in the `ActorCritic` class above), the gradient directly adjusts the Critic's prediction to bring it closer to the TD target.
 
 The complete computation chain for one update step:
 

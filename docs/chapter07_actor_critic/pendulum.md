@@ -1,5 +1,5 @@
 ---
-title: '7.4 Hands-on: Pendulum Swing-Up and Balance'
+title: '7.4 Hands-on: Pendulum Continuous Control'
 ---
 
 # 7.4 Hands-on: Pendulum Continuous Control
@@ -146,11 +146,13 @@ The `actor_loss` has a negative sign because the optimizer performs gradient des
 The `critic_loss` pushes the Critic's estimate toward the TD target. The final `entropy` term encourages the policy to retain some exploration and prevents the standard deviation from collapsing too early. The `0.5` and `0.001` above are illustrative loss coefficients: the Stable-Baselines3 script used in Section 7.4.5 sets the same value-function coefficient (`vf_coef=0.5`) but leaves the entropy bonus off (`ent_coef=0.0`), relying on the Gaussian's own sampling noise for exploration on this task.
 
 ::: tip Tanh squashing and the log-probability correction
-A Gaussian can sample any real number, but Pendulum only accepts $[-2, 2]$. The code squashes samples with $a = 2\tanh(u)$, $u \sim \mathcal{N}(\mu, \sigma^2)$. Squashing changes the density, so the log-probability of the executed (squashed) action needs the change-of-variables correction:
+A Gaussian can sample any real number, but Pendulum only accepts $[-2, 2]$. In the hand-rolled network above, the `tanh` squashes the _mean_ (`mu = torch.tanh(self.mu_head(features)) * 2.0`); the sampled action is then clipped to $[-2, 2]$. The SB3 A2C script used in Section 7.4.5 likewise samples an unsquashed Gaussian and clips to the action bounds, so its `log_prob` needs no Jacobian correction.
 
-$$\log \pi(a|s) = \log \mathcal{N}(u; \mu, \sigma) - \sum_i \log(1 - \tanh^2(u_i) + \epsilon),$$
+The correction is required only if the _sample itself_ is squashed, as in SAC-style policies with $a = 2\tanh(u)$, $u \sim \mathcal{N}(\mu, \sigma^2)$. Squashing changes the density, so the log-probability of the executed (squashed) action needs the change-of-variables correction:
 
-i.e. subtract the log-determinant of the $\tanh$ Jacobian (plus the constant $\log 2$ scaling). Skipping this correction biases the Actor gradient near the bounds, where $\tanh$ compresses hard. Libraries such as Stable-Baselines3 handle the squashed density internally; if you hand-roll the Gaussian head above, apply the correction before forming `actor_loss`.
+$$\log \pi(a|s) = \log \mathcal{N}(u; \mu, \sigma) - \sum_i \log\big(2(1 - \tanh^2(u_i)) + \epsilon\big),$$
+
+i.e. subtract the log-determinant of the $\tanh$ Jacobian including the factor of $2$ ($\log 2$ per dimension). Skipping this correction biases the Actor gradient near the bounds, where $\tanh$ compresses hard. If you hand-roll a sample-squashing Gaussian head, apply the correction before forming `actor_loss`.
 :::
 
 ## 7.4.5 Running the Training

@@ -15,7 +15,7 @@ title: '7.5 Hands-On: Reproducing AlphaGo'
 After learning policy gradients and Actor-Critic, we already have two weapons in hand:
 the **policy network** (deciding where to play next; review: [policy $\pi_\theta(a|s)$](../chapter06_policy_gradient/reinforce))
 and the **value network** (judging which side has the better prospects; review: [Critic $V(s)$](./critic-training)).
-In 2016, DeepMind's AlphaGo combined these two weapons with Monte Carlo Tree Search (MCTS) and defeated world champion Lee Sedol.
+In 2016, DeepMind's AlphaGo combined these two weapons with Monte Carlo Tree Search (MCTS) and defeated world champion Lee Sedol. [^1]
 This was one of the most widely recognized moments in the history of reinforcement learning.
 
 In this section, we reproduce AlphaGo's core idea with minimal code: we train an AI that can learn to play Go on a 6x6 board by self-play.
@@ -411,7 +411,7 @@ Pay attention to `-value` in `backpropagate`. This is the key to zero-sum games:
 what benefits Black harms White by the same amount. So as the perspective alternates each ply, the value must flip sign.
 
 ::: warning A simplification in the demo above
-The listing evaluates the value network even at terminal positions (no legal moves) and backpropagates that estimate. A production implementation would instead backpropagate the actual game outcome at terminal nodes and only call the value network at non-terminal leaves. On 6x6 the simplification keeps the code short, but expect slightly noisier training targets because of it.
+The listing evaluates the value network at every search leaf, including positions where the game has already ended (two consecutive passes), and backpropagates that estimate. A production implementation would check for termination first, backpropagate the actual game outcome at terminal nodes, and only call the value network at non-terminal leaves. On 6x6 the simplification keeps the code short, but expect slightly noisier training targets because of it.
 :::
 
 ## 7.5.5 Self-Play Training
@@ -624,7 +624,7 @@ Let's map each AlphaGo component back to what we have learned in this chapter:
 
 You can see the pattern: the core of AlphaGo is Actor-Critic plus MCTS search.
 The policy network (Actor) provides search priors; the value network (Critic) evaluates leaf nodes; MCTS integrates both into a stronger decision rule.
-This "Actor gives priors + Critic gives evaluations + search does the integration" template was later generalized by AlphaZero
+This "Actor gives priors + Critic gives evaluations + search does the integration" template was later generalized by AlphaZero [^2] [^3]
 to chess and shogi, and it influenced many subsequent RL algorithm designs.
 
 ## 7.5.8 Open-Source Projects and Datasets
