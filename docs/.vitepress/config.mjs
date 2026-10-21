@@ -953,7 +953,11 @@ const sidebar = {
               link: '/chapter10_offline_rl/experiments'
             },
             {
-              text: '10.4 Summary and Exercises',
+              text: '10.4 Lab: Offline RL from Fixed Datasets',
+              link: '/chapter10_offline_rl/lab'
+            },
+            {
+              text: '10.5 Summary and Exercises',
               link: '/chapter10_offline_rl/review'
             }
           ]

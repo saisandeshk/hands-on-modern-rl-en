@@ -1,8 +1,8 @@
 ---
-title: '10.L Lab: Offline RL from Fixed Datasets'
+title: 10.4 Lab: Offline RL from Fixed Datasets
 ---
 
-# 10.L Lab: Offline RL from Fixed Datasets
+# 10.4 Lab: Offline RL from Fixed Datasets
 
 In [10.1](./offline-data-distribution-shift) we diagnosed why offline RL is hard: the Bellman `max` queries actions the dataset never saw, the network extrapolates arbitrarily there, and the error is amplified by $1/(1-\gamma)$. In this lab you reproduce that failure with your own hands, fix it with the discrete version of the CQL penalty from Section 10.1, and then evaluate a policy you are not allowed to run, using the off-policy evaluation tools every offline project needs.
 
