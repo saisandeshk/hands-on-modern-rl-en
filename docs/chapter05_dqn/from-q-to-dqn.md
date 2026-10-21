@@ -1,5 +1,5 @@
 ---
-title: 5.1 Why DQN Is Needed
+title: 5.1 From Q-Learning to DQN
 ---
 
 # 5.1 From Q-Learning to DQN

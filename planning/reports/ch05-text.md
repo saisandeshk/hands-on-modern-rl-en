@@ -1,0 +1,48 @@
+# Report: ch05-text (Chapter 5 text pass)
+
+## Summary
+
+Reviewed all five pages in `docs/chapter05_dqn/` for technical correctness (re-derived equations, recomputed every numeric example, traced code snippets), fixed cross-references and stale chapter paths, added concise treatments for the missing/partial core curriculum items, and created the new `docs/chapter05_dqn/review.md` summary-and-exercises page. Build passes; no code, image, or component files touched.
+
+## Technical fixes
+
+1. **False paper attribution (dqn-components.md).** The page claimed "In its 2015 DQN paper DeepMind ran a comparison experiment" in which a no-replay Breakout agent "repeatedly learns the policy of bouncing the ball to the left." The Nature paper discusses replay's importance but contains no such specific Breakout anecdote. Rewrote as an unattributed illustrative mechanism ("Consider what happens without experience replay on Atari Breakout…"). Verified by: knowledge of the paper's contents; flagged rather than deleted since the mechanism itself is correct.
+2. **Wrong chapter paths (visual-game-projects.md).** Five references pointed at `chapter07_dqn/` (Classic Control install/run commands, Atari run command, Pokemon install/run commands, and a GIF render `--output docs/chapter07_dqn/images/…`). All corrected to `chapter05_dqn/`. Verified by: `code/chapter05_dqn/` directory listing (scripts exist there); `docs/chapter07_actor_critic/` is Actor-Critic, not DQN.
+3. **Misleading pipeline claim (visual-game-projects.md).** The Key Settings table described `buffer_size=10000` as "aligned with validated RL-Zoo Pong DQN pipeline." The script default is 100_000 and RL-Zoo Atari DQN uses 100_000; a 10k buffer combined with `learning_starts=100000` evicts 90k pre-learning transitions before the first update. Kept the command values (they may reflect the actual run) but replaced the justification with an accurate note about the small buffer holding only the most recent 10k transitions. Listed under Needs external verification.
+4. **Title/H1/sidebar mismatches.** `from-q-to-dqn.md` front matter said "5.1 Why DQN Is Needed" while H1 and sidebar say "5.1 From Q-Learning to DQN" → unified on the latter. `dqn-components.md` H1 said "5.2 DQN Structure and Implementation" while front matter and sidebar say "5.2 DQN Architecture and Implementation" → unified on the latter. `visual-game-projects.md` had no `title` front matter (only an `outline` block, unlike every other page) → added `title: '5.5 Hands-on: Visual Game Projects'` (quoted; unquoted colon broke the VitePress build — caught and fixed).
+5. **Overstated cross-reference (visual-game-projects.md).** Claimed Section 5.3 covers "Q-values, and ablation studies"; the LunarLander page covers curves, replays, and failure analysis but has no Q-value-evolution or ablation sections. Trimmed to what Section 5.3 contains.
+6. **Numeric spot-checks (all pass, no change needed).** Recomputed with `.venv/bin/python`: $50^6 = 1.5625\times10^{10}$ ✓; $0.99^{100}\approx0.366$, $0.9^{100}\approx2.7\times10^{-5}$ ✓; all four $\varepsilon$-decay table columns ($0.95/0.99/0.995/0.999$ at 100/200/400 episodes) ✓; MLP parameter count $4{\times}128{+}128{+}128{\times}128{+}128{+}128{\times}2{+}2 = 17410 \approx 17000$ ✓; moving-target example $1+0.99\times8.0=8.92$ ✓; Baird-sketch growth $1.08^3 = 1.259712$ ✓; review-exercise answers ($3.92^2 = 15.3664$, PER weights $[9.0,1.8,0.9,0.45]\to[1.0,0.2,0.1,0.05]$, dueling Q $[6,4,8,2]$) ✓.
+
+## Other changes
+
+Added compact curriculum treatments to `dqn-components.md` (existing flow preserved; all new material in subsections/`details` blocks):
+
+- Semi-gradient update equation, MSVE vs Bellman-error distinction, linear features/state aggregation and the projected fixed point (Tsitsiklis & Van Roy), plus a hand-verified two-state Baird-style divergence sketch ($w_{k+1} = 1.08\,w_k$).
+- Replay age / policy drift / update-to-data ratio / transition immutability box; reward-scale/clipping/observation-scaling box.
+- Polyak soft-update equation with $\tau = 0.005$, hard-vs-soft target-lag discussion (notes the chapter scripts use hard updates with `tau=1.0`, confirmed in `code/chapter05_dqn/dqn_atari_sb3.py:305`).
+- Diagnostics box (fixed reference batch: mean Q, target scale, |TD error|, gradient norm) plus checkpoint-everything and fixed-batch differential-test boxes.
+- Created `docs/chapter05_dqn/review.md`: 8 learning outcomes, 8 key equations with one-line readings, 6 pitfalls, 10 exercises (conceptual, derivations, hand computations, 2 code exercises on `code/chapter05_dqn/`, 1 task-suitability design question) with fully worked solutions.
+
+Coverage table (RL-3 checklist): covered — value-function approximation/generalization, semi-gradient TD, MSVE/Bellman-error, on-policy prediction (linear projected fixed point), off-policy bootstrapping/triad, Baird mechanism, neural action values, buffer capacity/sampling, transition immutability/aliasing, replay age/drift/nonstationary data, target networks + hard intervals, Polyak updates, DQN targets/gather/detach, reward clipping/observation scaling, Q-scale diagnostics, target lag/replay ratio/UTD, maximization bias/double, fixed-batch differential tests, checkpointing, train/eval exploration separation, dueling, PER + corrections, distributional value. Partial (intentionally brief, per Depth/Later tags): linear features/projected solutions (short paragraph), distributional learning (already had a paragraph; kept). Missing: none in-scope (general nonlinear off-policy convergence theory is marked Later).
+
+## Needs external verification
+
+- Whether the Pong long-run actually used `--buffer-size 10000` with `--learning-starts 100000` (wasteful but functional) or whether `10000` is a typo for the Zoo/script default `100000`. I kept the printed values and fixed only the justification.
+- LunarLander/Atari reported curves and episode numbers (e.g. `253.12`, Pong table) cannot be re-verified offline; left untouched.
+- Error message in `code/chapter05_dqn/dqn_atari_sb3.py:294` references `chapter04_dqn/requirements.txt` (should be `chapter05_dqn`); code belongs to another worker, so I did not edit it — flagging for them.
+
+## Sidebar additions
+
+- `5.R Summary and Exercises` → `/chapter05_dqn/review` (new page; coordinator to place after 5.5 and renumber as needed).
+
+## Commands run and results
+
+- `npx prettier --write` on all six files (review.md + 5 existing): clean.
+- `npx vitepress build docs`: initially failed on unquoted `title: 5.5 Hands-on: …` YAML colon; fixed with quotes; rebuild succeeds.
+- `.venv/bin/python -c` arithmetic checks for all numbers above: all match.
+- No code tests apply (no `code/` edits allowed); code snippets in text were traced by hand against `code/chapter05_dqn/*.py` argument names.
+
+## Open issues
+
+- `dqn-family.md` has an end-of-page Exercises 1–6 list that overlaps with the new `review.md` exercises; left as-is to avoid scope creep, but the coordinator may want to deduplicate.
+- `dqn-components.md` pseudocode uses generic SGD ($\theta \leftarrow \theta - \alpha\nabla\mathcal{L}$) while the code uses Adam; noted in text as pseudocode-level, acceptable.

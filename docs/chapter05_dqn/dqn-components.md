@@ -2,7 +2,7 @@
 title: 5.2 DQN Architecture and Implementation
 ---
 
-# 5.2 DQN Structure and Implementation
+# 5.2 DQN Architecture and Implementation
 
 ## Reading Guide
 
@@ -141,6 +141,30 @@ The outer $\mathbb{E}$ means "average over all possible transitions $(s, a, r, s
 
 Putting the four blocks together: the training process of a deep Q-network is to keep sampling from the experience replay buffer, compute the TD target (the reference answer), compare it with the network output (the student's answer), compute the loss as a mean squared error, and then update the parameters $\theta$ by backpropagation. In essence it is exactly the same as the tabular Q-Learning method, except that the parameters are now updated by gradient descent instead of directly modifying numbers in a table.
 
+### Semi-Gradient, MSVE, and the Bellman Error
+
+The loss above looks like ordinary supervised regression, but one detail makes it different: when we differentiate $\mathcal{L}(\theta)$, the TD target $y$ is treated as a constant. In code this is the `torch.no_grad()` block around the target-network forward pass. The gradient used is therefore
+
+$$
+\nabla_\theta \mathcal{L} \approx -2\,\mathbb{E}\left[\left(y - Q(s,a;\theta)\right)\nabla_\theta Q(s,a;\theta)\right], \qquad y\ \text{held fixed},
+$$
+
+which is called a **semi-gradient** update: it ignores the fact that $y$ itself depends on the parameters (through the periodically synced $\theta^-$). It is not the gradient of any fixed objective, which is one reason DQN can oscillate even when the loss looks well-behaved.
+
+Two error measures are worth keeping apart here. The **mean-squared value error (MSVE)**, $\mathbb{E}[(Q(s,a;\theta) - Q^\pi(s,a))^2]$, measures distance to the true values, but it cannot be computed because the true values are unknown. The **Bellman error**, $\mathbb{E}[(Q - \mathcal{T}Q)^2]$ with $\mathcal{T}$ the Bellman optimality operator, is what the DQN loss approximates with samples. Minimizing the Bellman error is not the same as minimizing the MSVE once function approximation is used: the two weight states differently, and the network can reduce the Bellman error by distorting values where it matters least for the MSVE.
+
+The linear case makes this concrete. With linear features $Q(s,a) = \phi(s,a)^\top w$ (state aggregation, where $\phi$ is a one-hot cell indicator, is the special case of piecewise-constant features), on-policy TD converges to the **projected Bellman fixed point** — the best approximation within the feature span under the sampling distribution — not to the MSVE minimizer (Tsitsiklis & Van Roy, 1997). Neural networks leave even this guarantee behind: with nonlinear approximation plus bootstrapping plus off-policy data (the deadly triad of Section 5.1), convergence is no longer assured at all.
+
+::: details A two-state sketch of Baird-style divergence
+Baird's counterexample (1995) uses 7 states and linear features to show that off-policy bootstrapping with function approximation can diverge even when the true values are all zero. The mechanism distills to two states. Let $V(s_1; w) = w$, $V(s_2; w) = 2w$ (one shared parameter, so the states alias each other), $\gamma = 0.9$, reward $0$, and suppose the off-policy buffer keeps feeding the transition $s_1 \to s_2$. The semi-gradient TD update from this transition is
+
+$$
+\Delta w = \alpha\big(0 + \gamma V(s_2) - V(s_1)\big)\cdot 1 = \alpha(0.9 \cdot 2w - w) = 0.8\,\alpha\, w.
+$$
+
+Starting from $w_0 = 1$ with $\alpha = 0.1$, each update multiplies $w$ by $1.08$: $1.0, 1.08, 1.17, \ldots$, diverging away from the correct fixed point $w = 0$. The update generalizes from $s_1$ to $s_2$ through the shared parameter, the bootstrapped target grows with the prediction, and the error amplifies instead of shrinking. DQN's target network and diverse replay data are pragmatic brakes on exactly this positive-feedback loop.
+:::
+
 There is, however, a key detail we have mentioned repeatedly but not yet explained: how exactly do the "expectation" and the "random sampling" above work in practice? Why can we not simply train on the single piece of data the agent has just experienced? This leads to the second component.
 
 ## Experience Replay
@@ -149,7 +173,7 @@ The outer $\mathbb{E}$ of the loss function asks us to average over all transiti
 
 This means that if we train the network directly on the data just experienced, adjacent samples are almost identical. In CartPole, the observation vectors of two consecutive frames may differ only in the digits after the decimal point. Deep learning requires data to be approximately independent and identically distributed (i.i.d.), and when training on such highly correlated data the gradient direction is dominated by the experience of the last few steps, and the network "forgets" what it learned before.
 
-This is by no means an abstract theoretical worry. In its 2015 DQN paper DeepMind ran a comparison experiment: without experience replay, the agent on Atari Breakout repeatedly learns the policy of "bounce the ball to the left," because for hundreds of consecutive frames the ball bounces on the left. When the ball returns to the right, the network has already forgotten how to play the right side and has to learn it again from scratch. With experience replay, a batch can contain very different scenes at once, such as "ball in the upper left," "ball at the right edge," and "ball about to land," and only then can the network learn to handle all kinds of situations at the same time. A similar phenomenon appears in autonomous driving: if the model is trained only on the most recent 10 seconds of continuous data, it may learn to handle only "a straight road on a sunny day" and have no idea how to respond to a curve in the rain.
+This is not just an abstract theoretical worry. Consider what happens without experience replay on Atari Breakout: for hundreds of consecutive frames the ball bounces on the left side, so a network trained on consecutive frames in time order repeatedly sees "bounce the ball to the left." When the ball returns to the right, the network has already forgotten how to play the right side and has to learn it again from scratch. With experience replay, a batch can contain very different scenes at once, such as "ball in the upper left," "ball at the right edge," and "ball about to land," and only then can the network learn to handle all kinds of situations at the same time. A similar phenomenon appears in autonomous driving: if the model is trained only on the most recent 10 seconds of continuous data, it may learn to handle only "a straight road on a sunny day" and have no idea how to respond to a curve in the rain.
 
 The solution of experience replay is simple but effective: store every transition $(s, a, r, s', d)$ that has been experienced in a buffer, and sample a small batch at random for each training step. Random sampling breaks temporal correlation. A batch may contain failed experience from early training and successful experience from later, so the gradient directions are more diverse.
 
@@ -219,6 +243,14 @@ Experience replay has three benefits:
 
 The size of the replay buffer is a hyperparameter that needs tuning. If it is too small, the experience in the buffer is not diverse enough and training works poorly. If it is too large, outdated experience from long ago (produced by a Q-network that was not yet accurate at the time) is still sampled and may slow convergence. Commonly used capacities in practice are $10^4$ to $10^6$.
 
+::: details Replay age, update-to-data ratio, and what the buffer freezes in place
+Three practical properties of the buffer deserve attention. First, **stored transitions are immutable**: once $(s,a,r,s',d)$ is written, its reward and termination flag never change. If you redefine the reward function or fix a termination bug mid-project, old entries silently carry the old semantics — version the buffer or re-collect after such changes. Second, **replay age and policy drift**: the buffer mixes data from many past policies, so training is always off-policy to some degree. Q-Learning tolerates this in principle, but a buffer full of ancient random-play data slows learning, while a tiny buffer contains only the current policy's failures. Capacity therefore trades diversity against staleness. Third, the **update-to-data (replay ratio)**: our loop performs one gradient update per environment step (ratio 1), while the Atari script in Section 5.5 uses `train_freq=4` (ratio $1/4$). Raising the ratio reuses data more aggressively but can overfit to whatever the buffer currently holds, especially early on when the buffer is small.
+:::
+
+::: details Reward scale, clipping, and observation scaling
+Gradient steps care about absolute numbers, so reward scale is an optimization choice, not just a task definition. Atari scores range from single points (Pong) to thousands (Seaquest); the SB3 `AtariWrapper` used in Section 5.5 therefore clips rewards to $\pm 1$ and scales pixels to $[0,1]$. This unifies the TD-target scale across games and keeps one learning rate working everywhere — but it changes the objective: a clipped agent cannot distinguish a 1-point event from a 100-point event. LunarLander in Section 5.3 needs no clipping because its rewards already live on a moderate scale. Rule of thumb: keep the raw reward if TD targets stay in the tens-to-hundreds range; clip or normalize when raw scores span orders of magnitude, and remember the agent then optimizes the transformed game.
+:::
+
 Experience replay solves the problems of "where the data comes from" and "sample correlation." One problem remains unsolved, however: the TD target $r + \gamma \max_{a'} Q(s', a'; \theta^-)$ in the loss function can itself be unstable. If the TD target changes in step with the network parameters, the network faces a new target after every update, and the optimization becomes hard to converge. This leads to the third and last component.
 
 ## The Target Network
@@ -244,6 +276,14 @@ with torch.no_grad():
 As a result, between two parameter copies the TD target is fixed, and the target no longer moves around. The Q-network can learn calmly toward a stable target instead of chasing a moving one. Updating the target network every fixed number of steps amounts to moving the target to a new position from time to time, giving the Q-network a more accurate target to chase.
 
 The update frequency of the target network is another hyperparameter. If it is updated too often (for example, at every step), the target network is almost identical to the Q-network and does not stabilize anything. If it is updated too rarely (for example, only every 10000 steps), the TD target given by the target network is too stale, and what the Q-network learns may be outdated information. Update frequencies commonly used in practice are once every 100 to 1000 steps.
+
+The hard copy $\theta^- \leftarrow \theta$ is one of two standard choices. The other is the **Polyak (soft) update**, which nudges the target parameters toward the online ones every step:
+
+$$
+\theta^- \leftarrow \tau\,\theta + (1 - \tau)\,\theta^-, \qquad 0 < \tau \ll 1
+$$
+
+with $\tau = 0.005$ a common value (later popularized by DDPG for continuous control; see Chapter 9). A hard copy holds the target perfectly still and then jumps; Polyak averaging moves it continuously but slowly. Both control the same quantity, **target lag**: too little lag (copy every step, or $\tau$ near 1) and the target network is a useless duplicate of the online network; too much lag and the Q-network chases outdated values. The scripts in this chapter use hard updates (`tau=1.0` with a periodic copy), matching the original DQN paper.
 
 ## Implementing DQN from Scratch
 
@@ -539,6 +579,22 @@ In this training loop, every action step is immediately followed by one round of
 :::
 
 At this point a complete DQN has been built from scratch. The core of the whole implementation is the `update()` method: the forward pass computes the Q values and the TD target, MSE computes the loss, and backpropagation updates the parameters. The rest of the code (the network definition, the replay buffer, action selection, and the training loop) all serves this logic.
+
+### Watching Training the Right Way: Diagnostics and Checkpoints
+
+The loss curve alone is a poor health metric for DQN, because the target moves: a falling loss can mean the predictions caught up with a stale target, not that the policy improved. Track these instead, evaluated on a **fixed reference batch** sampled once and reused, so changes reflect the network and not sampling noise:
+
+- **Mean predicted Q** on the reference batch: should rise smoothly toward a plausible return scale (tens to hundreds on CartPole). Q values exploding into the thousands signal the Baird-style feedback loop above.
+- **Mean TD target and mean absolute TD error**: the target scale tells you what the network is chasing; a shrinking absolute TD error with a stable target scale is the real sign of convergence.
+- **Gradient norm** (before clipping): occasional spikes are normal in RL, but a steadily growing norm means the clipping threshold, not the learning rate, is doing the optimization.
+
+::: details Checkpoint everything, not just the weights
+Resuming or reproducing a run needs the full training state: both networks' parameters, the optimizer state (Adam's momenta), the replay buffer contents, the $\varepsilon$ schedule position, and the random seeds (Python, NumPy, Torch, environment). The SB3 scripts in Sections 5.3 and 5.5 save model and optimizer state in `final_model.zip` and periodic checkpoints, which covers weights and optimizer but not the buffer or RNG streams — exact resumption needs those too. At minimum, record the code version, hyperparameters, and seed alongside every checkpoint, or a "good result" may prove unreproducible.
+:::
+
+::: details A fixed-batch differential test
+When comparing two update variants (for example, one-step vs Double targets), do not compare two live training runs: sampling noise drowns the signal. Instead, sample one fixed batch, clone the network, apply $N$ updates of each variant to the clones, and compare the resulting predictions and TD errors on a held-out batch. Same data, same starting point — any difference is the update rule's doing. This is the cheapest reliable way to test a DQN idea before spending a full training run on it.
+:::
 
 ## Learning and Inference: Two Uses of the Same Network
 
