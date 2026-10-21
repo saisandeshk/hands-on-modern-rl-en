@@ -1,6 +1,6 @@
-# 16.8 Hands-On: veRL Code Generation RL Experiment
+# 15.8 Hands-On: veRL Code Generation RL Experiment
 
-This directory holds the companion code for _Hands-On Modern Reinforcement Learning_, [Section 16.8](../../../docs/chapter15_grpo/verl-code-sandbox.md): **running PPO training on a code generation task with veRL**.
+This directory holds the companion code for _Hands-On Modern Reinforcement Learning_, [Section 15.8](../../../docs/chapter15_grpo/verl-code-sandbox.md): **running PPO training on a code generation task with veRL**.
 
 Code problems share a key advantage with math problems: the answer isn't graded by a human, it **can be verified by running tests**. Passing the tests earns positive reward, failing earns low reward — this is "hard feedback." This section is about getting a model to write programs that actually run.
 
@@ -8,13 +8,13 @@ Code problems share a key advantage with math problems: the answer isn't graded 
 
 This dataset is easy to get confused about (see [issue #53](https://github.com/walkinglabs/hands-on-modern-rl/issues/53)). It is **not** in the HumanEval-style format with `entry_point` / `tests` fields; its real structure is:
 
-| Field          | Meaning                                                                                                                                                  |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `prompt`       | Chat message list. `system` is the PRIME reasoning-action template (`[ASSESS]`/`[ADVANCE]`…); `user` holds the actual problem                             |
-| `ability`      | `"math"` or `"code"`; this experiment uses only `code` (25,276 train / 1,024 val samples)                                                                |
+| Field          | Meaning                                                                                                                                                                  |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `prompt`       | Chat message list. `system` is the PRIME reasoning-action template (`[ASSESS]`/`[ADVANCE]`…); `user` holds the actual problem                                            |
+| `ability`      | `"math"` or `"code"`; this experiment uses only `code` (25,276 train / 1,024 val samples)                                                                                |
 | `reward_model` | `{"ground_truth": <answer>, "style": "rule"}`. For code samples, `ground_truth` is a JSON string `{"inputs": [...], "outputs": [...]}`, i.e. **stdin/stdout test pairs** |
-| `data_source`  | Origin: `codecontests` / `taco` / `apps` / `codeforces`                                                                                                  |
-| `extra_info`   | `{index, split}`                                                                                                                                         |
+| `data_source`  | Origin: `codecontests` / `taco` / `apps` / `codeforces`                                                                                                                  |
+| `extra_info`   | `{index, split}`                                                                                                                                                         |
 
 In other words, these are **competitive-programming problems that read from stdin and write to stdout**, not "implement this function signature" problems. The verification info lives in `reward_model.ground_truth`, and veRL passes it to the reward function at training time.
 
@@ -105,11 +105,11 @@ REWARD=(
 
 ## File overview
 
-| File                               | Purpose                                                                        |
-| ---------------------------------- | ------------------------------------------------------------------------------ |
+| File                               | Purpose                                                                                         |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `prepare_data.py`                  | Download Eurus-2-RL-Data → filter code samples → rebuild chat-format prompts → sample → parquet |
-| `code_reward.py`                   | I/O-style reward: extract code → run stdin/stdout tests in a subprocess → return the pass rate |
-| `run_qwen_coder_ppo_single_gpu.sh` | Single-GPU 0.5B PPO launch script (including `custom_reward_function` wiring)   |
+| `code_reward.py`                   | I/O-style reward: extract code → run stdin/stdout tests in a subprocess → return the pass rate  |
+| `run_qwen_coder_ppo_single_gpu.sh` | Single-GPU 0.5B PPO launch script (including `custom_reward_function` wiring)                   |
 
 ## Environment notes
 

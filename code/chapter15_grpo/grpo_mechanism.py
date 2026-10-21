@@ -1,5 +1,5 @@
 """
-Chapter 9: GRPO Core Mechanism Demo — Group Relative Policy Optimization
+Chapter 15: GRPO Core Mechanism Demo — Group Relative Policy Optimization
 ==========================================================
 
 This script uses synthetic data to walk step by step through the core idea of
@@ -29,8 +29,8 @@ import matplotlib.pyplot as plt
 # Create the output directory
 os.makedirs("output", exist_ok=True)
 
-# Set a CJK-capable font so chart titles and labels render correctly
-plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'SimHei']
+# Use a plain sans-serif font stack (English-only labels)
+plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial']
 plt.rcParams['axes.unicode_minus'] = False
 
 

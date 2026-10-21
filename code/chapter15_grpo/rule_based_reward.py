@@ -1,5 +1,5 @@
 """
-Chapter 9: Verifiable Reward Function — The Core Component of RLVR
+Chapter 15: Verifiable Reward Function — The Core Component of RLVR
 ==========================================================
 
 This script implements the rule-based reward functions commonly used in
@@ -28,8 +28,8 @@ def check_answer_correctness(response, ground_truth):
 
     Extraction rules:
       1. Prefer extracting from \\boxed{...} (LaTeX format)
-      2. If there's no boxed answer, try to match patterns like "答案是..." ("the answer is..."),
-         "最终答案为..." ("the final answer is...")
+      2. If there is no boxed answer, try English markers like "The answer is ...",
+         "The final answer is ..."
       3. Supports integers, decimals, fractions, percentages, negative numbers, etc.
 
     Args:
@@ -52,22 +52,22 @@ def check_answer_correctness(response, ground_truth):
         extracted = boxed_match.group(1).strip()
         method = "\\boxed{} extraction"
 
-    # Method 2: match Chinese patterns like "答案是/为/：" ("the answer is/:")
+    # Method 2: match English answer markers like "The answer is:" / "The final answer is:"
     if extracted is None:
-        cn_patterns = [
-            r'答案[是为：:]\s*([+-]?\d+\.?\d*)',       # "答案是 42" ("the answer is 42")
-            r'最终答案[是为：:]\s*([+-]?\d+\.?\d*)',    # "最终答案为 42" ("the final answer is 42")
-            r'结果[是为：:]\s*([+-]?\d+\.?\d*)',         # "结果是 42" ("the result is 42")
-            r'所以[，,]\s*(?:答案[是为])?\s*([+-]?\d+\.?\d*)',  # "所以答案是 42" ("so the answer is 42")
+        answer_patterns = [
+            r'[Tt]he answer is\s*:?\s*([+-]?\d+\.?\d*)',
+            r'[Ff]inal answer is\s*:?\s*([+-]?\d+\.?\d*)',
+            r'[Tt]he result is\s*:?\s*([+-]?\d+\.?\d*)',
+            r'[Ss]o[,.]?\s*(?:the answer is\s*)?([+-]?\d+\.?\d*)',
         ]
-        for pattern in cn_patterns:
+        for pattern in answer_patterns:
             match = re.search(pattern, response)
             if match:
                 extracted = match.group(1).strip()
-                method = "Chinese pattern match"
+                method = "English pattern match"
                 break
 
-    # Method 3: match English patterns like "The answer is ..."
+    # Method 3: match "Therefore ..." style closings
     if extracted is None:
         en_patterns = [
             r'[Tt]he answer is\s*([+-]?\d+\.?\d*)',
@@ -118,8 +118,8 @@ def check_format(response):
     Check whether the response has a well-structured reasoning format
 
     Checks performed:
-      1. Whether it contains reasoning step markers (e.g. "步骤" ("step"), "第X步" ("step X"), "Step", etc.)
-      2. Whether it contains a final-answer marker (e.g. "答案" ("answer"), "\\boxed{}", etc.)
+      1. Whether it contains reasoning step markers (e.g. "Step 1", "Step", "First", etc.)
+      2. Whether it contains a final-answer marker (e.g. "Answer", "\\boxed{}", etc.)
       3. Whether the response length is reasonable (not too short, not too long)
       4. Whether it contains a mathematical expression
 
@@ -135,11 +135,10 @@ def check_format(response):
 
     # Check 1: reasoning step markers (0.25 points)
     step_patterns = [
-        r'步骤\s*\d',         # "步骤1" ("step 1")
-        r'第\s*\d+\s*步',     # "第1步" ("step 1")
         r'[Ss]tep\s*\d',      # "Step 1"
         r'\d+\)\s',           # "1) "
-        r'首先|然后|接着|最后',  # Chinese connective words (first/then/next/finally)
+        r'[Ff]irst|[Tt]hen|[Nn]ext|[Ff]inally',
+        r'Step 1|Step 2|First,|Then,',
     ]
     has_steps = any(re.search(p, response) for p in step_patterns)
     details["has_step_markers"] = 0.25 if has_steps else 0.0
@@ -147,9 +146,9 @@ def check_format(response):
     # Check 2: final-answer marker (0.25 points)
     answer_patterns = [
         r'\\boxed\{',         # LaTeX format
-        r'答案[是为：:]',       # Chinese marker ("the answer is:")
         r'[Tt]he answer is',  # English marker
-        r'最终结果',           # Chinese marker ("final result")
+        r'[Ff]inal (?:answer|result)',
+        r'[Aa]nswer\s*:',
     ]
     has_answer = any(re.search(p, response) for p in answer_patterns)
     details["has_answer_marker"] = 0.25 if has_answer else 0.0
@@ -165,9 +164,9 @@ def check_format(response):
 
     # Check 4: contains a math expression (0.25 points)
     math_patterns = [
-        r'\d+\s*[+\-*/×÷]\s*\d+',   # arithmetic operation: 3 + 5
-        r'\d+\s*[=＝]\s*\d+',        # equation: x = 10
-        r'[（(][^)]*[)）]',          # parenthesized expression
+        r'\d+\s*[+\-*/]\s*\d+',   # arithmetic operation: 3 + 5
+        r'\d+\s*[=]\s*\d+',        # equation: x = 10
+        r'\([^)]*\)',          # parenthesized expression
         r'\\frac|\\sqrt|\\times',     # LaTeX math commands
     ]
     has_math = any(re.search(p, response) for p in math_patterns)
@@ -205,7 +204,7 @@ def check_reasoning_quality(response):
 
     # Dimension 1: number of reasoning steps (0 ~ 0.3 points)
     # Use the number of sentences/lines in the response as a proxy for reasoning steps
-    sentences = re.split(r'[。.！!？?\n]', response)
+    sentences = re.split(r'[.!?\n]', response)
     sentences = [s.strip() for s in sentences if len(s.strip()) > 3]
     num_steps = len(sentences)
     if num_steps >= 5:
@@ -220,9 +219,9 @@ def check_reasoning_quality(response):
     # Dimension 2: intermediate computation results (0 ~ 0.3 points)
     # Check for "=" or other computation markers
     calc_patterns = [
-        r'\d+\s*[+－\-]\s*\d+\s*[=＝]\s*\d+',   # addition/subtraction
-        r'\d+\s*[*×]\s*\d+\s*[=＝]\s*\d+',       # multiplication
-        r'\d+\s*[/÷]\s*\d+\s*[=＝]\s*[\d.]+',   # division
+        r'\d+\s*[+\-]\s*\d+\s*=\s*\d+',   # addition/subtraction
+        r'\d+\s*[*]\s*\d+\s*=\s*\d+',       # multiplication
+        r'\d+\s*/\s*\d+\s*=\s*[\d.]+',   # division
         r'=+\s*\d+',                              # "=" followed by a number
     ]
     calc_count = sum(len(re.findall(p, response)) for p in calc_patterns)
@@ -235,10 +234,10 @@ def check_reasoning_quality(response):
 
     # Dimension 3: logical connectives (0 ~ 0.2 points)
     logic_words = [
-        '因此', '所以', '因为', '由于', '于是',
-        '那么', '从而', '也就是说', '换句话说',
-        '根据', '根据题意', '由题意可知',
-        '首先', '然后', '接着', '最后',
+        'therefore', 'so', 'because', 'since', 'thus',
+        'then', 'hence', 'that is', 'in other words',
+        'according to', 'given that', 'we know that',
+        'first', 'then', 'next', 'finally',
     ]
     logic_count = sum(1 for word in logic_words if word in response)
     if logic_count >= 3:
@@ -251,11 +250,10 @@ def check_reasoning_quality(response):
     # Dimension 4: no obvious errors (0 ~ 0.2 points)
     # Check for common reasoning errors
     error_patterns = [
-        r'除以\s*0',           # divide by zero (Chinese)
-        r'÷\s*0',             # divide by zero (symbol form)
+        r'divide[sd]?\s+by\s+0',   # divide by zero
         r'/\s*0(?!\d)',        # divide by zero (slash form)
-        r'负数.*开方',         # square root of a negative number
-        r'负数.*开根号',       # square root of a negative number (alt phrasing)
+        r'square root of a negative',
+        r'sqrt\(\s*-',
     ]
     has_errors = any(re.search(p, response) for p in error_patterns)
     details["no_errors"] = 0.0 if has_errors else 0.20
@@ -375,11 +373,11 @@ def run_tests():
             "label": "Perfect answer",
             "ground_truth": "42",
             "response": (
-                "我们来一步步解决这个问题。\n"
-                "步骤1：根据题意，小明有 15 个苹果，小红给了他 27 个。\n"
-                "步骤2：所以总数 = 15 + 27 = 42。\n"
-                "因此，小明现在一共有 42 个苹果。\n"
-                "答案是：42"
+                "Let us solve this step by step.\n"
+                "Step 1: Ming has 15 apples and Hong gives him 27.\n"
+                "Step 2: So the total = 15 + 27 = 42.\n"
+                "Therefore, Ming now has 42 apples in total.\n"
+                "The answer is: 42"
             ),
         },
         {
@@ -391,26 +389,26 @@ def run_tests():
             "label": "Incorrect answer but detailed reasoning",
             "ground_truth": "42",
             "response": (
-                "首先，我们需要计算苹果的总数。\n"
-                "根据题意，小明有 15 个苹果，小红给了他 27 个。\n"
-                "然后，我们计算 15 + 27 = 35。\n"
-                "所以，总数 = 35 个苹果。\n"
-                "由于这个加法比较简单，我们直接得出结果。\n"
-                "答案是：35"
+                "First, we need the total number of apples.\n"
+                "Ming has 15 apples and Hong gives him 27.\n"
+                "Then we compute 15 + 27 = 35.\n"
+                "So the total = 35 apples.\n"
+                "Since this addition is simple, we conclude directly.\n"
+                "The answer is: 35"
             ),
         },
         {
             "label": "Fully non-compliant",
             "ground_truth": "42",
-            "response": "不知道",
+            "response": "I do not know",
         },
         {
             "label": "LaTeX-formatted answer",
             "ground_truth": "36",
             "response": (
-                "首先，根据题意我们需要计算 4 × 9。\n"
-                "第1步：4 × 9 = 36\n"
-                "所以答案是 \\boxed{36}"
+                "First, we need to compute 4 x 9.\n"
+                "Step 1: 4 x 9 = 36\n"
+                "So the answer is \\boxed{36}"
             ),
         },
     ]

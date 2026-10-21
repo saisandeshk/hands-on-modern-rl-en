@@ -1,5 +1,5 @@
 """
-Chapter 7: DPO Math Reasoning Alignment -- Training Math Preferences with Rule-Based Signals
+Chapter 14: DPO Math Reasoning Alignment -- Training Math Preferences with Rule-Based Signals
 ==========================================================
 
 This script demonstrates how to apply DPO to the math reasoning domain:
@@ -45,63 +45,63 @@ def create_math_preference_data():
 
     math_examples = [
         {
-            "prompt": "小明有 15 个苹果，给了小红 7 个，又买了 3 个。请问小明现在有几个苹果？",
-            "chosen": "我们一步步来算。\n第一步：小明原来有 15 个苹果。\n第二步：给了小红 7 个，所以剩下 15 - 7 = 8 个。\n第三步：又买了 3 个，所以现在有 8 + 3 = 11 个。\n答：小明现在有 11 个苹果。",
-            "rejected": "小明原来有 15 个苹果。\n给了小红 7 个，剩下 15 - 7 = 9 个。（错误：15-7=8，不是9）\n又买了 3 个，所以有 9 + 3 = 12 个。\n答：小明现在有 12 个苹果。",
+            "prompt": "Ming has 15 apples, gives 7 to Hong, then buys 3 more. How many apples does Ming have now?",
+            "chosen": "Let us work through it.\nStep 1: Ming starts with 15 apples.\nStep 2: He gives 7 to Hong, so 15 - 7 = 8 remain.\nStep 3: He buys 3 more, so now he has 8 + 3 = 11.\nAnswer: Ming now has 11 apples.",
+            "rejected": "Ming starts with 15 apples.\nHe gives 7 to Hong, leaving 15 - 7 = 9. (Error: 15-7=8, not 9)\nHe buys 3 more, so 9 + 3 = 12.\nAnswer: Ming now has 12 apples.",
             "answer": 11,
         },
         {
-            "prompt": "一本书有 240 页，小红每天看 30 页，看了 5 天。还剩多少页没看？",
-            "chosen": "我们一步步来算。\n第一步：小红每天看 30 页，看了 5 天。\n第二步：已经看了 30 × 5 = 150 页。\n第三步：总共有 240 页，所以还剩 240 - 150 = 90 页。\n答：还剩 90 页没看。",
-            "rejected": "小红每天看 30 页，看了 5 天。\n已经看了 30 + 5 = 35 页。（错误：应该用乘法，不是加法）\n还剩 240 - 35 = 205 页。\n答：还剩 205 页没看。",
+            "prompt": "A book has 240 pages. Hong reads 30 pages a day for 5 days. How many pages are left unread?",
+            "chosen": "Let us work through it.\nStep 1: Hong reads 30 pages a day for 5 days.\nStep 2: She has read 30 x 5 = 150 pages.\nStep 3: The book has 240 pages, so 240 - 150 = 90 remain.\nAnswer: 90 pages are left unread.",
+            "rejected": "Hong reads 30 pages a day for 5 days.\nShe has read 30 + 5 = 35 pages. (Error: use multiplication, not addition)\nSo 240 - 35 = 205 remain.\nAnswer: 205 pages are left unread.",
             "answer": 90,
         },
         {
-            "prompt": "一个长方形的长是 12 厘米，宽是 8 厘米，求面积。",
-            "chosen": "长方形的面积 = 长 × 宽。\n长 = 12 厘米，宽 = 8 厘米。\n面积 = 12 × 8 = 96 平方厘米。\n答：面积是 96 平方厘米。",
-            "rejected": "长方形的面积 = 长 + 宽。（错误：面积是乘法，不是加法）\n面积 = 12 + 8 = 20 平方厘米。\n答：面积是 20 平方厘米。",
+            "prompt": "A rectangle is 12 cm long and 8 cm wide. Find its area.",
+            "chosen": "Area of a rectangle = length x width.\nLength = 12 cm, width = 8 cm.\nArea = 12 x 8 = 96 square cm.\nAnswer: the area is 96 square cm.",
+            "rejected": "Area of a rectangle = length + width. (Error: area uses multiplication, not addition)\nArea = 12 + 8 = 20 square cm.\nAnswer: the area is 20 square cm.",
             "answer": 96,
         },
         {
-            "prompt": "商店里有 36 个篮球和 24 个足球，篮球比足球多几个？",
-            "chosen": "篮球有 36 个，足球有 24 个。\n篮球比足球多 36 - 24 = 12 个。\n答：篮球比足球多 12 个。",
-            "rejected": "篮球有 36 个，足球有 24 个。\n篮球和足球一共 36 + 24 = 60 个。（错误：题目问的是差值，不是总数）\n答：篮球比足球多 60 个。",
+            "prompt": "A shop has 36 basketballs and 24 soccer balls. How many more basketballs than soccer balls?",
+            "chosen": "There are 36 basketballs and 24 soccer balls.\nThere are 36 - 24 = 12 more basketballs.\nAnswer: 12 more basketballs.",
+            "rejected": "There are 36 basketballs and 24 soccer balls.\nTogether that is 36 + 24 = 60. (Error: the question asks for the difference, not the total)\nAnswer: 60 more basketballs.",
             "answer": 12,
         },
         {
-            "prompt": "一箱橘子有 48 个，平均分给 6 个小朋友，每人能分几个？",
-            "chosen": "总共 48 个橘子，平均分给 6 个小朋友。\n每人分到 48 ÷ 6 = 8 个。\n答：每人能分到 8 个橘子。",
-            "rejected": "总共 48 个橘子，平均分给 6 个小朋友。\n每人分到 48 - 6 = 42 个。（错误：应该用除法，不是减法）\n答：每人能分到 42 个橘子。",
+            "prompt": "A box has 48 oranges shared equally among 6 children. How many does each child get?",
+            "chosen": "48 oranges shared among 6 children.\nEach child gets 48 / 6 = 8.\nAnswer: each child gets 8 oranges.",
+            "rejected": "48 oranges shared among 6 children.\nEach child gets 48 - 6 = 42. (Error: use division, not subtraction)\nAnswer: each child gets 42 oranges.",
             "answer": 8,
         },
         {
-            "prompt": "一个三角形的底是 10 厘米，高是 6 厘米，求面积。",
-            "chosen": "三角形的面积 = 底 × 高 ÷ 2。\n底 = 10 厘米，高 = 6 厘米。\n面积 = 10 × 6 ÷ 2 = 30 平方厘米。\n答：面积是 30 平方厘米。",
-            "rejected": "三角形的面积 = 底 × 高。（错误：三角形面积要除以2）\n面积 = 10 × 6 = 60 平方厘米。\n答：面积是 60 平方厘米。",
+            "prompt": "A triangle has base 10 cm and height 6 cm. Find its area.",
+            "chosen": "Area of a triangle = base x height / 2.\nBase = 10 cm, height = 6 cm.\nArea = 10 x 6 / 2 = 30 square cm.\nAnswer: the area is 30 square cm.",
+            "rejected": "Area of a triangle = base x height. (Error: a triangle's area must be halved)\nArea = 10 x 6 = 60 square cm.\nAnswer: the area is 60 square cm.",
             "answer": 30,
         },
         {
-            "prompt": "一列火车每小时行驶 80 公里，行驶了 3.5 小时，共行驶多少公里？",
-            "chosen": "速度 = 80 公里/小时，时间 = 3.5 小时。\n路程 = 速度 × 时间 = 80 × 3.5 = 280 公里。\n答：共行驶 280 公里。",
-            "rejected": "速度 = 80 公里/小时，时间 = 3.5 小时。\n路程 = 80 + 3.5 = 83.5 公里。（错误：应该用乘法，不是加法）\n答：共行驶 83.5 公里。",
+            "prompt": "A train travels at 80 km/h for 3.5 hours. How far does it travel?",
+            "chosen": "Speed = 80 km/h, time = 3.5 h.\nDistance = speed x time = 80 x 3.5 = 280 km.\nAnswer: it travels 280 km.",
+            "rejected": "Speed = 80 km/h, time = 3.5 h.\nDistance = 80 + 3.5 = 83.5 km. (Error: use multiplication, not addition)\nAnswer: it travels 83.5 km.",
             "answer": 280,
         },
         {
-            "prompt": "妈妈买了 3 千克苹果，每千克 12 元，又买了 2 千克香蕉，每千克 8 元。一共花了多少钱？",
-            "chosen": "苹果花了：3 × 12 = 36 元。\n香蕉花了：2 × 8 = 16 元。\n一共花了 36 + 16 = 52 元。\n答：一共花了 52 元。",
-            "rejected": "苹果花了：3 × 12 = 36 元。\n香蕉花了：2 × 8 = 16 元。\n一共花了 36 × 16 = 576 元。（错误：应该用加法，不是乘法）\n答：一共花了 576 元。",
+            "prompt": "A mother buys 3 kg of apples at $12 per kg and 2 kg of bananas at $8 per kg. How much does she spend in total?",
+            "chosen": "Apples cost: 3 x 12 = $36.\nBananas cost: 2 x 8 = $16.\nTotal: 36 + 16 = $52.\nAnswer: she spends $52 in total.",
+            "rejected": "Apples cost: 3 x 12 = $36.\nBananas cost: 2 x 8 = $16.\nTotal: 36 x 16 = $576. (Error: use addition, not multiplication)\nAnswer: she spends $576 in total.",
             "answer": 52,
         },
         {
-            "prompt": "一个正方形的边长是 9 厘米，求周长。",
-            "chosen": "正方形的周长 = 边长 × 4。\n边长 = 9 厘米。\n周长 = 9 × 4 = 36 厘米。\n答：周长是 36 厘米。",
-            "rejected": "正方形的周长 = 边长 × 边长。（错误：这是面积公式，不是周长）\n周长 = 9 × 9 = 81 厘米。\n答：周长是 81 厘米。",
+            "prompt": "A square has side length 9 cm. Find its perimeter.",
+            "chosen": "Perimeter of a square = side x 4.\nSide = 9 cm.\nPerimeter = 9 x 4 = 36 cm.\nAnswer: the perimeter is 36 cm.",
+            "rejected": "Perimeter of a square = side x side. (Error: that is the area formula, not the perimeter)\nPerimeter = 9 x 9 = 81 cm.\nAnswer: the perimeter is 81 cm.",
             "answer": 36,
         },
         {
-            "prompt": "爸爸今年 42 岁，儿子今年 12 岁。5 年后爸爸比儿子大多少岁？",
-            "chosen": "年龄差不会随时间变化。\n现在爸爸比儿子大 42 - 12 = 30 岁。\n5 年后爸爸比儿子仍然大 30 岁。\n答：5 年后爸爸比儿子大 30 岁。",
-            "rejected": "5 年后爸爸 42 + 5 = 47 岁，儿子 12 + 5 = 17 岁。\n爸爸比儿子大 47 - 12 = 35 岁。（错误：儿子的年龄也加5了，计算差值时却没加）\n答：5 年后爸爸比儿子大 35 岁。",
+            "prompt": "A father is 42 years old and his son is 12. In 5 years, how much older will the father be than the son?",
+            "chosen": "The age gap never changes with time.\nRight now the father is 42 - 12 = 30 years older.\nIn 5 years the father will still be 30 years older.\nAnswer: in 5 years the father will be 30 years older.",
+            "rejected": "In 5 years the father is 42 + 5 = 47 and the son is 12 + 5 = 17.\nThe father is 47 - 12 = 35 years older. (Error: the son's age also grows by 5, but the subtraction forgot it)\nAnswer: in 5 years the father will be 35 years older.",
             "answer": 30,
         },
     ]
@@ -120,23 +120,23 @@ def create_test_data():
     """
     test_examples = [
         {
-            "prompt": "有 56 个糖果，平均分给 8 个小朋友，每人分几个？",
+            "prompt": "There are 56 candies shared equally among 8 children. How many does each child get?",
             "answer": 7,
         },
         {
-            "prompt": "小明每天跑步 5 公里，跑了 7 天，一共跑了多少公里？",
+            "prompt": "Ming runs 5 km a day for 7 days. How many km does he run in total?",
             "answer": 35,
         },
         {
-            "prompt": "一个长方形的长是 15 厘米，宽是 4 厘米，求周长。",
+            "prompt": "A rectangle is 15 cm long and 4 cm wide. Find its perimeter.",
             "answer": 38,
         },
         {
-            "prompt": "水果店有 100 个苹果，卖出了 37 个，又进货 20 个，现在有几个？",
+            "prompt": "A fruit shop has 100 apples, sells 37, then stocks 20 more. How many are there now?",
             "answer": 83,
         },
         {
-            "prompt": "一箱牛奶有 24 盒，学校买了 5 箱，一共有多少盒牛奶？",
+            "prompt": "A carton of milk has 24 boxes, and the school buys 5 cartons. How many boxes in total?",
             "answer": 120,
         },
     ]
@@ -149,12 +149,12 @@ def create_test_data():
 
 def extract_number(text):
     """Extract the final numeric answer from the model's response"""
-    # Try to match the number in patterns like "答：...是 X" or "答：X" (i.e. "Answer: ... is X" / "Answer: X")
+    # Try English answer markers first: "Answer: X", "The answer is X", "The result is X", "equals X"
     patterns = [
-        r"答[：:][^0-9]*?(\d+)",
-        r"答案是\s*(\d+)",
-        r"结果是\s*(\d+)",
-        r"等于\s*(\d+)",
+        r"[Aa]nswer\s*:\s*([+-]?\d+\.?\d*)",
+        r"[Tt]he answer is\s*([+-]?\d+\.?\d*)",
+        r"[Tt]he result is\s*([+-]?\d+\.?\d*)",
+        r"equals\s*([+-]?\d+\.?\d*)",
     ]
     for pattern in patterns:
         match = re.findall(pattern, text)
@@ -215,176 +215,181 @@ def evaluate_math(model, tokenizer, test_data, label="Model"):
 # 4. Main workflow begins
 # ==========================================
 
-print("=" * 60)
-print("  DPO Math Reasoning Alignment Experiment")
-print("  -- Training with Rule-Based Preference Signals")
-print("=" * 60)
-print()
+def main():
+    print("=" * 60)
+    print("  DPO Math Reasoning Alignment Experiment")
+    print("  -- Training with Rule-Based Preference Signals")
+    print("=" * 60)
+    print()
 
-# Prepare the data
-math_data = create_math_preference_data()
-test_data = create_test_data()
+    # Prepare the data
+    math_data = create_math_preference_data()
+    test_data = create_test_data()
 
-print(f"Training set size: {len(math_data)} math preference examples")
-print(f"Test set size: {len(test_data)} math problems")
-print()
-print("How the preference data is constructed:")
-print("  - chosen:  a correct, step-by-step reasoning process (every step of the computation is correct)")
-print("  - rejected: a solution that contains a reasoning error (a computation or formula is wrong at some step)")
-print("  - This preference signal requires no human labeling; it is generated entirely by rules")
-print()
-
-
-# ==========================================
-# 5. Load the model and evaluate pre-training performance
-# ==========================================
-
-MODEL_NAME = "Qwen/Qwen2.5-0.5B-Instruct"
-
-print(f"Loading base model {MODEL_NAME} ...")
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-tokenizer.pad_token = tokenizer.eos_token
-
-model_before = AutoModelForCausalLM.from_pretrained(MODEL_NAME, device_map="auto")
-
-before_accuracy = evaluate_math(model_before, tokenizer, test_data, label="Before Training")
-
-# Free up GPU memory
-del model_before
-torch.cuda.empty_cache() if torch.cuda.is_available() else None
+    print(f"Training set size: {len(math_data)} math preference examples")
+    print(f"Test set size: {len(test_data)} math problems")
+    print()
+    print("How the preference data is constructed:")
+    print("  - chosen:  a correct, step-by-step reasoning process (every step of the computation is correct)")
+    print("  - rejected: a solution that contains a reasoning error (a computation or formula is wrong at some step)")
+    print("  - This preference signal requires no human labeling; it is generated entirely by rules")
+    print()
 
 
-# ==========================================
-# 6. DPO training
-# ==========================================
+    # ==========================================
+    # 5. Load the model and evaluate pre-training performance
+    # ==========================================
 
-print("\nStarting DPO training with rule-based math preference data...")
+    MODEL_NAME = "Qwen/Qwen2.5-0.5B-Instruct"
 
-# Reload the model for training
-model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
-train_tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-train_tokenizer.pad_token = train_tokenizer.eos_token
+    print(f"Loading base model {MODEL_NAME} ...")
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    tokenizer.pad_token = tokenizer.eos_token
 
-# Build the HuggingFace Dataset
-data_dict = {
-    "prompt": [item["prompt"] for item in math_data],
-    "chosen": [item["chosen"] for item in math_data],
-    "rejected": [item["rejected"] for item in math_data],
-}
-train_dataset = Dataset.from_dict(data_dict)
+    model_before = AutoModelForCausalLM.from_pretrained(MODEL_NAME, device_map="auto")
 
-# Configure training arguments
-training_args = DPOConfig(
-    output_dir="./dpo_math_results",
-    per_device_train_batch_size=2,
-    learning_rate=5e-5,
-    num_train_epochs=5,         # Math reasoning needs more epochs to learn the reasoning pattern
-    logging_steps=2,
-    save_strategy="no",
-    bf16=torch.cuda.is_bf16_supported() if torch.cuda.is_available() else False,
-    remove_unused_columns=False,
-    beta=0.1,
-)
+    before_accuracy = evaluate_math(model_before, tokenizer, test_data, label="Before Training")
 
-# Create the DPOTrainer
-trainer = DPOTrainer(
-    model=model,
-    args=training_args,
-    train_dataset=train_dataset,
-    processing_class=train_tokenizer,
-)
-
-print("\nTraining... watch how loss and reward evolve\n")
-train_result = trainer.train()
-
-# ==========================================
-# 7. Print training metrics
-# ==========================================
-
-print("\n" + "=" * 60)
-print("[Training Metrics Detail]")
-print("=" * 60)
-print(f"Final training loss: {train_result.training_loss:.4f}")
-print()
-
-# Parse the reward information from the training log
-log_history = trainer.state.log_history
-print("Training metrics at each step:")
-print(f"{'Step':>6} | {'Loss':>8} | {'Chosen Reward':>14} | {'Rejected Reward':>16} | {'Margin':>8}")
-print("-" * 70)
-
-for entry in log_history:
-    if "loss" in entry:
-        step = entry.get("step", "?")
-        loss = entry["loss"]
-        chosen_r = entry.get("rewards/chosen", "N/A")
-        rejected_r = entry.get("rewards/rejected", "N/A")
-        margin = entry.get("rewards/margins", "N/A")
-
-        # Format the output
-        if isinstance(chosen_r, float):
-            chosen_r = f"{chosen_r:.4f}"
-        if isinstance(rejected_r, float):
-            rejected_r = f"{rejected_r:.4f}"
-        if isinstance(margin, float):
-            margin = f"{margin:.4f}"
-
-        print(f"{step:>6} | {loss:>8.4f} | {chosen_r:>14} | {rejected_r:>16} | {margin:>8}")
-
-# Save the model
-save_path = "./dpo_math_results/final_model"
-trainer.save_model(save_path)
-print(f"\nModel saved to {save_path}")
+    # Free up GPU memory
+    del model_before
+    torch.cuda.empty_cache() if torch.cuda.is_available() else None
 
 
-# ==========================================
-# 8. Evaluate the trained model
-# ==========================================
+    # ==========================================
+    # 6. DPO training
+    # ==========================================
 
-# Load the trained model for evaluation
-print("\nLoading the trained model for evaluation...")
-model_after = AutoModelForCausalLM.from_pretrained(save_path, device_map="auto")
-eval_tokenizer = AutoTokenizer.from_pretrained(save_path)
-eval_tokenizer.pad_token = eval_tokenizer.eos_token
+    print("\nStarting DPO training with rule-based math preference data...")
 
-after_accuracy = evaluate_math(model_after, eval_tokenizer, test_data, label="After Training")
+    # Reload the model for training
+    model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
+    train_tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    train_tokenizer.pad_token = train_tokenizer.eos_token
+
+    # Build the HuggingFace Dataset
+    data_dict = {
+        "prompt": [item["prompt"] for item in math_data],
+        "chosen": [item["chosen"] for item in math_data],
+        "rejected": [item["rejected"] for item in math_data],
+    }
+    train_dataset = Dataset.from_dict(data_dict)
+
+    # Configure training arguments
+    training_args = DPOConfig(
+        output_dir="./dpo_math_results",
+        per_device_train_batch_size=2,
+        learning_rate=5e-5,
+        num_train_epochs=5,         # Math reasoning needs more epochs to learn the reasoning pattern
+        logging_steps=2,
+        save_strategy="no",
+        bf16=torch.cuda.is_bf16_supported() if torch.cuda.is_available() else False,
+        remove_unused_columns=False,
+        beta=0.1,
+    )
+
+    # Create the DPOTrainer
+    trainer = DPOTrainer(
+        model=model,
+        args=training_args,
+        train_dataset=train_dataset,
+        processing_class=train_tokenizer,
+    )
+
+    print("\nTraining... watch how loss and reward evolve\n")
+    train_result = trainer.train()
+
+    # ==========================================
+    # 7. Print training metrics
+    # ==========================================
+
+    print("\n" + "=" * 60)
+    print("[Training Metrics Detail]")
+    print("=" * 60)
+    print(f"Final training loss: {train_result.training_loss:.4f}")
+    print()
+
+    # Parse the reward information from the training log
+    log_history = trainer.state.log_history
+    print("Training metrics at each step:")
+    print(f"{'Step':>6} | {'Loss':>8} | {'Chosen Reward':>14} | {'Rejected Reward':>16} | {'Margin':>8}")
+    print("-" * 70)
+
+    for entry in log_history:
+        if "loss" in entry:
+            step = entry.get("step", "?")
+            loss = entry["loss"]
+            chosen_r = entry.get("rewards/chosen", "N/A")
+            rejected_r = entry.get("rewards/rejected", "N/A")
+            margin = entry.get("rewards/margins", "N/A")
+
+            # Format the output
+            if isinstance(chosen_r, float):
+                chosen_r = f"{chosen_r:.4f}"
+            if isinstance(rejected_r, float):
+                rejected_r = f"{rejected_r:.4f}"
+            if isinstance(margin, float):
+                margin = f"{margin:.4f}"
+
+            print(f"{step:>6} | {loss:>8.4f} | {chosen_r:>14} | {rejected_r:>16} | {margin:>8}")
+
+    # Save the model
+    save_path = "./dpo_math_results/final_model"
+    trainer.save_model(save_path)
+    print(f"\nModel saved to {save_path}")
 
 
-# ==========================================
-# 9. Compare results and summarize
-# ==========================================
+    # ==========================================
+    # 8. Evaluate the trained model
+    # ==========================================
 
-print("\n" + "=" * 60)
-print("[DPO Math Reasoning Alignment -- Final Results Comparison]")
-print("=" * 60)
-print()
-print(f"  Accuracy before training: {before_accuracy:.1f}%")
-print(f"  Accuracy after training: {after_accuracy:.1f}%")
-print(f"  Improvement: {after_accuracy - before_accuracy:+.1f}%")
-print()
+    # Load the trained model for evaluation
+    print("\nLoading the trained model for evaluation...")
+    model_after = AutoModelForCausalLM.from_pretrained(save_path, device_map="auto")
+    eval_tokenizer = AutoTokenizer.from_pretrained(save_path)
+    eval_tokenizer.pad_token = eval_tokenizer.eos_token
 
-print("=" * 60)
-print("[Experiment Summary]")
-print("=" * 60)
-print("""
-1. Rule-based preference signals:
-   This experiment does not rely on human labeling. Instead, it uses the simple
-   rule "is the answer correct" to automatically generate chosen/rejected pairs.
-   This approach scales easily to many more problems.
+    after_accuracy = evaluate_math(model_after, eval_tokenizer, test_data, label="After Training")
 
-2. DPO's effect on math reasoning:
-   - DPO can learn correct reasoning patterns (such as choosing the right operator)
-   - After training, the model tends to favor correct solution strategies on new problems
-   - However, with only 0.5B parameters, the improvement on complex reasoning is limited
 
-3. Comparison with RLHF:
-   - Traditional RLHF: requires training a reward model -> optimizing the policy with PPO
-   - DPO approach: optimizes directly from preference data, skipping reward model training
-   - For tasks with clear-cut rules (like math), DPO + rule-based signals is very efficient
+    # ==========================================
+    # 9. Compare results and summarize
+    # ==========================================
 
-4. Directions for further extension:
-   - Use larger models (7B, 14B) for better reasoning ability
-   - Increase the amount of training data (e.g. the full GSM8K dataset)
-   - Combine with Chain-of-Thought prompting to deepen reasoning
-   - Use multiple incorrect rejected samples to strengthen contrastive learning
-""")
+    print("\n" + "=" * 60)
+    print("[DPO Math Reasoning Alignment -- Final Results Comparison]")
+    print("=" * 60)
+    print()
+    print(f"  Accuracy before training: {before_accuracy:.1f}%")
+    print(f"  Accuracy after training: {after_accuracy:.1f}%")
+    print(f"  Improvement: {after_accuracy - before_accuracy:+.1f}%")
+    print()
+
+    print("=" * 60)
+    print("[Experiment Summary]")
+    print("=" * 60)
+    print("""
+    1. Rule-based preference signals:
+       This experiment does not rely on human labeling. Instead, it uses the simple
+       rule "is the answer correct" to automatically generate chosen/rejected pairs.
+       This approach scales easily to many more problems.
+
+    2. DPO's effect on math reasoning:
+       - DPO can learn correct reasoning patterns (such as choosing the right operator)
+       - After training, the model tends to favor correct solution strategies on new problems
+       - However, with only 0.5B parameters, the improvement on complex reasoning is limited
+
+    3. Comparison with RLHF:
+       - Traditional RLHF: requires training a reward model -> optimizing the policy with PPO
+       - DPO approach: optimizes directly from preference data, skipping reward model training
+       - For tasks with clear-cut rules (like math), DPO + rule-based signals is very efficient
+
+    4. Directions for further extension:
+       - Use larger models (7B, 14B) for better reasoning ability
+       - Increase the amount of training data (e.g. the full GSM8K dataset)
+       - Combine with Chain-of-Thought prompting to deepen reasoning
+       - Use multiple incorrect rejected samples to strengthen contrastive learning
+    """)
+
+
+if __name__ == '__main__':
+    main()

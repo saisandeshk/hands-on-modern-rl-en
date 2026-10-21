@@ -1,6 +1,6 @@
 """
-Chapter 13: Tree of Thought (ToT) Reasoning Experiment
-——Exploring search strategies for LLM test-time reasoning
+Chapter 17: Tree of Thought (ToT) Reasoning Experiment
+-- Exploring search strategies for LLM test-time reasoning
 
 Tree of Thought (ToT) is a method that performs explicit search at inference time:
 - At each step, generate multiple candidate thoughts (breadth-first)
@@ -26,8 +26,8 @@ from copy import deepcopy
 # Create output directory
 os.makedirs("output", exist_ok=True)
 
-# Set Chinese font (kept for compatibility with any Chinese labels)
-plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'SimHei']
+# Use a plain sans-serif font stack (English-only labels)
+plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial']
 plt.rcParams['axes.unicode_minus'] = False
 
 
@@ -552,7 +552,7 @@ def run_experiment():
     target = 24.0
 
     print("=" * 60)
-    print("  Chapter 13: Tree of Thought (ToT) Reasoning Experiment")
+    print("  Chapter 17: Tree of Thought (ToT) Reasoning Experiment")
     print("=" * 60)
     print(f"  Task: Game of 24 — combine 4 numbers to make {target}")
     print(f"  Number of problems: {len(problems)}")

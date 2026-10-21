@@ -1,4 +1,4 @@
-# Chapter 12: Agentic RL experiment dependencies
+# Chapter 19: Agentic RL experiment dependencies
 transformers==4.57.3
 trl==0.24.0
 datasets==4.4.1

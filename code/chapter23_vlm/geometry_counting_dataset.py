@@ -1,5 +1,5 @@
 """
-Chapter 11: Geometry Shape Counting Dataset Generator
+Chapter 23: Geometry Shape Counting Dataset Generator
 ==========================================================
 
 This script generates a geometry shape counting dataset for VLM (Vision-Language Model)
@@ -32,8 +32,8 @@ import matplotlib.pyplot as plt
 # Create output directory
 os.makedirs("output", exist_ok=True)
 
-# Set a CJK-capable font to ensure chart titles and labels render correctly
-plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'SimHei']
+# Use a plain sans-serif font stack (English-only labels)
+plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial']
 plt.rcParams['axes.unicode_minus'] = False
 
 
@@ -114,9 +114,9 @@ def draw_square(draw, cx, cy, size, color, outline_color='#2c3e50'):
 
 # Map shape names to their drawing functions
 SHAPE_DRAWERS = {
-    '三角形': draw_triangle,
-    '圆形': draw_circle,
-    '正方形': draw_square,
+    'triangle': draw_triangle,
+    'circle': draw_circle,
+    'square': draw_square,
 }
 
 
@@ -141,7 +141,7 @@ def generate_single_image(img_width=256, img_height=256, seed=None):
     Returns:
         image: PIL Image object
         ground_truth: dict containing the count of each shape
-                      e.g.: {'三角形': 3, '圆形': 1, '正方形': 2}
+                      e.g.: {'triangle': 3, 'circle': 1, 'square': 2}
     """
     if seed is not None:
         random.seed(seed)
@@ -151,29 +151,38 @@ def generate_single_image(img_width=256, img_height=256, seed=None):
     draw = ImageDraw.Draw(image)
 
     # Track the count of each shape
-    ground_truth = {'三角形': 0, '圆形': 0, '正方形': 0}
+    ground_truth = {'triangle': 0, 'circle': 0, 'square': 0}
 
     # Regions occupied by already-drawn shapes (for simple collision detection)
     occupied_regions = []
 
-    for shape_name in ['三角形', '圆形', '正方形']:
+    for shape_name in ['triangle', 'circle', 'square']:
         # Randomly decide the count for this shape (0~5)
         count = random.randint(0, 5)
         ground_truth[shape_name] = count
 
         for _ in range(count):
-            # Random size: 15~30 pixels
-            size = random.randint(15, 30)
+            # Random size, adapted to the canvas (shrunk for small test canvases)
+            max_size = max(6, min(30, (img_width - 20) // 2, (img_height - 20) // 2))
+            size = random.randint(min(15, max_size), max_size)
 
             # Random color
             color = random.choice(SHAPE_COLORS)
+
+            # Placement bounds, clamped so tiny canvases still work
+            lo_x, hi_x = size + 5, img_width - size - 5
+            lo_y, hi_y = size + 5, img_height - size - 5
+            if hi_x < lo_x or hi_y < lo_y:
+                # Canvas too small for a margin: place anywhere at random
+                lo_x, hi_x = 0, max(0, img_width - 1)
+                lo_y, hi_y = 0, max(0, img_height - 1)
 
             # Try to find a position that doesn't overlap with existing shapes
             # Try at most 50 times to avoid an infinite loop
             placed = False
             for _attempt in range(50):
-                cx = random.randint(size + 10, img_width - size - 10)
-                cy = random.randint(size + 10, img_height - size - 10)
+                cx = random.randint(lo_x, hi_x)
+                cy = random.randint(lo_y, hi_y)
 
                 # Simple collision detection: check the distance between the new shape's
                 # center and existing shapes' centers
@@ -195,8 +204,8 @@ def generate_single_image(img_width=256, img_height=256, seed=None):
             # If it still couldn't be placed after multiple attempts, force-place it
             # at a random position
             if not placed:
-                cx = random.randint(size + 10, img_width - size - 10)
-                cy = random.randint(size + 10, img_height - size - 10)
+                cx = random.randint(lo_x, hi_x)
+                cy = random.randint(lo_y, hi_y)
                 drawer = SHAPE_DRAWERS[shape_name]
                 drawer(draw, cx, cy, size, color)
                 occupied_regions.append((cx, cy, size))
@@ -230,8 +239,8 @@ def generate_dataset(output_dir='output/geometry_dataset',
             "train": [
                 {
                     "image_path": "train/train_0001.png",
-                    "prompt": "请数一下图片中有多少个三角形、圆形和正方形",
-                    "ground_truth": {"三角形": 3, "圆形": 1, "正方形": 2},
+                    "prompt": "Count how many triangles, circles, and squares are in the image",
+                    "ground_truth": {"triangle": 3, "circle": 1, "square": 2},
                     "total_shapes": 6
                 },
                 ...
@@ -263,7 +272,7 @@ def generate_dataset(output_dir='output/geometry_dataset',
     metadata = {'train': [], 'test': []}
 
     # Standard prompt: ask the model to count each type of shape
-    prompt = "请数一下图片中有多少个三角形、圆形和正方形"
+    prompt = "Count how many triangles, circles, and squares are in the image"
 
     # ---------- Generate training set ----------
     print(f"\nGenerating training set ({num_train} images)...")
@@ -345,7 +354,7 @@ def print_dataset_statistics(metadata):
     print(f"  {'------':>6s}  {'----':>4s}  {'----':>4s}  {'------':>6s}  {'--------':>8s}")
 
     total_shapes_list = []
-    for shape_name in ['三角形', '圆形', '正方形']:
+    for shape_name in ['triangle', 'circle', 'square']:
         counts = [item['ground_truth'][shape_name] for item in all_data]
         min_count = min(counts)
         max_count = max(counts)
@@ -411,7 +420,7 @@ def display_sample_images(metadata, output_dir='output/geometry_dataset', num_sa
         # Show the annotation info in the title
         gt = item['ground_truth']
         title = (f"Sample #{idx+1}\n"
-                 f"Triangles: {gt['三角形']}  Circles: {gt['圆形']}  Squares: {gt['正方形']}\n"
+                 f"Triangles: {gt['triangle']}  Circles: {gt['circle']}  Squares: {gt['square']}\n"
                  f"Total: {item['total_shapes']} shapes")
         ax.set_title(title, fontsize=11)
 
@@ -456,7 +465,7 @@ if __name__ == "__main__":
     - Each image contains 0~5 triangles, 0~5 circles, 0~5 squares
     - 0~15 shapes total, covering varying difficulty levels
     - Shape colors and positions are randomized, with simple collision detection
-    - Standard prompt: "请数一下图片中有多少个三角形、圆形和正方形" (Please count how many triangles, circles, and squares are in the image)
+    - Standard prompt: "Count how many triangles, circles, and squares are in the image"
 
   Next steps:
     - Run multi_modal_reward.py: design a multi-modal reward function

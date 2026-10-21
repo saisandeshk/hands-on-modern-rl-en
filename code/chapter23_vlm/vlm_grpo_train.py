@@ -1,5 +1,5 @@
 """
-Chapter 11: VLM GRPO Training Simulation Demo
+Chapter 23: VLM GRPO Training Simulation Demo
 ==========================================================
 
 This script simulates the GRPO training process on a VLM (Vision-Language Model):
@@ -33,8 +33,8 @@ import matplotlib.pyplot as plt
 # Create output directory
 os.makedirs("output", exist_ok=True)
 
-# Set a CJK-capable font to ensure chart titles and labels render correctly
-plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'SimHei']
+# Use a plain sans-serif font stack (English-only labels)
+plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial']
 plt.rcParams['axes.unicode_minus'] = False
 
 
@@ -90,7 +90,7 @@ def print_vlm_grpo_overview():
 # preset templates are used here to simulate model responses of varying quality
 
 # Standard prompt for the geometry shape counting task
-STANDARD_PROMPT = "请数一下图片中有多少个三角形、圆形和正方形"
+STANDARD_PROMPT = "Count how many triangles, circles, and squares are in the image"
 
 # Templates simulating responses of varying quality levels
 # Each template is a function that generates a response from the ground_truth
@@ -98,23 +98,24 @@ def generate_correct_response(gt):
     """Generate a fully correct response (including reasoning)"""
     shapes_desc = []
     for shape, count in gt.items():
+        plural = shape + 's'
         if count > 0:
-            shapes_desc.append(f"{shape}{count}个")
+            shapes_desc.append(f"{count} {plural}")
         else:
-            shapes_desc.append(f"{shape}0个（没有{shape}）")
+            shapes_desc.append(f"0 {plural} (no {plural})")
     return (
-        f"让我仔细观察图片中的形状。\n"
-        f"首先，分析三角形：我数到了{gt['三角形']}个三角形。\n"
-        f"然后，分析圆形：图片中有{gt['圆形']}个圆形。\n"
-        f"接着，分析正方形：有{gt['正方形']}个正方形。\n"
-        f"所以，{shapes_desc[0]}，{shapes_desc[1]}，{shapes_desc[2]}。\n"
-        f"答：三角形{gt['三角形']}个，圆形{gt['圆形']}个，正方形{gt['正方形']}个。"
+        f"Let me look at the shapes in the image carefully.\n"
+        f"First, the triangles: I count {gt['triangle']} triangles.\n"
+        f"Then, the circles: there are {gt['circle']} circles in the image.\n"
+        f"Next, the squares: there are {gt['square']} squares.\n"
+        f"So, {shapes_desc[0]}, {shapes_desc[1]}, {shapes_desc[2]}.\n"
+        f"Answer: triangles {gt['triangle']}, circles {gt['circle']}, squares {gt['square']}."
     )
 
 
 def generate_short_correct_response(gt):
     """Generate a correct but short response"""
-    return f"三角形{gt['三角形']}个，圆形{gt['圆形']}个，正方形{gt['正方形']}个。"
+    return f"Triangles {gt['triangle']}, circles {gt['circle']}, squares {gt['square']}."
 
 
 def generate_wrong_response(gt):
@@ -125,9 +126,9 @@ def generate_wrong_response(gt):
     delta = random.choice([-2, -1, 1, 2])
     wrong_gt[shape_to_modify] = max(0, wrong_gt[shape_to_modify] + delta)
     return (
-        f"我来看一下图片。\n"
-        f"三角形{wrong_gt['三角形']}个，圆形{wrong_gt['圆形']}个，正方形{wrong_gt['正方形']}个。\n"
-        f"总共{sum(wrong_gt.values())}个形状。"
+        f"Let me look at the image.\n"
+        f"Triangles {wrong_gt['triangle']}, circles {wrong_gt['circle']}, squares {wrong_gt['square']}.\n"
+        f"{sum(wrong_gt.values())} shapes in total."
     )
 
 
@@ -142,7 +143,7 @@ def generate_partially_correct_response(gt):
             wrong_gt[s] = gt[s]
         else:
             wrong_gt[s] = max(0, gt[s] + random.choice([-1, 1]))
-    return f"分析图片后，三角形{wrong_gt['三角形']}个，圆形{wrong_gt['圆形']}个，正方形{wrong_gt['正方形']}个。"
+    return f"After analyzing the image: triangles {wrong_gt['triangle']}, circles {wrong_gt['circle']}, squares {wrong_gt['square']}."
 
 
 def generate_low_quality_response(gt):
@@ -150,7 +151,7 @@ def generate_low_quality_response(gt):
     shapes = list(gt.keys())
     random.shuffle(shapes)
     nums = [max(0, gt[s] + random.choice([-2, -1, 0, 1, 2])) for s in shapes]
-    return f"大概有{shapes[0]}{nums[0]}个{shapes[1]}{nums[1]}个{shapes[2]}{nums[2]}个吧"
+    return f"Probably {shapes[0]} {nums[0]}, {shapes[1]} {nums[1]}, {shapes[2]} {nums[2]} or something"
 
 
 # List of response generators, ordered from highest to lowest quality
@@ -171,12 +172,15 @@ def extract_numbers(response, shape_names):
     import re
     extracted = {}
     for shape_name in shape_names:
+        plural = shape_name + 's'
         patterns = [
-            rf'{shape_name}[^0-9]*?(\d+)',
-            rf'(\d+)\s*个\s*{shape_name}',
+            rf'{plural}\s*:?\s*(?:is\s*)?(\d+)',
+            rf'{shape_name}\s*:?\s*(?:is\s*)?(\d+)',
+            rf'(\d+)\s+{plural}',
+            rf'(\d+)\s+{shape_name}',
         ]
         for pattern in patterns:
-            matches = re.findall(pattern, response)
+            matches = re.findall(pattern, response.lower())
             if matches:
                 extracted[shape_name] = int(matches[-1])
                 break
@@ -199,7 +203,7 @@ def simple_reward(response, ground_truth):
     score = 0.0
 
     # Correctness
-    extracted = extract_numbers(response, ['三角形', '圆形', '正方形'])
+    extracted = extract_numbers(response, ['triangle', 'circle', 'square'])
     all_correct = True
     for shape, expected in ground_truth.items():
         if extracted.get(shape, -1) != expected:
@@ -209,14 +213,15 @@ def simple_reward(response, ground_truth):
         score += 1.0
 
     # Reasoning bonus
-    step_keywords = ['首先', '然后', '接着', '最后', '分析', '观察', '因为', '所以']
-    step_count = sum(1 for kw in step_keywords if kw in response)
+    response_lower = response.lower()
+    step_keywords = ['first', 'then', 'next', 'finally', 'analyz', 'observ', 'because', 'so']
+    step_count = sum(1 for kw in step_keywords if kw in response_lower)
     score += min(step_count * 0.06, 0.3)
 
     # Format bonus
-    if all(s in response for s in ['三角形', '圆形', '正方形']):
+    if all(s in response_lower for s in ['triangle', 'circle', 'square']):
         score += 0.1
-    if re.search(r'答[：:]', response):
+    if re.search(r'answer\s*:', response_lower):
         score += 0.1
 
     return score
@@ -246,9 +251,9 @@ def create_training_samples(num_samples=20, seed=42):
     for i in range(num_samples):
         # Randomly generate the count of each shape (0~5)
         gt = {
-            '三角形': random.randint(0, 5),
-            '圆形': random.randint(0, 5),
-            '正方形': random.randint(0, 5),
+            'triangle': random.randint(0, 5),
+            'circle': random.randint(0, 5),
+            'square': random.randint(0, 5),
         }
 
         samples.append({
@@ -415,10 +420,10 @@ def print_before_after_comparison(samples, history, seed=42):
         # Before training: low-quality response
         response = generate_wrong_response(gt)
         reward = simple_reward(response, gt)
-        extracted = extract_numbers(response, ['三角形', '圆形', '正方形'])
+        extracted = extract_numbers(response, ['triangle', 'circle', 'square'])
         is_correct = all(extracted.get(s, -1) == gt[s] for s in gt)
-        print(f"\n  Sample {i+1} (GT: triangles={gt['三角形']}, circles={gt['圆形']}, "
-              f"squares={gt['正方形']})")
+        print(f"\n  Sample {i+1} (GT: triangles={gt['triangle']}, circles={gt['circle']}, "
+              f"squares={gt['square']})")
         print(f"    Response: {response[:60]}...")
         print(f"    Reward: {reward:.2f} | {'correct' if is_correct else 'incorrect'}")
 
@@ -428,10 +433,10 @@ def print_before_after_comparison(samples, history, seed=42):
         # After training: high-quality response
         response = generate_correct_response(gt)
         reward = simple_reward(response, gt)
-        extracted = extract_numbers(response, ['三角形', '圆形', '正方形'])
+        extracted = extract_numbers(response, ['triangle', 'circle', 'square'])
         is_correct = all(extracted.get(s, -1) == gt[s] for s in gt)
-        print(f"\n  Sample {i+1} (GT: triangles={gt['三角形']}, circles={gt['圆形']}, "
-              f"squares={gt['正方形']})")
+        print(f"\n  Sample {i+1} (GT: triangles={gt['triangle']}, circles={gt['circle']}, "
+              f"squares={gt['square']})")
         print(f"    Response: {response[:60]}...")
         print(f"    Reward: {reward:.2f} | {'correct' if is_correct else 'incorrect'}")
 
@@ -538,9 +543,9 @@ def demonstrate_grpo_normalization():
     print("=" * 70)
 
     # Simulate the ground truth for one sample
-    gt = {'三角形': 3, '圆形': 1, '正方形': 2}
+    gt = {'triangle': 3, 'circle': 1, 'square': 2}
 
-    print(f"\nInput image contains: triangles={gt['三角形']}, circles={gt['圆形']}, squares={gt['正方形']}")
+    print(f"\nInput image contains: triangles={gt['triangle']}, circles={gt['circle']}, squares={gt['square']}")
     print(f"Prompt: {STANDARD_PROMPT}")
     print()
 
@@ -614,7 +619,7 @@ if __name__ == "__main__":
     print("\n  Sample examples:")
     for i, s in enumerate(samples[:5]):
         gt = s['ground_truth']
-        print(f"    Sample {i+1}: triangles={gt['三角形']}, circles={gt['圆形']}, squares={gt['正方形']}, "
+        print(f"    Sample {i+1}: triangles={gt['triangle']}, circles={gt['circle']}, squares={gt['square']}, "
               f"total={sum(gt.values())}")
 
     # Step 4: simulate GRPO training

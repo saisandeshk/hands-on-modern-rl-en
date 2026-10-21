@@ -3,7 +3,7 @@
 # PPO | Eurus-2 code generation | single GPU | Qwen2.5-Coder-0.5B
 #
 # Prerequisites:
-#   1. Install veRL (see docs 16.8 "Installing veRL")
+#   1. Install veRL (see docs 15.8 "Installing veRL")
 #   2. Prepare data: python prepare_data.py (generates ~/data/eurus2/train1000.parquet)
 #
 # Notes (issue #53):

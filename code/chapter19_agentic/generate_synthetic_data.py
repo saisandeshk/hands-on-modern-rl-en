@@ -12,8 +12,22 @@ Prerequisites:
 
 import os
 import json
-from openai import OpenAI
 import sys
+
+
+def get_client():
+    """Create the OpenAI-compatible client lazily (import-safe: no import or
+    network access at module load; only when generation is requested)."""
+    from openai import OpenAI
+
+    return OpenAI(
+        api_key=os.environ.get("OPENAI_API_KEY", "your-api-key-here"),
+        base_url=os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+    )
+
+
+def get_model_name():
+    return os.environ.get("OPENAI_MODEL_NAME", "gpt-4o")
 
 # Import our offline environment from the benchmark script
 sys.path.append(
@@ -24,16 +38,10 @@ sys.path.append(
 )
 from deep_research_rl_benchmark import DOCS, TASKS
 
-# Initialize OpenAI Client (Replace with your compatible API base and key)
+# Initialize OpenAI client lazily inside main() (see get_client()).
 # Example for DeepSeek API: base_url="https://api.deepseek.com/v1"
-client = OpenAI(
-    api_key=os.environ.get("OPENAI_API_KEY", "your-api-key-here"),
-    base_url=os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
-)
 
-MODEL_NAME = os.environ.get("OPENAI_MODEL_NAME", "gpt-4o")
-
-def generate_trajectory(task):
+def generate_trajectory(task, client, model_name):
     """
     Simulate a multi-step thought process to generate a high-quality SFT trajectory.
     We instruct the API to output the exact XML format required by our GRPO script.
@@ -67,7 +75,7 @@ You MUST output exactly in this format:
 
     try:
         response = client.chat.completions.create(
-            model=MODEL_NAME,
+            model=model_name,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
@@ -81,12 +89,14 @@ You MUST output exactly in this format:
         return None
 
 def main():
-    print(f"Generating synthetic data using {MODEL_NAME}...")
+    client = get_client()
+    model_name = get_model_name()
+    print(f"Generating synthetic data using {model_name}...")
     synthetic_data = []
-    
+
     for i, task in enumerate(TASKS):
         print(f"Processing Task {i+1}/{len(TASKS)}: {task.question}")
-        trajectory = generate_trajectory(task)
+        trajectory = generate_trajectory(task, client, model_name)
         
         if trajectory:
             synthetic_data.append({

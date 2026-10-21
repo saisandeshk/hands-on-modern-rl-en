@@ -1,20 +1,33 @@
 # run.py
+"""Train the sandbox code agent with GRPO (needs a downloaded model + GPU)."""
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from environment import SandboxEnv
 from policy import Policy
 from trainer import GRPOAgentTrainer
 
-# Load a small model
-model_name = "Qwen/Qwen2.5-0.5B-Instruct"
-model = AutoModelForCausalLM.from_pretrained(model_name)
-tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-# Initialize the components
-env = SandboxEnv(timeout=10)
-policy = Policy(model, tokenizer, lr=5e-5)
-ref_model = AutoModelForCausalLM.from_pretrained(model_name)
-policy.set_ref_model(ref_model)
+def main():
+    # Load a small model
+    model_name = "Qwen/Qwen2.5-0.5B-Instruct"
+    model = AutoModelForCausalLM.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    # Initialize the components
+    env = SandboxEnv(timeout=10)
+    policy = Policy(model, tokenizer, lr=5e-5)
+    ref_model = AutoModelForCausalLM.from_pretrained(model_name)
+    policy.set_ref_model(ref_model)
+
+    # Start training
+    trainer = GRPOAgentTrainer(
+        policy=policy,
+        env=env,
+        reward_fn=code_reward,
+        group_size=4,
+        max_turns=3,
+    )
+    return trainer.fit(prompts, n_steps=30)
 
 
 TASK_EXPECTED_OUTPUTS = {
@@ -40,11 +53,5 @@ def code_reward(trajectory):
 prompts = list(TASK_EXPECTED_OUTPUTS)
 
 # Start training
-trainer = GRPOAgentTrainer(
-    policy=policy,
-    env=env,
-    reward_fn=code_reward,
-    group_size=4,
-    max_turns=3,
-)
-history = trainer.fit(prompts, n_steps=30)
+if __name__ == "__main__":
+    history = main()
