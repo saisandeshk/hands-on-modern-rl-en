@@ -277,23 +277,23 @@ PPO-Clip actually does two things:
 
 A concrete example shows how `torch.min` works. Suppose a sample has advantage $A_t = 2$ (a good action) and $\varepsilon = 0.2$, so the clipping interval is $[0.8, 1.2]$:
 
-| ratio   | surr1 = ratio × 2 | surr2 = clipped × 2 | Which one torch.min takes | Meaning                                     |
-| ------- | ----------------- | ------------------- | ------------------------- | ------------------------------------------- |
-| 0.7     | 1.4               | 1.6                 | surr1                     | Below the lower bound, optimize normally    |
-| 1.0     | 2.0               | 2.0                 | Equal                     | ratio = 1, the old and new policies agree   |
-| 1.1     | 2.2               | 2.2                 | Equal                     | Inside the clipping interval, optimize normally |
+| ratio   | surr1 = ratio × 2 | surr2 = clipped × 2 | Which one torch.min takes | Meaning                                          |
+| ------- | ----------------- | ------------------- | ------------------------- | ------------------------------------------------ |
+| 0.7     | 1.4               | 1.6                 | surr1                     | Below the lower bound, optimize normally         |
+| 1.0     | 2.0               | 2.0                 | Equal                     | ratio = 1, the old and new policies agree        |
+| 1.1     | 2.2               | 2.2                 | Equal                     | Inside the clipping interval, optimize normally  |
 | **1.3** | **2.6**           | **2.4**             | **surr2**                 | **Above the upper bound, take the clipped term** |
-| 2.0     | 4.0               | 2.4                 | surr2                     | Far above, the clipped term caps the value  |
+| 2.0     | 4.0               | 2.4                 | surr2                     | Far above, the clipped term caps the value       |
 
 For a bad action with $A_t = -2$:
 
-| ratio   | surr1 = ratio × (-2) | surr2 = clipped × (-2) | Which one torch.min takes | Meaning                                     |
-| ------- | -------------------- | ---------------------- | ------------------------- | ------------------------------------------- |
-| 0.7     | -1.4                 | -1.6                   | surr2                     | Below the lower bound, take the clipped term |
-| 1.0     | -2.0                 | -2.0                   | Equal                     | ratio = 1, the old and new policies agree   |
-| 1.1     | -2.2                 | -2.2                   | Equal                     | Inside the clipping interval, optimize normally |
+| ratio   | surr1 = ratio × (-2) | surr2 = clipped × (-2) | Which one torch.min takes | Meaning                                          |
+| ------- | -------------------- | ---------------------- | ------------------------- | ------------------------------------------------ |
+| 0.7     | -1.4                 | -1.6                   | surr2                     | Below the lower bound, take the clipped term     |
+| 1.0     | -2.0                 | -2.0                   | Equal                     | ratio = 1, the old and new policies agree        |
+| 1.1     | -2.2                 | -2.2                   | Equal                     | Inside the clipping interval, optimize normally  |
 | **1.3** | **-2.6**             | **-2.4**               | **surr2**                 | **Above the upper bound, take the clipped term** |
-| 2.0     | -4.0                 | -2.4                   | surr2                     | Far above, the clipped term caps the value  |
+| 2.0     | -4.0                 | -2.4                   | surr2                     | Far above, the clipped term caps the value       |
 
 In both cases `torch.min` **lets surr1 dominate inside the safe interval and lets the clipped term dominate outside it**.
 
@@ -375,17 +375,17 @@ flowchart LR
 
 When $A_t > 0$, the unclipped and clipped terms are equal on the interval $r_t \leq 1+\varepsilon$, so it does not matter which one $\min$ takes. Once $r_t$ passes $1+\varepsilon$, the clipped term stays at $(1+\varepsilon) \cdot A_t$ while the unclipped term keeps growing linearly, so $\min$ picks the clipped term automatically and the gradient drops to zero.
 
-| Range of $r_t$             | Unclipped term $r_t \cdot A_t$ | Clipped term $\overline{r}_t \cdot A_t$ | Which one $\min$ takes             |
-| -------------------------- | ------------------------------ | --------------------------------------- | ---------------------------------- |
-| $r_t \leq 1 + \varepsilon$ | $r_t \cdot A_t$                | $r_t \cdot A_t$                         | Equal, optimize normally           |
-| $r_t > 1 + \varepsilon$    | $r_t \cdot A_t$ (larger)       | $(1+\varepsilon) \cdot A_t$ (constant)  | Clipped term, gradient is zero     |
+| Range of $r_t$             | Unclipped term $r_t \cdot A_t$ | Clipped term $\overline{r}_t \cdot A_t$ | Which one $\min$ takes         |
+| -------------------------- | ------------------------------ | --------------------------------------- | ------------------------------ |
+| $r_t \leq 1 + \varepsilon$ | $r_t \cdot A_t$                | $r_t \cdot A_t$                         | Equal, optimize normally       |
+| $r_t > 1 + \varepsilon$    | $r_t \cdot A_t$ (larger)       | $(1+\varepsilon) \cdot A_t$ (constant)  | Clipped term, gradient is zero |
 
 When $A_t < 0$, watch the sign. Let $A_t=-2$ and $\varepsilon=0.2$. At $r_t=0.7$ the unclipped term is $-1.4$ and the clipped term is $-1.6$, so $\min$ takes the smaller $-1.6$ (the clipped term) and the gradient is zero.
 
-| Range of $r_t$             | Unclipped term $r_t \cdot A_t$     | Clipped term $\overline{r}_t \cdot A_t$ | Which one $\min$ takes                |
-| -------------------------- | ---------------------------------- | --------------------------------------- | ------------------------------------- |
-| $r_t < 1 - \varepsilon$    | Larger than the clipped term, e.g. $-1.4$ | $(1-\varepsilon) \cdot A_t$ (constant) | Clipped term, gradient is zero        |
-| $r_t \geq 1 - \varepsilon$ | Unclipped term                     | Equal inside the interval               | Unclipped term, keep optimizing normally |
+| Range of $r_t$             | Unclipped term $r_t \cdot A_t$            | Clipped term $\overline{r}_t \cdot A_t$ | Which one $\min$ takes                   |
+| -------------------------- | ----------------------------------------- | --------------------------------------- | ---------------------------------------- |
+| $r_t < 1 - \varepsilon$    | Larger than the clipped term, e.g. $-1.4$ | $(1-\varepsilon) \cdot A_t$ (constant)  | Clipped term, gradient is zero           |
+| $r_t \geq 1 - \varepsilon$ | Unclipped term                            | Equal inside the interval               | Unclipped term, keep optimizing normally |
 
 ```python
 import numpy as np
@@ -516,15 +516,15 @@ flowchart TD
 
 ### Hyperparameters
 
-| Symbol        | Name                   | Typical value | Role                                                  | Code parameter |
-| ------------- | ---------------------- | ------------- | ----------------------------------------------------- | -------------- |
-| $\varepsilon$ | Clip range             | 0.1–0.2       | Limits how far the policy ratio may move              | `clip_eps`     |
-| $c_1$         | Value loss coefficient | 0.5           | Balances the policy update against value function fitting | `vf_coef`  |
-| $c_2$         | Entropy coefficient    | 0.01          | Encourages exploration                                | `ent_coef`     |
-| $\gamma$      | Discount factor        | 0.99          | How fast future rewards decay                         | `gamma`        |
-| $\lambda$     | GAE parameter          | 0.95          | Bias-variance tradeoff in advantage estimation        | `lam`          |
-| $T$           | Rollout length         | 2048          | How many steps of data to collect each time           | `steps`        |
-| $K$           | Number of epochs       | 10            | How many rounds to update on the same batch           | `epochs`       |
+| Symbol        | Name                   | Typical value | Role                                                      | Code parameter |
+| ------------- | ---------------------- | ------------- | --------------------------------------------------------- | -------------- |
+| $\varepsilon$ | Clip range             | 0.1–0.2       | Limits how far the policy ratio may move                  | `clip_eps`     |
+| $c_1$         | Value loss coefficient | 0.5           | Balances the policy update against value function fitting | `vf_coef`      |
+| $c_2$         | Entropy coefficient    | 0.01          | Encourages exploration                                    | `ent_coef`     |
+| $\gamma$      | Discount factor        | 0.99          | How fast future rewards decay                             | `gamma`        |
+| $\lambda$     | GAE parameter          | 0.95          | Bias-variance tradeoff in advantage estimation            | `lam`          |
+| $T$           | Rollout length         | 2048          | How many steps of data to collect each time               | `steps`        |
+| $K$           | Number of epochs       | 10            | How many rounds to update on the same batch               | `epochs`       |
 
 ## The Complete Algorithm
 
@@ -664,11 +664,11 @@ This reads "the probability that the policy network with parameters $\theta$ cho
 
 `action_probs` is $\pi_\theta(\cdot \mid s_t)$, the probability distribution over all actions. `dist` is a probability distribution object that provides several commonly used methods:
 
-| Code                    | Meaning                                              | Mathematical counterpart              |
-| ----------------------- | ---------------------------------------------------- | ------------------------------------- |
-| `dist.sample()`         | Sample an action from the probability distribution   | $a_t \sim \pi_\theta(\cdot \mid s_t)$ |
-| `dist.log_prob(action)` | Query the log probability of an action               | $\log \pi_\theta(a_t \mid s_t)$       |
-| `dist.entropy()`        | Compute how random the distribution is, encouraging exploration | $H[\pi_\theta]$            |
+| Code                    | Meaning                                                         | Mathematical counterpart              |
+| ----------------------- | --------------------------------------------------------------- | ------------------------------------- |
+| `dist.sample()`         | Sample an action from the probability distribution              | $a_t \sim \pi_\theta(\cdot \mid s_t)$ |
+| `dist.log_prob(action)` | Query the log probability of an action                          | $\log \pi_\theta(a_t \mid s_t)$       |
+| `dist.entropy()`        | Compute how random the distribution is, encouraging exploration | $H[\pi_\theta]$                       |
 
 Running from the initial state to the end gives a trajectory:
 
@@ -908,13 +908,13 @@ The previous four parts paved the starting point of the PPO derivation: policy g
 
 Policy gradient methods evolve along the following main line, and each step answers a clear bottleneck of the previous one:
 
-| Link | Method                         | What it solved                                         | Remaining bottleneck                                 |
-| ---- | ------------------------------ | ------------------------------------------------------ | ---------------------------------------------------- |
-| ①    | REINFORCE                      | The first implementable algorithm for the policy gradient theorem | High variance, each batch of data usable only once |
-| ②    | Actor-Critic + advantage       | Uses $V_\theta$ as a baseline to reduce variance       | Size of a single update step is uncontrolled         |
-| ③    | Importance sampling + surrogate objective | Lets old data be reused                     | $r_t$ is unbounded, and updates become unstable      |
-| ④    | TRPO                           | Limits the update with a hard KL divergence constraint | Needs second-order information, expensive to engineer |
-| ⑤    | PPO-Clip                       | Approximates the TRPO constraint with first-order clipping | —                                                |
+| Link | Method                                    | What it solved                                                    | Remaining bottleneck                                  |
+| ---- | ----------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------- |
+| ①    | REINFORCE                                 | The first implementable algorithm for the policy gradient theorem | High variance, each batch of data usable only once    |
+| ②    | Actor-Critic + advantage                  | Uses $V_\theta$ as a baseline to reduce variance                  | Size of a single update step is uncontrolled          |
+| ③    | Importance sampling + surrogate objective | Lets old data be reused                                           | $r_t$ is unbounded, and updates become unstable       |
+| ④    | TRPO                                      | Limits the update with a hard KL divergence constraint            | Needs second-order information, expensive to engineer |
+| ⑤    | PPO-Clip                                  | Approximates the TRPO constraint with first-order clipping        | —                                                     |
 
 The main text jumps from ③ straight to ⑤ and skips the key transition ④. TRPO was the first to write "constrain the size of the policy update" in strict mathematical form, and the design of PPO-Clip comes directly from simplifying TRPO.
 
@@ -964,12 +964,12 @@ $$
 
 The key comparison between TRPO and PPO-Clip:
 
-| Dimension             | TRPO                             | PPO-Clip                       |
-| --------------------- | -------------------------------- | ------------------------------ |
-| Object of constraint  | Distribution-level KL divergence | Sample-level policy ratio $r_t$ |
-| Information used      | Second-order (Fisher matrix)     | First-order (ordinary gradient) |
-| Implementation complexity | Conjugate gradient + line search | One line of `torch.clamp`  |
-| Strength of constraint | Hard constraint (exact)         | Soft constraint (heuristic)    |
+| Dimension                 | TRPO                             | PPO-Clip                        |
+| ------------------------- | -------------------------------- | ------------------------------- |
+| Object of constraint      | Distribution-level KL divergence | Sample-level policy ratio $r_t$ |
+| Information used          | Second-order (Fisher matrix)     | First-order (ordinary gradient) |
+| Implementation complexity | Conjugate gradient + line search | One line of `torch.clamp`       |
+| Strength of constraint    | Hard constraint (exact)          | Soft constraint (heuristic)     |
 
 PPO-Clip gives up the theoretical exactness of TRPO in exchange for engineering feasibility. For settings like LLM alignment at the scale of tens of billions of parameters, second-order methods are infeasible, and the simple implementation of PPO has become the de facto standard. A detailed analysis of the clipping mechanism, the $\min$ operation, and directionality is in [Constraint Mechanisms for Policy Updates](./trust-region-clipping).
 

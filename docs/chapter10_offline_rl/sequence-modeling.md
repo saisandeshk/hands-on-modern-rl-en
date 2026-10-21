@@ -247,15 +247,15 @@ Through this guidance mechanism, the reward condition changes the denoising dire
 
 Let's put the three sequence-modeling routes, Decision Transformer, Trajectory Transformer, and Diffuser, side by side so that you can choose according to the setting:
 
-| Dimension                       | Decision Transformer        | Trajectory Transformer        | Diffuser                      |
-| ------------------------------- | --------------------------- | ----------------------------- | ----------------------------- |
-| What is modeled                 | A conditional policy given RTG | The joint distribution of a whole trajectory | A diffusion model of a whole trajectory |
-| Discretization                  | No                          | Yes (every state dimension is discretized) | No                |
-| Inference method                | Autoregressive single-step sampling | Beam search over multiple steps | Iterative denoising (dozens of steps) |
-| Planning ability                | Weak (implicit, single-step) | Strong (explicit multi-step lookahead) | Strong (conditional generation) |
-| Stitching ability               | Weak                        | Medium                        | Strong                        |
-| Inference speed                 | Fast                        | Slow                          | Medium (needs dozens of denoising steps) |
-| Compatibility with the LLM training stack | Strong (architecture closest to GPT) | Strong           | Weak (diffusion-model architecture) |
+| Dimension                                 | Decision Transformer                 | Trajectory Transformer                       | Diffuser                                 |
+| ----------------------------------------- | ------------------------------------ | -------------------------------------------- | ---------------------------------------- |
+| What is modeled                           | A conditional policy given RTG       | The joint distribution of a whole trajectory | A diffusion model of a whole trajectory  |
+| Discretization                            | No                                   | Yes (every state dimension is discretized)   | No                                       |
+| Inference method                          | Autoregressive single-step sampling  | Beam search over multiple steps              | Iterative denoising (dozens of steps)    |
+| Planning ability                          | Weak (implicit, single-step)         | Strong (explicit multi-step lookahead)       | Strong (conditional generation)          |
+| Stitching ability                         | Weak                                 | Medium                                       | Strong                                   |
+| Inference speed                           | Fast                                 | Slow                                         | Medium (needs dozens of denoising steps) |
+| Compatibility with the LLM training stack | Strong (architecture closest to GPT) | Strong                                       | Weak (diffusion-model architecture)      |
 
 How do you choose? Here is a simple practical guide:
 

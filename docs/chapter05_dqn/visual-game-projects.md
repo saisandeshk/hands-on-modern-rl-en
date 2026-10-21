@@ -172,8 +172,8 @@ The table below lists several common Atari games. `NoFrameskip-v4` names are bet
 
 The animations in the table are rendered directly from ALE environments and are only for building task intuition — they do not represent successful DQN training.
 
-| Preview                                                                                                        | Game           | Common Env ID                 | Newer Env ID           | What to Observe                                              |
-| -------------------------------------------------------------------------------------------------------------- | -------------- | ----------------------------- | ---------------------- | ------------------------------------------------------------ |
+| Preview                                                                                      | Game           | Common Env ID                 | Newer Env ID           | What to Observe                                              |
+| -------------------------------------------------------------------------------------------- | -------------- | ----------------------------- | ---------------------- | ------------------------------------------------------------ |
 | <img src="./images/atari-game-pong.gif" alt="Pong gameplay" width="150">                     | Pong           | `PongNoFrameskip-v4`          | `ALE/Pong-v5`          | Ball, paddle, and short feedback chain — best starting point |
 | <img src="./images/atari-game-breakout.gif" alt="Breakout gameplay" width="150">             | Breakout       | `BreakoutNoFrameskip-v4`      | `ALE/Breakout-v5`      | Ball control, brick clearing, and clearer pixel structure    |
 | <img src="./images/atari-game-space-invaders.gif" alt="Space Invaders gameplay" width="150"> | Space Invaders | `SpaceInvadersNoFrameskip-v4` | `ALE/SpaceInvaders-v5` | Horizontal movement, shooting, and enemy pressure            |

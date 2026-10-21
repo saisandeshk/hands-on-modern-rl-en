@@ -146,11 +146,11 @@ The benefit of PEARL is that it separates "task inference" from "policy learning
 
 Let's compare the three methods side by side:
 
-| Method | Where adaptation happens            | Needs second-order gradients | How new experience is used at test time |
-| ------ | ----------------------------------- | ---------------------------- | --------------------------------------- |
-| MAML   | Model parameters                    | Can use them, or a first-order approximation | Perform a few gradient updates |
-| RL²    | RNN hidden state                    | No                           | Keep feeding in the interaction history |
-| PEARL  | Task-variable posterior $q(z\mid\tau)$ | No                        | Update the task-variable posterior      |
+| Method | Where adaptation happens               | Needs second-order gradients                 | How new experience is used at test time |
+| ------ | -------------------------------------- | -------------------------------------------- | --------------------------------------- |
+| MAML   | Model parameters                       | Can use them, or a first-order approximation | Perform a few gradient updates          |
+| RL²    | RNN hidden state                       | No                                           | Keep feeding in the interaction history |
+| PEARL  | Task-variable posterior $q(z\mid\tau)$ | No                                           | Update the task-variable posterior      |
 
 ### 1.5 Meta-RL and Few-Shot Learning
 
@@ -191,12 +191,12 @@ Note that the `|` separators between episodes correspond to the done flag, exact
 
 AD and RL² look similar, but there are several key differences:
 
-| Dimension                | RL²                        | Algorithm Distillation              |
-| ------------------------ | -------------------------- | ----------------------------------- |
-| Model                    | Small RNN (LSTM/GRU)       | Large transformer                   |
-| Data                     | Online meta-training       | **Offline** learning histories      |
-| What is learned in context | Task ID (implicit)       | **The RL algorithm itself**         |
-| Generalization across algorithms | A single algorithm | Can distill DQN, PPO, A2C, etc.     |
+| Dimension                        | RL²                  | Algorithm Distillation          |
+| -------------------------------- | -------------------- | ------------------------------- |
+| Model                            | Small RNN (LSTM/GRU) | Large transformer               |
+| Data                             | Online meta-training | **Offline** learning histories  |
+| What is learned in context       | Task ID (implicit)   | **The RL algorithm itself**     |
+| Generalization across algorithms | A single algorithm   | Can distill DQN, PPO, A2C, etc. |
 
 RL² interacts with the environment online during training, and it can only learn "how to adapt on this kind of task", which is in essence an implicit inference of the task identity. AD uses offline data and can distill the training process of any RL algorithm (DQN, PPO, A2C) into it. What the Transformer sees is the more general pattern of "how actions change once reward goes up". What it learns is not a particular task but **the RL update rule itself**.
 

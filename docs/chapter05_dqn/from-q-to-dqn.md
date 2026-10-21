@@ -54,13 +54,13 @@ The main line of this chapter can thus be summarized in one sentence: **how to e
 
 ## Chapter Layout
 
-| Section | Core question |
-| --------------------------------------------------------- | ------------------------------------------------------------------ |
-| [Why We Need Deep Q-Networks](./from-q-to-dqn) | Why can the Q table not hold everything? How does a neural network replace the table? |
-| [The Three Components of a Deep Q-Network](./dqn-components) | What problem does each of the Q-network, experience replay, and target network solve? How do the formulas map completely onto code? |
-| [Hands-On: LunarLander](./lunar-lander) | How do we train, analyze, and evaluate a low-dimensional DQN control task? |
-| [The Deep Q-Network Family](./dqn-family) | What do improvements such as Double, Dueling, and Rainbow each solve? |
-| [Project: From LunarLander to Visual Games](./visual-game-projects) | How do we migrate the deep Q-network to pixel input and complex games? |
+| Section                                                             | Core question                                                                                                                       |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| [Why We Need Deep Q-Networks](./from-q-to-dqn)                      | Why can the Q table not hold everything? How does a neural network replace the table?                                               |
+| [The Three Components of a Deep Q-Network](./dqn-components)        | What problem does each of the Q-network, experience replay, and target network solve? How do the formulas map completely onto code? |
+| [Hands-On: LunarLander](./lunar-lander)                             | How do we train, analyze, and evaluate a low-dimensional DQN control task?                                                          |
+| [The Deep Q-Network Family](./dqn-family)                           | What do improvements such as Double, Dueling, and Rainbow each solve?                                                               |
+| [Project: From LunarLander to Visual Games](./visual-game-projects) | How do we migrate the deep Q-network to pixel input and complex games?                                                              |
 
 ## Learning Objectives
 
@@ -173,10 +173,10 @@ This is exactly what **function approximation** handles. It does not change the 
 Let us first generalize the "value table" idea of Section 3.1 by one step. A state-value table stores one $V(s)$ for each state, and a Q table stores one $Q(s,a)$ for every action in each state. In a small discrete, enumerable environment, Q-Learning therefore maintains a "state × action" table:
 
 | State | No thrust | Left thruster | Main engine | Right thruster |
-| ----- | ----- | ----- | -------- | ---- |
-| $s_1$ | 0.10  | 0.05  | 0.40     | 0.00 |
-| $s_2$ | -0.20 | 0.15  | 0.30     | 0.10 |
-| $s_3$ | 0.00  | -0.10 | 0.20     | 0.05 |
+| ----- | --------- | ------------- | ----------- | -------------- |
+| $s_1$ | 0.10      | 0.05          | 0.40        | 0.00           |
+| $s_2$ | -0.20     | 0.15          | 0.30        | 0.10           |
+| $s_3$ | 0.00      | -0.10         | 0.20        | 0.05           |
 
 This table reads exactly as in the earlier sections. State $s_2$ corresponds to the second row, and this row holds the value estimates of all actions in the current state:
 
@@ -197,13 +197,13 @@ $$
 
 This formula can be read as follows:
 
-| Symbol | Meaning |
-| ------------------- | ---------------------------------------------------------- |
-| $s$ | The current state, for example the 8-dimensional state vector of LunarLander. |
-| $a_i$ | The $i$-th available action. |
-| $\theta$ | The parameters of the function; in DQN they are the neural network parameters. |
-| $Q(s,a_i;\theta)$ | The value estimate, under parameters $\theta$, of taking action $a_i$ in state $s$. |
-| $Q(s,\cdot;\theta)$ | The vector of Q values of all actions, obtained from a single input of state $s$. |
+| Symbol              | Meaning                                                                             |
+| ------------------- | ----------------------------------------------------------------------------------- |
+| $s$                 | The current state, for example the 8-dimensional state vector of LunarLander.       |
+| $a_i$               | The $i$-th available action.                                                        |
+| $\theta$            | The parameters of the function; in DQN they are the neural network parameters.      |
+| $Q(s,a_i;\theta)$   | The value estimate, under parameters $\theta$, of taking action $a_i$ in state $s$. |
+| $Q(s,\cdot;\theta)$ | The vector of Q values of all actions, obtained from a single input of state $s$.   |
 
 The meaning of this step is that the "row" that used to be looked up in the Q table is now computed on the fly by the function. For LunarLander, the input can be
 

@@ -8,7 +8,7 @@ title: Environment Setup Guide
 If you are using a coding assistant such as Codex, tell it your learning goal first and then ask it to do the installation:
 
 > Hello, I am about to start this reinforcement learning course and want to set up the lab environment first. Please check my operating system, Python version, and GPU/CUDA status, create a Python 3.10 environment named `rl-course`, install the dependencies needed for the minimal runnable course environment, and then run the CartPole verification program. If you hit installation problems, keep troubleshooting and fixing them. If you need administrator privileges or system-level configuration changes, ask for my confirmation first.
-:::
+> :::
 
 > **Goal of this section**: build a complete development environment for this course from scratch, covering Python, PyTorch, the RL toolchain, and LLM training frameworks. Follow the steps end to end, and you will be able to run every experiment in the book.
 

@@ -146,11 +146,11 @@ This trick looks simple but is critical. It makes the high level's off-policy tr
 
 Let's put the three hierarchical methods side by side:
 
-| Algorithm | High-level output     | Low-level objective | Training method         | Main problem                  |
-| --------- | --------------------- | ------------------- | ----------------------- | ----------------------------- |
-| Options   | option id             | Fixed sub-policy    | SMDP-Q                  | Options must be predefined    |
-| FeUdal    | Latent direction $g$  | Worker intrinsic    | On-policy, end-to-end   | Unstable training             |
-| HIRO      | State displacement    | State matching      | Off-policy              | Design of goal transition     |
+| Algorithm | High-level output    | Low-level objective | Training method       | Main problem               |
+| --------- | -------------------- | ------------------- | --------------------- | -------------------------- |
+| Options   | option id            | Fixed sub-policy    | SMDP-Q                | Options must be predefined |
+| FeUdal    | Latent direction $g$ | Worker intrinsic    | On-policy, end-to-end | Unstable training          |
+| HIRO      | State displacement   | State matching      | Off-policy            | Design of goal transition  |
 
 ### 2.5 Practical Difficulties of Hierarchical RL
 

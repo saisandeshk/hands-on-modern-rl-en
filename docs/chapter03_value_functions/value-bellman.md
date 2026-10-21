@@ -1108,11 +1108,11 @@ This is the basic move of TD learning: every time the agent takes a step, it use
 
 The table above used abstract labels $s$, $s_1$, and $s_2$. The same arithmetic happens on a walk to class. A student wants to estimate remaining discomfort from each place on the route. They have no true $V^\pi$. The table starts at zero.
 
-| Place | Meaning | Current guess $V$ |
-| ----- | ------- | ----------------- |
-| Home | still at home | $0$ |
-| Bus stop | waiting for the bus | $0$ |
-| Classroom | already seated; the trip is over | $0$ |
+| Place     | Meaning                          | Current guess $V$ |
+| --------- | -------------------------------- | ----------------- |
+| Home      | still at home                    | $0$               |
+| Bus stop  | waiting for the bus              | $0$               |
+| Classroom | already seated; the trip is over | $0$               |
 
 Let $\gamma=0.9$ and $\alpha=0.5$. Each minute of walking or waiting gives reward $-1$. The classroom is terminal, so $V(\text{Classroom})$ stays $0$.
 
@@ -1140,12 +1140,12 @@ $$
 V(\text{Home})\leftarrow -1+0.5\times(-2.8)=-2.4.
 $$
 
-| Time | What happened | $r$ | $V(s)$ before | $V(s')$ used | $\delta$ | $V(s)$ after |
-| ---- | ------------- | --: | ------------: | -----------: | -------: | -----------: |
-| Start | table initialized | — | $0$ | — | — | — |
-| 1 | Home $\to$ Bus stop | $-2$ | $0$ | $0$ | $-2$ | $V(\text{Home})=-1$ |
-| 2 | Bus stop $\to$ Classroom | $-4$ | $0$ | $0$ | $-4$ | $V(\text{Bus stop})=-2$ |
-| 3 | Home $\to$ Bus stop again | $-2$ | $-1$ | $-2$ | $-2.8$ | $V(\text{Home})=-2.4$ |
+| Time  | What happened             |  $r$ | $V(s)$ before | $V(s')$ used | $\delta$ |            $V(s)$ after |
+| ----- | ------------------------- | ---: | ------------: | -----------: | -------: | ----------------------: |
+| Start | table initialized         |    — |           $0$ |            — |        — |                       — |
+| 1     | Home $\to$ Bus stop       | $-2$ |           $0$ |          $0$ |     $-2$ |     $V(\text{Home})=-1$ |
+| 2     | Bus stop $\to$ Classroom  | $-4$ |           $0$ |          $0$ |     $-4$ | $V(\text{Bus stop})=-2$ |
+| 3     | Home $\to$ Bus stop again | $-2$ |          $-1$ |         $-2$ |   $-2.8$ |   $V(\text{Home})=-2.4$ |
 
 True remaining discomfort was never required. Step 1 used $V(\text{Bus stop})=0$ because that was the table entry. Step 3 used $V(\text{Bus stop})=-2$ because the table had been written once. Each $\delta$ is the gap between the old guess for the current place and “this step’s reward plus the current guess for the next place.”
 

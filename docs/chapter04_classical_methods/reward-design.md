@@ -27,10 +27,10 @@ The reward function defines "what is worth pursuing." What the algorithm sees is
 Let us start from a minimal example. Imagine a simple grid world: the agent starts at the bottom-left corner, and the goal is to reach the end point at the top-right. There are only four actions: up, down, left, and right. The map, the states, and the actions are all fixed. We change only one thing: the reward rule.
 
 | Reward rule | Reward per step | Reaching the goal | Hitting a wall or going out of bounds |
-| -------- | ---------- | -------- | ---------- |
-| Rule A | $0$ | $+1$ | $0$ |
-| Rule B | $-0.01$ | $+1$ | $0$ |
-| Rule C | $+0.02$ | $+1$ | $0$ |
+| ----------- | --------------- | ----------------- | ------------------------------------- |
+| Rule A      | $0$             | $+1$              | $0$                                   |
+| Rule B      | $-0.01$         | $+1$              | $0$                                   |
+| Rule C      | $+0.02$         | $+1$              | $0$                                   |
 
 Look at Rule A first. It seems the most "correct": I give you 1 point only when you reach the goal and say nothing otherwise. Isn't that the cleanest definition of the objective?
 
@@ -182,6 +182,7 @@ $$
 $$
 
 After expansion, all the intermediate terms cancel (a telescoping sum):
+
 - $\gamma \Phi(s_1) - \Phi(s_0)$
 - $\gamma^2 \Phi(s_2) - \gamma \Phi(s_1)$
 - $\gamma^3 \Phi(s_3) - \gamma^2 \Phi(s_2)$
@@ -222,6 +223,7 @@ Here is the problem: the reward at step 47 is 0 (failure), but did the mistake r
 Sparse, dense, and delayed are three words that describe three different dimensions of the learning signal: how much the signal appears (sparse vs dense), how early the signal arrives (delayed vs immediate), and whether the signal can clearly point out "this very step is good or bad." They are not mutually exclusive categories. You can have a "dense but delayed" reward, for example one with points at every step whose key consequences show up only long afterward.
 
 Let us put all three back on one 50-step trajectory to get a feel for them:
+
 - +1 only at step 50 when the exit is reached, and 0 for the other 49 steps: this is sparse.
 - +1 or -1 at every step according to the change in distance, with an extra +1 for reaching the goal: this is dense.
 - A bad action is chosen at step 8, but its consequence does not lead to failure until step 40: this is delayed.
@@ -231,6 +233,7 @@ Let us put all three back on one 50-step trajectory to get a feel for them:
 Up to here we have been dealing with the case of a "single objective": the maze only needs the goal, and CartPole only needs to keep the pole upright. Real tasks are often not like this. A robot must walk forward, but also keep its balance, save power, and not fall. Putting several objectives together makes things more complicated.
 
 The maze has only one requirement: reach the goal. You only need to answer "did it get there." But in robot control things immediately become complicated. For a humanoid robot walking, you want it at the same time to:
+
 - move forward (with high forward speed),
 - not fall (keep balance),
 - not move too violently (save energy and reduce wear),
@@ -246,11 +249,11 @@ $$
 r = r_{\text{forward}} + r_{\text{alive}} + r_{\text{ctrl}}.
 $$
 
-| Sub-reward | Meaning |
-| -------------------- | ------------ |
-| $r_{\text{forward}}$ | Forward speed |
-| $r_{\text{alive}}$ | Alive bonus per step |
-| $r_{\text{ctrl}}$ | Joint torque penalty (control cost) |
+| Sub-reward           | Meaning                             |
+| -------------------- | ----------------------------------- |
+| $r_{\text{forward}}$ | Forward speed                       |
+| $r_{\text{alive}}$   | Alive bonus per step                |
+| $r_{\text{ctrl}}$    | Joint torque penalty (control cost) |
 
 Looks reasonable, right? Encourage moving forward, reward staying alive, penalize overly violent actions: all three are wanted. But the **numerical ranges** of the three things may be completely different. $r_{\text{forward}}$ may range from 0 to 5, and $r_{\text{ctrl}}$ from -100 to 0. If they are added directly, the absolute value of the control cost may be dozens of times that of the forward speed. The result is that the agent would rather stand still (zero control cost) than dare to move a leg (moving a leg has a high control cost, while the forward reward is only a little).
 
@@ -266,14 +269,17 @@ These coefficients **are hyperparameters**. If they are poorly tuned, the agent 
 Let us look at how several standard Gymnasium/MuJoCo environments design their rewards, to appreciate the complexity of weights and combinations of reward terms.
 
 **HalfCheetah-v4** (a two-legged cheetah) is the cleanest design, with only two terms:
+
 ```python
 forward_reward = x_velocity          # r1: forward speed
 ctrl_cost = 0.1 * sum(a^2)           # r2: control cost (penalty)
 reward = forward_reward - ctrl_cost
 ```
+
 The coefficient 0.1 decides the trade-off between "run fast" and "do not move too violently."
 
 **Ant-v4** (a four-legged ant) has four terms:
+
 ```python
 forward_reward = x_velocity                # r1: forward speed
 healthy_reward = 1.0                        # r2: alive bonus
@@ -281,15 +287,18 @@ ctrl_cost = 0.5 * sum(a^2)                  # r3: control cost
 contact_cost = 0.5 * 1e-3 * sum(c^2)       # r4: contact cost
 reward = forward_reward + healthy_reward - ctrl_cost - contact_cost
 ```
+
 Note that the contact cost coefficient is only 0.0005. It barely matters early in training, and only later, when the policy has stabilized, does this tiny penalty begin to teach the robot to avoid unnecessary body collisions. Setting the coefficient higher makes the robot too conservative, and setting it lower makes the legs hit each other.
 
 **BipedalWalker-v3** (a biped walking over rough terrain) also mixes PBRS potential shaping with penalty terms:
+
 ```python
 shaping = 130 * pos.x / SCALE          # r1: forward-distance potential
 shaping -= 5.0 * abs(hull_angle)       # r2: head-upright penalty
 reward = shaping - self.prev_shaping    # potential difference (PBRS)
 reward -= 0.00035 * MOTORS_TORQUE * sum(|a|)  # r3: action penalty
 ```
+
 The posture penalty is written inside the potential function, which changes the trade-off between "moving forward" and "staying upright." It does not enjoy the PBRS guarantee of "does not change the optimal policy."
 :::
 
@@ -305,11 +314,11 @@ $$
 r = r_{\text{reach}} + r_{\text{grasp}} + r_{\text{lift}} + r_{\text{target}}.
 $$
 
-| Sub-reward | Trigger condition | Intent |
-| ------------------- | ------------ | ------------ |
-| $r_{\text{reach}}$ | The gripper approaches the object | First learn to "approach" |
-| $r_{\text{grasp}}$ | The gripper closes and grasps the object | Then learn to "grasp firmly" |
-| $r_{\text{lift}}$ | The object leaves the table | Then learn to "lift" |
+| Sub-reward          | Trigger condition                           | Intent                         |
+| ------------------- | ------------------------------------------- | ------------------------------ |
+| $r_{\text{reach}}$  | The gripper approaches the object           | First learn to "approach"      |
+| $r_{\text{grasp}}$  | The gripper closes and grasps the object    | Then learn to "grasp firmly"   |
+| $r_{\text{lift}}$   | The object leaves the table                 | Then learn to "lift"           |
 | $r_{\text{target}}$ | The object is placed at the target position | Finally complete the transport |
 
 Here is the problem: **the agent will stay in its "comfort zone."** If $r_{\text{reach}}$ and $r_{\text{grasp}}$ are easy to get while $r_{\text{target}}$ is very hard, the agent is content with "I approached and I grasped, and that is already quite a few points." It may learn to keep the gripper holding the object but never lift it.
@@ -387,6 +396,7 @@ R(s,a) = 1 - c_1|\theta| - c_2|x|,
 $$
 
 learning is faster, since every step tells the agent "how crooked the pole is and how far off the cart is." But the two coefficients $c_1$ and $c_2$ immediately bring us back to the weight problem. Let us plug in specific numbers: at some step $|\theta| = 0.1$ and $|x| = 0.4$.
+
 - If $c_1=2, c_2=0.5$: the reward is $1 - 0.2 - 0.2 = 0.6$.
 - If $c_1=2$ stays and $c_2=2$: the reward becomes $1 - 0.2 - 0.8 = 0$.
 
@@ -460,12 +470,13 @@ Within the RLHF framework, researchers have proposed improvements from different
 
 **GRPO (Group Relative Policy Optimization)**: It drops PPO's separate value network, generates a group of answers to the same problem (for example 8), and estimates advantages by standardizing the scores within the group. It works well on tasks such as mathematical reasoning where an answer checker can score directly, but it still depends on a reliable scoring signal. Concretely, suppose $3$ of the $8$ answers are correct and $5$ are incorrect, with verifier rewards $1$ and $0$. The group's mean reward is $3/8=0.375$ and the population standard deviation is about $0.484$. A correct answer therefore has standardized advantage $(1-0.375)/0.484\approx1.29$, while an incorrect answer has advantage $(0-0.375)/0.484\approx-0.77$. The absolute rewards $0$ and $1$ have been converted into "how far above or below this group's average" each answer lies.
 
-| Method | Core idea | What it eases | New risk introduced |
-| ----- | ---------------------- | -------------- | -------------------- |
-| ORM | Learn an overall reward from preferences | Hand-written rewards are hard | Over-optimization, surface correlations |
-| PRM | Score each step separately | Outcome rewards are too sparse | High annotation cost |
-| RLAIF | Replace human annotation with AI | Cost of human annotation | Bias in the AI's own judgments |
-| GRPO | Estimate advantages from within-group relative rewards | Removes the value network | Still depends on a reliable scoring signal |
+| Method | Core idea                                              | What it eases                  | New risk introduced                        |
+| ------ | ------------------------------------------------------ | ------------------------------ | ------------------------------------------ |
+| ORM    | Learn an overall reward from preferences               | Hand-written rewards are hard  | Over-optimization, surface correlations    |
+| PRM    | Score each step separately                             | Outcome rewards are too sparse | High annotation cost                       |
+| RLAIF  | Replace human annotation with AI                       | Cost of human annotation       | Bias in the AI's own judgments             |
+| GRPO   | Estimate advantages from within-group relative rewards | Removes the value network      | Still depends on a reliable scoring signal |
+
 :::
 
 ## Summary

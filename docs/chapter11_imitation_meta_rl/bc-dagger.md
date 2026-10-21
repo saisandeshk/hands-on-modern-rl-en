@@ -72,9 +72,9 @@ But if you turn the steering wheel a bit too much at some moment and the car dri
 
 Let's compute with numbers. Suppose the policy's error rate on states visited by the expert is only $\epsilon=0.01$, agreeing with the expert 99% of the time. Looking at each step alone, this error rate is negligibly low. But the task runs for $T$ consecutive steps, and the probability of making no error throughout is $(1-\epsilon)^T$, which decays sharply with the number of steps:
 
-| Task length $T$                  | 10 steps | 50 steps | 100 steps | 1000 steps |
-| -------------------------------- | -------- | -------- | --------- | ---------- |
-| Probability of no error overall  | 0.90     | 0.61     | 0.37      | 0.00004    |
+| Task length $T$                 | 10 steps | 50 steps | 100 steps | 1000 steps |
+| ------------------------------- | -------- | -------- | --------- | ---------- |
+| Probability of no error overall | 0.90     | 0.61     | 0.37      | 0.00004    |
 
 In a 100-step task, in two out of three episodes at least one mistake is made along the way. And this is still an optimistic estimate: it assumes that the error rate stays at 1% after deviating from the expert trajectory. In reality, once the agent deviates, the states are no longer in the training set and the error rate rises sharply. The DAgger paper (Ross et al. 2011) writes the cumulative task cost on the order of $O(T^2\epsilon)$:
 
@@ -148,11 +148,11 @@ But you may already have thought of a problem: the price is that the expert must
 
 Let's put the three methods side by side:
 
-| Method | Source of training data                  | Solves distribution shift | Needs online expert labeling     |
-| ------ | ---------------------------------------- | ------------------------- | -------------------------------- |
-| BC     | Offline expert data only                 | ❌                        | ❌                               |
-| DAgger | Expert + states visited by the policy    | ✅                        | ✅ (the key limitation)          |
-| GAIL   | Expert + policy rollouts                 | ✅ (implicitly)           | ❌ (only state-action pairs needed) |
+| Method | Source of training data               | Solves distribution shift | Needs online expert labeling        |
+| ------ | ------------------------------------- | ------------------------- | ----------------------------------- |
+| BC     | Offline expert data only              | ❌                        | ❌                                  |
+| DAgger | Expert + states visited by the policy | ✅                        | ✅ (the key limitation)             |
+| GAIL   | Expert + policy rollouts              | ✅ (implicitly)           | ❌ (only state-action pairs needed) |
 
 DAgger's engineering bottleneck is that it **needs online interaction with the expert**. It is hard for a human driver to label the correct action in real time for the abnormal states the policy visits. You cannot have an instructor sit beside you and tell you immediately, every time the car veers off, how many degrees the wheel should turn, and you certainly cannot have the instructor label thousands upon thousands of failed trajectories.
 

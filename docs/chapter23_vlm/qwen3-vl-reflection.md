@@ -56,14 +56,14 @@ Back to the bar chart at the start: the model has to first locate bar A and bar 
 
 You may have noticed that visual reflection also uses the framework of a VLM: an image, a question, and an answer. What, then, is the essential difference between it and the ordinary VLM reasoning we studied earlier?
 
-| Dimension | Ordinary VLM | Visual-reflection VLM |
-|------|---------|-------------|
-| Reasoning process | Implicit, going directly from image to answer | Explicit, keeping the intermediate evidence and calculation steps |
-| Verifiability | Only the final answer is checked | The intermediate evidence can be checked for correctness |
-| Failure modes | Misreading, omission, and lucky guesses are all mixed together | The failing step (evidence / reasoning / verification) can be located |
-| Training objective | Outcome reward | Outcome + process reward (evidence hit rate, validity of tool calls) |
-| Tool use | None | Can call tools such as zoom and search to observe again |
-| Suitable tasks | Simple recognition and classification | Complex reasoning, multi-step calculation, long-video understanding |
+| Dimension          | Ordinary VLM                                                   | Visual-reflection VLM                                                 |
+| ------------------ | -------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Reasoning process  | Implicit, going directly from image to answer                  | Explicit, keeping the intermediate evidence and calculation steps     |
+| Verifiability      | Only the final answer is checked                               | The intermediate evidence can be checked for correctness              |
+| Failure modes      | Misreading, omission, and lucky guesses are all mixed together | The failing step (evidence / reasoning / verification) can be located |
+| Training objective | Outcome reward                                                 | Outcome + process reward (evidence hit rate, validity of tool calls)  |
+| Tool use           | None                                                           | Can call tools such as zoom and search to observe again               |
+| Suitable tasks     | Simple recognition and classification                          | Complex reasoning, multi-step calculation, long-video understanding   |
 
 The core difference comes down to one point: **in an ordinary VLM, you care only about whether the final answer is right; in visual reflection, you need to care whether the intermediate evidence is used correctly.**
 

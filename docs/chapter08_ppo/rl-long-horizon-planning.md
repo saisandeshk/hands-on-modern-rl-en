@@ -460,15 +460,15 @@ Imitation learning and reinforcement learning are not an either-or choice. In pr
 
 The table below summarizes the main method families of classical RL for long-horizon tasks:
 
-| Method family      | Core idea                                   | Representative work        | Strengths                                      | Limitations                                    |
-| ------------------ | ------------------------------------------- | -------------------------- | ---------------------------------------------- | ---------------------------------------------- |
-| Hierarchical RL    | Split a long task into subtasks             | Options, HIRO, DIAYN       | Lower decision frequency, interpretable        | Subgoal discovery, complex training            |
-| HER                | Relabel failed experience as successful     | DDPG+HER                   | Simple and effective, high sample efficiency   | Needs goal conditioning, very long tasks still hard |
-| Model-based planning | Learn a world model / tree search         | MBPO, Dreamer, AlphaZero   | Very high sample efficiency or reasoning power | Model error, or needs a perfect environment model |
-| Exploration methods | Return to the past / curiosity-driven      | Go-Explore, RND, ICM       | Targets sparse-reward exploration directly     | Needs a simulator, or suffers from noisy TV    |
-| Reward shaping     | Design intermediate rewards to guide learning | Potential-based shaping, IRL | Theoretical guarantee of an unchanged optimal policy | Needs domain knowledge                  |
-| Curriculum learning | Progress from easy to hard                 | ALP-GMM, GoalGAN, PLR      | Stable training, good for transfer             | Curriculum design is itself hard               |
-| Imitation learning | Learn from expert demonstrations            | BC, DAgger, GAIL           | Bypasses exploration, quick to get a policy    | Needs expert data, distribution shift          |
+| Method family        | Core idea                                     | Representative work          | Strengths                                            | Limitations                                         |
+| -------------------- | --------------------------------------------- | ---------------------------- | ---------------------------------------------------- | --------------------------------------------------- |
+| Hierarchical RL      | Split a long task into subtasks               | Options, HIRO, DIAYN         | Lower decision frequency, interpretable              | Subgoal discovery, complex training                 |
+| HER                  | Relabel failed experience as successful       | DDPG+HER                     | Simple and effective, high sample efficiency         | Needs goal conditioning, very long tasks still hard |
+| Model-based planning | Learn a world model / tree search             | MBPO, Dreamer, AlphaZero     | Very high sample efficiency or reasoning power       | Model error, or needs a perfect environment model   |
+| Exploration methods  | Return to the past / curiosity-driven         | Go-Explore, RND, ICM         | Targets sparse-reward exploration directly           | Needs a simulator, or suffers from noisy TV         |
+| Reward shaping       | Design intermediate rewards to guide learning | Potential-based shaping, IRL | Theoretical guarantee of an unchanged optimal policy | Needs domain knowledge                              |
+| Curriculum learning  | Progress from easy to hard                    | ALP-GMM, GoalGAN, PLR        | Stable training, good for transfer                   | Curriculum design is itself hard                    |
+| Imitation learning   | Learn from expert demonstrations              | BC, DAgger, GAIL             | Bypasses exploration, quick to get a policy          | Needs expert data, distribution shift               |
 
 These classical methods have made substantial progress in robot control, game AI, autonomous driving, and other fields. What they share is a need for careful task-specific design (subgoal structure, reward shaping, curriculum strategy, expert data), and their ability to generalize to entirely new tasks is limited. In later chapters we will see that introducing LLMs brings a new paradigm to long-horizon planning: using the commonsense and reasoning ability of large models to generate subgoals, design rewards, and even plan directly, which greatly reduces the dependence on manual design.
 

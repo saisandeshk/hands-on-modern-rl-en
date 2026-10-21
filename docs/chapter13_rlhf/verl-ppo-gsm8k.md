@@ -750,8 +750,8 @@ From an algorithmic viewpoint, this experiment follows the same six-step loop fr
 
 This section depends on external veRL and does not copy veRL source code. This repository only keeps the course adaptation layer:
 
-| File                                                                                                                                                                                                 | Purpose                             |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| File                                                                                                                                                                                                    | Purpose                             |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
 | [`code/chapter13_rlhf/verl_gsm8k/README.md`](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter13_rlhf/verl_gsm8k/README.md)                                                   | External veRL index and usage notes |
 | [`code/chapter13_rlhf/verl_gsm8k/gsm8k_reward.py`](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter13_rlhf/verl_gsm8k/gsm8k_reward.py)                                       | Basic 0/1 accuracy reward           |
 | [`code/chapter13_rlhf/verl_gsm8k/gsm8k_reward_advanced.py`](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter13_rlhf/verl_gsm8k/gsm8k_reward_advanced.py)                     | Accuracy + format combined reward   |

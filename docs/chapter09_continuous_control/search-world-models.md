@@ -332,7 +332,7 @@ $$
 \text{symlog}(x) = \text{sign}(x) \log(|x| + 1)
 $$
 
-   What does this function look like? For positive numbers it is $\log(x+1)$, for negative numbers it is $-\log(-x+1)$, it is approximately linear near 0, and it grows logarithmically at large absolute values. It automatically compresses the range of large values while keeping the sign. The value network predicts in symlog space, and the output is mapped back with symexp (the inverse of symlog), so learning stays stable however large the reward scale is.
+What does this function look like? For positive numbers it is $\log(x+1)$, for negative numbers it is $-\log(-x+1)$, it is approximately linear near 0, and it grows logarithmically at large absolute values. It automatically compresses the range of large values while keeping the sign. The value network predicts in symlog space, and the output is mapped back with symexp (the inverse of symlog), so learning stays stable however large the reward scale is.
 
 3. **No KL annealing (No KL Annealing)**. When training latent-variable models one usually uses KL annealing: the KL term has a small weight at the start so the model first learns to reconstruct observations, and the weight is then gradually increased to align prior and posterior. Dreamer V3 found this entirely unnecessary. It fixes the KL weight at 1 and directly maximizes the ELBO (evidence lower bound), letting the posterior match the prior naturally. Removing the KL-annealing hyperparameter greatly improves robustness.
 
@@ -360,14 +360,14 @@ Having covered the three lines AlphaZero → MuZero → Dreamer V3, we can now s
 
 Let's put model-free and model-based side by side in one table and look at their trade-offs along several dimensions:
 
-| Dimension                | Model-Free                  | Model-Based                                   |
-| ------------------------ | --------------------------- | --------------------------------------------- |
-| **Sample efficiency**    | Low (millions of steps)     | High (tens of thousands of steps)             |
-| **Asymptotic performance** | High                      | Limited by model error                        |
-| **Computational cost**   | Low (uses data directly)    | High (model training + search/planning)       |
-| **Interpretability**     | Black box                   | The model can be analyzed                     |
-| **Transferability**      | Weak                        | The model can transfer to downstream tasks    |
-| **Hyperparameter sensitivity** | Medium                | High (model quality determines everything)    |
+| Dimension                      | Model-Free               | Model-Based                                |
+| ------------------------------ | ------------------------ | ------------------------------------------ |
+| **Sample efficiency**          | Low (millions of steps)  | High (tens of thousands of steps)          |
+| **Asymptotic performance**     | High                     | Limited by model error                     |
+| **Computational cost**         | Low (uses data directly) | High (model training + search/planning)    |
+| **Interpretability**           | Black box                | The model can be analyzed                  |
+| **Transferability**            | Weak                     | The model can transfer to downstream tasks |
+| **Hyperparameter sensitivity** | Medium                   | High (model quality determines everything) |
 
 Let's explain these dimensions one by one:
 

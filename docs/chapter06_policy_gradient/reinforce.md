@@ -8,13 +8,13 @@ Chapter 3 followed one route: learn $Q(s,a)$, use it to score each action, and c
 
 These tasks suggest a second route: skip the intermediate $Q$ values and learn a **policy** $\pi_\theta(a\mid s)$ directly. This is the idea behind the [policy objective $J(\theta)$](../chapter02_rl_basics/policy-value) from Chapter 3 — define a score for the policy as a whole, then adjust its parameters $\theta$ to increase that score. The differences between the two routes can be summarized as:
 
-| Property           | Value-based methods                     | Policy-based methods                   |
-| ------------------ | --------------------------------------- | -------------------------------------- |
-| Learned object     | $Q(s,a)$, a score per action            | $\pi_\theta(a\mid s)$, action probabilities |
-| Action selection   | $\arg\max_a Q(s,a)$                    | sample from $\pi_\theta(\cdot\mid s)$  |
-| Action space       | finite discrete actions in standard DQN | discrete or continuous                 |
-| Exploration        | added by a separate rule                | represented by the policy distribution |
-| Data reuse         | off-policy replay is common             | vanilla REINFORCE is on-policy         |
+| Property         | Value-based methods                     | Policy-based methods                        |
+| ---------------- | --------------------------------------- | ------------------------------------------- |
+| Learned object   | $Q(s,a)$, a score per action            | $\pi_\theta(a\mid s)$, action probabilities |
+| Action selection | $\arg\max_a Q(s,a)$                     | sample from $\pi_\theta(\cdot\mid s)$       |
+| Action space     | finite discrete actions in standard DQN | discrete or continuous                      |
+| Exploration      | added by a separate rule                | represented by the policy distribution      |
+| Data reuse       | off-policy replay is common             | vanilla REINFORCE is on-policy              |
 
 The two routes can be combined: Actor-Critic methods (Chapter 7) use a policy network to choose actions and a value network to reduce variance. Before that, we need the policy-gradient calculation that makes the actor trainable. A step-by-step comparison is available as supplementary reading: [Why Policy Gradients?](./pg-necessity).
 
@@ -24,7 +24,7 @@ Three earlier ideas will be used throughout the chapter:
 - [Policy $\pi_\theta$ and objective $J(\theta)$](../chapter02_rl_basics/policy-value): how a parameterized policy is represented and evaluated
 - [Monte Carlo methods](../chapter04_classical_methods/dp-mc-td): finish an episode, then compute its return
 - [State value $V(s)$](../chapter03_value_functions/value-bellman): the expected return from a state and the source of a useful baseline
-:::
+  :::
 
 This section answers two questions: what metric should we use to measure "how good" a policy is, and how do we optimize that metric?
 

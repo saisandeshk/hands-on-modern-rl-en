@@ -289,14 +289,14 @@ How well does it work? On the MuJoCo continuous-control benchmarks, SAC has **lo
 
 Let's compare the three algorithms side by side:
 
-| Dimension                  | DDPG        | TD3           | SAC                       |
-| -------------------------- | ----------- | ------------- | ------------------------- |
-| Policy type                | Deterministic | Deterministic | Stochastic (Gaussian)   |
-| Q-networks                 | 1           | 2 (twin)      | 2 (twin)                  |
-| Exploration                | Added noise | Added noise   | Entropy bonus (built in)  |
-| Stability                  | Poor        | Moderate      | Strong                    |
-| Hyperparameter sensitivity | High        | Moderate      | Low (automatic temperature) |
-| Recommended first choice   | ❌          | ⚠️            | ✅                        |
+| Dimension                  | DDPG          | TD3           | SAC                         |
+| -------------------------- | ------------- | ------------- | --------------------------- |
+| Policy type                | Deterministic | Deterministic | Stochastic (Gaussian)       |
+| Q-networks                 | 1             | 2 (twin)      | 2 (twin)                    |
+| Exploration                | Added noise   | Added noise   | Entropy bonus (built in)    |
+| Stability                  | Poor          | Moderate      | Strong                      |
+| Hyperparameter sensitivity | High          | Moderate      | Low (automatic temperature) |
+| Recommended first choice   | ❌            | ⚠️            | ✅                          |
 
 **Practical recommendation**: **choose SAC first** for continuous-control tasks. Choose TD3 only when you explicitly need a deterministic policy (for example, when you want no randomness at all at deployment time). DDPG now has mainly teaching value and is rarely used in practice.
 

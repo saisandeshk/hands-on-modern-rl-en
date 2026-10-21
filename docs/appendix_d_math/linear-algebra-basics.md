@@ -459,13 +459,13 @@ In matrix multiplication, $(A \times B)(B \times C) = A \times C$, so the inner 
 
 This article established five basic objects in linear algebra:
 
-| Object   | Role in RL                         | Example           |
-| -------- | ---------------------------------- | ----------------- |
-| Scalar   | Single reward or hyperparameter    | r=2, γ=0.9        |
-| Set      | Possible states and actions        | $S=\{s_1, s_2\}$  |
-| Function | Value function and policy function | v(s), π(a\|s)     |
-| Vector   | All state values together          | **v**=[3, 5, 2]ᵀ  |
-| Matrix   | Transitions among all states       | P ∈ ℝⁿˣⁿ          |
+| Object   | Role in RL                         | Example          |
+| -------- | ---------------------------------- | ---------------- |
+| Scalar   | Single reward or hyperparameter    | r=2, γ=0.9       |
+| Set      | Possible states and actions        | $S=\{s_1, s_2\}$ |
+| Function | Value function and policy function | v(s), π(a\|s)    |
+| Vector   | All state values together          | **v**=[3, 5, 2]ᵀ |
+| Matrix   | Transitions among all states       | P ∈ ℝⁿˣⁿ         |
 
 Their relationships are: scalars form vectors, vectors form matrices, and matrix-vector multiplication implements probability weighting. The next article combines these objects into a full system of equations: the matrix form of the Bellman equation $v = r + \gamma Pv$.
 

@@ -322,7 +322,7 @@ and with probability $1-\epsilon$ it picks the action with the largest current Q
 Its advantage is simplicity,
 and its drawback is that a random action does not know which states are new or which are important.
 
-One way to improve on this is to give the agent an *intrinsic reward*.
+One way to improve on this is to give the agent an _intrinsic reward_.
 The extrinsic reward comes from the environment,
 while the intrinsic reward comes from the agent's own judgment of new or unpredictable states.
 The total reward is often written as

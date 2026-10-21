@@ -226,7 +226,7 @@ Budget settings cannot rest on a surface classification such as "is this a math 
 1. **Is the verifier reliable?** With a reliable verifier (code can be run and tests passed), best-of-N is very effective; without one, majority voting is the fallback.
 2. **What is the single-attempt success rate?** When $p$ is too low, raising $p$ first (by training or changing the model) is more cost-effective than increasing $N$.
 3. **What is the cost of task failure?** In settings such as medicine, law, and production code, failure is costly and more budget can be given; for casual chat and simple question answering, quickly giving an acceptable answer matters more.
-:::
+   :::
 
 ## Section Summary
 

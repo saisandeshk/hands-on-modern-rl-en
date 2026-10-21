@@ -3,6 +3,7 @@ title: 4.1 DP, MC, and TD
 ---
 
 # 4.1 Dynamic Programming, Monte Carlo and TD
+
 ## Section Preview
 
 **Key Ideas**
@@ -287,8 +288,8 @@ You can also read these expansions as a branch table:
 
 This table is straightforward to read. The following four figures bold the corresponding branches:
 
-| Branch                                                        | Figure                                                                                                                                           |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Branch                                                        | Figure                                                                                                                         |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | **From $S$, go Right**: pay $-1$, arrive at $M$               | <img src="./images/three-state-corridor-highlight-s-right.svg" alt="Highlight branch: S go right" style="max-width: 320px;" /> |
 | **From $S$, go Left**: pay $-2$, hit the wall and stay at $S$ | <img src="./images/three-state-corridor-highlight-s-left.svg" alt="Highlight branch: S go left" style="max-width: 320px;" />   |
 | **From $M$, go Right**: pay $-1$, arrive at terminal $G$      | <img src="./images/three-state-corridor-highlight-m-right.svg" alt="Highlight branch: M go right" style="max-width: 320px;" /> |
@@ -434,8 +435,8 @@ $$
 
 The state transitions for each step are:
 
-| Step | One-step transition      | Figure                                                                                                                                                             |
-| ---- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Step | One-step transition      | Figure                                                                                                                                           |
+| ---- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 1    | **$S\xrightarrow{-2}S$** | <img src="./images/three-state-corridor-highlight-s-left.svg" alt="Sampled trajectory, step 1: S go left into wall" style="max-width: 260px;" /> |
 | 2    | **$S\xrightarrow{-1}M$** | <img src="./images/three-state-corridor-highlight-s-right.svg" alt="Sampled trajectory, step 2: S go right to M" style="max-width: 260px;" />    |
 | 3    | **$M\xrightarrow{-2}S$** | <img src="./images/three-state-corridor-highlight-m-left.svg" alt="Sampled trajectory, step 3: M go left back to S" style="max-width: 260px;" /> |
@@ -528,8 +529,8 @@ $$
 
 Be careful: TD reads **the current table at the current moment**. After step 1 updates $S$, if step 3 goes from $M$ left back to $S$, it immediately reads the already-updated $V(S)=-1$. This is a clear difference between TD and MC: MC computes everything after the episode ends; TD keeps using newly learned numbers as the trajectory unfolds.
 
-| Step | Figure                                                                                                                                            | One-step transition      | Updated old value | TD target $r+V(s')$   | New value written                |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | ----------------- | --------------------- | -------------------------------- |
+| Step | Figure                                                                                                                          | One-step transition      | Updated old value | TD target $r+V(s')$   | New value written                |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | ----------------- | --------------------- | -------------------------------- |
 | 1    | <img src="./images/three-state-corridor-highlight-s-left.svg" alt="TD step 1: S go left into wall" style="max-width: 220px;" /> | **$S\xrightarrow{-2}S$** | $V(S)=0$          | $-2+V(S)=-2+0=-2$     | $V(S)=0+0.5(-2-0)=-1$            |
 | 2    | <img src="./images/three-state-corridor-highlight-s-right.svg" alt="TD step 2: S go right to M" style="max-width: 220px;" />    | **$S\xrightarrow{-1}M$** | $V(S)=-1$         | $-1+V(M)=-1+0=-1$     | $V(S)=-1+0.5[-1-(-1)]=-1$        |
 | 3    | <img src="./images/three-state-corridor-highlight-m-left.svg" alt="TD step 3: M go left back to S" style="max-width: 220px;" /> | **$M\xrightarrow{-2}S$** | $V(M)=0$          | $-2+V(S)=-2-1=-3$     | $V(M)=0+0.5(-3-0)=-1.5$          |

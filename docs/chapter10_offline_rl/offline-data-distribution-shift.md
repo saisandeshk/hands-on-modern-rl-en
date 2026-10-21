@@ -220,15 +220,15 @@ In the whole IQL procedure, the backup of Q uses V(s') rather than $\max_a Q(s',
 
 Let's put the three classic algorithms side by side:
 
-| Dimension                      | BCQ                   | CQL                       | IQL                              |
-| ------------------------------ | --------------------- | ------------------------- | -------------------------------- |
-| Where the constraint sits      | Action space          | Value function            | Implicit (expectile + AWR)       |
-| Evaluates OOD actions          | No (sampling constraint) | Yes (logsumexp)        | No (avoids explicit queries)     |
-| Extra network                  | VAE $\pi_\beta$       | None                      | $V$ network                      |
-| Hyperparameter sensitivity     | High (perturbation magnitude) | Medium ($\alpha$ automatic) | Low ($\tau, \beta$)       |
-| Performance on medium datasets | Medium                | Strong                    | Strong                           |
-| Stability on sparse datasets   | Medium                | Occasionally unstable     | Strong                           |
-| Implementation complexity      | High                  | Medium                    | Low                              |
+| Dimension                      | BCQ                           | CQL                         | IQL                          |
+| ------------------------------ | ----------------------------- | --------------------------- | ---------------------------- |
+| Where the constraint sits      | Action space                  | Value function              | Implicit (expectile + AWR)   |
+| Evaluates OOD actions          | No (sampling constraint)      | Yes (logsumexp)             | No (avoids explicit queries) |
+| Extra network                  | VAE $\pi_\beta$               | None                        | $V$ network                  |
+| Hyperparameter sensitivity     | High (perturbation magnitude) | Medium ($\alpha$ automatic) | Low ($\tau, \beta$)          |
+| Performance on medium datasets | Medium                        | Strong                      | Strong                       |
+| Stability on sparse datasets   | Medium                        | Occasionally unstable       | Strong                       |
+| Implementation complexity      | High                          | Medium                      | Low                          |
 
 A practical suggestion: the first time you implement offline RL, you can use IQL to establish a baseline. Its updates depend only on in-dataset actions, it has few and robust hyperparameters, and it is the simplest to implement. When you need explicit control over the degree of conservatism, try CQL. BCQ is mainly useful for helping you understand the idea of "restricting candidate actions", and is used relatively less in actual engineering.
 
@@ -282,11 +282,11 @@ By changing the Bellman target from $\max Q$ to $V$, IQL eliminates the path by 
 
 Let's compare these three BC-regularization-based algorithms once more:
 
-| Method | Form of policy loss                      | Needs $V$ | Friendly to online fine-tuning |
-| ------ | ---------------------------------------- | --------- | ------------------------------ |
-| TD3+BC | $-\!Q + \lambda \|\mu - a\|^2$           | No        | Medium                         |
-| AWAC   | $-\!w(A) \log \pi$, $w = \exp(A/\beta)$  | Yes       | Strong                         |
-| IQL    | $-\!\exp(\beta A) \log \pi$ (AWR)        | Yes       | Medium                         |
+| Method | Form of policy loss                     | Needs $V$ | Friendly to online fine-tuning |
+| ------ | --------------------------------------- | --------- | ------------------------------ |
+| TD3+BC | $-\!Q + \lambda \|\mu - a\|^2$          | No        | Medium                         |
+| AWAC   | $-\!w(A) \log \pi$, $w = \exp(A/\beta)$ | Yes       | Strong                         |
+| IQL    | $-\!\exp(\beta A) \log \pi$ (AWR)       | Yes       | Medium                         |
 
 Note that the policy losses of AWAC and IQL are highly similar in structure, and the core difference lies in where A comes from: AWAC uses an explicit Q-V difference (with Q still going through the standard Bellman backup), while IQL implicitly estimates V with expectile regression and avoids OOD queries entirely. This detail again shows that in offline RL, **"avoiding the max over OOD actions" is a more fundamental issue than "how to add the BC regularizer"**.
 

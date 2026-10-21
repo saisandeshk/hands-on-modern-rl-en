@@ -3,6 +3,7 @@ title: 6.2 Variance Reduction and Baselines
 ---
 
 # 6.2 Policy Gradient Improvements
+
 The CartPole experiment in Section 6.4 will show the most direct symptom of high variance in REINFORCE: the learning curve shakes violently, and the policy gets dragged around by luck. This section answers a key question:
 
 **Can we reduce the variance of $G_t$ without changing the direction of the gradient in expectation?**

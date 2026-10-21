@@ -103,15 +103,15 @@ $$\mathcal{L}(\theta) = \mathbb{E}\left[\left( r + \gamma (1-d) \max_{a'} Q(s', 
 
 This formula looks complicated, so let us first sort out the "role" of each symbol in it:
 
-| Symbol | Meaning (intuitive reading) | Role |
-| ------------------------------------------------ | ------------------------------------------------ | ---------------------------- |
-| $\theta$ | The parameters of the Q-network (the network being trained) | The student, the one taking the exam |
-| $\theta^-$ | The parameters of the target network (a frozen copy of the Q-network) | The reference answer in the grader's hands |
-| $Q(s, a; \theta)$ | The student's current answer: "I think this step is worth $X$ points" | The network's prediction |
-| $r$ | The immediate reward actually received at this step | Points already in the pocket |
-| $d$ | Whether the episode truly terminated | Cuts off future value at termination |
-| $\gamma (1-d) \max_{a'} Q(s', a'; \theta^-)$ | From the new situation, the best future score given by the target network, discounted | "The most that can still be earned in the future" |
-| $r + \gamma (1-d) \max_{a'} Q(s', a'; \theta^-)$ | The TD target: "how many points this should be worth" | The reference answer |
+| Symbol                                           | Meaning (intuitive reading)                                                           | Role                                              |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| $\theta$                                         | The parameters of the Q-network (the network being trained)                           | The student, the one taking the exam              |
+| $\theta^-$                                       | The parameters of the target network (a frozen copy of the Q-network)                 | The reference answer in the grader's hands        |
+| $Q(s, a; \theta)$                                | The student's current answer: "I think this step is worth $X$ points"                 | The network's prediction                          |
+| $r$                                              | The immediate reward actually received at this step                                   | Points already in the pocket                      |
+| $d$                                              | Whether the episode truly terminated                                                  | Cuts off future value at termination              |
+| $\gamma (1-d) \max_{a'} Q(s', a'; \theta^-)$     | From the new situation, the best future score given by the target network, discounted | "The most that can still be earned in the future" |
+| $r + \gamma (1-d) \max_{a'} Q(s', a'; \theta^-)$ | The TD target: "how many points this should be worth"                                 | The reference answer                              |
 
 Now let us assemble this loss function step by step.
 
@@ -155,23 +155,23 @@ The solution of experience replay is simple but effective: store every transitio
 
 What exactly is stored? Each interaction step produces one five-tuple:
 
-| Component | Meaning | CartPole example |
-| ---- | ---------- | -------------------------------------------------------- |
-| $s$ | Current state | `[0.03, 0.12, -0.05, -0.32]` (position, velocity, angle, angular velocity) |
-| $a$ | Action taken | `0` (push left) |
-| $r$ | Reward received | `1.0` (the pole has not fallen; +1 each step) |
-| $s'$ | Next state | `[0.03, -0.05, -0.06, 0.18]` (the new observation after the action) |
-| $d$ | Whether terminated | `False` (the pole is still upright) |
+| Component | Meaning            | CartPole example                                                           |
+| --------- | ------------------ | -------------------------------------------------------------------------- |
+| $s$       | Current state      | `[0.03, 0.12, -0.05, -0.32]` (position, velocity, angle, angular velocity) |
+| $a$       | Action taken       | `0` (push left)                                                            |
+| $r$       | Reward received    | `1.0` (the pole has not fallen; +1 each step)                              |
+| $s'$      | Next state         | `[0.03, -0.05, -0.06, 0.18]` (the new observation after the action)        |
+| $d$       | Whether terminated | `False` (the pole is still upright)                                        |
 
 The replay buffer is a collection of such five-tuples. As the agent keeps interacting, the buffer gradually fills up. Here is what a replay buffer might actually store during CartPole training:
 
-| # | $s$ (state) | $a$ (action) | $r$ (reward) | $s'$ (next state) | $d$ (terminated) | Source |
-| --- | ---------------------------- | ----------- | ----------- | ---------------------------- | ----------- | ------------------ |
-| 1 | `[0.01, 0.12, 0.05, -0.32]` | `1` (push right) | `1.0` | `[0.01, 0.15, 0.04, -0.28]` | `False` | Episode 2, start |
-| 2 | `[0.02, 0.31, -0.12, 0.89]` | `0` (push left) | `1.0` | `[0.01, 0.28, -0.10, 0.85]` | `False` | Episode 8, midway |
-| 3 | `[0.05, 0.44, 0.21, 1.02]` | `1` (push right) | `1.0` | `[0.06, 0.48, 0.24, 1.10]` | `True` | Episode 8, pole fell |
-| 4 | `[0.00, 0.02, 0.01, -0.05]` | `0` (push left) | `1.0` | `[0.00, -0.01, 0.01, -0.03]` | `False` | Episode 45, pole very stable |
-| 5 | `[-0.03, -0.18, 0.08, 0.55]` | `1` (push right) | `1.0` | `[-0.03, -0.14, 0.09, 0.50]` | `False` | Episode 102, midway |
+| #   | $s$ (state)                  | $a$ (action)     | $r$ (reward) | $s'$ (next state)            | $d$ (terminated) | Source                       |
+| --- | ---------------------------- | ---------------- | ------------ | ---------------------------- | ---------------- | ---------------------------- |
+| 1   | `[0.01, 0.12, 0.05, -0.32]`  | `1` (push right) | `1.0`        | `[0.01, 0.15, 0.04, -0.28]`  | `False`          | Episode 2, start             |
+| 2   | `[0.02, 0.31, -0.12, 0.89]`  | `0` (push left)  | `1.0`        | `[0.01, 0.28, -0.10, 0.85]`  | `False`          | Episode 8, midway            |
+| 3   | `[0.05, 0.44, 0.21, 1.02]`   | `1` (push right) | `1.0`        | `[0.06, 0.48, 0.24, 1.10]`   | `True`           | Episode 8, pole fell         |
+| 4   | `[0.00, 0.02, 0.01, -0.05]`  | `0` (push left)  | `1.0`        | `[0.00, -0.01, 0.01, -0.03]` | `False`          | Episode 45, pole very stable |
+| 5   | `[-0.03, -0.18, 0.08, 0.55]` | `1` (push right) | `1.0`        | `[-0.03, -0.14, 0.09, 0.50]` | `False`          | Episode 102, midway          |
 
 A few things to note:
 
@@ -525,12 +525,12 @@ Here are the hyperparameter choices, one by one:
 ::: details Comparison of epsilon decay speeds
 After each episode $\varepsilon \leftarrow \varepsilon \times \text{epsilon\_decay}$. The effect of different decay factors:
 
-| Decay factor | After 100 episodes | After 200 episodes | After 400 episodes | Effect |
-| --------- | --------- | --------- | --------- | ------------------------------ |
-| 0.95 | 0.006 | — | — | Too fast: the policy hardens before any exploration |
-| 0.99 | 0.366 | 0.134 | 0.018 | Somewhat fast; usable for some tasks |
-| **0.995** | **0.606** | **0.368** | **0.135** | **Balanced: explore in the first half, exploit in the second** |
-| 0.999 | 0.905 | 0.819 | 0.670 | Too slow: still very random after 500 episodes |
+| Decay factor | After 100 episodes | After 200 episodes | After 400 episodes | Effect                                                         |
+| ------------ | ------------------ | ------------------ | ------------------ | -------------------------------------------------------------- |
+| 0.95         | 0.006              | —                  | —                  | Too fast: the policy hardens before any exploration            |
+| 0.99         | 0.366              | 0.134              | 0.018              | Somewhat fast; usable for some tasks                           |
+| **0.995**    | **0.606**          | **0.368**          | **0.135**          | **Balanced: explore in the first half, exploit in the second** |
+| 0.999        | 0.905              | 0.819              | 0.670              | Too slow: still very random after 500 episodes                 |
 
 :::
 
@@ -544,13 +544,13 @@ At this point a complete DQN has been built from scratch. The core of the whole 
 
 The training phase and the inference phase use the same Q-network, but run it in completely different ways:
 
-| | Training (learning) | Inference (use) |
-| -------- | --------------------------------------- | -------------------------------------------- |
-| Action selection | ε-greedy: explore randomly with probability $\varepsilon$ | Pure greedy: $a = \arg\max_{a'} Q(s, a'; \theta)$ |
-| Experience collection | Store each step in the replay buffer | Not needed |
-| Parameter update | Sample from the replay buffer, compute the loss, backpropagate | No parameter updates |
-| Target network | Takes part in computing the TD target, copied periodically | Not used |
-| Network mode | `q_net.train()` | `q_net.eval()` |
+|                       | Training (learning)                                            | Inference (use)                                   |
+| --------------------- | -------------------------------------------------------------- | ------------------------------------------------- |
+| Action selection      | ε-greedy: explore randomly with probability $\varepsilon$      | Pure greedy: $a = \arg\max_{a'} Q(s, a'; \theta)$ |
+| Experience collection | Store each step in the replay buffer                           | Not needed                                        |
+| Parameter update      | Sample from the replay buffer, compute the loss, backpropagate | No parameter updates                              |
+| Target network        | Takes part in computing the TD target, copied periodically     | Not used                                          |
+| Network mode          | `q_net.train()`                                                | `q_net.eval()`                                    |
 
 Exploration is needed in training because the agent has to discover better policies. If it only ever picks the action it currently believes is best, it may never reach more valuable regions. Exploration is turned off at inference because we want to evaluate **what the network has really learned**, and not the luck of its random wandering.
 

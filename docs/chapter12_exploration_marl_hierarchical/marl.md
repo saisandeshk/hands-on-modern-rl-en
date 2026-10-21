@@ -45,10 +45,10 @@ In a normal-form game:
 
 The classic example is the "prisoner's dilemma":
 
-|                  | Opponent confesses | Opponent denies |
-| ---------------- | ------------------ | --------------- |
-| **You confess**  | (-3, -3)           | (0, -5)         |
-| **You deny**     | (-5, 0)            | (-1, -1)        |
+|                 | Opponent confesses | Opponent denies |
+| --------------- | ------------------ | --------------- |
+| **You confess** | (-3, -3)           | (0, -5)         |
+| **You deny**    | (-5, 0)            | (-1, -1)        |
 
 You may remember the concept of the "Nash equilibrium" from game theory: no agent can raise its expected payoff by changing its own strategy **unilaterally**, and the joint strategy at that point is a Nash equilibrium.
 
@@ -250,12 +250,12 @@ Because it trains stably, is clear to implement, and performs well, MAPPO has no
 
 Let's put the CTDE algorithms mentioned in this chapter side by side to help you choose in practice:
 
-| Algorithm                | Critic input               | Actor input | On/off-policy | Representative tasks         |
-| ------------------------ | -------------------------- | ----------- | ------------- | ---------------------------- |
-| IQL (independent learning) | $o_i$                    | $o_i$       | off           | Weak baseline                |
-| VDN / QMIX               | $s$ (linear/monotonic decomposition) | $o_i$ | off      | Cooperative tasks            |
-| MADDPG                   | $(o_1,a_1,\ldots,o_n,a_n)$ | $o_i$       | off           | Mixed cooperative-competitive |
-| MAPPO                    | $s$                        | $o_i$       | on            | SMAC, Hanabi                 |
+| Algorithm                  | Critic input                         | Actor input | On/off-policy | Representative tasks          |
+| -------------------------- | ------------------------------------ | ----------- | ------------- | ----------------------------- |
+| IQL (independent learning) | $o_i$                                | $o_i$       | off           | Weak baseline                 |
+| VDN / QMIX                 | $s$ (linear/monotonic decomposition) | $o_i$       | off           | Cooperative tasks             |
+| MADDPG                     | $(o_1,a_1,\ldots,o_n,a_n)$           | $o_i$       | off           | Mixed cooperative-competitive |
+| MAPPO                      | $s$                                  | $o_i$       | on            | SMAC, Hanabi                  |
 
 ### 4.2 What Value Decomposition Solves
 

@@ -51,11 +51,11 @@ But, as you may already have wondered, what if the model is wrong? Will a policy
 
 Before going into details, let's list the three mainstream paradigms of model-based RL to give you the full picture:
 
-| Paradigm | Core idea                                       | Representative algorithm | Applicable setting                                    |
-| -------- | ----------------------------------------------- | ------------------------ | ----------------------------------------------------- |
-| **Dyna** | Model as data augmentation                      | Dyna-Q                   | Discrete actions, fast training                       |
-| **PETS** | Probabilistic ensemble + trajectory sampling    | PETS                     | High-precision control, where model uncertainty matters |
-| **MBPO** | Short-horizon rollouts                          | MBPO                     | General continuous control                            |
+| Paradigm | Core idea                                    | Representative algorithm | Applicable setting                                      |
+| -------- | -------------------------------------------- | ------------------------ | ------------------------------------------------------- |
+| **Dyna** | Model as data augmentation                   | Dyna-Q                   | Discrete actions, fast training                         |
+| **PETS** | Probabilistic ensemble + trajectory sampling | PETS                     | High-precision control, where model uncertainty matters |
+| **MBPO** | Short-horizon rollouts                       | MBPO                     | General continuous control                              |
 
 Let's begin with the simplest, Dyna.
 
@@ -284,11 +284,11 @@ The experimental results of MBPO are striking: on MuJoCo it matches or even exce
 
 Let's put Dyna, PETS, and MBPO, three landmark algorithms, side by side to help you choose in practice:
 
-| Algorithm | Model type             | Planning method        | Sample efficiency | Compute cost |
-| --------- | ---------------------- | ---------------------- | ----------------- | ------------ |
-| Dyna      | Deterministic          | 1-step fake data       | ~10×              | Low          |
-| PETS      | Probabilistic ensemble | CEM MPC                | ~50×              | High         |
-| MBPO      | Deterministic          | Short rollouts         | ~100×             | Medium       |
+| Algorithm | Model type             | Planning method  | Sample efficiency | Compute cost |
+| --------- | ---------------------- | ---------------- | ----------------- | ------------ |
+| Dyna      | Deterministic          | 1-step fake data | ~10×              | Low          |
+| PETS      | Probabilistic ensemble | CEM MPC          | ~50×              | High         |
+| MBPO      | Deterministic          | Short rollouts   | ~100×             | Medium       |
 
 Practical recommendations:
 

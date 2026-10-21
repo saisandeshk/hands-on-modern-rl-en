@@ -24,12 +24,12 @@ The answer lies in the causal order. Data and rewards decide what the model lear
 
 In this order, the signals and first checks of the four layers are:
 
-| Layer | Main signals | Check first | Corresponding tools |
-| ---------- | ------------------------ | ---------------------------------- | ------------------- |
-| Data and rewards | Reward rises, independent evaluation does not move | Reward rules, data duplication, evaluation contamination, length | Rewrite the reward, clean the data |
-| Policy change | KL rises fast, entropy falls fast | Update size, KL constraint, sampling difficulty, version | Lower the learning rate, tighten KL |
-| Numerical updates | Loss / gradient blow-up, NaN | Learning rate, precision, anomalous batches, clipping | Gradient clipping, optimizer |
-| Training system | The two sides' probabilities disagree, versions are misaligned | Weight synchronization, tokens, precision, MoE routing | Align versions and recompute probabilities |
+| Layer             | Main signals                                                   | Check first                                                      | Corresponding tools                        |
+| ----------------- | -------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------ |
+| Data and rewards  | Reward rises, independent evaluation does not move             | Reward rules, data duplication, evaluation contamination, length | Rewrite the reward, clean the data         |
+| Policy change     | KL rises fast, entropy falls fast                              | Update size, KL constraint, sampling difficulty, version         | Lower the learning rate, tighten KL        |
+| Numerical updates | Loss / gradient blow-up, NaN                                   | Learning rate, precision, anomalous batches, clipping            | Gradient clipping, optimizer               |
+| Training system   | The two sides' probabilities disagree, versions are misaligned | Weight synchronization, tokens, precision, MoE routing           | Align versions and recompute probabilities |
 
 The diagnosis should go through this table from top to bottom: first confirm that the target the model is learning is correct, then see whether the policy has moved too fast, then check the single-step update, and finally verify the distributed system. This avoids two common mistaken remedies: using numerical tools to fix a reward problem, or using data cleaning to cover up a weight-synchronization error. Both remedies make training "look recovered" when in fact the fault has only been hidden in a deeper layer.
 

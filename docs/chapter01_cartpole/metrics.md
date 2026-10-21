@@ -35,12 +35,12 @@ $$
 
 The subscript $t$ denotes the current time, and the four quantities are, in order, the cart position, the cart velocity, the pole angle, and the pole angular velocity.
 
-| Index | Observation  | Meaning                                        | Bounds in `observation_space` |
-| ----- | ------------ | ---------------------------------------------- | ----------------------------- |
-| 0     | $x$          | Position of the cart on the track              | $[-4.8,\ 4.8]$                |
-| 1     | $\dot{x}$    | Direction and speed of the cart's movement     | $(-\infty,\ +\infty)$         |
-| 2     | $\theta$     | Angle of the pole from the vertical            | About $[-24^\circ,\ 24^\circ]$ |
-| 3     | $\dot\theta$ | Direction and speed of the pole's rotation     | $(-\infty,\ +\infty)$         |
+| Index | Observation  | Meaning                                    | Bounds in `observation_space`  |
+| ----- | ------------ | ------------------------------------------ | ------------------------------ |
+| 0     | $x$          | Position of the cart on the track          | $[-4.8,\ 4.8]$                 |
+| 1     | $\dot{x}$    | Direction and speed of the cart's movement | $(-\infty,\ +\infty)$          |
+| 2     | $\theta$     | Angle of the pole from the vertical        | About $[-24^\circ,\ 24^\circ]$ |
+| 3     | $\dot\theta$ | Direction and speed of the pole's rotation | $(-\infty,\ +\infty)$          |
 
 The angle and the angular velocity must appear together. Knowing only that the pole leans to the right does not tell us whether it is falling quickly to the right or returning to the middle, and these two situations may call for exactly opposite actions.
 
@@ -259,15 +259,15 @@ The policy is corrected step by step through the iterations, and the reward curv
 
 Once the principles are covered, there is more worth looking at in the training records: every point on the curve and every number in the log corresponds to some stage we just discussed. This page analyzes one real run saved in the repository. The training curve, the diagnostic curves, and the console numbers all come from the same CSV, and no results from different scripts or different random seeds are stitched together.
 
-| Item            | Settings of this run                                                      |
-| --------------- | ------------------------------------------------------------------------- |
-| Date            | 2026-08-13                                                                |
-| Environment     | `CartPole-v1`                                                             |
-| Algorithm       | The repository's pure PyTorch PPO                                         |
-| Random seed     | `42`                                                                      |
-| Training amount | 40 iterations × 2048 steps = 81,920 environment steps                     |
-| Evaluation      | After training, 20 episodes run independently with the deterministic policy |
-| Software versions | Python 3.12.13, PyTorch 2.13.0, Gymnasium 1.3.0, NumPy 2.5.2            |
+| Item              | Settings of this run                                                        |
+| ----------------- | --------------------------------------------------------------------------- |
+| Date              | 2026-08-13                                                                  |
+| Environment       | `CartPole-v1`                                                               |
+| Algorithm         | The repository's pure PyTorch PPO                                           |
+| Random seed       | `42`                                                                        |
+| Training amount   | 40 iterations × 2048 steps = 81,920 environment steps                       |
+| Evaluation        | After training, 20 episodes run independently with the deterministic policy |
+| Software versions | Python 3.12.13, PyTorch 2.13.0, Gymnasium 1.3.0, NumPy 2.5.2                |
 
 The reproduction commands are as follows. `--swanlab-mode disabled` only turns off dashboard logging and does not change the training process.
 

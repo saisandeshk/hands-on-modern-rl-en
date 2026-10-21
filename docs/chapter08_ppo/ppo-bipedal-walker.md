@@ -20,15 +20,15 @@ This chapter uses the following concepts frequently:
 - [Advantage function $A(s,a)$](../chapter07_actor_critic/advantage-function): the PPO policy update depends on the advantage signal
 - [TD error and Critic training](../chapter07_actor_critic/critic-training): how the Critic is trained in PPO
 - [Actor-Critic architecture](../chapter07_actor_critic/actor-critic): PPO is a practical variant of Actor-Critic
-:::
+  :::
 
 This chapter follows the path "**practice → constraint → estimation → extension**":
 
-| Section                                                          | Questions you will answer                                                                                                            |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **8.1 Hands-On: PPO on BipedalWalker**                           | What does PPO training look like? How do you read Reward, Entropy, Clip Fraction, and KL? How does it handle a continuous action space? |
-| [8.2 Trust Regions and PPO-Clip](./trust-region-clipping)        | Why does an update that is too large collapse? How do the KL constraint of TRPO and the clipping of PPO each work?                   |
-| [8.3 GAE Advantage Estimation](./gae-reward-model)               | How does GAE interpolate between bias and variance? How many models must run at once for PPO in LLM alignment?                       |
+| Section                                                   | Questions you will answer                                                                                                               |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **8.1 Hands-On: PPO on BipedalWalker**                    | What does PPO training look like? How do you read Reward, Entropy, Clip Fraction, and KL? How does it handle a continuous action space? |
+| [8.2 Trust Regions and PPO-Clip](./trust-region-clipping) | Why does an update that is too large collapse? How do the KL constraint of TRPO and the clipping of PPO each work?                      |
+| [8.3 GAE Advantage Estimation](./gae-reward-model)        | How does GAE interpolate between bias and variance? How many models must run at once for PPO in LLM alignment?                          |
 
 **Bonus material** (optional): [PPO Mathematical Derivation](./ppo-math) · [PPO Game Projects](./ppo-game-benchmark) · [RL Exploration in Long-Horizon Tasks](./rl-long-horizon-planning)
 
@@ -170,12 +170,12 @@ If the KL divergence suddenly spikes above 0.05, some update pushed the policy t
 
 The four metrics are not independent, and there are clear causal relations among them:
 
-| Phenomenon            | Reward          | Policy entropy   | Clip fraction        | KL divergence        |
-| --------------------- | --------------- | ---------------- | -------------------- | -------------------- |
-| Normal training       | Gradually rising | Slowly falling  | 0.05-0.15            | 0.01-0.03            |
-| Update too aggressive | Sudden dive     | Sharp change     | Spikes above 0.2     | Spikes above 0.05    |
-| Premature convergence | Stagnant        | Close to 0       | Close to 0           | Close to 0           |
-| Late training         | Stable and high | Stable and low   | Stable and low       | Stable and low       |
+| Phenomenon            | Reward           | Policy entropy | Clip fraction    | KL divergence     |
+| --------------------- | ---------------- | -------------- | ---------------- | ----------------- |
+| Normal training       | Gradually rising | Slowly falling | 0.05-0.15        | 0.01-0.03         |
+| Update too aggressive | Sudden dive      | Sharp change   | Spikes above 0.2 | Spikes above 0.05 |
+| Premature convergence | Stagnant         | Close to 0     | Close to 0       | Close to 0        |
+| Late training         | Stable and high  | Stable and low | Stable and low   | Stable and low    |
 
 A reward dive almost always comes with a spike in the clip fraction and a sudden jump in the KL divergence. When all three metrics are abnormal, the policy update is too large, and you need to reduce the learning rate or increase `n_steps` (so that each rollout collects more data to stabilize the gradient estimate).
 
@@ -264,11 +264,11 @@ At 2M steps the policy has formed a stable and efficient gait. The joints are co
 
 Evaluation comparison of the three stages (average over 20 episodes):
 
-| Training steps | Mean reward | Std dev | Behavior                                                          |
-| -------------- | ----------- | ------- | ----------------------------------------------------------------- |
+| Training steps | Mean reward | Std dev | Behavior                                                           |
+| -------------- | ----------- | ------- | ------------------------------------------------------------------ |
 | 100k           | -34.1       | 3.3     | Stands steadily but cannot walk, runs all 1600 steps every episode |
-| 500k           | -65.2       | 73.1    | Transition: about 15% of episodes walk, the rest still fall       |
-| 2M             | 282.5       | 59.7    | Stable and efficient walking, the vast majority of episodes 290+  |
+| 500k           | -65.2       | 73.1    | Transition: about 15% of episodes walk, the rest still fall        |
+| 2M             | 282.5       | 59.7    | Stable and efficient walking, the vast majority of episodes 290+   |
 
 The learning trajectory of PPO on a continuous control task: first it learns "not to fall" (100k), then goes through the unstable "can walk occasionally" (500k), and finally forms "stable walking" (2M). The bimodal behavior at 500k steps deserves particular attention. The same model may get a reward of 100+ or -100 in different episodes, which shows that the policy is at the critical stage of crossing a behavioral threshold. This process is slower than in discrete control tasks, but the stage boundaries are clearer, because the policy space of a continuous action space is larger and each stage needs more data to break through.
 
@@ -276,26 +276,26 @@ The learning trajectory of PPO on a continuous control task: first it learns "no
 
 The 24-dimensional state of BipedalWalker can be divided into several groups:
 
-| State component              | Dimensions | Meaning                                    |
-| ---------------------------- | ---------- | ------------------------------------------ |
-| `hull_angle`                 | 1          | Tilt angle of the hull                     |
-| `hull_angular_velocity`      | 1          | Angular velocity of the hull               |
-| `vx, vy`                     | 2          | Horizontal / vertical velocity of the hull |
-| `hip1, hip2`                 | 2          | Hip joint angles of the two legs           |
-| `knee1, knee2`               | 2          | Knee joint angles of the two legs          |
-| `leg1_contact, leg2_contact` | 2          | Whether each foot touches the ground       |
+| State component              | Dimensions | Meaning                                          |
+| ---------------------------- | ---------- | ------------------------------------------------ |
+| `hull_angle`                 | 1          | Tilt angle of the hull                           |
+| `hull_angular_velocity`      | 1          | Angular velocity of the hull                     |
+| `vx, vy`                     | 2          | Horizontal / vertical velocity of the hull       |
+| `hip1, hip2`                 | 2          | Hip joint angles of the two legs                 |
+| `knee1, knee2`               | 2          | Knee joint angles of the two legs                |
+| `leg1_contact, leg2_contact` | 2          | Whether each foot touches the ground             |
 | `lidar[0..9]`                | 10         | Lidar range readings (sensing the terrain ahead) |
-| `hip_speed1, hip_speed2`     | 2          | Hip joint angular velocities               |
-| `knee_speed1, knee_speed2`   | 2          | Knee joint angular velocities              |
+| `hip_speed1, hip_speed2`     | 2          | Hip joint angular velocities                     |
+| `knee_speed1, knee_speed2`   | 2          | Knee joint angular velocities                    |
 
 The action is a 4-dimensional continuous vector, with every component in $[-1, 1]$:
 
-| Action component | Meaning              |
-| ---------------- | -------------------- |
-| `action[0]`      | Leg 1 hip torque     |
-| `action[1]`      | Leg 1 knee torque    |
-| `action[2]`      | Leg 2 hip torque     |
-| `action[3]`      | Leg 2 knee torque    |
+| Action component | Meaning           |
+| ---------------- | ----------------- |
+| `action[0]`      | Leg 1 hip torque  |
+| `action[1]`      | Leg 1 knee torque |
+| `action[2]`      | Leg 2 hip torque  |
+| `action[3]`      | Leg 2 knee torque |
 
 PPO handles continuous actions differently from discrete ones. In a discrete action space, the policy network outputs the probability of each action and samples from it. In a continuous action space, the policy network outputs a Gaussian distribution, with mean $\mu(s)$ and standard deviation $\sigma(s)$, and the action is sampled from $\mathcal{N}(\mu, \sigma^2)$:
 
@@ -339,14 +339,14 @@ model = PPO(
 
 Reference for common hyperparameters:
 
-| Parameter       | Setting in this section | What happens if it is unsuitable                                              |
-| --------------- | ----------------------- | ----------------------------------------------------------------------------- |
-| `learning_rate` | `3e-4`                  | Too large makes the joint torque output oscillate sharply, too small learns very slowly |
-| `batch_size`    | `256`                   | Too small gives unstable gradient estimates, too large makes each update too slow |
-| `n_steps`       | `2048`                  | Too small gives too little data per rollout, too large delays the policy update frequency |
+| Parameter       | Setting in this section | What happens if it is unsuitable                                                                 |
+| --------------- | ----------------------- | ------------------------------------------------------------------------------------------------ |
+| `learning_rate` | `3e-4`                  | Too large makes the joint torque output oscillate sharply, too small learns very slowly          |
+| `batch_size`    | `256`                   | Too small gives unstable gradient estimates, too large makes each update too slow                |
+| `n_steps`       | `2048`                  | Too small gives too little data per rollout, too large delays the policy update frequency        |
 | `ent_coef`      | `0.005`                 | Too small makes the policy converge early to standing still, too large never forms a stable gait |
-| `clip_range`    | `0.2`                   | Too large makes the gait change abruptly and fall, too small stalls training  |
-| `gamma`         | `0.99`                  | Too low focuses on short-term not falling and ignores long-term walking efficiency |
+| `clip_range`    | `0.2`                   | Too large makes the gait change abruptly and fall, too small stalls training                     |
+| `gamma`         | `0.99`                  | Too low focuses on short-term not falling and ignores long-term walking efficiency               |
 
 ## 8.1.7 Why BipedalWalker
 

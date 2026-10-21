@@ -206,13 +206,13 @@ Burda et al. found a surprising result in large-scale experiments: with the RND 
 
 Let's put the two methods side by side to help you understand where each applies:
 
-| Dimension                    | ICM                                     | RND                       |
-| ---------------------------- | --------------------------------------- | ------------------------- |
-| Depends on actions           | Yes (the forward model needs $a$)       | No                        |
-| Submodules to train          | Encoder + inverse + forward             | Predictor only            |
-| Robustness to noisy TV       | Weak                                    | Strong                    |
-| Computational cost           | High                                    | Medium                    |
-| Representative applications  | Visual exploration (Mario, DMLab)       | Atari hard-exploration    |
+| Dimension                   | ICM                               | RND                    |
+| --------------------------- | --------------------------------- | ---------------------- |
+| Depends on actions          | Yes (the forward model needs $a$) | No                     |
+| Submodules to train         | Encoder + inverse + forward       | Predictor only         |
+| Robustness to noisy TV      | Weak                              | Strong                 |
+| Computational cost          | High                              | Medium                 |
+| Representative applications | Visual exploration (Mario, DMLab) | Atari hard-exploration |
 
 ICM and RND each solve part of the problem, but they share a blind spot. Can you think of what it is?
 

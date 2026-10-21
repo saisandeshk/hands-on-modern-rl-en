@@ -99,10 +99,10 @@ The MC estimate does not depend on the Critic and is unbiased in expectation giv
 
 **How large the variance gets can be felt with numbers.** Suppose that starting from the same $s_0$, the environment has a 50% chance of a "good ending" (terminal $r_4 = +1$) and a 50% chance of a "bad ending" (terminal $r_4 = -1$), with the rewards of all other steps fixed at 0. With $V(s_0) = 0.1$:
 
-| Episode    | $G_0$ | $A_0^{\text{MC}} = G_0 - V(s_0)$ |
-| ---------- | ----- | -------------------------------- |
-| Good ending | $+1$ | $+0.9$                           |
-| Bad ending  | $-1$ | $-1.1$                           |
+| Episode     | $G_0$ | $A_0^{\text{MC}} = G_0 - V(s_0)$ |
+| ----------- | ----- | -------------------------------- |
+| Good ending | $+1$  | $+0.9$                           |
+| Bad ending  | $-1$  | $-1.1$                           |
 
 The two samples give advantage estimates of $+0.9$ and $-1.1$, which differ by 2.0, a very large variance. TD behaves differently: $\delta_0 = V(s_1) - V(s_0)$, and once the Critic has learned the expected value of $V(s_1)$, $\delta_0$ barely changes from episode to episode. **TD trades on the smoothness of the Critic to control variance, and the price is that the source of bias moves from sampling noise to the accuracy of the Critic.**
 
@@ -208,13 +208,13 @@ The weight decays geometrically from $1$ along $0.95 \to 0.90 \to 0.86 \to 0.81$
 
 As $\lambda$ grows, the advantage of the early steps climbs from $0.1$ all the way to $0.9$: **credit propagates from the last step back to every step**, but the variance rises in step (the randomness of the distant $\delta$ is added in). The usual engineering default for PPO is $\lambda = 0.95$, leaning toward the MC side, trading a little bias for a marked drop in variance.
 
-| $\lambda$ value | Equivalent to | Bias     | Variance        | Use case                                  |
-| --------------- | ------------- | -------- | --------------- | ----------------------------------------- |
-| 0.0             | Pure TD       | High     | Low             | Sparse data, inaccurate Critic            |
-| 0.9             | Leaning TD    | Moderate | Moderate to low | General purpose                           |
-| 0.95            | Balanced      | Lower    | Moderate        | **PPO default**                           |
-| 0.99            | Leaning MC    | Low      | Higher          | Accurate Critic, fine-grained evaluation  |
-| 1.0             | Pure MC       | None     | High            | Short episodes, plentiful data            |
+| $\lambda$ value | Equivalent to | Bias     | Variance        | Use case                                 |
+| --------------- | ------------- | -------- | --------------- | ---------------------------------------- |
+| 0.0             | Pure TD       | High     | Low             | Sparse data, inaccurate Critic           |
+| 0.9             | Leaning TD    | Moderate | Moderate to low | General purpose                          |
+| 0.95            | Balanced      | Lower    | Moderate        | **PPO default**                          |
+| 0.99            | Leaning MC    | Low      | Higher          | Accurate Critic, fine-grained evaluation |
+| 1.0             | Pure MC       | None     | High            | Short episodes, plentiful data           |
 
 ```python
 # ==========================================
@@ -391,12 +391,12 @@ flowchart TD
 
 The role of each model:
 
-| Model        | Role                                                   | Size                 | GPU memory |
-| ------------ | ------------------------------------------------------ | -------------------- | ---------- |
-| Actor        | The language model being trained, generates answers    | 7B-70B               | Largest    |
-| Critic       | Value network, evaluates how good an answer is         | Same as the Actor    | Large      |
-| Reference    | Frozen original model, supplies the KL penalty baseline | Same as the Actor   | Large      |
-| Reward Model | Referee model that scores answers                      | Usually smaller than the Actor | Medium |
+| Model        | Role                                                    | Size                           | GPU memory |
+| ------------ | ------------------------------------------------------- | ------------------------------ | ---------- |
+| Actor        | The language model being trained, generates answers     | 7B-70B                         | Largest    |
+| Critic       | Value network, evaluates how good an answer is          | Same as the Actor              | Large      |
+| Reference    | Frozen original model, supplies the KL penalty baseline | Same as the Actor              | Large      |
+| Reward Model | Referee model that scores answers                       | Usually smaller than the Actor | Medium     |
 
 Cramming four models into GPU memory at the same time is the engineering difficulty of RLHF. A 7B model needs at least 4 A100s (80GB), and a 70B model may need 16-32 A100s. And this does not yet count the earlier SFT and RM training stages.
 
@@ -451,6 +451,7 @@ The success of PPO is that it makes only two key changes to the Actor-Critic arc
 ---
 
 **Further Reading**:
+
 - For the complete mathematical derivation of PPO (the full argument from TRPO to PPO), see: [Bonus: PPO Mathematical Derivation](./ppo-math)
 - For more PPO practice projects, see: [Bonus: A Practical Guide to PPO Game Projects](./ppo-game-benchmark)
 - For long-horizon solutions beyond PPO, see: [Bonus: RL Exploration in Long-Horizon Tasks](./rl-long-horizon-planning)

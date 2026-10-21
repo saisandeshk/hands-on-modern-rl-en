@@ -219,12 +219,12 @@ Besides penalizing hallucination in the reward function, one can also filter it 
 
 #### Summary of Hallucination Control in Practice
 
-| Hallucination type | Detection method | RL penalty strategy |
-| ------------ | ----------------------- | --------------------------- |
-| Tool selection hallucination | Tool allowlist check | Call to a nonexistent tool: reward = 0 |
-| Parameter hallucination | Schema validation + type check | Malformed parameter: negative reward |
-| Result hallucination | NLI model + cross-validation | Claim contradicts tool result: penalty |
-| Citation hallucination | URL reachability + content relevance | Fake citation: penalty |
+| Hallucination type           | Detection method                     | RL penalty strategy                    |
+| ---------------------------- | ------------------------------------ | -------------------------------------- |
+| Tool selection hallucination | Tool allowlist check                 | Call to a nonexistent tool: reward = 0 |
+| Parameter hallucination      | Schema validation + type check       | Malformed parameter: negative reward   |
+| Result hallucination         | NLI model + cross-validation         | Claim contradicts tool result: penalty |
+| Citation hallucination       | URL reachability + content relevance | Fake citation: penalty                 |
 
 An important practical principle: **introduce the hallucination penalty early in training.** Once hallucinating behavior has been reinforced by RL, removing it later is very difficult.
 
@@ -272,19 +272,19 @@ The two paradigms are not mutually exclusive in Agentic RL. Researchers should c
 
 The table below summarizes the solution for each problem:
 
-| Problem | Solution | Source |
-| ---------------------- | -------------------------------------------------------------------- | ---------------- |
-| Training environment not reproducible | Build a deterministic synthetic environment | Alibaba |
-| Customization with small-scale data | A small amount of high-quality data (such as 72 samples) combined with RL can also give significant results | Amazon |
-| Gradient explosion early in training | Check that the low-level implementations of the inference engine and the training engine agree (such as the Attention Sink backward pass) | LinkedIn |
-| Output degenerates into repetitive gibberish | Use a minimal reward design (reward or penalize only task success or failure); filter overlong outputs | Bespoke Labs |
-| Policy drifts from the initial model | Set a small KL penalty (such as 0.001); periodically set the current model as the new reference model | Bespoke Labs |
-| Low output efficiency (too many steps) | Use a Gamma-decay reward to encourage finishing with fewer steps | Moonshot |
-| Format collapse | Use a conservative negative-sample strategy that excludes trajectories truncated for excessive length before a final answer was produced | Alibaba |
-| Context overflow on long tasks | Introduce context management that actively summarizes or discards useless history | Moonshot |
-| Low resource utilization in MoE training | Pipelined synchronous RL + Expert Parallelism; 16 H200 GPUs can train a 120B MoE | Salesforce |
-| MoE routing inconsistency | Be aware that non-deterministic MoE routing can break the on-policy assumption; separate root cause from symptom when debugging | LinkedIn |
-| Poor training results on small models | Improve base capability through distillation before RL; use the three-stage CPT → SFT → RL pipeline | Amazon / Alibaba |
+| Problem                                      | Solution                                                                                                                                  | Source           |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| Training environment not reproducible        | Build a deterministic synthetic environment                                                                                               | Alibaba          |
+| Customization with small-scale data          | A small amount of high-quality data (such as 72 samples) combined with RL can also give significant results                               | Amazon           |
+| Gradient explosion early in training         | Check that the low-level implementations of the inference engine and the training engine agree (such as the Attention Sink backward pass) | LinkedIn         |
+| Output degenerates into repetitive gibberish | Use a minimal reward design (reward or penalize only task success or failure); filter overlong outputs                                    | Bespoke Labs     |
+| Policy drifts from the initial model         | Set a small KL penalty (such as 0.001); periodically set the current model as the new reference model                                     | Bespoke Labs     |
+| Low output efficiency (too many steps)       | Use a Gamma-decay reward to encourage finishing with fewer steps                                                                          | Moonshot         |
+| Format collapse                              | Use a conservative negative-sample strategy that excludes trajectories truncated for excessive length before a final answer was produced  | Alibaba          |
+| Context overflow on long tasks               | Introduce context management that actively summarizes or discards useless history                                                         | Moonshot         |
+| Low resource utilization in MoE training     | Pipelined synchronous RL + Expert Parallelism; 16 H200 GPUs can train a 120B MoE                                                          | Salesforce       |
+| MoE routing inconsistency                    | Be aware that non-deterministic MoE routing can break the on-policy assumption; separate root cause from symptom when debugging           | LinkedIn         |
+| Poor training results on small models        | Improve base capability through distillation before RL; use the three-stage CPT → SFT → RL pipeline                                       | Amazon / Alibaba |
 
 ### References {#references}
 
@@ -329,11 +329,11 @@ Consider a concrete scenario. An agent is asked to "investigate a company's fina
 
 These three aspects correspond to the three core dimensions of agentic evaluation:
 
-| Dimension | What is evaluated | Representative benchmarks |
-| -------- | ------------------------- | ---------------------------- |
-| Tool calling | Whether the model can call APIs/tools correctly | BFCL, ACEBench, API-Bank |
-| Task completion | Whether the agent can complete end-to-end tasks | SWE-bench, WebArena, τ-bench |
-| General capability | Level as a general-purpose intelligent assistant | GAIA, Toolathlon |
+| Dimension          | What is evaluated                                | Representative benchmarks    |
+| ------------------ | ------------------------------------------------ | ---------------------------- |
+| Tool calling       | Whether the model can call APIs/tools correctly  | BFCL, ACEBench, API-Bank     |
+| Task completion    | Whether the agent can complete end-to-end tasks  | SWE-bench, WebArena, τ-bench |
+| General capability | Level as a general-purpose intelligent assistant | GAIA, Toolathlon             |
 
 The mainstream benchmarks are introduced below, dimension by dimension.
 
@@ -401,12 +401,12 @@ The three dimensions above cover general agentic capability. Different types of 
 
 A Deep Research result must satisfy four levels at the same time:
 
-| Level | Meaning | Evaluation method |
-| ---------- | -------------------- | -------------------------------- |
-| Answer correctness | Whether the final conclusion is correct | Compare with the reference answer (Exact Match/F1) |
-| Citation reliability | Whether each claim is backed by evidence | Reachability of the cited URL + content relevance |
-| Process rigor | Whether the reasoning chain is logically self-consistent | Step-level PRM score |
-| Execution efficiency | Whether the task is finished in the fewest steps | Number of interaction turns needed to complete the task |
+| Level                | Meaning                                                  | Evaluation method                                       |
+| -------------------- | -------------------------------------------------------- | ------------------------------------------------------- |
+| Answer correctness   | Whether the final conclusion is correct                  | Compare with the reference answer (Exact Match/F1)      |
+| Citation reliability | Whether each claim is backed by evidence                 | Reachability of the cited URL + content relevance       |
+| Process rigor        | Whether the reasoning chain is logically self-consistent | Step-level PRM score                                    |
+| Execution efficiency | Whether the task is finished in the fewest steps         | Number of interaction turns needed to complete the task |
 
 The mainstream evaluation benchmarks include:
 
@@ -461,13 +461,13 @@ Process evaluation is more than a nice-to-have. Research from Berkeley RDI found
 
 Take three common agent tasks as examples:
 
-| Quality dimension | Code Agent | Web Agent | Research Agent |
-| -------- | ---------------- | ---------------- | -------------------- |
-| Correctness | Patch passes the tests | Operation result matches expectation | Core conclusion agrees with the facts |
-| Completeness | Covers all relevant files | Completes all sub-steps | Report covers the key information points |
-| Efficiency | Total number of interaction turns | Number of operation steps | Number of searches / total turns |
-| Robustness | Handles edge cases | Recovers from page errors | Cross-validation of conflicting information |
-| Citation | — | — | Every claim has a traceable source |
+| Quality dimension | Code Agent                        | Web Agent                            | Research Agent                              |
+| ----------------- | --------------------------------- | ------------------------------------ | ------------------------------------------- |
+| Correctness       | Patch passes the tests            | Operation result matches expectation | Core conclusion agrees with the facts       |
+| Completeness      | Covers all relevant files         | Completes all sub-steps              | Report covers the key information points    |
+| Efficiency        | Total number of interaction turns | Number of operation steps            | Number of searches / total turns            |
+| Robustness        | Handles edge cases                | Recovers from page errors            | Cross-validation of conflicting information |
+| Citation          | —                                 | —                                    | Every claim has a traceable source          |
 
 After the dimensions are fixed, each one needs a scoring method. Correctness can usually be verified automatically (run the tests, compare with the answer), and efficiency can be computed directly (count the turns), but completeness and robustness often need a human or an LLM-as-Judge.
 
@@ -634,15 +634,15 @@ The core contribution of WebShaper is to turn the question "what information nee
 
 These methods can be grouped by where the data comes from:
 
-| Method | Data source | Core idea | Suitable scenario |
-| ------------- | --------------- | --------------------------------- | ------------------- |
-| TaskCraft | Atomic task templates | Combined depth + breadth extension | General multi-tool tasks |
-| APIGen-MT | LLM committee blueprints | Simulated agent-human interaction | Multi-turn dialogue tasks |
-| HardGen | Agent failure cases | Failure modes → API graph → hard traces | Supplementing hard boundary samples |
-| Evol-Instruct | Seed instructions | Evolution operations (deepen/broaden/constrain) | Systematically raising complexity |
-| AgentTrek | Web operation tutorials | Tutorial parsing → trajectory replay | Web agent training data |
-| Firefly | Real APIs | Real execution + verification loop | Tool-calling data |
-| WebShaper | Wikipedia + ISF | Information-seeking formalization + offline environment | Deep Research agents |
+| Method        | Data source              | Core idea                                               | Suitable scenario                   |
+| ------------- | ------------------------ | ------------------------------------------------------- | ----------------------------------- |
+| TaskCraft     | Atomic task templates    | Combined depth + breadth extension                      | General multi-tool tasks            |
+| APIGen-MT     | LLM committee blueprints | Simulated agent-human interaction                       | Multi-turn dialogue tasks           |
+| HardGen       | Agent failure cases      | Failure modes → API graph → hard traces                 | Supplementing hard boundary samples |
+| Evol-Instruct | Seed instructions        | Evolution operations (deepen/broaden/constrain)         | Systematically raising complexity   |
+| AgentTrek     | Web operation tutorials  | Tutorial parsing → trajectory replay                    | Web agent training data             |
+| Firefly       | Real APIs                | Real execution + verification loop                      | Tool-calling data                   |
+| WebShaper     | Wikipedia + ISF          | Information-seeking formalization + offline environment | Deep Research agents                |
 
 In practice these methods often **complement** one another. Take a combined scenario: you want to build an evaluation set for a "data analysis agent." First use **TaskCraft** to generate a batch of basic single-tool query tasks (the easy questions). Then use the constraint operator of **Evol-Instruct** to make the easy questions harder (add a time range, add a comparison dimension, add outlier filtering). Next use **HardGen** to collect the model's failure modes on these tasks and synthesize harder boundary cases in reverse. If web operations are involved (for example, downloading data from a data platform), use **AgentTrek** to synthesize trajectories from operation tutorials as reference answers. Finally, use the approach of **WebShaper** to build an offline data environment and make the evaluation deterministic.
 
@@ -664,13 +664,13 @@ The difficulty of this task is that **there is no reference answer**. The same "
 
 The quality of a frontend page can be measured along the following dimensions:
 
-| Dimension | Meaning | How to quantify |
-| -------- | -------------------------------- | ------------------------------- |
-| Functional correctness | Whether the page's interaction logic is correct | Puppeteer/Playwright automated tests |
-| Visual fidelity | Whether the page matches the layout and style in the requirement | LLM-as-Judge screenshot comparison |
-| Code quality | Whether the HTML/CSS/JS is well-formed and maintainable | ESLint + LLM scoring |
-| Responsiveness | Whether the page displays correctly at different screen sizes | Multi-resolution screenshot comparison |
-| Efficiency | How many interaction turns the agent used to finish the task | Count the trajectory turns |
+| Dimension              | Meaning                                                          | How to quantify                        |
+| ---------------------- | ---------------------------------------------------------------- | -------------------------------------- |
+| Functional correctness | Whether the page's interaction logic is correct                  | Puppeteer/Playwright automated tests   |
+| Visual fidelity        | Whether the page matches the layout and style in the requirement | LLM-as-Judge screenshot comparison     |
+| Code quality           | Whether the HTML/CSS/JS is well-formed and maintainable          | ESLint + LLM scoring                   |
+| Responsiveness         | Whether the page displays correctly at different screen sizes    | Multi-resolution screenshot comparison |
+| Efficiency             | How many interaction turns the agent used to finish the task     | Count the trajectory turns             |
 
 **Step two: construct the task set.**
 
@@ -764,13 +764,13 @@ The problem is real, but a combination of strategies can mitigate it.
 
 **Approach one: replace a single score with the multi-metric system of Design2Code.** Design2Code [^design2code] (NAACL 2025) does not rely on a single score. It evaluates visual fidelity independently along five dimensions:
 
-| Metric | What it evaluates | How it is computed |
-| ------------------ | ---------------------- | -------------------------- |
-| Block-Match | Whether the layout of page blocks is aligned | Fraction of matched corresponding blocks |
-| Text Accuracy | Whether the text content is correct | Sorensen-Dice character-level similarity |
-| Position Alignment | Whether element positions are accurate | Normalized spatial offset of block centers |
-| Color Consistency | Whether the colors are consistent | CIEDE2000 color difference (perceptually weighted) |
-| CLIP Similarity | Whether the overall visual semantics are close | Cosine similarity of CLIP-ViT embeddings |
+| Metric             | What it evaluates                              | How it is computed                                 |
+| ------------------ | ---------------------------------------------- | -------------------------------------------------- |
+| Block-Match        | Whether the layout of page blocks is aligned   | Fraction of matched corresponding blocks           |
+| Text Accuracy      | Whether the text content is correct            | Sorensen-Dice character-level similarity           |
+| Position Alignment | Whether element positions are accurate         | Normalized spatial offset of block centers         |
+| Color Consistency  | Whether the colors are consistent              | CIEDE2000 color difference (perceptually weighted) |
+| CLIP Similarity    | Whether the overall visual semantics are close | Cosine similarity of CLIP-ViT embeddings           |
 
 Each metric is computed and reported independently. If Block-Match is low but CLIP is high, the overall layout is right but the colors or text deviate. If Block-Match is high but Text Accuracy is low, the layout is right but the content is wrong. A multi-metric system gives richer diagnostic information than a single score.
 

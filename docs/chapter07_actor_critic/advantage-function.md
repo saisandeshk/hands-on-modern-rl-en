@@ -60,12 +60,12 @@ The quantity in parentheses, $G_t - V(s)$, is already an estimate of the **advan
 
 $$A^\pi(s,a) = Q^\pi(s,a) - V^\pi(s) \tag{7.1}$$
 
-| Symbol       | Meaning                                                                                                                                                      |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| $A^\pi(s,a)$ | Advantage function: how much better taking action $a$ in state $s$ is compared to "average."                                                                 |
+| Symbol       | Meaning                                                                                                                                                                  |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| $A^\pi(s,a)$ | Advantage function: how much better taking action $a$ in state $s$ is compared to "average."                                                                             |
 | $Q^\pi(s,a)$ | [Action-value function](../chapter03_value_functions/value-q): expected discounted return starting from state $s$, taking action $a$ first, then following policy $\pi$. |
 | $V^\pi(s)$   | [State-value function](../chapter03_value_functions/value-bellman): expected discounted return starting from state $s$ and following policy $\pi$.                       |
-| $\pi$        | The current policy, determining the probability of each action in each state.                                                                                |
+| $\pi$        | The current policy, determining the probability of each action in each state.                                                                                            |
 
 Their difference captures exactly "how many extra points were earned because action $a$ was chosen."
 

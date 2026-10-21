@@ -133,11 +133,11 @@ $$\text{clip}(x, a, b) = \begin{cases} a & x < a \\ x & a \leq x \leq b \\ b & x
 
 Substituting $a = 1 - \varepsilon = 0.8$ and $b = 1 + \varepsilon = 1.2$ gives a graph made of line segments: the left and right pieces are horizontal lines (with fixed values $0.8$ and $1.2$), and the middle piece is a diagonal of slope 1.
 
-| Position of $r_t$       | clip output     | Contains $\theta$        |
-| ----------------------- | --------------- | ------------------------ |
-| $r_t < 0.8$             | always $0.8$    | No (a plain number)      |
-| $0.8 \leq r_t \leq 1.2$ | $r_t$ itself    | Yes                      |
-| $r_t > 1.2$             | always $1.2$    | No (a plain number)      |
+| Position of $r_t$       | clip output  | Contains $\theta$   |
+| ----------------------- | ------------ | ------------------- |
+| $r_t < 0.8$             | always $0.8$ | No (a plain number) |
+| $0.8 \leq r_t \leq 1.2$ | $r_t$ itself | Yes                 |
+| $r_t > 1.2$             | always $1.2$ | No (a plain number) |
 
 Now we work through the chain rule in full. First write out how $r_t(\theta)$ depends on $\theta$:
 
@@ -374,13 +374,13 @@ Running this code shows: when $A > 0$, the objective becomes flat once $r_t > 1.
 
 The choice of $\varepsilon$ directly affects training dynamics. The table below summarizes practical experience:
 
-| ε value | Update size | Training speed           | Stability        | Typical use case                         |
-| ------: | ----------- | ------------------------ | ---------------- | ---------------------------------------- |
-|    0.05 | very small  | very slow                | extremely stable | fine-tuning an already trained policy    |
+| ε value | Update size | Training speed           | Stability        | Typical use case                              |
+| ------: | ----------- | ------------------------ | ---------------- | --------------------------------------------- |
+|    0.05 | very small  | very slow                | extremely stable | fine-tuning an already trained policy         |
 |     0.1 | small       | slower                   | stable           | LLM alignment (many parameters, more fragile) |
-|     0.2 | medium      | moderate                 | moderate         | games/control tasks (default value)      |
-|     0.3 | larger      | faster                   | unstable         | quick experiments/simple tasks           |
-|     0.5 | very large  | fast but often collapses | very unstable    | not recommended                          |
+|     0.2 | medium      | moderate                 | moderate         | games/control tasks (default value)           |
+|     0.3 | larger      | faster                   | unstable         | quick experiments/simple tasks                |
+|     0.5 | very large  | fast but often collapses | very unstable    | not recommended                               |
 
 In LLM alignment, a smaller $\varepsilon$ (around 0.1 or less) is commonly used, because the policy space of a language model is larger and more brittle: a single poorly controlled update can degrade the model's general language ability (for instance, losing an already acquired language).
 

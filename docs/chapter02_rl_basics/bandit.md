@@ -116,12 +116,12 @@ Machine A earns 0.2 per play on average, and machine B loses 0.2 per play on ave
 
 In each round, choose A or B with probability 50% each. The outcome of a round is produced in two steps: first pick a machine, then see whether it pays out. A round therefore has four possible outcomes:
 
-| Event | Reward | Probability |
-| ---- | ---- | ---- |
-| Choose A and win | +1 | 0.5 × 0.6 = 0.3 |
-| Choose A and lose | −1 | 0.5 × 0.4 = 0.2 |
-| Choose B and win | +1 | 0.5 × 0.4 = 0.2 |
-| Choose B and lose | −1 | 0.5 × 0.6 = 0.3 |
+| Event             | Reward | Probability     |
+| ----------------- | ------ | --------------- |
+| Choose A and win  | +1     | 0.5 × 0.6 = 0.3 |
+| Choose A and lose | −1     | 0.5 × 0.4 = 0.2 |
+| Choose B and win  | +1     | 0.5 × 0.4 = 0.2 |
+| Choose B and lose | −1     | 0.5 × 0.6 = 0.3 |
 
 By the expectation method, multiply the value of each of the four outcomes by its probability and add them up:
 
@@ -209,10 +209,10 @@ The premise that "10 trials are enough to see the two machines clearly" is not s
 
 A's true payout rate of 60% does not guarantee exactly 6 wins in every 10 plays. One run of 10 plays may produce only 4 wins, or it may produce 7. Here is one possible exploration record (✅ win, ❌ loss):
 
-| Machine | True payout rate | Results of 10 plays | Wins | Observed payout rate |
-| ---- | ---------- | --------- | -------- | ---------- |
-| A | 60% | ❌✅❌❌✅❌✅❌✅❌ | 4 | 40% |
-| B | 40% | ✅❌✅✅❌❌✅❌✅❌ | 5 | 50% |
+| Machine | True payout rate | Results of 10 plays  | Wins | Observed payout rate |
+| ------- | ---------------- | -------------------- | ---- | -------------------- |
+| A       | 60%              | ❌✅❌❌✅❌✅❌✅❌ | 4    | 40%                  |
+| B       | 40%              | ✅❌✅✅❌❌✅❌✅❌ | 5    | 50%                  |
 
 The intrinsic parameters of the two machines have not changed: A still has a 60% chance of paying out each time, and B still has only 40%. It is only that in this sample, A had somewhat bad luck and B had somewhat good luck. If we decide by the observed fractions, the last 80 rounds all go to B, which is actually the worse machine: the truly better option looks worse in a short-term sample.
 
@@ -249,12 +249,12 @@ What probability theory guarantees is that when we try enough times, the observe
 What really affects the return is the probability of misjudgment: the probability that, at the end of the exploration phase, B's number of wins exceeds A's. Split into cases by A's number of wins:
 
 | A's wins | Number B must exceed | Misjudged? |
-| ---------- | ---------------- | -------- |
-| 0 | 1–10 | Yes |
-| 1 | 2–10 | Yes |
-| ⋮ | ⋮ | ⋮ |
-| 9 | 10 | Yes |
-| 10 | Cannot exceed | No |
+| -------- | -------------------- | ---------- |
+| 0        | 1–10                 | Yes        |
+| 1        | 2–10                 | Yes        |
+| ⋮        | ⋮                    | ⋮          |
+| 9        | 10                   | Yes        |
+| 10       | Cannot exceed        | No         |
 
 When A and B have the same number of wins, we commit to A, which counts as a correct judgment.
 
@@ -571,11 +571,11 @@ Here $\mu^* = \max_a \mu_a$. Regret is the expected gap of "how much more could 
 
 The **regret bound** is the fundamental metric for evaluating an algorithm. A good policy should have regret that grows **sublinearly** in $T$, that is, $\text{Regret}(T) = o(T)$. This means that as $T \to \infty$ the agent gets closer and closer to optimal, and the average loss per round tends to 0.
 
-| Growth rate | Meaning | Assessment |
-| ------------------ | ------ | --------------------------- |
-| $\Theta(T)$ | Linear | The agent learned nothing, pure random |
-| $\Theta(\sqrt{T})$ | Sublinear | A standard good policy (UCB, Thompson) |
-| $\Theta(\log T)$ | Logarithmic | The theoretical lower bound (Lai-Robins 1985) |
+| Growth rate        | Meaning     | Assessment                                    |
+| ------------------ | ----------- | --------------------------------------------- |
+| $\Theta(T)$        | Linear      | The agent learned nothing, pure random        |
+| $\Theta(\sqrt{T})$ | Sublinear   | A standard good policy (UCB, Thompson)        |
+| $\Theta(\log T)$   | Logarithmic | The theoretical lower bound (Lai-Robins 1985) |
 
 ### $\epsilon$-Greedy and Decay Schedules
 
@@ -682,7 +682,7 @@ The multi-armed bandit has no state transitions, and rewards appear immediately.
 
 ### Further Reading
 
-- Sutton & Barto, *Reinforcement Learning: An Introduction*, Chapter 2
+- Sutton & Barto, _Reinforcement Learning: An Introduction_, Chapter 2
 - [Auer et al. 2002 "Finite-time Analysis of the Multiarmed Bandit Problem"](https://link.springer.com/article/10.1023/A:1013689704352)
 - [Russo et al. 2018 "A Tutorial on Thompson Sampling"](https://arxiv.org/abs/1707.02038)
-- [Lattimore & Szepesvári, *Bandit Algorithms*](https://banditalgs.com/)
+- [Lattimore & Szepesvári, _Bandit Algorithms_](https://banditalgs.com/)

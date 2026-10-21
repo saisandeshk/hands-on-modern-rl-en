@@ -40,7 +40,7 @@ Take riding a bicycle. Suppose you want to teach a child to ride. What would you
   <em>Figure 1: Teaching a child to ride a bicycle is a typical trial-and-error learning process. Source: <a href="https://commons.wikimedia.org/wiki/File:Dad_teaching_child_to_ride_a_bike.jpg" target="_blank" rel="noopener noreferrer">Wikimedia Commons</a></em>
 </div>
 
-You would not first hand over a copy of *The Physics and Balance Equations of Bicycles*, and you would not specify before he climbs on that "when the frame leans 5 degrees to the left, push with the right foot at 10 newtons." Such precise knowledge is useless to his brain. You just hold the back of the seat and encourage him to pedal. A fall and a scraped knee are negative feedback. Staying upright, with the wind in his face, is the reward. After a few rounds, his brain has learned on its own, through trial and error, how to adjust his center of gravity.
+You would not first hand over a copy of _The Physics and Balance Equations of Bicycles_, and you would not specify before he climbs on that "when the frame leans 5 degrees to the left, push with the right foot at 10 newtons." Such precise knowledge is useless to his brain. You just hold the back of the seat and encourage him to pedal. A fall and a scraped knee are negative feedback. Staying upright, with the wind in his face, is the reward. After a few rounds, his brain has learned on its own, through trial and error, how to adjust his center of gravity.
 
 This ability, **learning by trial and error in an unknown environment, guided by the final return**, is the most instinctive way of learning for every living thing. Strangely, the past decade of artificial intelligence bypassed it. We taught machines to recognize cats and dogs, translate languages, and generate pictures, all with the same method: give them thousands upon thousands of labeled correct answers and have them imitate. But when the problem changes from "recognition" to "decision-making" (getting a robot arm to grasp a cup, getting an AI to beat professional players at StarCraft, or getting a large language model to answer questions appropriately), you simply cannot label a standard answer for every step.
 
@@ -393,11 +393,11 @@ The experiment code of this course is compatible with the mainstream operating s
 
 GPU and memory requirements are divided into three tiers:
 
-| Tier             | VRAM required             | Coverage                                                              | Typical hardware                  |
-| ---------------- | ------------------------- | --------------------------------------------------------------------- | --------------------------------- |
-| Introductory     | CPU only / 4GB+ VRAM      | Classic RL experiments such as CartPole, Atari, and policy gradients | Integrated graphics, GTX 1650     |
-| Core             | 24GB VRAM                 | LLM-related experiments such as DPO alignment, PPO training, and GRPO | RTX 3090, RTX 4090, A5000         |
-| Large projects   | 80GB VRAM                 | A few large-scale model training runs (such as a full RLHF pipeline for 7B+ models) | A100, H100              |
+| Tier           | VRAM required        | Coverage                                                                            | Typical hardware              |
+| -------------- | -------------------- | ----------------------------------------------------------------------------------- | ----------------------------- |
+| Introductory   | CPU only / 4GB+ VRAM | Classic RL experiments such as CartPole, Atari, and policy gradients                | Integrated graphics, GTX 1650 |
+| Core           | 24GB VRAM            | LLM-related experiments such as DPO alignment, PPO training, and GRPO               | RTX 3090, RTX 4090, A5000     |
+| Large projects | 80GB VRAM            | A few large-scale model training runs (such as a full RLHF pipeline for 7B+ models) | A100, H100                    |
 
 Most experiments fit within **24GB of VRAM**, and one consumer GPU (such as an RTX 3090 / 4090) is enough to cover over 90% of the hands-on content in the book. Only a few advanced projects involving full-parameter training of large models require an 80GB-class GPU.
 

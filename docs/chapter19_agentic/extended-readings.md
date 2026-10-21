@@ -61,10 +61,10 @@ GUI agents enable AI to operate graphical interfaces like humans -- clicking but
 
 | Work                                          | Key highlight                                                                                    | Link                                                           |
 | --------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| WebAgent-R1 **[open-source]**                 | End-to-end multi-turn RL framework improving 3B model success rate from 6.1% to 33.9%            | [GitHub](https://github.com/weizhepei/WebAgent-R1)           |
+| WebAgent-R1 **[open-source]**                 | End-to-end multi-turn RL framework improving 3B model success rate from 6.1% to 33.9%            | [GitHub](https://github.com/weizhepei/WebAgent-R1)             |
 | Web-Shepherd **[open-source]**                | First step-level reward model specifically for web navigation, evaluating each interaction step  | [GitHub](https://github.com/kyle8581/Web-Shepherd)             |
 | CRAFT-GUI                                     | Combines curriculum learning with GRPO to improve GUI agent performance                          | [arXiv](https://arxiv.org/abs/2508.11360)                      |
-| MobileRL **[open-source]**                    | Mobile online RL framework using ADAGRPO algorithm                                               | [GitHub](https://github.com/THUDM/MobileRL)                 |
+| MobileRL **[open-source]**                    | Mobile online RL framework using ADAGRPO algorithm                                               | [GitHub](https://github.com/THUDM/MobileRL)                    |
 | Co-EPG                                        | Co-evolution framework simultaneously optimizing GUI agent planning and grounding capabilities   | [AAAI](https://ojs.aaai.org/index.php/AAAI/article/view/40981) |
 | Continual GUI Agents                          | Defines and addresses learning problems for GUI agents in continually changing environments      | [arXiv](https://arxiv.org/abs/2601.20732)                      |
 | WebFactory                                    | Fully automated closed-loop RL flow that "compresses" LLM intelligence into efficient GUI agents | [OpenReview](https://openreview.net/forum?id=HaIEP2PD4S)       |
@@ -76,45 +76,45 @@ GUI agents enable AI to operate graphical interfaces like humans -- clicking but
 
 When RL moves from the digital world to the physical world, agents face not text or images, but continuous control signals and uncertain physical environments. The works in this section explore how LLMs can directly participate in robot reasoning and control: some use RL to optimize spatial reasoning so 7B models surpass GPT-4o, some train self-correction capabilities in pixel-level world models, and others study cross-embodiment transfer and maintaining "cognitive identity" during continual learning.
 
-| Work                             | Key highlight                                                                                                | Link                                            |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
-| Robot-R1                         | Uses RL to directly optimize robot reasoning; 7B model spatial reasoning surpasses GPT-4o                    | [arXiv](https://arxiv.org/abs/2506.00070)       |
-| WMPO **[open-source]**           | RL training in pixel-level visual world models, emerging self-correction capabilities                        | [GitHub](https://github.com/WM-PO/WMPO) |
-| ViVa                             | Uses pre-trained video generation models as value function estimators for state value assessment             | [arXiv](https://arxiv.org/abs/2604.08168)       |
-| RoboAgent                        | Achieves embodied task planning through composing foundational capabilities                                  | [arXiv](https://arxiv.org/abs/2604.07774)       |
-| Cross-Embodiment Offline RL      | Achieves offline RL across different robot morphologies through morphological grouping strategies            | [arXiv](https://arxiv.org/abs/2602.18025)       |
-| Sensory-Motor Control with LLMs  | Enables LLMs to directly generate continuous control policies through iterative policy refinement            | [arXiv](https://arxiv.org/abs/2506.04867)       |
-| RM-RL                            | Proposes "role model" RL for precise robot manipulation                                                      | [arXiv](https://arxiv.org/abs/2510.15189)       |
-| Learning Without Losing Identity | Studies how embodied agents maintain stable "cognitive identity" while continually learning new capabilities | [arXiv](https://arxiv.org/abs/2604.07799)       |
+| Work                             | Key highlight                                                                                                | Link                                      |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
+| Robot-R1                         | Uses RL to directly optimize robot reasoning; 7B model spatial reasoning surpasses GPT-4o                    | [arXiv](https://arxiv.org/abs/2506.00070) |
+| WMPO **[open-source]**           | RL training in pixel-level visual world models, emerging self-correction capabilities                        | [GitHub](https://github.com/WM-PO/WMPO)   |
+| ViVa                             | Uses pre-trained video generation models as value function estimators for state value assessment             | [arXiv](https://arxiv.org/abs/2604.08168) |
+| RoboAgent                        | Achieves embodied task planning through composing foundational capabilities                                  | [arXiv](https://arxiv.org/abs/2604.07774) |
+| Cross-Embodiment Offline RL      | Achieves offline RL across different robot morphologies through morphological grouping strategies            | [arXiv](https://arxiv.org/abs/2602.18025) |
+| Sensory-Motor Control with LLMs  | Enables LLMs to directly generate continuous control policies through iterative policy refinement            | [arXiv](https://arxiv.org/abs/2506.04867) |
+| RM-RL                            | Proposes "role model" RL for precise robot manipulation                                                      | [arXiv](https://arxiv.org/abs/2510.15189) |
+| Learning Without Losing Identity | Studies how embodied agents maintain stable "cognitive identity" while continually learning new capabilities | [arXiv](https://arxiv.org/abs/2604.07799) |
 
 ## Multi-Agent Systems and Collaboration
 
 Multi-agent collaboration is far more difficult than single-agent -- when you learn new strategies your teammates are also changing, making the environment non-stationary; when the team succeeds, who gets credit, and when it fails, who is responsible? The works in this section address these challenges from multiple angles: extending GRPO to multi-agent settings, achieving decentralized coordination through knowledge distillation, solving context drift with digital twins, and large-scale MARL frameworks that jointly optimize sampling and training end-to-end.
 
-| Work                       | Key highlight                                                                                                                     | Link                                         |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| MAPoRL                     | New paradigm for multi-agent collaborative training                                                                               | [arXiv](https://arxiv.org/abs/2502.18439)    |
-| M-GRPO                     | Extends GRPO algorithm to multi-agent scenarios                                                                                   | [arXiv](https://arxiv.org/abs/2511.13288)    |
-| SAGE                       | Closed-loop self-evolution multi-agent RL framework                                                                               | [arXiv](https://arxiv.org/abs/2603.15255)    |
+| Work                       | Key highlight                                                                                                                     | Link                                           |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| MAPoRL                     | New paradigm for multi-agent collaborative training                                                                               | [arXiv](https://arxiv.org/abs/2502.18439)      |
+| M-GRPO                     | Extends GRPO algorithm to multi-agent scenarios                                                                                   | [arXiv](https://arxiv.org/abs/2511.13288)      |
+| SAGE                       | Closed-loop self-evolution multi-agent RL framework                                                                               | [arXiv](https://arxiv.org/abs/2603.15255)      |
 | MARTI **[open-source]**    | Multi-agent debate framework                                                                                                      | [GitHub](https://github.com/TsinghuaC3I/MARTI) |
-| KD-MARL                    | Transfers centralized expert coordination to lightweight decentralized agents through knowledge distillation                      | [arXiv](https://arxiv.org/abs/2604.06691)    |
-| Value-Guidance MeanFlow    | Value-guided flow model for offline multi-agent RL                                                                                | [arXiv](https://arxiv.org/abs/2604.08174)    |
-| FlexMARL                   | First end-to-end training framework jointly optimizing sampling, training, and their orchestration for large-scale LLM-based MARL | [arXiv](https://arxiv.org/abs/2602.09578)    |
-| TwinLoop                   | Proposes simulation-in-the-loop digital twin framework to address multi-agent performance degradation from context changes        | [arXiv](https://arxiv.org/abs/2604.06610)    |
-| Equivariant Multi-agent RL | Equivariant multi-agent RL for multi-modal vehicle-infrastructure cooperative systems                                             | [arXiv](https://arxiv.org/abs/2604.06914)    |
+| KD-MARL                    | Transfers centralized expert coordination to lightweight decentralized agents through knowledge distillation                      | [arXiv](https://arxiv.org/abs/2604.06691)      |
+| Value-Guidance MeanFlow    | Value-guided flow model for offline multi-agent RL                                                                                | [arXiv](https://arxiv.org/abs/2604.08174)      |
+| FlexMARL                   | First end-to-end training framework jointly optimizing sampling, training, and their orchestration for large-scale LLM-based MARL | [arXiv](https://arxiv.org/abs/2602.09578)      |
+| TwinLoop                   | Proposes simulation-in-the-loop digital twin framework to address multi-agent performance degradation from context changes        | [arXiv](https://arxiv.org/abs/2604.06610)      |
+| Equivariant Multi-agent RL | Equivariant multi-agent RL for multi-modal vehicle-infrastructure cooperative systems                                             | [arXiv](https://arxiv.org/abs/2604.06914)      |
 
 ## World Models and Model-Based RL
 
 The core bottleneck of model-free RL is sample efficiency -- agents must learn through extensive trial and error. World models provide a path around this bottleneck: first learn to "simulate the environment in your head," then generate training data in imagination. This section collects approaches from diffusion world models to object-centric representations, all with the core idea of having policy models interact with world models to complete multi-step planning and training "in imagination."
 
-| Work                    | Key highlight                                                                                 | Link                                        |
-| ----------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| GIRL                    | Generative imagination RL through information-theoretic hallucination control                 | [arXiv](https://arxiv.org/abs/2604.07426)   |
-| World4RL                | Diffusion world model for policy refinement in robot manipulation                             | [arXiv](https://arxiv.org/abs/2509.19080)   |
-| Dreamer-CDP             | Dreamer variant that does not require reconstructing raw pixel observations                   | —                                            |
-| RLVR-World              | Uses RLVR to directly optimize world models                                                   | [arXiv](https://arxiv.org/abs/2505.13934)   |
-| OC-STORM                | Enhances world models with object-centric representations for sample-efficient RL             | [arXiv](https://arxiv.org/abs/2501.16443)   |
-| Imagine-then-Plan (ITP) | Policy models interact with world models to generate multi-step trajectories "in imagination" | [arXiv](https://arxiv.org/abs/2601.08955)   |
+| Work                    | Key highlight                                                                                 | Link                                      |
+| ----------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| GIRL                    | Generative imagination RL through information-theoretic hallucination control                 | [arXiv](https://arxiv.org/abs/2604.07426) |
+| World4RL                | Diffusion world model for policy refinement in robot manipulation                             | [arXiv](https://arxiv.org/abs/2509.19080) |
+| Dreamer-CDP             | Dreamer variant that does not require reconstructing raw pixel observations                   | —                                         |
+| RLVR-World              | Uses RLVR to directly optimize world models                                                   | [arXiv](https://arxiv.org/abs/2505.13934) |
+| OC-STORM                | Enhances world models with object-centric representations for sample-efficient RL             | [arXiv](https://arxiv.org/abs/2501.16443) |
+| Imagine-then-Plan (ITP) | Policy models interact with world models to generate multi-step trajectories "in imagination" | [arXiv](https://arxiv.org/abs/2601.08955) |
 
 ## Role-Playing and Persona Simulation
 

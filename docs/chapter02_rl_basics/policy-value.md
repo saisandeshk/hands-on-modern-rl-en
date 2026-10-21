@@ -55,11 +55,11 @@ The arrow $\to$ means “maps from the expression on the left to the expression 
 
 To make the mapping concrete, consider three states and a simple teaching policy. This is not claimed to be an optimal CartPole controller.
 
-| Input state $s$ | Pole motion | Policy output $\pi(s)$ |
-| --- | --- | --- |
-| $s_1=[0.00,0.00,0.08,0.15]$ | tilted in the positive direction and still rotating that way | push right |
-| $s_2=[0.12,-0.04,-0.05,-0.10]$ | tilted in the negative direction and still rotating that way | push left |
-| $s_3=[-0.08,0.03,0.01,-0.02]$ | nearly upright | push right |
+| Input state $s$                | Pole motion                                                  | Policy output $\pi(s)$ |
+| ------------------------------ | ------------------------------------------------------------ | ---------------------- |
+| $s_1=[0.00,0.00,0.08,0.15]$    | tilted in the positive direction and still rotating that way | push right             |
+| $s_2=[0.12,-0.04,-0.05,-0.10]$ | tilted in the negative direction and still rotating that way | push left              |
+| $s_3=[-0.08,0.03,0.01,-0.02]$  | nearly upright                                               | push right             |
 
 The first row can be written as
 
@@ -88,10 +88,10 @@ $$
 For example, $[0.1,0.9]$ assigns probability $0.1$ to pushing left and $0.9$ to pushing right. The vectors $[0.5,0.5]$, $[0.8,0.2]$, and $[0,1]$ are also valid distributions in $\Delta(\mathcal{A})$.
 
 | Input state $s$ | Probability of left | Probability of right | Policy output $\pi(\cdot\mid s)$ |
-| --- | ---: | ---: | --- |
-| $s_1$ | $0.1$ | $0.9$ | $[0.1,0.9]$ |
-| $s_2$ | $0.85$ | $0.15$ | $[0.85,0.15]$ |
-| $s_3$ | $0.45$ | $0.55$ | $[0.45,0.55]$ |
+| --------------- | ------------------: | -------------------: | -------------------------------- |
+| $s_1$           |               $0.1$ |                $0.9$ | $[0.1,0.9]$                      |
+| $s_2$           |              $0.85$ |               $0.15$ | $[0.85,0.15]$                    |
+| $s_3$           |              $0.45$ |               $0.55$ | $[0.45,0.55]$                    |
 
 For $s_1$, the policy returns $[0.1,0.9]$. If the agent encounters $s_1$ many times, it will push left about $10\%$ of the time and right about $90\%$ of the time.
 

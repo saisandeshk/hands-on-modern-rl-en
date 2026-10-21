@@ -20,7 +20,7 @@ This section first explains why a reward cannot be determined uniquely from demo
 
 Let's first build intuition for why "inferring the reward" may be better than "imitating actions directly".
 
-Imagine watching an experienced driver. He drives steadily in the middle of the lane, slows down at a red light, and gives way to pedestrians. If you only do behavior cloning, what you learn is "brake when you see a red light" and "steer when you see a pedestrian", but you do not know *why*. If you meet a new scene never seen in training (such as a strange obstacle), you may not know what to do.
+Imagine watching an experienced driver. He drives steadily in the middle of the lane, slows down at a red light, and gives way to pedestrians. If you only do behavior cloning, what you learn is "brake when you see a red light" and "steer when you see a pedestrian", but you do not know _why_. If you meet a new scene never seen in training (such as a strange obstacle), you may not know what to do.
 
 But if you can figure out "what reward he is maximizing", for example "keep a safe distance", "reach the destination as soon as possible", and "ride comfortably", then even in a new state you can judge for yourself what to do based on this reward. This is the effect that IRL hopes to achieve: to learn an "intention" that generalizes, rather than rote-memorizing an action mapping.
 
@@ -55,11 +55,11 @@ Let's take this formula apart and look at each part:
 
 Let's compute $Z$ with numbers. Suppose the environment is tiny, with only three possible trajectories in total, and the current reward function gives them the following total scores:
 
-| Trajectory                       | Total reward $\sum_t r_\psi$ | Unnormalized weight        | Normalized probability |
-| -------------------------------- | ---------------------------- | -------------------------- | ---------------------- |
-| $\tau_1$: the expert's short path | 10                          | $e^{10}\approx 22026$      | 0.993                  |
-| $\tau_2$: a somewhat longer path | 5                            | $e^{5}\approx 148$         | 0.0067                 |
-| $\tau_3$: the path into a wall   | 0                            | $e^{0}=1$                  | 0.00005                |
+| Trajectory                        | Total reward $\sum_t r_\psi$ | Unnormalized weight   | Normalized probability |
+| --------------------------------- | ---------------------------- | --------------------- | ---------------------- |
+| $\tau_1$: the expert's short path | 10                           | $e^{10}\approx 22026$ | 0.993                  |
+| $\tau_2$: a somewhat longer path  | 5                            | $e^{5}\approx 148$    | 0.0067                 |
+| $\tau_3$: the path into a wall    | 0                            | $e^{0}=1$             | 0.00005                |
 
 $Z = 22026 + 148 + 1 \approx 22176$. Adding up the whole third column normalizes the probabilities. The exponential amplifies the reward gap between "10 points and 5 points" into a probability gap of about 149 times: trajectories with high total reward are strongly preferred, while trajectories with close scores still keep a chance.
 
@@ -218,14 +218,14 @@ From a more theoretical perspective, GAIL is in fact minimizing the Jensen-Shann
 
 Let's compare BC, MaxEnt IRL, and GAIL systematically:
 
-| Dimension                    | BC  | MaxEnt IRL                      | GAIL                         |
-| ---------------------------- | --- | ------------------------------- | ---------------------------- |
-| Solves distribution shift    | ❌  | ✅                              | ✅                           |
-| Needs an environment model   | ❌  | ✅ (or a soft Q approximation)  | ❌                           |
-| Explicit reward function     | —   | ✅ (interpretable)              | ❌ (implicit)                |
-| Computational cost           | Low | High (inner-loop RL)            | Medium (adversarial training) |
-| Scaling to high dimensions   | Easy | Hard                           | Medium                       |
-| Counterpart in LLMs          | SFT | —                               | DPO, implicitly (see 14.6)   |
+| Dimension                  | BC   | MaxEnt IRL                     | GAIL                          |
+| -------------------------- | ---- | ------------------------------ | ----------------------------- |
+| Solves distribution shift  | ❌   | ✅                             | ✅                            |
+| Needs an environment model | ❌   | ✅ (or a soft Q approximation) | ❌                            |
+| Explicit reward function   | —    | ✅ (interpretable)             | ❌ (implicit)                 |
+| Computational cost         | Low  | High (inner-loop RL)           | Medium (adversarial training) |
+| Scaling to high dimensions | Easy | Hard                           | Medium                        |
+| Counterpart in LLMs        | SFT  | —                              | DPO, implicitly (see 14.6)    |
 
 ### 4.1 Training Stability of GAIL
 

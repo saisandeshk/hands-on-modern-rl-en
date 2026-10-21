@@ -63,10 +63,10 @@ $$
 
 It takes 11.6 days to take a single action. By contrast, a policy network needs only one forward pass: feed the state into the network and output the action vector directly, which takes about $1\text{ms}$:
 
-| Method                    | Computation for one action selection                       | Time                 |
-| ------------------------- | ---------------------------------------------------------- | -------------------- |
-| DQN + discretization      | $10^{12}$ forward passes                                   | $\approx 11.6$ days  |
-| Policy network            | 1 forward pass, directly outputs $\mu = f_\theta(s)$       | $\approx 1\text{ms}$ |
+| Method               | Computation for one action selection                 | Time                 |
+| -------------------- | ---------------------------------------------------- | -------------------- |
+| DQN + discretization | $10^{12}$ forward passes                             | $\approx 11.6$ days  |
+| Policy network       | 1 forward pass, directly outputs $\mu = f_\theta(s)$ | $\approx 1\text{ms}$ |
 
 And this is only 6 joints, each discretized to just 100 values. When a real robotic arm has more joints and higher precision requirements, the number of discretized actions grows exponentially. This is the **curse of dimensionality**: every additional joint multiplies the total number of actions by a factor.
 
@@ -76,13 +76,13 @@ Text generation by large models faces a similar problem. At each step one token 
 
 Suppose we are about to generate the next word, and the network outputs the probabilities of some tokens (here Chinese tokens, shown in pinyin with a gloss):
 
-| token                  | $P(\text{token} \mid \text{context})$ |
-| ---------------------- | ------------------------------------- |
-| "shi" (is)             | $0.40$                                |
-| "wei" (be, as)         | $0.25$                                |
-| "nai" (be, literary)   | $0.15$                                |
-| "xi" (be, literary)    | $0.10$                                |
-| ...                    | ...                                   |
+| token                | $P(\text{token} \mid \text{context})$ |
+| -------------------- | ------------------------------------- |
+| "shi" (is)           | $0.40$                                |
+| "wei" (be, as)       | $0.25$                                |
+| "nai" (be, literary) | $0.15$                                |
+| "xi" (be, literary)  | $0.10$                                |
+| ...                  | ...                                   |
 
 $\arg\max$ (greedy decoding) picks the most probable "shi" every time. If the probability distributions at the next several positions are similar, greedy decoding will output the same character over and over. Sampling from the probability distribution, on the other hand, picks "wei" with 25% probability and "nai" with 15% probability; this randomness is exactly what fluent text generation requires. A policy network naturally outputs a probability distribution $\pi_\theta(a|s)$, and sampling is the generation process itself.
 
@@ -102,12 +102,12 @@ $$
 \pi_\theta(\text{left} \mid s) = 0.3, \quad \pi_\theta(\text{right} \mid s) = 0.7.
 $$
 
-| Symbol                        | Meaning                                                      |
-| ----------------------------- | ------------------------------------------------------------ |
-| $\pi_\theta$                  | The policy network with parameters $\theta$                  |
-| $\pi_\theta(a \mid s)$        | The probability of choosing action $a$ in state $s$          |
+| Symbol                        | Meaning                                                              |
+| ----------------------------- | -------------------------------------------------------------------- |
+| $\pi_\theta$                  | The policy network with parameters $\theta$                          |
+| $\pi_\theta(a \mid s)$        | The probability of choosing action $a$ in state $s$                  |
 | $s = [0.05, 0.1, -0.02, 0.3]$ | The current state (position, velocity, pole angle, angular velocity) |
-| $[0.3, 0.7]$                  | The action-probability vector output by the network          |
+| $[0.3, 0.7]$                  | The action-probability vector output by the network                  |
 
 Actions are chosen by **sampling** and not by comparison. To sample from the distribution $[0.3, 0.7]$: generate a uniform random number $u$ on $[0,1)$; if $u < 0.3$, push left, otherwise push right. For example, with $u = 0.65$, since $0.65 > 0.3$, we choose "push right."
 
@@ -133,16 +133,16 @@ For continuous action spaces, the policy network's output takes the form of the 
 
 ## Differences Between the Two Routes
 
-|                        | Value-Based (DQN)                                     | Policy-Based (Policy Gradient)                                       |
-| ---------------------- | ----------------------------------------------------- | -------------------------------------------------------------------- |
-| What it learns         | $Q(s,a)$: how many points each action is worth        | $\pi_\theta(a\|s)$: with what probability each action should be taken |
-| How it picks actions   | $\arg\max_a Q(s,a)$ (take the highest score)          | Sample from $\pi_\theta(\cdot\|s)$                                   |
-| Policy form            | Deterministic (always picks the highest score)        | Stochastic (outputs a probability distribution)                      |
-| Action space           | Discrete only                                         | Discrete + continuous                                                |
-| Exploration mechanism  | Added externally ($\varepsilon$-greedy)               | Built in (a probability distribution naturally includes exploration) |
-| Data use               | Off-policy (the replay buffer can reuse old data)     | On-policy (must use fresh data from the current policy)              |
-| Variance               | Low (TD targets are relatively stable)                | High (Monte Carlo returns fluctuate a lot)                           |
-| Representative algorithms | DQN (Chapter 5)                                    | REINFORCE (this chapter) → PPO (Chapter 8)                           |
+|                           | Value-Based (DQN)                                 | Policy-Based (Policy Gradient)                                        |
+| ------------------------- | ------------------------------------------------- | --------------------------------------------------------------------- |
+| What it learns            | $Q(s,a)$: how many points each action is worth    | $\pi_\theta(a\|s)$: with what probability each action should be taken |
+| How it picks actions      | $\arg\max_a Q(s,a)$ (take the highest score)      | Sample from $\pi_\theta(\cdot\|s)$                                    |
+| Policy form               | Deterministic (always picks the highest score)    | Stochastic (outputs a probability distribution)                       |
+| Action space              | Discrete only                                     | Discrete + continuous                                                 |
+| Exploration mechanism     | Added externally ($\varepsilon$-greedy)           | Built in (a probability distribution naturally includes exploration)  |
+| Data use                  | Off-policy (the replay buffer can reuse old data) | On-policy (must use fresh data from the current policy)               |
+| Variance                  | Low (TD targets are relatively stable)            | High (Monte Carlo returns fluctuate a lot)                            |
+| Representative algorithms | DQN (Chapter 5)                                   | REINFORCE (this chapter) → PPO (Chapter 8)                            |
 
 Let's explain the key differences row by row.
 
@@ -204,12 +204,12 @@ In $s_3$, the policy network considers the two actions nearly equally good ($0.5
 
 Putting the key numbers of the two routes side by side:
 
-| Comparison dimension                 | DQN at $s_3$                                          | Policy gradient at $s_3$                                         |
-| ------------------------------------ | ----------------------------------------------------- | ---------------------------------------------------------------- |
-| Network output                       | $Q(s_3, a_1) = 3.1$, $Q(s_3, a_2) = 2.9$              | $\pi(a_1 \mid s_3) = 0.55$, $\pi(a_2 \mid s_3) = 0.45$           |
-| How the action is chosen             | $\arg\max\{3.1, 2.9\} = a_1$                          | Sampling: $a_1$ with 55% probability, $a_2$ with 45% probability |
-| Exploration                          | Add $\varepsilon$-greedy (uniform random)             | Built in (the probability distribution adapts)                   |
-| Applicable to continuous action spaces | No (requires discretizing and computing a grid of $Q$ values) | Yes (directly outputs Gaussian parameters)                |
+| Comparison dimension                   | DQN at $s_3$                                                  | Policy gradient at $s_3$                                         |
+| -------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Network output                         | $Q(s_3, a_1) = 3.1$, $Q(s_3, a_2) = 2.9$                      | $\pi(a_1 \mid s_3) = 0.55$, $\pi(a_2 \mid s_3) = 0.45$           |
+| How the action is chosen               | $\arg\max\{3.1, 2.9\} = a_1$                                  | Sampling: $a_1$ with 55% probability, $a_2$ with 45% probability |
+| Exploration                            | Add $\varepsilon$-greedy (uniform random)                     | Built in (the probability distribution adapts)                   |
+| Applicable to continuous action spaces | No (requires discretizing and computing a grid of $Q$ values) | Yes (directly outputs Gaussian parameters)                       |
 
 The core difference is in the last row: DQN's $\arg\max$ confines the action space to a finite discrete set; policy gradients skip the step of "scoring every action" and directly output a probability distribution over "how to choose actions," so continuous action spaces are no longer an obstacle.
 

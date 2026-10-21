@@ -26,13 +26,13 @@ $$\nabla_\theta J \approx \nabla_\theta \log \pi_\theta(a_t|s_t) \cdot \delta$$
 
 This substitution is fundamentally transformative:
 
-|                    | REINFORCE                         | Actor-Critic                                                           |
-| ------------------ | --------------------------------- | ---------------------------------------------------------------------- |
-| Advantage estimate | $G_t$ (MC, needs full trajectory) | $\delta = r + \gamma V(s') - V(s)$ (TD, update after one step)         |
-| Update timing      | after the episode ends            | after every step                                                       |
-| Variance           | high                              | low                                                                    |
+|                    | REINFORCE                         | Actor-Critic                                                                         |
+| ------------------ | --------------------------------- | ------------------------------------------------------------------------------------ |
+| Advantage estimate | $G_t$ (MC, needs full trajectory) | $\delta = r + \gamma V(s') - V(s)$ (TD, update after one step)                       |
+| Update timing      | after the episode ends            | after every step                                                                     |
+| Variance           | high                              | low                                                                                  |
 | Bias               | unbiased                          | biased (bias introduced by [bootstrapping](../chapter04_classical_methods/dp-mc-td)) |
-| Cost               | none                              | must train a Critic                                                    |
+| Cost               | none                              | must train a Critic                                                                  |
 
 ### Numerical Comparison: Both Updates on the Same Scenario
 
@@ -509,9 +509,9 @@ Actor-Critic is not the destination; it is a skeleton. In later chapters you wil
 
 | Chapter                                                          | Variant                          | Key improvement                                                                                  |
 | ---------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------ |
-| [Chapter 8 PPO](../chapter08_ppo/ppo-bipedal-walker)                          | PPO-Clip                         | Limit the size of policy updates to avoid "taking steps that are too big"                        |
+| [Chapter 8 PPO](../chapter08_ppo/ppo-bipedal-walker)             | PPO-Clip                         | Limit the size of policy updates to avoid "taking steps that are too big"                        |
 | [Chapter 8 GAE](../chapter08_ppo/gae-reward-model)               | Generalized Advantage Estimation | Exponentially weighted sum of multi-step TD errors; precisely control the bias-variance tradeoff |
-| [Chapter 14 DPO](../chapter14_dpo/dpo-objective-derivation)                         | Implicit Actor-Critic            | Replace the Critic with preference data; remove the on-policy constraint                         |
+| [Chapter 14 DPO](../chapter14_dpo/dpo-objective-derivation)      | Implicit Actor-Critic            | Replace the Critic with preference data; remove the on-policy constraint                         |
 | [Chapter 15 GRPO](../chapter15_grpo/grpo-practice-and-mechanism) | Remove the Critic                | Replace $V(s)$ with an in-group mean; save one network                                           |
 
 All variants share the same skeleton: one network responsible for choosing, plus one signal responsible for evaluating. What changes is only "where the evaluation signal comes from" and "how the selection network is updated."
