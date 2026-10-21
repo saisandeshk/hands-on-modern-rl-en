@@ -1197,6 +1197,10 @@ const sidebar = {
             {
               text: '18.5 Data Engineering for Large-Scale RL',
               link: '/chapter18_llm_rl_industrial/data-engineering'
+            },
+            {
+              text: '18.6 Summary and Exercises',
+              link: '/chapter18_llm_rl_industrial/review'
             }
           ]
         }

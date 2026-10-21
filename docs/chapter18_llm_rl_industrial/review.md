@@ -1,8 +1,8 @@
 ---
-title: 18.R Summary and Exercises
+title: 18.6 Summary and Exercises
 ---
 
-# 18.R Summary and Exercises
+# 18.6 Summary and Exercises
 
 This chapter moved from single-machine RL scripts to the systems that train production language models: role orchestration, reward plumbing, stability diagnosis, distributed execution, and data engineering. This page collects what to retain and gives you problems to check that you retained it.
 
