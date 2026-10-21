@@ -1,8 +1,8 @@
 ---
-title: '26.1 How Models Generate Their Own Training Data: Self-Play and LLM Training'
+title: '26.1 How Models Generate Training Data'
 ---
 
-# 26.1 Self-Play and Training-Data Generation
+# 26.1 How Models Generate Training Data
 
 Suppose a language model has exhausted a fixed set of demonstrations. We can ask it to generate a candidate answer, let another model instance criticize that answer, and train on the resulting comparison. The next round now contains data produced by the current system rather than only by a static dataset.
 
@@ -45,8 +45,17 @@ If the latest checkpoint plays only against itself, training can cycle: one vers
 Therefore, in industrial-grade code, we typically use **Fictitious Play** or maintain a **Model Pool**, randomly sampling a past version of itself as the opponent each time:
 
 ```python
-def self_play_training_loop(env, current_model, model_pool, total_iterations):
+import random
+
+import numpy as np
+
+
+def self_play_training_loop(env, current_model, model_pool, total_iterations, save_interval=10):
     """A typical industrial Self-Play training loop"""
+
+    # Seed the pool so the 20% historical branch never samples an empty list.
+    if not model_pool:
+        model_pool.append(current_model.copy())
 
     for i in range(total_iterations):
         # 1. 80% chance play against latest self, 20% against historical version
@@ -127,11 +136,11 @@ def debate_training(question, model_a, model_b, judge, rounds=3):
     reward_b = -reward_a
 
     # REINFORCE policy gradient update: winner's policy strengthened, loser weakened
-    # loss = -log_prob * reward (positive reward → increase action probability)
-    for lp in log_probs_a:
-        loss_a = -lp * reward_a
-    for lp in log_probs_b:
-        loss_b = -lp * reward_b
+    # loss = -log_prob * reward (positive reward → increase action probability).
+    # In real code the per-turn terms are summed and passed to an optimizer;
+    # the sketch below shows the per-turn loss construction only.
+    loss_a = sum(-lp * reward_a for lp in log_probs_a)
+    loss_b = sum(-lp * reward_b for lp in log_probs_b)
 
     return reward_a  # Return reward for upper-level self-play loop to record
 ```
@@ -174,7 +183,7 @@ The solution is **Population-Based Training**: maintain an opponent pool contain
 
 $$\pi_{\text{opponent}} = \sum_{k=1}^{K} w_k \pi_k, \quad \sum_k w_k = 1$$
 
-where $w_k$ is the probability of selecting the $k$-th historical policy. Modern frameworks like **PSRO (Policy Space Response Oracles)** further introduce "regret-based policy selection" — prioritizing historical opponents that the current strategy finds most difficult, maximizing information gain per training round. AlphaZero and OpenAI Five both use similar mechanisms; in DeepSeek-R1's RL training, maintaining diverse historical checkpoints is likewise key to stable training.
+where $w_k$ is the probability of selecting the $k$-th historical policy. Modern frameworks like **PSRO (Policy Space Response Oracles)** further introduce "regret-based policy selection" — prioritizing historical opponents that the current strategy finds most difficult, maximizing information gain per training round. OpenAI Five (and AlphaStar) use league training with such an opponent pool; AlphaZero itself plays each self-play game against only the most recent checkpoint of the same network, which is why later systems moved to leagues to break cycles. (DeepSeek-R1's mathematics and coding RL, by contrast, is single-agent training against verifiable rewards rather than against an opponent pool.)
 
 ### Closed Loop 2: Adaptive Curriculum — From Uniform Sampling to Difficulty Matching
 
@@ -227,7 +236,7 @@ Self-evolution systems sound wonderful, but they still face several fundamental 
 
 The ideas of self-play and self-evolution thread through the core themes of the entire book. Let us trace these connections:
 
-- **Concept from Previous Chapters — AlphaGo self-play (Chapter 7):** Direct predecessor of self-play — from Go to language
+- **Concept from Previous Chapters — AlphaGo self-play (Section 7.5):** Direct predecessor of self-play — from Go to language
 - **Concept from Previous Chapters — GRPO within-group comparison (Chapter 15):** Within-group comparison is "simplified self-play" — multiple answers from the same model compete
 - **Concept from Previous Chapters — Experience replay (Chapter 5):** "Experience distillation" in self-evolution — from raw replay to summarized distillation
 - **Concept from Previous Chapters — PPO (Chapter 8):** Policy optimization algorithm for self-play training
@@ -241,7 +250,7 @@ From this perspective, the path from Chapter 15's GRPO to this chapter's self-pl
 
 ---
 
-Next we discuss [26.3 LLM Multi-Agent Reinforcement Learning](../llm-multi-agent-rl/) — from multi-agent cooperation to model-based RL, with a hands-on experiment using PettingZoo.
+Next we discuss [26.3 How Multiple LLMs Learn Together](../llm-multi-agent-rl/) — from multi-agent cooperation to model-based RL, with a hands-on experiment using PettingZoo.
 
 ---
 

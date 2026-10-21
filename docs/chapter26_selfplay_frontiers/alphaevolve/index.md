@@ -1,4 +1,8 @@
-# 26.4 LLM-Driven Algorithm Search
+---
+title: 26.4 How LLMs Search for New Algorithms
+---
+
+# 26.4 How LLMs Search for New Algorithms
 
 Suppose we want to speed up a matrix multiplication routine that is called over and over. Low-level routines like this are often called "kernels." Each call saves only a little time, but in large-model training a kernel is invoked billions of times, and the savings add up to a considerable total difference.
 
@@ -22,7 +26,7 @@ flowchart LR
 
 This diagram gives the main thread of the whole section. The generative model enlarges the candidate space, the evaluator turns candidates into comparable results, and the program database decides which experience enters the next round. None of the three components can be dropped: generation alone yields many unverified ideas, evaluation alone does not explore new schemes on its own, and without a history database the loop keeps trying similar modifications.
 
-This loop has a structure similar to the RL of the previous sections. A candidate program plays the role of an action, the automatic evaluator provides feedback, and the history program database stores search experience. The difference is that AlphaEvolve mainly uses population-based evolutionary search and does not update Gemini's parameters through policy gradients. The purpose of putting it in the same article as Genie 3, Titans, M-GRPO, and recursive self-improvement is precisely to tell apart several mechanisms by which "a system keeps improving."
+This loop has a structure similar to the RL of the previous sections. A candidate program plays the role of an action, the automatic evaluator provides feedback, and the history program database stores search experience. The difference is that AlphaEvolve mainly uses population-based evolutionary search and does not update Gemini's parameters through policy gradients. The purpose of putting it in the same section as Genie 3, Titans, M-GRPO, and recursive self-improvement is precisely to tell apart several mechanisms by which "a system keeps improving."
 
 What these systems actually change differs from one to the next:
 
@@ -126,7 +130,7 @@ Titans distinguishes three kinds of information:
 - Long-term memory: the neural memory module is updated continuously at test time.
 - Persistent memory: stores task-related parameters that are fixed after training.
 
-The paper uses "surprise" to decide which inputs are worth writing into long-term memory. The surprise here comes from the memory model's loss or gradient signal on the current sample. It is a test-time learning rule and not an RL reward given by an environment. The original paper reports that Titans outperforms the Transformer and linear recurrent baselines it compares against on language modeling, commonsense reasoning, genomics, and time series tasks, and scales to contexts of more than 2M tokens in needle-in-a-haystack evaluation.
+The paper uses "surprise" to decide which inputs are worth writing into long-term memory. The surprise here comes from the memory model's loss or gradient signal on the current sample. It is a test-time learning rule and not an RL reward given by an environment. The original paper reports that Titans outperforms the Transformer and linear recurrent baselines it compares against on language modeling, commonsense reasoning, genomics, and time series tasks, including strong needle-in-a-haystack performance at very long contexts.
 
 The connection between Titans and the main thread of this chapter occurs at the system level: a long-running agent can use this kind of memory to store information across episodes, and RL then learns how to use the observations formed from memory. The memory module itself is updated by gradients, which does not automatically make it a reinforcement learning algorithm.
 
