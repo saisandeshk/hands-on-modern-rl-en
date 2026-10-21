@@ -4,7 +4,7 @@
 
 **Key Ideas**
 
-- Understand why random exploration almost cannot succeed in sparse-reward tasks. Take Montezuma's Revenge as the example: the probability that $\epsilon$-greedy stumbles on the first reward is only $10^{-18}$. How small is that?
+- Understand why random exploration almost cannot succeed in sparse-reward tasks. Take Montezuma's Revenge as the example: the probability that blind random search stumbles on the first reward is only about $10^{-39}$. How small is that?
 - Master the central idea of intrinsic rewards: before any external reward arrives, use "curiosity" to give the agent a learning signal.
 - Understand how ICM (the Intrinsic Curiosity Module) builds an intrinsic reward from prediction error, and why it needs an inverse model to filter out irrelevant noise.
 - Understand why RND (Random Network Distillation) is simpler yet more robust: it needs no actions and no inverse model, and it also solves the "noisy TV" problem.
@@ -34,25 +34,33 @@ Let's take this expression apart:
 
 In a bandit problem this formula works well. But when we enter the high-dimensional visual environments of deep RL, the problem is magnified thousands upon thousands of times.
 
-### That Despairing Number: $10^{-18}$
+### That Despairing Number: $10^{-39}$
 
 In Atari games such as Montezuma's Revenge or Pitfall!, to obtain the first reward from the initial state the agent must execute a chain of **precise** actions: jump over a trap, climb a ladder, pick up a key, and then open a door. That takes dozens of completely correct steps.
 
-Let's do the arithmetic. Suppose the agent uses the simplest $\epsilon$-greedy exploration, with probability $\epsilon = 0.1$ of choosing a random action at each step (already a fairly high exploration rate), with 6 available actions at every step, and obtaining the first reward requires at least 50 consecutive correct choices.
+Let's do the arithmetic. Suppose there are 6 available actions at every step, the agent explores by choosing uniformly at random, and obtaining the first reward requires at least 50 consecutive correct choices.
 
 What is the probability that it stumbles on the first reward by wandering blindly?
 
-About $10^{-18}$.
+$$(1/6)^{50} \approx 1.2 \times 10^{-39}.$$
 
-How small is that number? Let's make it concrete:
+That is, roughly one success in $10^{39}$ blind attempts. If the agent instead uses $\epsilon$-greedy with $\epsilon = 0.1$, the situation is even worse: the greedy branch just repeats what (little) it already knows, so an unknown sequence can only be discovered on steps where the random branch fires. If every one of the 50 steps has to come from the random branch, the per-step success probability on such a step is $0.1 \times (1/6) = 1/60$, and the 50-step success probability for pure random-branch discovery falls to $(1/60)^{50} \approx 10^{-89}$.
 
-- The age of the universe is about $10^{17}$ seconds
-- The number of grains of sand on Earth is about $10^{18}$
-- In other words, an agent exploring once per second since the Big Bang might not yet have met a single reward today!
+How small is $10^{-39}$? Let's make it concrete:
+
+- The age of the universe is about $10^{17}$ seconds. Exploring once per second since the Big Bang gives only $10^{17}$ attempts, still a factor of $10^{22}$ short.
+- The number of grains of sand on Earth is about $10^{18}$.
+- The number of atoms in the observable universe is about $10^{80}$. You would need roughly one attempt per $10^{41}$ atoms to expect a single success.
 
 This is why DQN scored zero for a long time on these **hard-exploration** games. The algorithm was not bad. Against rewards this sparse, random exploration is almost impossible to succeed probabilistically.
 
 Where does the difficulty come from? From the extreme sparsity of the reward signal. Let's formalize it: suppose the agent starts at the initial state $s_0$ and needs at least $H^\star$ steps to reach the first rewarding state $s^\star$. Any update that depends only on the environment reward $r_t$ must wait until the first successful trajectory appears before learning can start, and the density of successful trajectories falls exponentially as $H^\star$ grows.
+
+It helps to distinguish three related but different difficulties, because they call for different tools:
+
+- **Sparse rewards**: the reward is zero almost everywhere, as in Montezuma's Revenge. The problem is _finding_ any signal at all. Count-based and curiosity bonuses (this section) are the direct remedy.
+- **Delayed rewards**: the reward arrives, but only long after the decisive actions, as in a chess game decided by one blunder on move 20. The problem is _credit assignment_ over a long horizon: which of the hundreds of preceding actions deserves the credit? GAE ([Chapter 8](../chapter08_ppo/gae-reward-model.md)) and Retrace-style multi-step returns propagate the signal backward; hierarchy (Section 12.3) shortens the distance it must travel.
+- **Deceptive rewards**: a dense reward actively points the wrong way, as in a maze where the goal sits behind the starting position so that "move closer to the goal" walks into a wall. Greedy exploitation of the reward then converges to a local optimum, and _more_ exploration, not better exploitation, is the fix. This is why novelty-seeking objectives explicitly reward visiting states the greedy policy would never reach.
 
 This leads to the core idea of the **intrinsic reward**: before reaching the external reward, we manufacture some "curiosity signals" for the agent ourselves, encouraging it to visit novel or hard-to-predict states, just as a human infant actively explores its surroundings. The infant does not do this to get a reward right away, but purely because "I have never seen this thing and I want to take a look."
 
@@ -73,6 +81,26 @@ But an intrinsic reward cannot be given carelessly. It has to satisfy two key co
 
 1. **Computable**: it depends only on data that has already been observed and needs no additional external supervision. We cannot label "is this state novel?" by hand during training.
 2. **Exhaustible**: after a state has been visited enough times, its intrinsic reward should decay to zero. Otherwise the agent will find some "novel wall", stand there forever "farming points", and never complete the real task again.
+
+### Counts, Pseudo-Counts, and the Price of Undirected Exploration
+
+Before curiosity, it is worth seeing how far the classical ideas go, because they fix the vocabulary the rest of the chapter uses.
+
+The simplest exploration is **undirected**: $\epsilon$-greedy takes a uniform random action with probability $\epsilon$, and entropy-regularized objectives add a bonus for stochastic policies,
+
+$$J(\theta) = \mathbb{E}[G_t] + \alpha\,\mathcal{H}(\pi_\theta(\cdot \mid s_t)),$$
+
+where $\mathcal{H}$ is the Shannon entropy and $\alpha$ the temperature trading reward against randomness. Both keep the policy from collapsing to a premature deterministic choice, but neither _seeks_ anything: they diffuse around the states the policy already visits and, as the $10^{-39}$ calculation shows, cannot cover a large state space on purpose.
+
+**Optimism** does seek. The UCB rule above is the bandit instance of the optimism-in-the-face-of-uncertainty principle: act as if every uncertain option were as good as its confidence bound allows. In MDPs the same principle becomes a **count-based exploration bonus**
+
+$$r^{\text{int}}_t = \frac{1}{\sqrt{N(s_t)}},$$
+
+where $N(s_t)$ counts prior visits to $s_t$ (counting state–action pairs $N(s, a)$ gives the closer analogue of Bellemare et al. 2016). The scale of the bonus is set once, by the $\beta$ in $r^{\text{total}}_t = r^{\text{ext}}_t + \beta \cdot r^{\text{int}}_t$ above, so the two formulas combine to a training bonus of $\beta/\sqrt{N(s_t)}$. Acting greedily with respect to optimistic value estimates, this bonus provably drives the agent to cover the state space in the tabular setting (it is the reward-bonus counterpart of UCB-style model-based exploration such as MBIE, Model-Based Interval Estimation). A quick check with $\beta = 1$: the first visit pays $1$, the 4th visit pays $1/2$, and the 100th pays $1/10$ — novelty is literally used up by revisits.
+
+Counts break in high-dimensional observations, where almost no raw state repeats. **Pseudo-counts** (Bellemare et al. 2016) repair the idea with a density model $\rho(s)$ trained on visited states: a state the model already assigns high probability to is "familiar", and one that surprises the model gets a high pseudo-count-novelty. Concretely, after observing $s$, the model's probability jumps from $\rho(s)$ to $\rho'(s)$, and the pseudo-count $\hat{N}(s)$ is defined as the count that would produce the same jump in a tabular frequency estimator. This turns "have I seen this?" into a question a neural network can answer, and the $1/\sqrt{\hat{N}}$ bonus (scaled by the same $\beta$) ports directly to Atari-scale pixels.
+
+Two warnings come with every bonus. First, **a bonus is not reward shaping**. Potential-based shaping, $F(s, s') = \gamma\Phi(s') - \Phi(s)$ for an arbitrary potential $\Phi$, provably leaves the optimal policy unchanged, because the added terms telescope over a trajectory. A novelty bonus has no such guarantee: kept at full strength forever, it changes what "optimal" means, and the agent may prefer entertaining itself to solving the task. That is exactly why bonuses must satisfy the exhaustibility condition above, or be annealed away. Second, **measure coverage, not just return**. On sparse tasks the training return stays zero for a long time and says nothing; track instead the _state-action visitation_ (which regions were ever reached) and the _success coverage_ (what fraction of goals or levels was ever completed). NGU's episodic memory below is precisely a visitation tracker, and Agent57 reports per-game human-normalized scores, summarized by the median across the 57 games, rather than relying on a single averaged score.
 
 In the next two sections we look at the two mainstream routes for constructing intrinsic rewards: ICM, based on prediction error, and RND, based on random network distillation.
 
@@ -128,23 +156,30 @@ $$\mathcal{L} = \mathcal{L}_{\text{policy}}(\theta) + \lambda_{\text{inv}}\,\mat
 ```python
 class ICM(nn.Module):
     def __init__(self, feat_dim=256, action_dim=6):
+        super().__init__()
+        self.action_dim = action_dim
         self.encoder = CNNtoMLP(out=feat_dim)              # Φ(s)
         self.inverse = nn.Linear(feat_dim * 2, action_dim) # g_φ
         self.forward_net = MLP(feat_dim + action_dim, feat_dim)
 
-    def intrinsic_reward(self, s, a, s_next):
+    def _features(self, s, a, s_next):
+        # a holds discrete action indices; the forward model needs one-hot vectors
+        a_oh = F.one_hot(a.long(), num_classes=self.action_dim).float()
         phi, phi_next = self.encoder(s), self.encoder(s_next)
-        phi_pred = self.forward_net(torch.cat([phi, a], -1))
+        phi_pred = self.forward_net(torch.cat([phi, a_oh], -1))
+        return phi, phi_next, phi_pred
+
+    def intrinsic_reward(self, s, a, s_next):
+        _, phi_next, phi_pred = self._features(s, a, s_next)
         return 0.5 * (phi_next - phi_pred).pow(2).sum(-1)
 
     def forward_loss(self, s, a, s_next):
-        phi, phi_next = self.encoder(s), self.encoder(s_next)
-        phi_pred = self.forward_net(torch.cat([phi, a], -1))
+        phi, phi_next, phi_pred = self._features(s, a, s_next)
         return F.mse_loss(phi_pred, phi_next.detach()) + \
-               F.cross_entropy(self.inverse(torch.cat([phi, phi_next], -1)), a)
+               F.cross_entropy(self.inverse(torch.cat([phi, phi_next], -1)), a.long())
 ```
 
-ICM performs well on tasks such as Super Mario Bros. with continuous control plus visual input: with no external reward at all, the agent can cross the whole map purely on curiosity. But, as you may have guessed, it has a fatal weakness called the **noisy TV problem**.
+ICM performs well on tasks such as Super Mario Bros. with discrete actions and visual input: with no external reward at all, the agent can cross the whole map purely on curiosity. But, as you may have guessed, it has a fatal weakness called the **noisy TV problem**.
 
 Imagine there is a television in the environment that always plays random static. Whatever the agent does, the picture is completely random and unpredictable. The forward model can never learn to predict the next frame, so the intrinsic reward stays high forever. What is the result? The agent will plant itself in front of the TV without moving, watching the static forever to "farm points", and never complete the real task again.
 
@@ -186,6 +221,7 @@ RND has several big advantages over ICM:
 ```python
 class RND(nn.Module):
     def __init__(self, obs_shape, feat_dim=512):
+        super().__init__()
         # Target network: frozen, never updated
         self.target = CNN(obs_shape, feat_dim)
         for p in self.target.parameters():
