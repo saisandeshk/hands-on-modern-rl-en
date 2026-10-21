@@ -1409,6 +1409,10 @@ const sidebar = {
             {
               text: '25.5 How to Evaluate RL Models Reliably',
               link: '/chapter25_alignment_failures/rl-evaluation'
+            },
+            {
+              text: '25.6 Summary and Exercises',
+              link: '/chapter25_alignment_failures/review'
             }
           ]
         },
