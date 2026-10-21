@@ -1,8 +1,8 @@
 ---
-title: 13.R Summary and Exercises
+title: 13.10 Summary and Exercises
 ---
 
-# 13.R Summary and Exercises
+# 13.10 Summary and Exercises
 
 This page closes Chapter 13: the classic three-stage RLHF pipeline (SFT, reward model, PPO), its evaluation guardrails, and the controlled reward-hacking experiment. Chapter 14 replaces the explicit reward model with DPO; Chapters 15-17 replace more pieces with verifiable and process rewards.
 

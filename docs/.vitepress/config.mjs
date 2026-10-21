@@ -1039,6 +1039,10 @@ const sidebar = {
             {
               text: '13.9 Supplement: The PPO-RLHF Training Loop',
               link: '/chapter13_rlhf/ppo-rlhf-loop'
+            },
+            {
+              text: '13.10 Summary and Exercises',
+              link: '/chapter13_rlhf/review'
             }
           ]
         },
