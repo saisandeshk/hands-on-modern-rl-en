@@ -37,23 +37,67 @@
         { "action": "shell", "resource": "wc *", "effect": "allow" },
         { "action": "shell", "resource": "npm run build", "effect": "allow" },
         { "action": "shell", "resource": "npm run lint", "effect": "allow" },
-        { "action": "shell", "resource": "npm run format:check", "effect": "allow" },
+        {
+          "action": "shell",
+          "resource": "npm run format:check",
+          "effect": "allow"
+        },
         { "action": "shell", "resource": "npm run verify", "effect": "allow" },
-        { "action": "shell", "resource": "npm run verify:*", "effect": "allow" },
+        {
+          "action": "shell",
+          "resource": "npm run verify:*",
+          "effect": "allow"
+        },
         { "action": "shell", "resource": "npm run sitemap", "effect": "allow" },
-        { "action": "shell", "resource": "npm run fix:headings*", "effect": "allow" },
+        {
+          "action": "shell",
+          "resource": "npm run fix:headings*",
+          "effect": "allow"
+        },
         { "action": "shell", "resource": "npx prettier *", "effect": "allow" },
         { "action": "shell", "resource": "npx eslint *", "effect": "allow" },
-        { "action": "shell", "resource": "npx vitepress build*", "effect": "allow" },
+        {
+          "action": "shell",
+          "resource": "npx vitepress build*",
+          "effect": "allow"
+        },
         { "action": "shell", "resource": "node scripts/*", "effect": "allow" },
         { "action": "shell", "resource": "node --test *", "effect": "allow" },
-        { "action": "shell", "resource": "bash scripts/verify.sh*", "effect": "allow" },
-        { "action": "shell", "resource": "python3 scripts/*", "effect": "allow" },
-        { "action": "shell", "resource": "python3 -m py_compile *", "effect": "allow" },
-        { "action": "shell", "resource": ".venv/bin/python *", "effect": "allow" },
-        { "action": "shell", "resource": ".venv/bin/pytest *", "effect": "allow" },
-        { "action": "shell", "resource": "timeout * .venv/bin/python *", "effect": "allow" },
-        { "action": "shell", "resource": "timeout * .venv/bin/pytest *", "effect": "allow" },
+        {
+          "action": "shell",
+          "resource": "bash scripts/verify.sh*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "python3 scripts/*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "python3 -m py_compile *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": ".venv/bin/python *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": ".venv/bin/pytest *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "timeout * .venv/bin/python *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "timeout * .venv/bin/pytest *",
+          "effect": "allow"
+        },
 
         { "action": "external_directory", "resource": "*", "effect": "deny" },
         { "action": "doom_loop", "resource": "*", "effect": "deny" }
@@ -73,13 +117,21 @@
         { "action": "grep", "resource": "*", "effect": "allow" },
         { "action": "list", "resource": "*", "effect": "allow" },
         { "action": "todowrite", "resource": "*", "effect": "allow" },
-        { "action": "edit", "resource": "*planning/reviews/*", "effect": "allow" },
+        {
+          "action": "edit",
+          "resource": "*planning/reviews/*",
+          "effect": "allow"
+        },
         { "action": "shell", "resource": "*", "effect": "ask" },
         { "action": "shell", "resource": "git diff*", "effect": "allow" },
         { "action": "shell", "resource": "git show*", "effect": "allow" },
         { "action": "shell", "resource": "git log*", "effect": "allow" },
         { "action": "shell", "resource": "git ls-tree*", "effect": "allow" },
-        { "action": "shell", "resource": ".venv/bin/python -c *", "effect": "allow" },
+        {
+          "action": "shell",
+          "resource": ".venv/bin/python -c *",
+          "effect": "allow"
+        },
         { "action": "external_directory", "resource": "*", "effect": "deny" },
         { "action": "doom_loop", "resource": "*", "effect": "deny" }
       ]

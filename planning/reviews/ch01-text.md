@@ -9,7 +9,7 @@ figure numbering and the sidebar were checked against `docs/.vitepress/config.mj
 
 ## Errors
 
-1. `docs/chapter01_cartpole/metrics.md:246` — "transitions, obs = collect_rollout(model, env, obs, device, num_steps=2048)"
+1. `docs/chapter01_cartpole/metrics.md:246` — "transitions, obs = collect\*rollout(model, env, obs, device, num_steps=2048)"
    — the sketch still does not match the function it calls. `collect_rollout` in
    `code/chapter01_cartpole/2-pytorch_ppo.py` returns a **six**-tuple
    `(transitions, obs, completed_rewards, completed_lengths, episode_reward, episode_length)`, so unpacking it
@@ -17,15 +17,14 @@ figure numbering and the sidebar were checked against `docs/.vitepress/config.mj
    returns the completed-episode statistics alongside the transitions") states the very fact that the code line
    contradicts. Two lines further down, `ppo_update(model, optimizer, transitions, advantages, returns)` also
    drops the required positional argument `device` (real signature: `ppo_update(model, optimizer, transitions,
-   advantages, returns, device, clip_eps=0.2, epochs=10, batch_size=64)`), so that call fails as well. The
+advantages, returns, device, clip_eps=0.2, epochs=10, batch_size=64)`), so that call fails as well. The
    writer's report claims this sketch was corrected to match the real signature ("hides the multi-value
    return"); the call form was fixed, the unpacking was not.
-   — Suggested fix: `transitions, obs, ep_rewards, ep_lengths, *_ = collect_rollout(model, env, obs, device, num_steps=2048)`
-   and pass `device` in the `ppo_update` call (or extend the "simplified" comment to say so explicitly).
+   — Suggested fix: `transitions, obs, ep_rewards, ep_lengths, \** = collect_rollout(model, env, obs, device, num_steps=2048)`and pass`device`in the`ppo_update` call (or extend the "simplified" comment to say so explicitly).
 
 2. `docs/chapter01_cartpole/training.md:163` — "The per-iteration mean reward in the saved CSV is 21.35 in
    iteration 1, 500.0 in iteration 10, and falls back to 460.4 in iteration 11." The numbers are right for the
-   *archived* CSV, but §1.3.2 (line 42) still instructs the reader to regenerate **that same file**
+   _archived_ CSV, but §1.3.2 (line 42) still instructs the reader to regenerate **that same file**
    (`--log-csv output/training_metrics_seed42.csv`), i.e. to overwrite the archived copy with the current
    script's schema, in which `mean_episode_reward` is the 100-episode rolling average. After that regeneration
    the quoted numbers no longer hold: the rolling mean at iteration 10 is ≈148, not 500.0. Calculation from
@@ -92,7 +91,7 @@ figure numbering and the sidebar were checked against `docs/.vitepress/config.mj
    GPU. The point the sentence wants to make (no discrete GPU needed) is right; the mechanism is not.
 
 4. `docs/chapter01_cartpole/review.md:145` (Exercise 8) — "the diagnostic pair moves in opposite directions, which
-   is exactly the trade-off the clipped objective encodes". This holds only because the clip-fraction *threshold*
+   is exactly the trade-off the clipped objective encodes". This holds only because the clip-fraction _threshold_
    moves with `clip_eps` (the metric is `mean(|r-1| > clip_eps)`, so widening the band mechanically shrinks the
    count). Chapter 8 states the opposite relation for a fixed threshold: "when the clip fraction is high, the KL
    divergence is also high" (`docs/chapter08_ppo/ppo-bipedal-walker.md:165`). A reader who carries this

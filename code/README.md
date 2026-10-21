@@ -20,12 +20,12 @@ Chapter 1 scripts accept `--device auto|cuda|mps|cpu` (auto prefers CUDA, then A
 ## Chapter Code Overview
 
 | Chapter                 | Directory                       | Main Code                            | Description                                                                                                               |
-| ----------------------- | ------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------- |
+| ----------------------- | ------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
 | Ch01 CartPole           | `chapter01_cartpole/`           | `1-ppo_cartpole.py`                  | SB3 PPO trains CartPole, logging SwanLab metrics                                                                          |
 |                         |                                 | `2-pytorch_ppo.py`                   | Pure PyTorch PPO: Actor-Critic, GAE, clipping, metric logging                                                             |
-|                         |                                 | `plot_curves.py`                     | Plots reviewable metric curves from the CSV exported by training                                                           |
-|                         |                                 | `capture_frames.py`                  | Loads a model and captures real Gymnasium rendered frames                                                                  |
-| Ch02 DPO                | `chapter17_dpo/`                | `0-download_model.py`                | Downloads Qwen2.5-0.5B-Instruct                                                                                            |
+|                         |                                 | `plot_curves.py`                     | Plots reviewable metric curves from the CSV exported by training                                                          |
+|                         |                                 | `capture_frames.py`                  | Loads a model and captures real Gymnasium rendered frames                                                                 |
+| Ch02 DPO                | `chapter17_dpo/`                | `0-download_model.py`                | Downloads Qwen2.5-0.5B-Instruct                                                                                           |
 |                         |                                 | `1-generate_data.py`                 | Generates preference data correcting excessive compliance                                                                 |
 |                         |                                 | `2-test_before.py`                   | Test before fine-tuning                                                                                                   |
 |                         |                                 | `3-train_dpo.py`                     | TRL DPO training                                                                                                          |

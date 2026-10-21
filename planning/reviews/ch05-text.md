@@ -15,7 +15,7 @@ out independently.
    `code/chapter05_dqn/dqn_gym_sb3.py:251-256` builds its checkpoint callback as
    `CheckpointCallback(save_freq=…, save_path=…, name_prefix=…, save_replay_buffer=True)`, and in SB3
    2.9.0 (`common/callbacks.py:307-312`) `save_replay_buffer=True` makes the callback also write
-   `replay_buffer_<steps>_steps.pkl` next to every model checkpoint. So the 5.3 script *does*
+   `replay_buffer_<steps>_steps.pkl` next to every model checkpoint. So the 5.3 script _does_
    persist the buffer with its periodic checkpoints; only the Atari script
    (`dqn_atari_sb3.py:343-348`) omits the flag. The new sentence therefore contradicts the code of
    the very page it cites.
@@ -38,7 +38,7 @@ out independently.
 3. `docs/chapter05_dqn/from-q-to-dqn.md` — "Go has about $3^{361} \approx 10^{170}$ positions" —
    arithmetically wrong. $3^{361} = 1.74\times10^{172}$ (since $\log_{10}3^{361} = 361\log_{10}3 =
    172.24$), so the two numbers differ by two orders of magnitude. The $\approx2.1\times10^{170}$ figure
-   is Tromp's count of *legal* Go positions, which is a different quantity from the $3^{361}$ board
+   is Tromp's count of _legal_ Go positions, which is a different quantity from the $3^{361}$ board
    configurations; writing them as equal is the error.
    — Suggested fix: "Go has about $3^{361} \approx 1.7\times10^{172}$ board configurations (Tromp's
    count of legal positions is $\approx 2.1\times10^{170}$)."
@@ -107,9 +107,9 @@ out independently.
 1. `docs/chapter05_dqn/review.md` (exercise 9 solution) — "the default run's evaluation mean rises
    faster and fluctuates less; the 10x-lag run learns from staler targets, so its curve lags and its
    final 5-episode mean is typically lower (often by tens of points on LunarLander)". The direction is
-   asserted, not established: (a) a staler target moves in bigger but rarer jumps, so the *stale* run
+   asserted, not established: (a) a staler target moves in bigger but rarer jumps, so the _stale_ run
    may well be the smoother one, contradicting "the default run … fluctuates less"; (b) the DQN paper
-   itself (Mnih et al., 2015) trained with a target update every 10,000 steps, i.e. a *larger* target
+   itself (Mnih et al., 2015) trained with a target update every 10,000 steps, i.e. a _larger_ target
    interval than the 1,000-step default used here, so "10× larger ⇒ worse" is not the literature's
    verdict; (c) "final 5-episode means" does not match the script default `--eval-episodes 10` (only
    the 5.3 command sets 5), and with `--total-timesteps 100000` and `--eval-freq 10000` only 10
@@ -119,15 +119,15 @@ out independently.
 2. `docs/chapter05_dqn/review.md` (exercise 8 solution) — "the Double clone ends with a lower mean Q
    and usually a slightly lower absolute TD error on the held-out batch". The Q-gap part is well
    founded (Double DQN removes the maximization bias). The TD-error part depends entirely on which
-   target scores the held-out batch: scored against the *vanilla* max target, the Double clone should
-   show a *larger* error, since it deliberately refuses the inflated maximum; scored with each
+   target scores the held-out batch: scored against the _vanilla_ max target, the Double clone should
+   show a _larger_ error, since it deliberately refuses the inflated maximum; scored with each
    variant's own target, the comparison is close to a wash. Also note the code directory already
    contains `code/chapter05_dqn/double_dqn_cartpole.py`, the natural reference for this exercise.
 
 3. `docs/chapter05_dqn/review.md` (exercise 7 solution) — "The highest-error sample is drawn most
    often but down-weighted least after normalization" reads backwards as written: with
    $w_i = (1/(NP(i)))^\beta = [9.0, 1.8, 0.9, 0.45]$ normalized by the max, the highest-error sample
-   ends with the *largest* weight (1.0), i.e. it is up-weighted most. The numbers in the answer are
+   ends with the _largest_ weight (1.0), i.e. it is up-weighted most. The numbers in the answer are
    right (I recomputed $P = [0.0278, 0.1389, 0.2778, 0.5556]$, $w = [9.0, 1.8, 0.9, 0.45]$,
    normalized $[1.0, 0.2, 0.1, 0.05]$); only the prose is muddled, and the following clause ("low-error
    samples keep small weights so they barely move the parameters") states the correct idea.
@@ -154,7 +154,7 @@ out independently.
 
 6. `docs/chapter05_dqn/dqn-components.md` — "It is not the gradient of any fixed objective, which is
    one reason DQN can oscillate even when the loss looks well-behaved". More precisely: with the target
-   frozen at a given sync, the update *is* the exact gradient of the surrogate
+   frozen at a given sync, the update _is_ the exact gradient of the surrogate
    $\mathcal{L}(\theta)=\mathbb{E}[(y-Q(\theta))^2]$ with $y$ held constant; what it is not is a descent
    step on the true TD objective whose target depends on $\theta$ — which is why the fixed point is a
    projected fixed point rather than an MSVE minimizer. As written the sentence denies that the
