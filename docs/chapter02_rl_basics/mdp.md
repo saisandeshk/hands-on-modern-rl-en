@@ -61,7 +61,7 @@ $$
 
 ## The MDP Tuple: State, Action, and Environment
 
-An MDP is defined by five components, written $(S, A, P, R, \gamma)$. Together they form a complete decision loop: **in a situation (S) you make a choice (A), the world changes (P), you receive feedback (R), and you enter the next situation and repeat. The discount factor $\gamma$ decides how much you care about rewards far in the future.**
+An MDP is defined by five components, written $(\mathcal{S}, \mathcal{A}, P, R, \gamma)$. Together they form a complete decision loop: **in a situation (S) you make a choice (A), the world changes (P), you receive feedback (R), and you enter the next situation and repeat. The discount factor $\gamma$ decides how much you care about rewards far in the future.**
 
 Given any RL problem, it is often enough to ask five questions:
 
@@ -73,13 +73,13 @@ Given any RL problem, it is often enough to ask five questions:
 
 These five components are not arbitrary: they cover every link in sequential decision-making. Without S you cannot define the situation; without A you cannot act; without P you cannot predict consequences; without R you cannot define what is good; without $\gamma$ you cannot trade off short-term vs. long-term. **The 5-tuple is a minimal, complete description of a decision world.**
 
-| Symbol | English                | Meaning         | Intuition                | Bandit                       | CartPole                     |
-| ------ | ---------------------- | --------------- | ------------------------ | ---------------------------- | ---------------------------- |
-| S      | State                  | state space     | "where am I"             | {initial} (single state)     | R^4 (4D continuous)          |
-| A      | Action                 | action space    | "what can I do"          | {choose A, choose B}         | {push left, push right}      |
-| P      | Transition probability | dynamics        | "what happens next"      | always returns to same state | determined by physics engine |
-| R      | Reward                 | reward function | "how am I scored"        | win +1, lose -1              | survive +1                   |
-| γ      | Discount factor        | discounting     | "how much future counts" | not used (single-step)       | typically 0.99               |
+| Symbol | English                | Meaning         | Intuition                | Bandit                       | CartPole                       |
+| ------ | ---------------------- | --------------- | ------------------------ | ---------------------------- | ------------------------------ |
+| S      | State                  | state space     | "where am I"             | {initial} (single state)     | $\mathbb{R}^4$ (4D continuous) |
+| A      | Action                 | action space    | "what can I do"          | {choose A, choose B}         | {push left, push right}        |
+| P      | Transition probability | dynamics        | "what happens next"      | always returns to same state | determined by physics engine   |
+| R      | Reward                 | reward function | "how am I scored"        | win +1, lose -1              | survive +1                     |
+| γ      | Discount factor        | discounting     | "how much future counts" | not used (single-step)       | typically 0.99                 |
 
 ### State $S$
 
@@ -92,6 +92,8 @@ representing cart position, cart velocity, pole angle, and pole angular velocity
 The core assumption of an MDP is the **Markov property**: given the current state, the future is independent of the past. You do not need to know how you arrived here to act optimally. Like chess: to choose the best move, you only need the current board, not the last ten moves.
 
 This implies the state must be "complete". If CartPole only gave you the pole angle but not the angular velocity, you would not know whether the pole is accelerating downward or slowing down. It is like seeing only the current speed but not whether the car is accelerating or braking. **The state must contain all information needed for decision-making.**
+
+A related distinction is **state versus observation**. The state is the full situation the dynamics depend on; an observation is what the agent actually perceives, which may omit part of the state. CartPole with all four measurements observed is fully observed. If the velocity readings were hidden and the agent saw only position and angle, the problem would be partially observed: two different true situations could produce the same observation, and a single observation no longer satisfies the Markov property. In that case the agent must use memory, for example a history of recent observations, to reconstruct enough information to act well. The formal model for this setting is a partially observable MDP (POMDP), where the agent maintains a belief (a distribution over possible true states). Full POMDP planning is a deeper topic beyond this chapter; the practical takeaway here is that whenever learning stalls unexpectedly, checking whether the observation hides decision-relevant information is a useful first diagnostic.
 
 ### Action $A$
 
@@ -108,7 +110,7 @@ The type of action space strongly influences algorithm choice:
 
 $$P(s' \mid s, a) = \text{probability of transitioning to } s' \text{ after taking action } a \text{ in state } s$$
 
-In a bandit, the state never changes. In CartPole, the dynamics $P$ are determined by Newtonian mechanics. Suppose the current pole angle is $\theta = 0.05$ (a small tilt) and the action is "push right":
+In a bandit, the state never changes. In CartPole, the dynamics $P$ are determined by Newtonian mechanics. To see what a stochastic transition looks like, take a hypothetical noisy version of the same situation. Suppose the current pole angle is $\theta = 0.05$ (a small tilt), the action is "push right", and actuation noise makes the outcome uncertain:
 
 $$P(\theta' = 0.03 \mid \theta = 0.05, \text{push right}) \approx 0.7 \qquad (\text{angle decreases; pole returns toward upright})$$
 
@@ -132,6 +134,8 @@ Richard Sutton proposed the **reward hypothesis**: any goal can be described as 
 
 But designing a good reward function is one of the hardest parts of RL engineering. The classic failure mode is **reward hacking**: the agent finds loopholes in the reward and achieves a high score in unintended ways. In LLM alignment, even defining "what deserves a high score" is itself a research problem, which is exactly what RLHF and DPO are trying to address.
 
+A subtler trap is **reward shaping that changes the optimal policy**. Suppose CartPole gave +1 per step plus a bonus proportional to the cart's rightward displacement, intended to reward "making progress". An agent maximizing that shaped reward as written may park the cart at the right edge of the track: every step near the edge collects the displacement bonus on top of the +1 survival reward, so edge-riding outscores centered balancing. The shaped reward's optimal policy (ride the edge, fragilely close to the track limit) is no longer the true task's optimal policy (stay centered and balanced). Extra progress signals are legitimate when they preserve the intended optimum, but every added term should be checked by asking "what behavior earns the maximum of this reward, and is that the behavior I actually want?"
+
 ### Discount Factor $\gamma$
 
 $$\gamma \in [0, 1]$$
@@ -140,7 +144,7 @@ $\gamma$ controls how much the agent values delayed gratification. Consider two 
 
 | $\gamma$ | $G_0$ of policy A | $G_0$ of policy B         | Better policy               |
 | -------- | ----------------- | ------------------------- | --------------------------- |
-| 0.5      | 10                | $0.5^9 \times 20 = 0.39$  | A (very short-sighted)      |
+| 0.5      | 10                | $0.5^9 \times 20 = 0.039$ | A (very short-sighted)      |
 | 0.9      | 10                | $0.9^9 \times 20 = 7.7$   | A (still prefers near-term) |
 | 0.99     | 10                | $0.99^9 \times 20 = 18.3$ | B (long-horizon preference) |
 
@@ -150,13 +154,13 @@ The closer $\gamma$ is to 1, the more long-horizon the agent becomes and the mor
 
 Let's put bandits, CartPole, and LLM alignment side by side and see what their MDP components look like:
 
-| Component | Bandit                                 | CartPole         | LLM alignment                         |
-| --------- | -------------------------------------- | ---------------- | ------------------------------------- |
-| S         | {initial} (single state)               | R^4 (continuous) | generated token prefix                |
-| A         | {choose A, choose B}                   | {left, right}    | next token in vocabulary              |
-| P         | payout probability (fixed but unknown) | physics engine   | LM sampling dynamics                  |
-| R         | ±1                                     | +1 per step      | human preference / reward model score |
-| $\gamma$  | n/a (single-step)                      | 0.99             | often unused (sequence-level scoring) |
+| Component | Bandit                                 | CartPole                    | LLM alignment                         |
+| --------- | -------------------------------------- | --------------------------- | ------------------------------------- |
+| S         | {initial} (single state)               | $\mathbb{R}^4$ (continuous) | generated token prefix                |
+| A         | {choose A, choose B}                   | {left, right}               | next token in vocabulary              |
+| P         | payout probability (fixed but unknown) | physics engine              | LM sampling dynamics                  |
+| R         | ±1                                     | +1 per step                 | human preference / reward model score |
+| $\gamma$  | n/a (single-step)                      | 0.99                        | often unused (sequence-level scoring) |
 
 Line by line:
 
@@ -178,11 +182,17 @@ The MDP tuple specifies the rules. But rules alone are not enough: we must defin
 
 To evaluate how well an episode went, we aggregate rewards across steps. $G_t$ is that objective: it sums rewards along the interaction and discounts future rewards, defining "how many points you can still get starting from now".
 
-The tuple defines the one-step rules, but RL is not a one-step game. CartPole runs for up to 200 steps; an LLM may generate hundreds of tokens. Each step yields a state, action, and reward. Chaining them forms a **trajectory**:
+The tuple defines the one-step rules, but RL is not a one-step game. CartPole runs for up to 500 steps; an LLM may generate hundreds of tokens. Each step yields a state, action, and reward. Chaining them forms a **trajectory**:
 
 $$s_0, a_0, r_0, \; s_1, a_1, r_1, \; s_2, a_2, r_2, \; \ldots$$
 
 In episodic tasks, a full episode usually corresponds to a full trajectory. But "trajectory" is a data-centric term: it can refer to a whole episode, a segment of experience sampled for training, or a slice of interaction from a continuing task.
+
+### Termination Versus Truncation
+
+An episode can end for two very different reasons, and confusing them corrupts value estimates in later chapters. **Termination** means the task itself reached an absorbing outcome: the pole fell, the game was won or lost, the robot broke. There is genuinely no future, so the value of the terminal state is zero and bootstrapped targets use no future value. **Truncation** means an external limit cut the interaction short: CartPole's 500-step cap fired while the pole was still balanced, or a continuing task was cut into fixed-length rollout slices for batched training. (A rollout slice is not a Gymnasium-style episode end — the environment is not reset at the slice boundary — but it plays the same role: the task could have continued, so the state at the cutoff still has future value and bootstrapping should include the estimated value of continuing.)
+
+Concretely, suppose CartPole balances all 500 steps without falling. That episode was truncated, not terminated: the return $G_0$ counts only the 500 observed rewards, but a learner must not treat the cutoff as worth zero. The state at the cutoff still has continuation value $V(s_{500})$ (whatever balancing longer would add), so a bootstrapped training target for the truncated episode must add $\gamma^{500}V(s_{500})$ instead of 0. Libraries such as Gymnasium report these separately (`terminated` versus `truncated` flags) for exactly this reason. Episodes that always end by termination are episodic tasks; a task with no natural end, such as a robot patrolling indefinitely, is a continuing task, where discounting ($\gamma < 1$) keeps the objective finite and experience is cut into fixed-length training batches whose boundaries likewise bootstrap rather than terminate.
 
 A bandit has only one step, so the trajectory is $(s_0, a_0, r_0)$ and the score is just that single reward. What if CartPole survives for 4 steps and gets +1 each step? The most direct score is the sum: $1 + 1 + 1 + 1 = 4$. But is 1 point now really equal to 1 point 10 steps later?
 
