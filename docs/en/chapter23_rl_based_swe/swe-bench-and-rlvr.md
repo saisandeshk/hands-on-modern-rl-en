@@ -1,314 +1,343 @@
 # 20.1 Foundations of SWE-RL
 
-+This section studies one concrete problem: **how to place a language model inside a real repository, have it understand an issue, edit code, run tests, and continue repairing from test failures.**
+This section studies one concrete problem: **how to place a language model inside a real code repository, have it read an issue, edit the code, run the tests, and keep repairing based on test failures.**
 
-- +Ordinary code generation may require only one function. Real software engineering adds long call chains, regressions caused by a local edit, and repeated diagnosis after tests fail. A final patch alone cannot teach the model how to search files, use error messages, or choose the next action. SWE-RL treats the entire repair process as a trainable trajectory and obtains feedback from executable tests.
-- +## Start with a Small Task That Really Fails
-- +Suppose a shopping-cart project contains:
-- +```python
-  +def average_price(prices):
-- return sum(prices) / len(prices)
-  +```
-- +An issue says that `average_price([])` should return `0.0` without changing nonempty-cart behavior. The repository initially tests only:
-- +```python
-  +def test_average_price():
-- assert average_price([10.0, 20.0]) == 15.0
-  +```
-- +The model's first patch may be too broad:
-- +```python
-  +def average_price(prices):
-- try:
--        return sum(prices) / len(prices)
-- except Exception:
--        return 0.0
-  +```
-- +The empty-list test passes, but every exception is now hidden. Passing `None` incorrectly returns `0.0`. A regression test exposes the problem:
-- +```python
-  +def test_invalid_input_is_not_hidden():
-- with pytest.raises(TypeError):
--        average_price(None)
-  +```
-- +After reading the failure, the model narrows its second patch:
-- +```python
-  +def average_price(prices):
-- if len(prices) == 0:
--        return 0.0
-- return sum(prices) / len(prices)
-  +```
-- +One repair has now completed a loop:
-- +1. Read the issue and identify behavior that must remain unchanged.
-  +2. Search for and open the relevant files.
-  +3. Generate a candidate patch.
-  +4. Run tests and observe failures.
-  +5. Edit again from the feedback and submit the patch.
-- +These five steps form a **trajectory**. If the repository state at step $t$ is $s_t$ and the action $a_t$ is reading, searching, editing, or testing, then
-- +$$
-+\tau=(s_0,a_0,s_1,a_1,\ldots,s_T).
-+$$
-- +Each later observation depends on earlier actions. Opening the wrong file deprives the patch of key context; a failed test can supply the clue needed for the next edit. Reinforcement learning improves this decision trajectory from repository inspection to patch submission.
-- +<img src="../../chapter23_rl_based_swe/images/swe-rl-verifier-loop.svg" alt="SWE-RL forms a training loop from a repository and issue through an agent, candidate patch, and executable verifier">
-- +The verifier is usually a test suite executed in an isolated environment. A passing patch earns reward, while failure logs return as the agent's next observation. The agent can therefore revise within one task and update its policy across many tasks.
--
--
+Ordinary code generation usually asks the model only to complete a single function. A real software engineering task adds several layers of difficulty. The problem may be hidden deep in a long call chain, one change may break existing functionality, and after a test fails the cause has to be located again. Looking only at the patch the model finally writes cannot teach it how to search for files, use error messages, and decide the next action. SWE-RL treats the whole repair process as one trainable trajectory and uses executable tests to provide feedback.
 
-## SWE-bench Task Definition
+We start from a small task of only a few lines of code. First we see why a single repair needs multi-step interaction, and then we move step by step into SWE-bench, reward design, and training data.
 
-[SWE-bench](https://arxiv.org/abs/2310.06770) (Jimenez et al. 2023) is the core benchmark of SWE-RL. Its task definition is as follows:
+## Start with a Small Task That Really Fails
 
-```text
-Input:
-  - A GitHub repository (containing the full code)
-  - An Issue description (in natural language, describing a bug or a feature request)
-  - Test cases (used to verify whether the fix is correct)
+Suppose a shopping-cart project has the following function:
 
-Output:
-  - A code patch (the modified code)
-
-Validation:
-  - Apply the patch to the repository
-  - Run the test cases
-  - All pass → Task is successful
-  - Any test fails → Task is failed
+```python
+def average_price(prices):
+    return sum(prices) / len(prices)
 ```
 
-### A Concrete Example
+Now an issue arrives:
+
+> When the cart is empty, `average_price([])` should return `0.0`, but it currently raises `ZeroDivisionError`. The behavior of existing non-empty carts must not change.
+
+The repository originally has only one test:
+
+```python
+def test_average_price():
+    assert average_price([10.0, 20.0]) == 15.0
+```
+
+After reading "an empty list returns 0," the model may write an overly broad fix on its first attempt:
+
+```python
+def average_price(prices):
+    try:
+        return sum(prices) / len(prices)
+    except Exception:
+        return 0.0
+```
+
+The empty-list test passes, but this patch swallows every exception. If a caller mistakenly passes in `None`, the program also returns `0.0`, and the real input error is hidden. Once a regression test is added, the problem is exposed:
+
+```python
+def test_invalid_input_is_not_hidden():
+    with pytest.raises(TypeError):
+        average_price(None)
+```
+
+After reading the failure message, the model's second edit handles only the boundary case described in the issue:
+
+```python
+def average_price(prices):
+    if len(prices) == 0:
+        return 0.0
+    return sum(prices) / len(prices)
+```
+
+This repair contains one complete loop:
+
+1. Read the issue and confirm which old behaviors must be preserved.
+2. Search for and open the relevant files.
+3. Generate a candidate patch.
+4. Run the tests and observe the failure messages.
+5. Edit again based on the feedback, and finally submit the patch.
+
+Together these five steps form one **trajectory**. Let $s_t$ be the repository state seen at step $t$, and let the action $a_t$ be reading a file, searching, editing, or running tests. A repair can then be written as:
+
+$$
+\tau=(s_0,a_0,s_1,a_1,\ldots,s_T).
+$$
+
+The formula only records a plain fact: what is seen at a later step is affected by the action at the earlier step. Reading the wrong file leaves the later patch without key information, and the first test failure may offer a clue for the second edit. The object that reinforcement learning improves is exactly this decision trajectory, from reading the repository to submitting the patch.
+
+<img src="../../chapter23_rl_based_swe/images/swe-rl-verifier-loop.svg" alt="SWE-RL starts from a repository and an issue, and forms a training loop through the code agent, a candidate patch, and an executable verifier">
+
+The verifier in the figure is usually a set of tests that can run in an isolated environment. When a candidate patch passes the tests, a reward is produced. The failure log goes back to the agent and becomes part of the next observation. A code agent can therefore redo its work within a single task, and also update its policy through RL across many tasks.
+
+## SWE-bench Tasks
+
+The shopping-cart example above is artificial. To train and compare code agents we also need a large number of tasks that come from real repositories and can be run repeatedly. The [SWE-bench paper](https://arxiv.org/abs/2310.06770) built 2,294 software engineering problems from GitHub issues and their corresponding pull requests, covering 12 popular Python repositories. Each problem keeps the repository snapshot from the time the issue occurred, so the model faces code that has not yet been fixed.
+
+### What Exactly Does a Problem Contain
+
+From the model's point of view, the input of a SWE-bench problem has two main parts:
+
+- The complete repository at the specified commit.
+- The issue text that describes the defect or the feature request.
+
+The model must output a code patch that can be applied to this repository. The evaluation system then puts the patch into a container and runs the tests that belong to the task. The official [SWE-bench evaluation guide](https://www.swebench.com/SWE-bench/guides/evaluation/) stores model outputs as JSONL. A minimal record contains the instance ID, the model name, and the patch:
+
+```json
+{
+  "instance_id": "django__django-11099",
+  "model_name_or_path": "my-code-agent",
+  "model_patch": "diff --git a/... b/...\n..."
+}
+```
+
+The evaluator carries out the following work in order:
+
+1. Restore the repository version specified by the problem.
+2. Apply the patch generated by the model.
+3. Install the dependencies in an isolated Docker environment and run the tests.
+4. Check whether the behavior corresponding to the issue is fixed and whether existing functionality has regressed.
+5. Record `resolved`, the test logs, the patch, and infrastructure errors.
+
+Three kinds of material need to be kept apart here. The **repository's existing tests** can be called by the agent to help locate the problem. The **final evaluation tests** are held by the evaluation environment and decide whether the patch really solves the task. The **developer's gold patch** is used to construct and verify the data and should not be handed to the model as an answer. Exposing the latter two to the model turns evaluation into answer reproduction.
+
+### Another Example, Closer to a Real Repository
+
+The original draft used Django's empty `__in` query to illustrate the relationships among these fields. We keep that scenario below, but only as a teaching sketch. It is not an original SWE-bench problem and not Django's real patch.
 
 ```text
-Repository: django/django (Django Web Framework)
+Repository: a simplified web ORM
 
 Issue:
-  "In Django 4.2, using `Model.objects.filter(field__in=[])`
-   returns an empty queryset, but the SQL query is still executed.
-   It should short-circuit to return an empty result, avoiding unnecessary database calls."
+  When the filter condition is field__in=[], the result must be empty,
+  and the query builder should return early to avoid touching the database.
 
-Test cases:
-  def test_empty_in_lookup_short_circuits(self):
-      # Expected: filter(field__in=[]) does not trigger SQL
-      with self.assertNumQueries(0):
-          list(Model.objects.filter(field__in=[]))
+Actions the agent may go through:
+  search "in lookup" → read the query compiler → find the empty-collection branch
+  → modify the short-circuit condition → run the lookup tests → run the regression tests
 
-Model Output:
-  - Modify django/db/models/sql/query.py
-  - Add in the as_sql method: if not self.bloom_metadata and not value: return '', []
-
-Validation:
-  - Apply the patch
-  - Run the tests: ✓ Passed
-  - Task is successful
+Final evaluation:
+  The test corresponding to the issue passes, and existing query behavior has not regressed.
 ```
 
-### Difficulty of SWE-bench
+This example is harder than the shopping-cart function, because the entry API, the query object, and the SQL compiler may live in different files. The model first has to decide at which layer the problem occurs, and only then choose where to edit. This is where the difficulty of repository-level tasks appears: **the patch is usually short, but the trajectory needed to find the right patch is long.**
 
-The difficulty of SWE-bench far exceeds that of traditional code generation:
+### How It Differs from Function Completion
 
-| Dimension       | Ordinary Code Generation            | SWE-bench                               |
-| --------------- | ----------------------------------- | --------------------------------------- |
-| Context         | Single function / short description | Entire repository (10K-1M lines)        |
-| Output          | Complete code snippet               | Exact patch (diff)                      |
-| Validation      | Manual or testing                   | Automated test suite                    |
-| Multi-file      | Rare                                | Often requires cross-file modifications |
-| Reasoning Depth | 1-10 steps                          | 10-100+ steps                           |
+Tasks such as HumanEval and MBPP usually give a function signature and a description. The model generates the whole function in one pass, and then the tests are run all together. SWE-bench extends the task to the repository level:
 
-The state-of-the-art performance on the SWE-bench Verified (high-quality subset, 500 problems):
+- The input grows from one function to an issue plus a full repository.
+- The output changes from a code snippet to an exact patch that can be applied.
+- Changes may span several files, such as the implementation, configuration, and tests.
+- The agent can read, search, edit, and run tests many times.
+- The final result must satisfy the new requirement and also pass the regression checks for old functionality.
 
-- Early 2024: ~12% (OpenAI SWE-agent)
-- Mid-2024: ~25% (Cognition Devin)
-- Early 2025: ~40% (Open-source SWE-RL series)
-- End of 2025: ~53% (NVIDIA and others)
-- Early 2026: ~65% (Claude Opus 4.7 + tool calls)
+The outcome is therefore decided by more than the model parameters. The way files are searched, the available tools, the context length, the number of test-time samples, and the maximum number of interaction steps all change the final resolve rate. When comparing SWE-bench results, the model, the agent scaffold, and the inference budget must be reported together.
 
-## Why SWE is an Ideal Arena for RLVR
+::: details Timeline Snapshot of the Original Draft's Leaderboard
 
-Recalling [Chapter 15 on RLVR](../chapter18_grpo/rlvr) — the core idea of RLVR is to **replace RM with rule-based verification**. RLVR requires three conditions:
+The original draft recorded a timeline of "about 12% in early 2024, about 25% in mid-2024, about 40% in early 2025, about 53% in late 2025, and about 65% in early 2026," and tied these points to SWE-agent, Devin, open-source SWE-RL, NVIDIA, and Claude systems respectively.
 
-1. **The task has a clear answer**: Right is right, wrong is wrong
-2. **Verification can be automated**: No need for human judgment
-3. **There is enough training data**: To support large-scale RL
+These numbers are not tied to a single leaderboard version, submission record, agent configuration, or sampling budget, so they cannot serve as evidence about which method is better. They are kept only as a historical writing record. When current results need to be cited, open the corresponding leaderboard entry on the [official SWE-bench site](https://www.swebench.com/) and record the model version, the scaffold, the evaluation set, and the run settings together.
 
-SWE perfectly satisfies these three conditions:
+:::
 
-### Clear Answer
+## Test Rewards
 
-Code either passes the tests or does not — there is no "partially correct" or "subjective judgment." This is the purest "right or wrong" domain outside of mathematics.
+SWE-bench is first of all an evaluation benchmark. To use tasks of this kind for training, test results must also be turned into numerical feedback. This process belongs to [RLVR](../chapter18_grpo/rlvr): the reward is produced by checkable rules or programs, and does not rely on another model scoring by feel.
 
-### Automated Verification
+Suppose the evaluator runs $m$ tests in total, with $z_i=1$ when the $i$-th test passes and $z_i=0$ when it fails. The most direct reward is the test pass fraction:
 
-Testing frameworks like `pytest` and `unittest` automatically run tests and output PASS/FAIL. The entire verification process requires no human intervention.
+$$
+R_{\text{test}}(\tau)=\frac{1}{m}\sum_{i=1}^{m}z_i.
+$$
 
-### Massive Data
+This reward maps "how many tests passed" to a value between 0 and 1. If the task counts as solved only when all tests pass, a binary reward can be used instead:
 
-- GitHub has over 400 million repositories
-- Each PR is a natural SWE task (issue + patch + tests)
-- Internal commit histories of industrial companies are also a vast source of training data
+$$
+R_{\text{resolved}}(\tau)=\mathbb{1}\!\left[\sum_{i=1}^{m}z_i=m\right].
+$$
 
-These three conditions make SWE-RL one of the **most successful applications** of RLVR in industry. Companies like Meta, ByteDance, Cognition, Alibaba, and Tsinghua University have all invested heavily in this direction.
+The first form gives denser feedback, since fixing part of the behavior can also earn a score. The second form corresponds strictly to whether the whole problem is solved. The two serve different training purposes, and "test reward" should not be described loosely as if it had only one form.
 
-## SWE-RL vs. Traditional Code Generation
-
-Traditional code generation (e.g., HumanEval, MBPP) involves the following task:
-
-```text
-Input: Function signature + docstring
-Output: Complete function implementation
-```
-
-This is a **short-context, single-file, no-test-feedback** setup. RL performs poorly on such tasks — because the generation space is small, SFT (Supervised Fine-tuning) can already reach SOTA (State-of-the-Art) performance.
-
-In contrast, the task of SWE-RL is:
-
-```text
-Input: Full repository + Issue + Test cases
-Output: Exact patch
-Allowed: Multi-step interaction (read file, edit, run test, edit again)
-```
-
-This is a **long-context, multi-file, with-test-feedback** setup. RL performs well on such tasks — because:
-
-- **Exploration space is huge**: The number of possible patches is astronomical, and RL can efficiently explore this space
-- **Delayed feedback**: Test results are delayed rewards, which naturally aligns with RL's advantage in reward estimation
-- **Multi-step decision making**: Read → think → edit → test → fix → submit is a typical agent trajectory
-
-## Data Generation for SWE-bench
-
-<img src="../../chapter23_rl_based_swe/images/swe-rl-data-loop.svg" alt="Real issues, synthetic defects, and self-play tasks enter a versioned SWE-RL training-data loop">
-
-SWE-RL training requires a large number of (Issue, patch, tests) triplets. There are three sources:
-
-### Real PRs (SWE-bench Method)
-
-PRs are scraped from GitHub, and the following are extracted:
-
-- Issue text (the issue associated with the PR)
-- Code diff (the changes made in the PR)
-- Test cases (new or modified tests in the PR)
-
-Scale: Approximately 2,300 entries (original SWE-bench)
-
-Limitations:
-
-- **Limited data**: 2,300 entries are insufficient for training large models
-- **Dependent on PR quality**: Low-quality PRs are also collected
-- **Missing tests**: Many PRs lack complete test coverage
-
-### Synthetic Data (SWE-smith Method)
-
-[SWE-smith](../chapter22_agentic/agent-data-swe-smith) ([arXiv:2504.21798](https://arxiv.org/abs/2504.21798)) — **Intentionally inject bugs into good code and run tests to see which bugs are detected**.
-
-Scale: Over 50,000 entries (covering 128 Python repositories)
-
-Advantages:
-
-- **Large volume**: 20 times that of SWE-bench
-- **Controllable**: Types and difficulty of bugs can be adjusted
-- **Complete testing**: Each bug has corresponding test cases
-
-### Self-play SSR Method (Self-Generated Training Data)
-
-Let the model:
-
-1. Find a "looks like a bug" place in the repository
-2. Write a "fix"
-3. Run tests to see if they pass
-4. The passed (issue, patch, test) triple as training data
-
-This is the core idea of [Section 20.3 SSR](./self-play-ssr-and-summary) — **the model generates its own training data**.
-
-## Reward Function in SWE-RL
-
-The reward function in SWE-RL is typically extremely simple:
+A minimal implementation is:
 
 ```python
 def swe_reward(test_results):
-    """Test results as reward"""
+    """Convert a group of boolean test results into a pass fraction."""
     passed = sum(test_results)
     total = len(test_results)
-    return passed / total  # Or binary: 1.0 if passed == total else 0.0
+    return passed / total
 ```
 
-This reward function is mathematically identical to the binary reward in R1-Zero — **0/1 binary reward**.
+### Conditions That Suit RL
 
-### Details of Reward Shaping
+Code repair has three properties at once: the result can be checked by execution, feedback can be produced automatically, and tasks can be scaled up from the history of open-source software or from synthetic environments. More importantly, the reward usually appears only after multiple steps of interaction. The agent has to decide:
 
-However, in industrial practice, several shaping terms are added:
+- Which file to read first and which symbol to search for.
+- Whether to modify the implementation or the caller.
+- Whether to run a local test or the full test suite.
+- After seeing an error, whether to keep patching or to roll back a wrong change.
+- When to stop exploring and submit the patch.
 
-**Term 1: Test Pass Rate**
+These actions jointly affect the final test result. The role of RL is to raise the probability of whole trajectories that earn a high reward, and not merely to imitate one final diff.
+
+If you are not yet familiar with "how a model calls the search, edit, and test tools," you can first review [19.1 Agentic RL Basics](../chapter22_agentic/overview). Here we keep our focus on how test feedback enters the reward.
+
+### Limits of the Test Signal
+
+Tests check only the behaviors that have been written into the verifier. When coverage is incomplete, a model may earn a high score without meeting the real requirement. For example:
+
+- Deleting or skipping failing tests.
+- Hardcoding answers to the public examples.
+- Breaking uncovered old functionality in order to fix one boundary case.
+- Modifying the test entry point so that the evaluator mistakenly believes the tests have run.
+
+The training environment therefore has to place the evaluation tests where the agent cannot modify them, and has to distinguish "the test failed" from "the environment did not start successfully." The final assessment should also inspect the patch contents, regression behavior, and infrastructure logs. Tests provide a scalable approximate signal, and the design of the tests decides how close this signal is to real software requirements.
+
+## Sources of Training Tasks
+
+With a verifier in hand, we still need enough problems. Real PRs, software evolution records, synthetic defects, and self-play each address a different data problem. They are related to one another, but they are not one paper or one fixed training recipe.
+
+<img src="../../chapter23_rl_based_swe/images/swe-rl-data-loop.svg" alt="Real fixes, software evolution, and synthetic defects pass through an executable environment to form SWE-RL training tasks">
+
+### The Evaluation Tasks of SWE-bench
+
+[SWE-bench](https://arxiv.org/abs/2310.06770) recovers the repository snapshot, the problem description, and the evaluation conditions from real GitHub issues and their corresponding fixes. Its main value is to establish a standard evaluation that is close to real maintenance work. The original data contains 2,294 problems. Data cleaning also has to deal with difficulties such as dependency installation, flaky tests, and the correspondence between issues and patches.
+
+The advantage of real tasks is that they are natural, and their limitation is just as direct: the number of PRs that are high quality, reproducible, and well tested is limited. The commit history inside a company can supplement the evolution records of a specific codebase, but permissions, privacy, and software licenses have to be handled as well.
+
+### Recovering the Training Signal in SWE-RL
+
+The [SWE-RL paper](https://arxiv.org/abs/2502.18449) studies how to train code models using open-source software evolution records. The data contains more than benchmark problems: it includes evolution information such as code snapshots, changes, issues, and pull requests. The paper adopts a lightweight rule-based reward, for example comparing the similarity between the model's solution and the developer's real solution, and reports that Llama3-SWE-RL-70B reaches 41.0% on SWE-bench Verified.
+
+One distinction needs special care here: the core reward of the SWE-RL paper cannot be simplified into "score 1 if all hidden tests pass." A patch-similarity reward, a test reward, and a process reward check different objects. When citing experimental results, state the training data, the reward definition, and the evaluation environment, to avoid writing the common practice of later systems back into the paper's original method.
+
+### Defect Synthesis in SWE-smith
+
+The [SWE-smith paper](https://arxiv.org/abs/2504.21798) expands data from another direction. It builds an executable environment for a Python repository and then injects defects into code that originally passes its tests. Only a mutation that really makes existing tests fail becomes a verifiable repair problem. The paper constructs 50,000 task instances from 128 GitHub repositories and uses this data to train SWE-agent-LM-32B. The paper reports that this model reaches 40.2% Pass@1 on SWE-bench Verified.
+
+Synthetic tasks allow control over quantity and defect type, and they guarantee that the error triggers a test. The price is that the defect distribution is limited by the mutator and does not necessarily match the problems developers meet in real projects. After the data scale grows, transfer still has to be checked on real tasks. For the details of repository construction and defect filtering, see [SWE-smith Data Construction](../chapter22_agentic/agent-data-swe-smith).
+
+### Alternating Problem Posing and Solving in SSR
+
+[Self-play SWE-RL](https://arxiv.org/abs/2512.18552) reduces the dependence on human-written issues further. The model first injects into a runnable repository a defect described by a test patch, and then tries to repair it. The test patch is responsible for stating "what behavior is wrong right now." The same model alternately practices posing and solving problems, and the task difficulty can change as capability rises. The detailed process is covered in [20.3 Self-Play SWE-RL](./self-play-ssr-and-summary).
+
+These four routes can be understood by purpose: SWE-bench establishes the real evaluation, SWE-RL trains from software evolution records, SWE-smith synthesizes executable defects at scale, and SSR explores a self-play data loop.
+
+## Reward Shaping Terms
+
+The test pass fraction is a clear starting point, but it reflects only the final behavior. Real training systems sometimes also add shaping terms such as trajectory cost, patch quality, or context efficiency. Below we keep the four designs of the original draft and present them as **optional teaching schemes**, and not as a standard recipe shared by any particular papers.
+
+### 1. Test Pass Fraction
 
 ```python
 reward = passed / total
 ```
 
-Not binary, but a continuous value. This allows the model to receive partial reward when it "fixes half" of the issue.
+It provides continuous feedback for partial repairs. The risk is that the model may prioritize fixing many easy tests and give up the few tests that really define the core requirement. If the tests differ in importance, they can be weighted by test group, and whether the problem is finally resolved should still be reported separately.
 
-**Term 2: Length Penalty**
+### 2. Trajectory Length Penalty
 
 ```python
 reward -= 0.01 * len(trajectory)
 ```
 
-Encourages the model to complete the task in fewer steps — avoiding the waste of "first randomly change, then fix after test failure."
+This term encourages fewer useless searches, repeated reads, and unfounded trial edits. When the coefficient is too large, the model may submit too early in order to save a few steps. The training logs need to track the resolve rate and the average number of steps together, and cannot look only at the total reward.
 
-**Term 3: Patch Quality**
+### 3. Patch Quality Score
 
 ```python
-patch_quality = score_patch(model_output)  # Judged by LLM
+patch_quality = score_patch(model_output)  # e.g. static checks or an independent reviewer
 reward += 0.1 * patch_quality
 ```
 
-Encourages the model to generate more elegant patches (e.g., no code duplication, no breaking existing logic).
+It can penalize duplicated code, large unrelated changes, or patches that clearly break an interface. If `score_patch` uses an LLM judge, the scorer itself brings bias and extra cost. Executable static checks, patch-size constraints, and manual spot checks are usually easier to interpret.
 
-**Term 4: Context Efficiency**
+### 4. Context Usage Efficiency
 
 ```python
 context_efficiency = relevant_files_read / total_files_read
 reward += 0.05 * context_efficiency
 ```
 
-Encourages the model to read only relevant files, avoiding the waste of "reading all files."
+This term aims to reduce the waste of "reading the entire repository." The real difficulty is how to define `relevant_files_read` at training time. If only the files touched by the developer's patch are labeled relevant, upstream files that the model reads to understand the call chain may be penalized wrongly. It is therefore better used as a diagnostic metric first and enters the reward only after validation.
 
-However, [Meta SWE-RL](https://arxiv.org/abs/2502.18449) reported an important finding: **the simplest reward (binary test pass) performs best**. Complex shaping can easily introduce reward hacking — the model learns to "optimize shaping terms" rather than truly fixing bugs.
+Combining these terms gives:
 
-This aligns with the findings of [R1-Zero](../chapter18_grpo/deepseek-dapo): **simple reward + large-scale RL > complex reward + small-scale RL**.
+$$
+R(\tau)=R_{\text{test}}(\tau)
+-\lambda_{\text{step}}C_{\text{step}}(\tau)
++\lambda_{\text{patch}}Q_{\text{patch}}(\tau)
++\lambda_{\text{ctx}}E_{\text{ctx}}(\tau).
+$$
 
-## Training Process of SWE-RL
+Here $C_{\text{step}}$ is the interaction cost, $Q_{\text{patch}}$ is the patch quality, and $E_{\text{ctx}}$ is the context efficiency. The three $\lambda$ coefficients control the weight of each term in the total reward. The formula merges several training preferences into one scalar. Each added term also introduces one more loophole the model may exploit, so the minimal test reward should be verified first, and ablation experiments should then be run term by term.
 
-A complete training process of SWE-RL:
+## A Minimal Runnable SWE-RL Training Loop
+
+The material above can be connected into four stages:
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│ Step 1: Base model selection                                │
-│   - Usually a code-tuned LLM (e.g., Qwen-Coder, DeepSeek-Coder) │
-│   - Already pre-trained on a large amount of code           │
-├─────────────────────────────────────────────────────────────┤
-│ Step 2: Cold Start with SFT (Optional)                      │
-│   - Use SWE-bench / SWE-smith data for SFT                  │
-│   - Let the model learn the basic trajectory format         │
-├─────────────────────────────────────────────────────────────┤
-│ Step 3: RL Training                                         │
-│   - GRPO / PPO                                              │
-│   - Reward: Test pass binary                               │
-│   - Long horizon: Each trajectory may have 16-100+ steps    │
-├─────────────────────────────────────────────────────────────┤
-│ Step 4: Rejection Sampling + Second SFT                    │
-│   - Generate multiple candidates from the RL-trained model   │
-│   - Select the best one for SFT                             │
-├─────────────────────────────────────────────────────────────┤
-│ Step 5: Evaluation                                          │
-│   - SWE-bench Verified                                     │
-│   - Internal evaluation set                                │
-└─────────────────────────────────────────────────────────────┘
+Task sampling
+  repository snapshot + issue + isolated environment
+        ↓
+Agent rollout
+  read → search → edit → test → edit → submit
+        ↓
+Executable verification
+  apply patch → run task tests and regression tests → produce reward and logs
+        ↓
+Policy update
+  raise the probability of high-reward trajectories, then sample the next batch of tasks
 ```
 
-This process is highly similar to the training process of [DeepSeek-R1](../chapter18_grpo/deepseek-dapo) — both are combinations of SFT + RL + secondary SFT. The difference lies only in:
+### Task Sampling
 
-- R1's reward is based on whether the mathematical answer is correct.
-- SWE-RL's reward is based on whether the test passes.
+The trainer selects a repository snapshot and an issue and starts a clean container. Multiple trajectories of the same task must start from the same initial state, otherwise differences in reward may come from leftover environment state.
 
-This similarity indicates: **The training paradigm of RLVR is generalizable** — as long as an appropriate verifier is found, the same algorithm can be applied to different domains.
+### Agent Rollout
+
+The model uses tools to read files, search symbols, edit code, and run visible tests. At each step the observation, the action, the tool output, and the token consumption are recorded. Long trajectories easily run into context overflow, accumulated errors, and environment timeouts, all of which must be distinguished explicitly in the training data.
+
+### Executable Verification
+
+The verifier applies the final patch to a read-only copy of the baseline and runs the task tests and regression tests. A failed dependency installation, a container timeout, and a test failure should use different status codes. The first two are infrastructure problems and cannot be counted directly as failures of the model's ability.
+
+### Policy Update
+
+The training algorithm updates the policy from the multiple rollouts of the same task and their rewards. PPO, GRPO, or other policy optimization methods can be used. An SFT cold start, rejection sampling, and a second round of SFT are all optional stages, and a particular paper may adopt only some of them.
+
+To actually connect these four stages into a system, continue with [19.10 Implementing an Agentic RL Training System from Scratch](../chapter22_agentic/build-agentic-training-system).
+
+::: details Five-Step Extended Recipe in the Original Draft
+
+The original draft wrote the engineering workflow as "code pretrained model → optional SFT cold start → PPO/GRPO training → optional rejection sampling and second-round SFT → evaluation on SWE-bench Verified and an internal set." This recipe can still serve as a system-design checklist, but it cannot be said that every SWE-RL method uses exactly the same combination of SFT, RL, and second-round SFT as DeepSeek-R1.
+
+A verifier for mathematical reasoning usually checks the final answer, while a software engineering verifier runs the patch and the tests. Both belong to RLVR, yet the environment state, the action space, the trajectory length, and the failure types differ markedly. Having the same algorithm name does not mean the training system only needs one line of the reward function swapped out.
+
+:::
+
+## Evaluation Checks
+
+After the training reward rises, we still have to confirm that the model really got better at repairing repositories. At least the following kinds of results should be checked separately:
+
+- **Is the requirement resolved**: whether the tests corresponding to the issue pass.
+- **Is old functionality preserved**: whether the regression tests keep passing.
+- **Is the patch valid**: whether the evaluator really applied a non-empty patch, and whether the tests were actually executed.
+- **Is the environment healthy**: whether dependency installation, container startup, and test timeouts are counted independently.
+- **Is the cost acceptable**: how many tokens, tool calls, samples, and how much run time each problem uses.
+- **Is the comparison fair**: whether the model, scaffold, tool permissions, maximum steps, and test-time budget are consistent.
+
+SWE-bench Verified is a 500-problem subset that has been checked by humans, commonly used to reduce the ambiguity and non-reproducibility present in the original tasks. Even with the same subset, different agent scaffolds and test-time scaling strategies produce noticeable differences. Paper results are suitable for comparison only when the full setups agree, and extracting a single percentage on its own easily leads to wrong conclusions.
 
 ## Summary
 
-SWE-bench is the core benchmark of SWE-RL, defining the task format of (issue, patch, tests). SWE is an ideal battlefield for RLVR — with clear answers, automated verification, and massive data.
+Now the whole line can be connected. Real issues or synthetic defects provide the tasks, repository snapshots provide the initial environment, the code agent generates a patch through multi-step tool calls, executable tests turn the patch into a reward, and RL then raises the probability that successful trajectories appear.
 
-SWE-RL differs fundamentally from traditional code generation — with long context, multi-file support, test feedback, and multi-step decision-making. This makes it highly aligned with Agentic RL, making it one of the most valuable applications of RL in industry.
+SWE-bench solves "how to standardize real-repository repair and evaluate it." SWE-RL, SWE-smith, and SSR expand the training data from software evolution, defect synthesis, and self-play respectively. Tests make feedback automatable, and they also leave room for insufficient coverage and reward gaming. A trustworthy SWE-RL system therefore has to train the model and also protect the verifier, separate infrastructure failures, and report the complete inference budget.
 
-Next, we will first examine [Supplementary Reading: Meta SWE-RL](./meta-swe-rl) to observe how GRPO and simple rewards are applied in real-world repositories, and then move on to [20.2 Code World Model and DeepSWE](./world-model-and-deep-swe), addressing the issue of unstable training on long trajectories.
+Next, you can first read the [supplementary reading: Meta SWE-RL](./meta-swe-rl) to see how GRPO and a simple reward land on real repositories. Then go on to [20.2 Code World Model and DeepSWE](./world-model-and-deep-swe) to deal with state modeling and stability in long-trajectory training.

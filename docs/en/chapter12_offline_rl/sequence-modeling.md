@@ -1,178 +1,276 @@
 # 10.2 Offline Reinforcement Learning through Sequence Modeling
 
-[Section 10.1](./offline-data-distribution-shift) remains within the Bellman framework and estimates value while constraining the policy or value function to stay near the fixed dataset. Decision Transformer takes a different approach: it arranges states, actions, and returns into a sequence and directly learns which action to take for a specified target return.
+## Reading Guide
 
-This section proceeds in four steps. We first construct Decision Transformer using return-to-go, then explain how Trajectory Transformer searches complete trajectories, introduce Diffuser's conditional generation, and finally compare the tasks suited to each method.
+**Key Ideas**
+
+- Understand the core idea of Decision Transformer (DT): why RL can drop the Bellman equation entirely and become a conditional sequence-generation problem of "given a target return, predict the action".
+- Understand what return-to-go (RTG) is, why it can serve as a condition that controls how good the generation is, and how RTG is used during training and during inference.
+- See how Trajectory Transformer discretizes a whole trajectory into tokens and plans with beam search.
+- See how Diffuser generates complete trajectories with a diffusion model, and the strengths, weaknesses, and suitable settings of the three sequence-modeling methods.
+
+In the previous section, [10.1](./offline-data-distribution-shift), we studied BCQ, CQL, IQL, and TD3+BC. Each has its own tricks, but at heart they all follow the traditional RL approach: estimate a value function, perform policy improvement, and try every way to keep extrapolation error from blowing up in the Bellman backup.
+
+But let's stop and think: do we really need a Q-function? Do we really need to iterate the Bellman equation over and over?
+
+The 2021 proposal of Decision Transformer gave a surprising answer to this question: no. It steps entirely outside the Bellman framework and redefines offline reinforcement learning as a **conditional sequence-generation problem**. States, actions, and returns are arranged in a sequence, and the model directly learns "when I want to obtain this much return, what action should be taken in the current state?" This idea is exactly the same as how large language models predict the next token!
+
+Does this sound a bit counterintuitive? Without computing Q-values or running value iteration, just by predicting actions, can a good policy really be learned? In this section we resolve the doubt in four steps. First we build Decision Transformer with return-to-go, then we explain how Trajectory Transformer searches complete trajectories, then we introduce the conditional generation of Diffuser, and finally we compare which tasks each of the three methods suits.
 
 ## 1. Training Decision Transformer with a Target Return
 
-The methods in [Section 10.1](./offline-data-distribution-shift) stabilize Bellman updates by constraining actions, lowering Q-values outside the dataset, or adding behavior-cloning regularization. Decision Transformer (Chen et al. 2021) does not learn a Q-function. Instead, it reformulates offline trajectories as a conditional sequence-generation problem.
+All the methods in the previous section stabilize the Bellman update by constraining actions, pushing down out-of-dataset Q-values, or adding a BC regularizer. Decision Transformer (Chen et al. 2021, DT for short below) takes a revolutionary route: it no longer learns a Q-function and no longer performs Bellman updates, but rewrites offline trajectories directly as a conditional sequence-generation problem.
 
 ### 1.1 Using Return-to-Go as a Condition
 
-Write a trajectory as $\tau=(s_1,a_1,r_1,\ldots,s_T,a_T,r_T)$. At step $t$, the model must know both the current state and the return it should obtain from that point onward. Decision Transformer represents this target as the sum of rewards from the current time through the end of the trajectory:
+Let's first recall what a trajectory looks like: $\tau=(s_1,a_1,r_1,s_2,a_2,r_2,\ldots,s_T,a_T,r_T)$, triples of state, action, and reward arranged in time order.
+
+Traditional RL looks backward from the future: at time t, you estimate how much reward you will receive in the future (the Q-value) and then pick the action that maximizes it. DT reverses this logic. It looks forward: at step t, in addition to the current state, the model is directly told "**from now until the end of the episode, how much total return I want to obtain**", and it is then asked to predict which action was actually taken in the historical data in that situation.
+
+This "sum of the remaining rewards from the current time to the end of the trajectory" has a dedicated name, **return-to-go (RTG)**:
 
 $$\hat{R}_t = \sum_{t'=t}^{T} r_{t'}$$
 
-This quantity is called the **return-to-go (RTG)**. For example, if the rewards over the next three steps are $2,1,3$, the RTGs at those positions are $6,4,3$. As time advances, rewards already obtained are subtracted from the target. Given $\hat R_t$ and $s_t$, the training task is to predict the action $a_t$ that actually appears in the data.
+Let's understand it with a concrete small example. Suppose the rewards obtained in the last three steps of a trajectory are 2, 1, and 3. What are the RTGs at these three positions?
 
-DT reorganizes a trajectory into a sequence of triplets:
+- Step one (before receiving 2): $\hat{R}_1 = 2 + 1 + 3 = 6$ (6 points can still be obtained)
+- Step two (after receiving 2, before receiving 1): $\hat{R}_2 = 1 + 3 = 4$ (4 points remain)
+- Step three (after receiving 1, before receiving 3): $\hat{R}_3 = 3$ (only the last 3 points remain)
+
+You see, as time goes on, the reward already obtained is deducted from the target RTG, and $\hat{R}_t$ always means "how much return is still to be obtained". Given $\hat{R}_t$ and $s_t$, the training task becomes remarkably simple: make the model predict the action $a_t$ actually taken in the data in this situation.
+
+How do we feed this information into a Transformer? DT reorganizes the trajectory into a sequence with the three elements interleaved:
 
 $$\hat{R}_1, s_1, a_1, \hat{R}_2, s_2, a_2, \ldots, \hat{R}_T, s_T, a_T$$
 
-Each time step contributes an RTG, a state, and an action in that order. Causal attention ensures that the model can access only current and preceding information when predicting $a_t$:
+Each time step contributes three tokens in turn: RTG, state, and action. A familiar GPT-style causal attention mask then ensures that when predicting $a_t$ the model can see only the current and earlier information and cannot peek at the future:
 
 $$\pi_\theta(a_t \mid \hat{R}_t, s_t, a_{t-1}, \ldots) = \text{Transformer}(\hat{R}_{1:t}, s_{1:t}, a_{1:t-1})$$
 
-The left side is the probability of selecting action $a_t$ in the current context; the right side indicates that the Transformer reads past target returns, states, and actions. Training uses no Bellman update. It only requires the predicted action to match the action in the dataset.
+Let's interpret this expression:
+
+- Left side $\pi_\theta(a_t \mid \ldots)$: the probability that the model chooses action $a_t$ in the current context (historical RTGs, states, and actions, plus the current RTG and current state)
+- Right side $\text{Transformer}(\ldots)$: the Transformer reads all the RTGs and states up to time t and the actions up to time t-1, and then outputs the distribution of $a_t$
+
+Note the most crucial difference: **the whole training process never invokes a Bellman update!** It is purely supervised learning, with the goal of making the predicted action as close as possible to the action actually taken in the training data. What does this mean? It means data loading, optimizers, distributed training, and all the mature toolchain you use for training GPT/BERT can be used directly!
+
+Looking at the code, you will find it is a standard GPT with slightly modified inputs:
 
 ```python
 class DecisionTransformer(nn.Module):
     def __init__(self, state_dim, act_dim, hidden_dim, n_heads, n_layers,
                  max_ep_len=4096):
         super().__init__()
-        # Three embedding layers map RTG, state, and action to hidden_dim.
+        # Three embedding layers: RTG, state, action each mapped to hidden_dim
         self.embed_rtg  = nn.Linear(1, hidden_dim)
         self.embed_state = nn.Linear(state_dim, hidden_dim)
         self.embed_action = nn.Linear(act_dim, hidden_dim)
         self.embed_ln = nn.LayerNorm(hidden_dim)
-        # Positional encoding: timestep embeddings.
+        # Positional encoding: timestep embedding
         self.pos_emb = nn.Embedding(max_ep_len, hidden_dim)
-        # GPT backbone.
+        # The GPT backbone
         self.transformer = GPT(
             d_model=hidden_dim, n_heads=n_heads, n_layers=n_layers,
-            # Each timestep occupies three tokens; the attention mask must match.
+            # Key: each timestep takes 3 tokens, so the attention mask must match
             attn_pdrop=0.1, resid_pdrop=0.1
         )
-        # Action-prediction head for continuous-action regression.
+        # Action prediction head (regression, assuming continuous actions)
         self.action_head = nn.Linear(hidden_dim, act_dim)
 
     def forward(self, rtg, states, actions, timesteps):
         B, T, _ = states.shape
-        # Embed and interleave: (R1, s1, a1, R2, s2, a2, ...).
+        # Embed and interleave: (R1, s1, a1, R2, s2, a2, ...)
         rtg_emb   = self.embed_rtg(rtg)
         state_emb = self.embed_state(states) + self.pos_emb(timesteps)
         action_emb = self.embed_action(actions)
 
-        # Stack into (B, 3T, H) in RTG, state, action order.
+        # Stack the three into (B, 3T, H), in the order RTG, state, action
         stacked = torch.stack([rtg_emb, state_emb, action_emb], dim=1)
         stacked = stacked.permute(0, 2, 1, 3).reshape(B, 3 * T, -1)
         stacked = self.embed_ln(stacked)
 
-        # Causal attention: each token can attend only to the past.
+        # Causal attention: each token can only see the past
         h = self.transformer(stacked)
-        # Use outputs at state positions to predict the corresponding actions.
+        # Take the outputs at the state positions to predict the corresponding action
         h_states = h[:, 1::3, :]  # indices 1, 4, 7, ...
-        return self.action_head(h_states)  # Regress continuous actions.
+        return self.action_head(h_states)  # Regress to continuous actions
 
     @torch.no_grad()
     def act(self, state, target_rtg, history, t):
-        # At inference, use the target RTG as a prompt and generate autoregressively.
+        # At inference, use the target RTG as a "prompt" and generate actions autoregressively
         rtg_seq = torch.cat([history.rtg, target_rtg[None]], dim=0)[-self.K:]
         s_seq   = torch.cat([history.states, state[None]], dim=0)[-self.K:]
-        a_seq   = history.actions[-self.K - 1:-1]  # Shifted by one position.
+        a_seq   = history.actions[-self.K - 1:-1]  # Shifted by one
         t_seq   = torch.arange(len(s_seq))
         pred_a = self.forward(rtg_seq, s_seq, a_seq, t_seq)
-        return pred_a[-1]  # Prediction for the final timestep.
+        return pred_a[-1]  # Take the prediction of the last timestep
 ```
+
+Note an implementation detail: each time step takes 3 tokens (R, s, a), so the position indices of the state tokens are 1, 4, 7, ..., that is, starting from 1 and taking every third one, and the line `h[:, 1::3, :]` does exactly this.
 
 ### 1.2 Predicting Actions with Supervised Learning
 
-DT's training loss is simply MSE for continuous-action regression, or cross-entropy for discrete actions:
+DT's training loss is outrageously simple: it is just the MSE for continuous-action regression (or cross-entropy for discrete actions), with nothing fancy:
 
 $$\mathcal{L} = \mathbb{E}_{\tau \sim \mathcal{D}}\left[\sum_t \|\hat{a}_t - a_t\|^2\right]$$
 
-Continuous actions use mean squared error, while discrete actions use cross-entropy. Training follows the same procedure as an ordinary sequence model: read a segment of history and predict the next action. Data loaders, optimizers, and distributed-training components can therefore reuse the Transformer training stack.
+Here:
+
+- $\hat{a}_t$: the action predicted by the model at time t
+- $a_t$: the action actually taken at time t in the training data
+- Use mean squared error for continuous actions, and replace MSE with cross-entropy loss for discrete actions
+
+The training process is exactly like training any sequence model: cut a history window of length K (like GPT's context window), feed it to the Transformer, let it predict the action at every position, then compute the loss against the true actions and backpropagate. There is no target network, no soft update, and no conservative regularizer. It is pure supervised learning, as simple as it gets.
 
 ### 1.3 Using the Target Return at Inference Time
 
-DT deployment does not require an argmax over Q. We simply **specify a target RTG**, such as an expert score for the environment, and DT generates actions autoregressively so that cumulative return approaches the target:
+Training is this simple, so how is it used at deployment time? You will find it even simpler. DT does not need to take an argmax of Q over the action space. You only need to **specify a target RTG** (for example, check roughly what score expert trajectories in your dataset get and set the target to that number), and DT then generates actions autoregressively, like GPT generating text, trying to make the cumulative return of the whole trajectory approach the target you set.
+
+Here is the inference pseudocode:
 
 ```python
-target_return = 9000  # HalfCheetah expert level
+target_return = 9000  # Roughly the expert-level score in the HalfCheetah environment
 state = env.reset()
-history = TrajectoryBuffer()
+history = TrajectoryBuffer()  # Stores the most recent K steps of history
 for t in range(max_steps):
     action = model.act(state, target_return, history, t)
     next_state, reward, done, _ = env.step(action)
     history.append(state, action, reward)
     state = next_state
-    # Crucially, subtract the observed reward from RTG to obtain the remaining target.
+    # Key: subtract the reward actually received from the RTG at each step, as the "remaining target"
     target_return -= reward
 ```
 
-RTG serves as a control condition during inference. After each step, the observed reward is subtracted from the remaining target, so the next input represents the return still required. A target set too high may place the model in a conditioning range not covered by the training data, so the dataset's return range should guide the choice.
+The key line here is `target_return -= reward`: after every step executed in the environment and the actual reward received, that reward is subtracted from the remaining target. The RTG fed to the model at the next step then accurately represents "how much return is still needed until the end of the episode".
+
+For a concrete example, suppose you set a target total return of 6000 points.
+
+- The first step goes very well and earns a reward of 100, so target_return becomes 5900. This tells the model "good, 5900 points remain, keep it up."
+- The second step goes badly and earns a reward of -50 (hit a wall), so target_return becomes 5950. This tells the model "you messed up just now, and in the rest of the road you must find a way to earn 50 more points to make up for it."
+
+That is how plain the mechanism is! But you may ask: "What if I set the target RTG very high, higher than any trajectory in the dataset?" The answer is that the model may generate strange, incoherent actions never seen in the training data, because it has never seen the condition "get such a high score" during training and naturally cannot generalize to it. So do not set the target RTG carelessly. Choose it with reference to the return range in your dataset.
 
 ### 1.4 Why Decision Transformer Can Work
 
-Decision Transformer works when the data contain a stable relationship among states, actions, and final returns. If the dataset contains trajectories of varying quality, RTG helps the model distinguish actions that frequently occur in high-return trajectories.
+At this point you surely have a question: this is such a simple method, just a sequence model predicting actions, neither estimating Q nor doing a Bellman backup. How can it work? And the paper says it can match or even beat CQL on many D4RL benchmarks?
 
-- The dataset contains expert trajectories with high RTG, medium trajectories with intermediate RTG, and random trajectories with low RTG.
-- Given a high target RTG, the learned conditional distribution $p(a \mid \hat{R}_{\text{high}}, s)$ naturally favors high-return actions.
-- The model can be understood as imitating trajectories that achieved a similar RTG from similar states.
+Whether Decision Transformer works depends on whether your dataset contains a stable correspondence among states, actions, and final returns. If your dataset contains **trajectories of different quality**, with expert trajectories (high RTG), medium trajectories (medium RTG), and random trajectories (low RTG), then the RTG condition can help the model tell them apart: in similar states, how did those past good trajectories behave to obtain a high return?
 
-Formally, the policy learned by DT can be written as
+Specifically:
+
+- Given a very high target RTG, the conditional distribution $p(a \mid \hat{R}_{\text{high}}, s)$ learned by the Transformer naturally leans toward actions that often appear in high-return trajectories
+- Given a very low target RTG, it generates actions like a random policy
+- You can understand it intuitively as: **imitating "those trajectories that once reached a similar RTG in similar states"**
+
+Written formally, the policy learned by DT can be expressed as:
 
 $$\pi_\theta(a \mid s, \hat{R}) \propto \exp\left(-\frac{1}{2\sigma^2}\|a - f_\theta(s, \hat{R})\|^2\right)$$
 
-where $f_\theta$ is the Transformer's regression output. As $\sigma \to 0$, this reduces to the deterministic policy $a = f_\theta(s, \hat{R})$. Its relationship to $\pi_\beta$ is
+This is a Gaussian distribution whose mean is the Transformer's regression output $f_\theta(s, \hat{R})$ and whose variance is $\sigma^2$. When $\sigma \to 0$ it degenerates into a deterministic policy $a = f_\theta(s, \hat{R})$.
+
+What is the relation between this distribution and the behavior policy $\pi_\beta$ that generated the data? A simple one:
 
 $$\pi_\theta(a \mid s, \hat{R}) \approx \pi_\beta(a \mid s, \text{return} \approx \hat{R})$$
 
-Thus, DT learns the behavior policy's conditional distribution at a specified return. State-action combinations absent from the data remain difficult to predict reliably, and the ability to combine trajectory segments varies across tasks and datasets.
+In other words, what DT learns is nothing other than the **conditional distribution of the behavior policy under a specified return**. If you give it a high RTG target, it reproduces the action patterns of the trajectories in the data that obtained high returns. If you give it a low RTG, it reproduces the actions of poor trajectories.
 
-This observation motivated extensive subsequent work, including RL via supervised learning in online RL, in-context RL through Algorithm Distillation, Star-Vector, and Eyre et al.'s “language modeling is all you need for RL.”
+Of course, this also means it has limits: for state-action combinations not covered by the data it still cannot predict reliably, and whether it can "stitch" good segments from different trajectories together depends on the dataset and the ability of the Transformer.
+
+Even so, DT's contribution is pioneering. It spawned a whole line of research on "RL via supervised learning": RL via supervised learning (RvS) in online RL, in-context RL (Algorithm Distillation), Star-Vector, and even "language modeling is all you need for RL" type work can all trace their source to DT.
 
 ### 1.5 Limitations of Decision Transformer
 
-1. **It can learn only optimal behavior present in the data**—if the dataset contains no expert trajectories, even a very high target RTG cannot produce expert behavior.
-2. **Weak stitching ability**—traditional offline RL can combine useful segments of two suboptimal trajectories into a better policy, a process called subtrajectory stitching. As a purely supervised method, DT has limited compositional generalization of this kind.
-3. **Sensitivity to RTG selection**—a target set too high can produce incoherent actions, while one set too low yields conservative behavior.
+Although DT is simple and elegant, it is not a silver bullet, and there are a few clear limitations you need to know:
+
+1. **It can only learn the best policy that exists in the data.** This is the most fundamental limit. If your dataset has no expert trajectories at all (for example only random data), then no matter how high you set the target RTG, it cannot produce expert-level behavior from nothing, because it has never seen it.
+2. **Weak stitching (trajectory splicing) ability.** Traditional offline RL (such as CQL/IQL) can in theory do subtrajectory stitching: "sew together" the good parts of two suboptimal trajectories to obtain a policy better than any trajectory in the data. But DT is pure supervised learning and cannot achieve this kind of strong compositional generalization. At most it reproduces the average level of the trajectories in the data that are close to the target RTG.
+3. **Sensitivity to the choice of RTG.** A target RTG set too high produces incoherent, reckless actions, and one set too low is too conservative and cannot reach high scores. This hyperparameter needs to be tuned carefully for each environment.
 
 ## 2. Searching Trajectories with Trajectory Transformer
 
-After DT, the “RL as sequence modeling” approach quickly developed into several variants. Two representative methods are Trajectory Transformer, which models a complete trajectory as a token sequence and performs beam-search inference, and Diffuser, which generates a complete trajectory directly with a diffusion model.
+DT proved that the path of "RL as sequence modeling" can work, and afterward this line developed quickly and produced many works. Two of the most representative follow-ups are **Trajectory Transformer (TT)**, which does not merely predict actions but models the entire trajectory as a token sequence and plans with beam search, and **Diffuser**, which is more radical and generates the whole trajectory at once with a diffusion model.
 
 ### 2.1 Discretizing Trajectories and Using Beam Search
 
-Janner et al. 2021 discretize RTG, state, action, and reward into tokens, then train a standard Transformer to predict the next token:
+The idea of Trajectory Transformer, proposed by Janner et al. 2021, is more thorough than DT's. DT still predicts actions autoregressively by time step, while TT discretizes the RTG, state, action, and reward all into individual tokens and then trains a standard Transformer to predict the next token, modeling the joint distribution of the whole trajectory:
 
 $$p_\theta(\tau) = \prod_{t=1}^{T} p_\theta(s_t, a_t, r_t \mid s_{<t}, a_{<t}, r_{<t})$$
 
-At inference, beam search maximizes trajectory probability, optionally subject to a reward constraint. TT has three main properties:
+What does this mean? TT does not distinguish what is a state and what is an action. It treats the whole trajectory (the s, a, r of all time steps) as one long sequence of tokens and predicts the next token one by one like a language model.
 
-- Discretizing continuous quantities avoids regression, but the number of tokens grows rapidly because every state dimension must be discretized.
-- Beam-search inference is slow because it expands multiple candidate trajectories.
-- It supports **planning**: future reward constraints can be injected explicitly during search, producing a form of implicit model-based RL.
+At inference, it does not simply sample one action as DT does. It uses **beam search**, familiar from machine translation, to maximize the probability of the whole trajectory. And you can even add reward constraints explicitly during the search (for example "I want a final return ≥ X"), which amounts to implicit model-based planning!
+
+What are TT's characteristics? Let's summarize:
+
+- **Advantage**: strong planning ability. During beam search you can look several steps into the future and explicitly account for long-term return, which is very different from DT's single-step prediction.
+- **Drawback one**: continuous quantities must be discretized. Every dimension of the state has to be discretized into tokens separately. For example, if the state has 20 dimensions with each dimension discretized into 100 bins, one state takes 20 tokens, the sequence length explodes, and the computation is heavy.
+- **Drawback two**: beam-search inference is slow. It has to expand several candidate trajectories at once, and cannot produce an action in a single step as DT does.
 
 ## 3. Generating Complete Trajectories with Diffuser
 
-Janner et al. 2022 treat a complete trajectory as the object generated by a diffusion model. If the state dimension is $d_s$, the action dimension is $d_a$, and the trajectory length is $T$, the trajectory is a matrix of shape $T\times(d_s+d_a)$. During training, noise is added to real trajectories, and the network predicts that noise:
+Diffuser, proposed by Janner et al. 2022, takes yet another approach: since what we ultimately want is a good trajectory, why generate it autoregressively one token at a time? Can we use a diffusion model to generate a whole trajectory directly at once?
+
+The idea is very much like diffusion models in image generation: rather than painting pixels from left to right, start from pure noise, denoise step by step, and end up with a clear image. Diffuser applies this idea to trajectory generation.
+
+If the state dimension is $d_s$, the action dimension is $d_a$, and the trajectory length is $T$, a trajectory can be represented as a matrix of shape $T \times (d_s + d_a)$. You can think of it as a "trajectory image" whose horizontal axis is time and whose vertical axis is each component of the state/action.
+
+The training procedure is exactly the same as for an image diffusion model: first add Gaussian noise to a real trajectory step by step until it becomes pure noise, and then have a network predict what noise was added at each step:
 
 $$\min_\theta \; \mathbb{E}_{\tau, t, \epsilon}\left[\|\epsilon - \epsilon_\theta(\tau_t, t)\|^2\right]$$
 
-Here, $\tau_t$ is the noisy trajectory, $t$ is the diffusion step, $\epsilon$ is the noise actually added, and $\epsilon_\theta$ is the network's prediction. Their mean squared error decreases as the prediction improves. At inference, the process starts from random noise and repeatedly subtracts predicted noise until it produces a complete trajectory.
+Let's take this training objective apart:
 
-Diffuser uses classifier-free guidance to control generation. During training, it randomly drops state or reward conditions so that the model learns both conditional and unconditional distributions:
+- $\tau$: a real trajectory sampled from the dataset
+- $t$: the diffusion step (from 0 to T, where t=0 is the clean trajectory and t=T is pure noise)
+- $\epsilon \sim \mathcal{N}(0, I)$: the Gaussian noise we actually add
+- $\tau_t$: the noisy trajectory after t steps of noise
+- $\epsilon_\theta(\tau_t, t)$: the network's prediction of "what noise was added at this step"
+
+The training objective is to make the predicted noise as close as possible to the noise actually added (an MSE loss). This is standard diffusion-model training, without any special modification.
+
+At inference we go in reverse: start from pure random noise and iterate for T steps. At each step the network predicts the noise, and this noise is subtracted from the current noisy trajectory, and in the end we obtain a clean trajectory that looks like those in the training data.
+
+But wait! What we want is not just trajectories that "look like real data" but **high-return trajectories**. How do we control whether the generated trajectory is good or bad? Diffuser uses **classifier-free guidance**, a well-established technique from image diffusion. During training the conditioning information (such as reward or the starting state) is randomly dropped, so the model learns both conditional and unconditional generation. At inference the predictions of the two are combined by a weighted extrapolation:
 
 $$\tilde{\epsilon}_\theta = (1 + w) \cdot \epsilon_\theta(\tau_t, t, c) - w \cdot \epsilon_\theta(\tau_t, t)$$
 
-Here, $c$ is a condition such as maximizing future reward, and $w$ controls conditioning strength. At inference, the reward condition changes the denoising direction so that high-reward trajectories receive greater generation probability. Optimization therefore changes from explicitly selecting the maximum-value action to sampling from a reward-guided trajectory distribution.
+Here:
+
+- $c$: the conditioning information (such as "starting from the initial state s0, the final return must be ≥ a high score")
+- $\epsilon_\theta(\tau_t, t, c)$: the noise predicted with the condition (denoising toward trajectories that satisfy condition c)
+- $\epsilon_\theta(\tau_t, t)$: the noise predicted without the condition (it suffices to generate trajectories that look like real data)
+- $w$: the guidance scale. The larger w is, the more strongly the condition c is emphasized, and the higher the return of the generated trajectory, but diversity may drop and the trajectory may look unnatural.
+
+Through this guidance mechanism, the reward condition changes the denoising direction so that high-return trajectories get a higher generation probability. Optimization thereby changes from "explicitly choosing the action that maximizes Q", as in traditional RL, into "sampling from a reward-guided trajectory distribution", yet another completely different idea.
 
 ## 4. Comparing the Three Sequence-Modeling Methods
 
-| Dimension                              | Decision Transformer         | Trajectory Transformer                        | Diffuser                                 |
-| -------------------------------------- | ---------------------------- | --------------------------------------------- | ---------------------------------------- |
-| Modeling target                        | Conditional policy given RTG | Joint distribution over complete trajectories | Diffusion model of complete trajectories |
-| Discretization                         | No                           | Yes (each state dimension)                    | No                                       |
-| Inference                              | Autoregressive sampling      | Beam search                                   | Iterative denoising                      |
-| Planning ability                       | Weak (implicit)              | Strong (explicit)                             | Strong (conditional generation)          |
-| Stitching ability                      | Weak                         | Medium                                        | Strong                                   |
-| Inference speed                        | Fast                         | Slow                                          | Medium (dozens of denoising steps)       |
-| Compatibility with LLM training stacks | Strong (most GPT-like)       | Strong                                        | Weak (different architecture)            |
+Let's put the three sequence-modeling routes, Decision Transformer, Trajectory Transformer, and Diffuser, side by side so that you can choose according to the setting:
+
+| Dimension                       | Decision Transformer        | Trajectory Transformer        | Diffuser                      |
+| ------------------------------- | --------------------------- | ----------------------------- | ----------------------------- |
+| What is modeled                 | A conditional policy given RTG | The joint distribution of a whole trajectory | A diffusion model of a whole trajectory |
+| Discretization                  | No                          | Yes (every state dimension is discretized) | No                |
+| Inference method                | Autoregressive single-step sampling | Beam search over multiple steps | Iterative denoising (dozens of steps) |
+| Planning ability                | Weak (implicit, single-step) | Strong (explicit multi-step lookahead) | Strong (conditional generation) |
+| Stitching ability               | Weak                        | Medium                        | Strong                        |
+| Inference speed                 | Fast                        | Slow                          | Medium (needs dozens of denoising steps) |
+| Compatibility with the LLM training stack | Strong (architecture closest to GPT) | Strong           | Weak (diffusion-model architecture) |
+
+How do you choose? Here is a simple practical guide:
+
+- If you just want to quickly build a strong baseline that is fast, simple to implement, and compatible with the existing Transformer training stack, choose DT
+- If you need to do explicit long-horizon planning and are willing to spend more compute for better planning, try TT
+- If you need strong stitching ability, want to combine the good parts of different trajectories, or need complex conditional generation (for example constraining the starting state, intermediate milestones, and the final return at once), Diffuser is the better choice
 
 ## Section Summary
 
-Decision Transformer generates actions autoregressively for a specified return-to-go and can therefore reuse supervised Transformer training directly. Trajectory Transformer searches complete trajectories with beam search, while Diffuser generates trajectories through iterative denoising. All three depend on behavioral coverage already present in offline data; they differ in how they represent trajectories and select actions.
+In this section we looked at an offline RL route that steps entirely outside the Bellman framework: redefining reinforcement learning as a sequence-modeling problem.
 
-The next section, [10.3 Offline Reinforcement Learning and Preference Data](./experiments), applies the fixed-data perspective to preference optimization and compares DPO, preference data, and sequence modeling.
+Decision Transformer is the pioneer of this route. It introduces return-to-go as a condition, arranges trajectories as sequences of (R, s, a) triples, and performs pure supervised learning with a GPT-style causal Transformer: given a target RTG and the current state, predict the action directly. Its implementation and training are extremely simple, and it reuses the mature toolchain of large language models completely.
+
+Trajectory Transformer then goes further: it discretizes the whole trajectory into tokens, models the joint distribution with a standard language model, and plans explicitly with beam search at inference. Diffuser introduces diffusion models, iteratively denoising from noise to generate complete trajectories, and uses classifier-free guidance to steer generation toward high-return trajectories, with stronger stitching and planning ability.
+
+But have you noticed that all of this "learning from a fixed dataset" is useful not only in traditional RL settings such as robot control? Doesn't it look a bit like preference alignment of large language models today? When DPO trains, doesn't it also have to use an already-collected preference dataset and cannot freely interact with the environment or annotators? Could there be a deeper connection here?
+
+In the next section, [10.3 Offline Reinforcement Learning and Preference Data](./experiments), we answer this question: bring the offline RL perspective to LLM preference optimization, see why DPO is in fact a form of implicit offline Q-learning, and see which post-training phenomena the offline RL way of thinking can help us understand.

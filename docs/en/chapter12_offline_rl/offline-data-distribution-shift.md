@@ -1,86 +1,164 @@
 # 10.1 Offline Data and Distribution Shift
 
-Part II relied on agents continually interacting with an environment to collect experience. Many real systems can use only existing logs because new trial and error may be expensive, slow, or unsafe. Part III begins with offline reinforcement learning, then extends fixed-data learning to imitation learning, inverse reinforcement learning, meta-reinforcement learning, exploration, multi-agent learning, and hierarchical decision-making.
+## Reading Guide
 
-DDPG, TD3, and SAC in [Chapter 9](../chapter11_continuous_control/ddpg) can reuse historical data through a replay buffer, and model-based reinforcement learning can reduce real interaction with an environment model. These methods still allow a new policy to collect samples and correct old experience. Offline reinforcement learning removes this feedback channel: training can use only one fixed dataset.
+**Key Ideas**
 
-This section follows three questions: why fixed data cause distribution shift, how BCQ, CQL, and IQL constrain estimation errors, and how AWAC and TD3+BC incorporate behavior cloning into policy updates. With this foundation, [Section 10.2](./sequence-modeling) will turn to Decision Transformer's sequence-modeling approach.
+- Understand why "no new data" completely changes the rules of the RL game: where distribution shift and extrapolation error come from, and why errors are amplified by nearly 100 times when γ=0.99.
+- Master how the three classic offline RL algorithms differ in approach: BCQ restricts actions directly, CQL actively pushes down the Q-values of OOD actions, and IQL avoids evaluating out-of-dataset actions altogether.
+- Understand the power of the engineering route: why a simple method like TD3+BC, which "adds a BC term directly to the Actor loss", can approach the performance of complex algorithms.
+- Compare the subtle differences between AWAC and IQL, and understand why "avoiding the max over OOD actions" is the more fundamental solution.
 
-## 1. Why Fixed Data Cause Distribution Shift
+In Part II we learned a whole set of online reinforcement learning algorithms, from DQN to DDPG, TD3, and SAC, all of which rely on the agent continually interacting with the environment to collect experience. But let's stop and think: in the real world, does this mode of "learning while interacting" always work?
 
-Both [Chapter 5: DQN](../chapter07_dqn/from-q-to-dqn) and [Chapter 9: SAC](../chapter11_continuous_control/ddpg) update the value of the current state using the estimated value of the next state. First write the one-step target:
+You may think of many scenarios. A self-driving car cannot try and err repeatedly on real roads and hit people, a recommender system cannot casually push junk content to users to test its effect, and the medical field certainly cannot experiment on patients. In these scenarios we can only use existing historical logs, and any new trial and error may be expensive, slow, or even unsafe.
+
+Part III begins with **offline reinforcement learning (Offline RL)**, a setting in which "you can only look at historical data and cannot interact with the environment". We will then push the idea of learning from fixed data on to imitation learning, inverse reinforcement learning, meta-reinforcement learning, exploration, multi-agent learning, and hierarchical decision-making.
+
+Recall the DDPG, TD3, and SAC from [Chapter 9](../chapter11_continuous_control/ddpg). They can already reuse historical data with a replay buffer, and model-based reinforcement learning can also use an environment model to reduce real interaction. Still, these methods allow the new policy to keep sampling and to correct old experience, so they are online in essence. Offline reinforcement learning removes this feedback channel entirely: **during training only a fixed dataset can be used, and interaction with the environment is strictly forbidden.**
+
+Why does a restriction that sounds so small cause so much trouble? In this section we follow three core questions: why fixed data leads to distribution shift, how BCQ, CQL, and IQL limit erroneous value estimates, and how AWAC and TD3+BC add behavior cloning to the policy update. Once this main line is understood, [10.2](./sequence-modeling) turns to the sequence-modeling route pioneered by Decision Transformer, which does not even use the Bellman equation.
+
+## 1. Why Fixed Data Produces Distribution Shift
+
+In [Chapter 5: DQN](../chapter07_dqn/from-q-to-dqn) and [Chapter 9: SAC](../chapter11_continuous_control/ddpg), we always update the value of the current state using the value estimate of the next state. Let's first write out this one-step target that we already know well:
 
 $$y = r + \gamma \cdot \mathbb{E}_{s' \sim P(\cdot \mid s, a)}\left[V(s')\right]$$
 
-Read this expression from left to right: $y$ is the target fitted in the current update, $r$ is the reward already obtained from the current action, $V(s')$ is the long-term value after the next state, and $\gamma$ controls the weight of future value in the target. Even if online training temporarily overestimates a new state, the policy can visit it later and correct the estimate with observed rewards.
+Let's take this line apart from left to right and make sure every symbol is clear:
 
-In online RL, the $V(s')$ in the target is supported by future exploration. Even if a new policy reaches an unseen state, the agent continues interacting with the environment and collects new data to correct the estimate. **Offline RL has no such safeguard.** Dataset $\mathcal{D} = \{(s, a, r, s')\}$ is collected by a behavior policy $\pi_\beta$ and remains **completely fixed** during training:
+- $y$: the target value we want to fit this time, that is, the direction the current (s,a) should "aim at"
+- $r$: the reward already actually received by the current action, which is certain and known
+- $V(s')$: the long-term value after the next state, which we have to estimate, and this is where problems often arise
+- $\gamma$: the discount factor, which controls how much weight the future value has in the target, usually around 0.99
+
+During online training, even if we temporarily overestimate the V value of some new state, it does not matter, because the policy will eventually have a chance to actually visit that state and correct the estimate with the real reward signal. It is like learning to ride a bike: when you wobble occasionally, your body adjusts automatically the next time you reach that posture.
+
+But offline RL has no such "trial-and-error correction" insurance. Let's stop and think: if during training we can never go to new states, what happens when V(s') is estimated wrongly?
+
+In offline RL, the dataset $\mathcal{D} = \{(s, a, r, s')\}$ is collected by some **behavior policy** $\pi_\beta$ (the policy used when the data was collected), and it is **completely frozen** during training, with no new data ever added:
 
 $$\mathcal{D} = \{(s_i, a_i, r_i, s'_i)\}_{i=1}^{N}, \quad (s, a) \sim d^{\pi_\beta}(s) \pi_\beta(a \mid s)$$
 
-The new policy $\pi_\theta$ is deployed after training, but its action distribution $\pi_\theta(a \mid s)$ differs from $\pi_\beta(a \mid s)$. This creates **distribution shift**.
+Here:
+
+- $N$: the total number of transition samples in the dataset
+- $d^{\pi_\beta}(s)$: the state visitation distribution generated by the behavior policy $\pi_\beta$ (that is, which states it often visits)
+- $\pi_\beta(a \mid s)$: the probability that the behavior policy chooses action a in state s
+
+The new policy $\pi_\theta$ is deployed only after it has been trained on the dataset. But guess what? The distribution $\pi_\theta(a \mid s)$ with which it chooses actions is almost certainly different from the original behavior policy $\pi_\beta(a \mid s)$, because we trained it precisely to improve! This mismatch between the policy distribution and the data distribution is **distribution shift**.
+
+You may ask: "So the distributions differ. Doesn't the policy keep changing in online RL as well? Why is it a problem offline?" A good question. This is exactly the core difficulty of offline RL, so let's go on.
 
 ### 1.1 Where Extrapolation Error Comes From
 
-Fujimoto et al. 2019 precisely characterized the source of offline-RL failure in the BCQ paper. Let the dataset's action support be $\mathcal{D}_\mathcal{A}(s) = \{a : (s, a) \in \text{support}(\pi_\beta(\cdot \mid s))\}$. The Bellman operator receives no supervision for $a' \notin \mathcal{D}_\mathcal{A}(s')$. A neural network **extrapolates** at these OOD (out-of-distribution) points, and its output may be arbitrary.
+Fujimoto et al. 2019 characterized the root cause of offline RL failure precisely in the classic BCQ paper. Let's first define a concept: let the action support set of the dataset at state s be $\mathcal{D}_\mathcal{A}(s) = \{a : (s, a) \in \text{support}(\pi_\beta(\cdot \mid s))\}$. Put simply, this is "which actions actually appear in the data at state s".
 
-To identify the source of the problem, we can write an illustrative decomposition of value-estimation error:
+Now the key problem: the value of the Bellman operator on actions $a' \notin \mathcal{D}_\mathcal{A}(s')$ has **no supervision signal at all**! At these OOD (out-of-distribution) points the neural network can only guess, which is **extrapolation**, and the output of a neural network in the extrapolation region is arbitrary and unreliable.
 
-$$\underbrace{Q_\phi(s, a) - Q^\pi(s, a)}_{\text{total error}} = \underbrace{\epsilon_{\text{stat}}}_{\substack{\text{statistical error}\\\text{(finite samples)}}} + \underbrace{\epsilon_{\text{approx}}}_{\substack{\text{approximation error}\\\text{(network capacity)}}} + \underbrace{\max_{a'} Q_\phi(s', a') - Q^\pi(s', \pi(s'))}_{\text{extrapolation error}}$$
+To see where the error comes from, we can write the value-estimation error of the Q-function as an illustrative decomposition by source:
 
-The first two terms appear in both online and offline training. The third appears when maximization selects an action unsupported by the data: the network may happen to assign this action a large Q-value, and the max operator preferentially selects it, inserting the unverified estimate into the next target.
+$$\underbrace{Q_\phi(s, a) - Q^\pi(s, a)}_{\text{total error}} = \underbrace{\epsilon_{\text{stat}}}_{\substack{\text{statistical error}\\\text{(finite samples)}}} + \underbrace{\epsilon_{\text{approx}}}_{\substack{\text{function approximation error}\\\text{(network capacity)}}} + \underbrace{\max_{a'} Q_\phi(s', a') - Q^\pi(s', \pi(s'))}_{\text{extrapolation error}}$$
 
-The accumulation of extrapolation error can be expanded recursively. Let $Q_0$ be the initial estimate. After $T$ Bellman iterations, the error satisfies
+Let's look at the terms one at a time:
+
+- The first two terms, $\epsilon_{\text{stat}}$ and $\epsilon_{\text{approx}}$: old friends that appear in both online and offline training. Data and network capacity are finite, so a perfect fit is impossible, and that is normal.
+- The third term is the special demon of offline RL: when we perform the operation $\max_{a'} Q(s', a')$, if it happens to select an OOD action never seen in the data, the network may happen to assign it a very high Q-value (for example because the initialization happened to be large, or because of training noise), and this spurious high value, which has never been verified, enters the target of the next round.
+
+Even worse, this extrapolation error accumulates recursively through the Bellman backup. Let $Q_0$ be the initial estimate. After $T$ Bellman iterations the error satisfies:
+
+::: details Bonus: Derivation of the Extrapolation Error Accumulation Formula
 
 $$\|Q_T - Q^\pi\|_\infty \leq \gamma^T \|Q_0 - Q^\pi\|_\infty + \sum_{k=0}^{T-1} \gamma^k \|\mathcal{T} Q_k - \mathcal{T}^\pi Q_k\|_\infty$$
 
-Here, $\mathcal{T}$ is the Bellman update with action maximization, and $\mathcal{T}^\pi$ is the update computed under the true policy. The first term on the right is the initial error, which gradually decays after multiplication by $\gamma^T$. The sum contains the new error introduced at each iteration. If each iteration introduces error of approximately $\epsilon_{\text{ood}}$, its total effect is amplified by a geometric series to about $\epsilon_{\text{ood}}/(1-\gamma)$. For example, when $\gamma=0.99$, the amplification factor approaches 100. The error is **added repeatedly**; its magnitude does not itself grow exponentially.
+This expression looks a little frightening, but it is intuitive once taken apart:
 
-::: warning Why More Data Alone Is Insufficient
-Broader data coverage can reduce the number of OOD actions, but covering every possible $a$ in a continuous action space is difficult. As long as the update maximizes over unsupported regions, extrapolation error can occur. Data coverage and conservative updates must therefore be addressed together.
+- Left side $\|Q_T - Q^\pi\|_\infty$: the maximum gap between the Q-function and the true Q\* after T iterations
+- First term on the right, $\gamma^T \|Q_0 - Q^\pi\|_\infty$: the initial error decays exponentially through the discount factor γ. With γ=0.99, after 100 iterations less than 1% remains, which is good news.
+- The sum on the right: this is where the trouble lies. The new error introduced by each Bellman update is weighted by γ^k and accumulated.
+
+Here $\mathcal{T}$ denotes the Bellman update with action maximization (what we actually do), and $\mathcal{T}^\pi$ denotes the update computed under the true policy (the ideal case). The difference between the two is the newly generated extrapolation error in each round.
+
+If every round produces an error of size close to $\epsilon_{\text{ood}}$, their total effect is amplified by the geometric series to about $\epsilon_{\text{ood}}/(1-\gamma)$. For a concrete number: when γ=0.99, 1/(1-0.99)=100. That is, every round introduces 1 unit of OOD error, and in the end it accumulates into nearly 100 units of total error!
+
+Note that this is **errors repeatedly added up**, and does not mean that the error value itself grows exponentially. Even so, an amplification factor of 100 is enough to make training collapse completely.
+:::
+
+::: warning Why Adding More Data Cannot Save You
+At this point you may think: "Then I'll collect more data and cover all the (s,a), won't that do?" Unfortunately, in continuous action spaces this is almost impossible. Actions are continuous values, and you can never cover "every possible a". As long as the update still takes a maximum in regions lacking data, extrapolation error may appear. Expanding data coverage and conservative updates therefore both have to be pursued, and piling up data alone is not enough.
 :::
 
 ### 1.2 What Offline RL Must Optimize Simultaneously
 
-The preceding diagnosis yields a formal offline-RL objective: learn a policy $\pi_\theta$ within the support of the dataset that maximizes expected return, while ensuring that $\pi_\theta$ **does not depart too far from $\pi_\beta$**, which would move it into OOD regions. Modern offline-RL algorithms balance these two objectives:
+With the diagnosis above, we can now write the objective of offline RL formally: learn a policy $\pi_\theta$ under the support of the dataset so that its expected return is as large as possible, but **$\pi_\theta$ must not deviate too far from $\pi_\beta$**, otherwise it enters the OOD region and triggers the death spiral of extrapolation error.
+
+All modern offline RL algorithms are in essence balancing these two goals:
 
 $$\max_\theta \; \mathbb{E}_{s \sim \mathcal{D}}\left[Q^\pi(s, \pi_\theta(s))\right] \quad \text{subject to} \quad D(\pi_\theta \| \pi_\beta) \leq \epsilon$$
 
-We next examine how this constraint can be imposed in the action space or value function, then how behavior cloning can be included directly in the policy loss.
+This is a constrained optimization problem:
+
+- Objective: make the Q-value of the policy as high as possible (that is, the return as large as possible)
+- Constraint: measured with some divergence D (such as the KL divergence or the MMD distance), the gap between the new policy and the behavior policy must not exceed a threshold ε
+
+You can imagine it as walking along a cliff edge. You want to go as high as possible (max Q), but you cannot go too far from the safe zone (the range covered by the dataset), or you will fall off the cliff (extrapolation error explodes). The differences between algorithms are essentially different ways of drawing this "safety boundary".
+
+Below we first look at how the three classic algorithms implement this constraint in the action space or in the value function, and then look at another, more engineering-oriented route, which adds behavior cloning directly to the policy loss.
 
 ## 2. Constraining Out-of-Dataset Actions with Conservative Value Estimates
 
-The most direct idea is to **make the Q-function pessimistic for OOD actions**. If $Q(s,a)$ assigns low values to unseen $a$, then $\max_a Q(s,a)$ will not select imagined actions. Three classic algorithms—BCQ, CQL, and IQL—implement this principle in different ways.
+What is the most direct idea? Since the problem is that the Q-values of OOD actions may be overestimated, we can **make the Q-function pessimistic about OOD actions**. If $Q(s, a)$ gives very low values on actions $a$ never seen, then $\max_a Q(s, a)$ will naturally not pick those imagined actions that "look so good".
+
+The three classic algorithms, BCQ, CQL, and IQL, implement this "conservative estimation" principle from different angles. Let's go through them one by one.
 
 ### 2.1 BCQ: Constraining Actions to Remain Near the Data Distribution
 
-Batch-Constrained Q-Learning (Fujimoto et al. 2019) was the first deep algorithm shown to be stable on offline continuous-action data. Its central constraint is that **target action $a'$ must lie within the support of $\pi_\beta$**.
+Batch-Constrained Q-Learning (Fujimoto et al. 2019) is the first deep offline RL algorithm shown to train stably on continuous-action offline data. Its core constraint is very direct: **the action $a'$ used when computing the target must fall within the support of $\pi_\beta$**, that is, near actions that appeared in the data.
 
-BCQ trains a conditional VAE $\pi_\beta(a \mid s)$ to approximate the behavior policy, samples candidate actions $\{a_i\} \sim \pi_\beta$, and maximizes only over those candidates:
+How is it implemented? BCQ first trains a conditional VAE (variational autoencoder) $\pi_\beta(a \mid s)$ to approximate the behavior policy, then samples a batch of candidate actions $\{a_i\}$ from this VAE, and takes the max over these candidates, allowing only small perturbations:
 
 $$a' = \arg\max_{a \in \{a_i + \xi \Phi(s, a_i)\}} Q_\phi(s', a)$$
 
-Here, $\Phi(s,a)$ is a perturbation network that makes a small adjustment to a sampled action to approach a local optimum, and $\xi$ is the perturbation magnitude. This constrains the continuous-action argmax to high-density regions of the behavior policy.
+Let's take this expression apart:
+
+- $\{a_i\} \sim \pi_\beta$: sample n candidate actions (say n=100) from the learned behavior-policy model. These are all actions that appear in the data with high probability.
+- $\Phi(s, a)$: a perturbation network that makes small corrections to the sampled actions to approach the local optimum. Otherwise we could only imitate the behavior policy exactly and could not improve.
+- $\xi$: the upper limit of the perturbation magnitude, a hyperparameter. The perturbation cannot be too large, or we are out of the dataset again.
+- Finally, among these n perturbed candidates, choose the one with the highest Q-value as a'
+
+This amounts to confining the dangerous operation of "argmax in a continuous action space" to the high-density region of the behavior policy: you can only pick near actions seen in the data, and cannot wander off to places you have never been.
 
 ### 2.2 CQL: Lowering the Value of Actions Outside the Dataset
 
-Conservative Q-Learning (Kumar et al. 2020) approaches the problem differently. It does not constrain actions; it **directly penalizes Q-values for OOD actions**. A regularizer is added to the standard Bellman error:
+Conservative Q-Learning (Kumar et al. 2020) takes a different angle: I do not directly constrain which action you choose. Instead I **directly penalize the Q-function's values on OOD actions**, so that the Q-values of actions never seen are systematically underestimated. Then however you take the max, you will not pick them.
+
+How is it done? In addition to the standard Bellman error, add a conservative regularizer:
 
 $$\mathcal{L}_{\text{CQL}}(Q) = \alpha \left(\mathbb{E}_{s \sim \mathcal{D}}\left[\log \sum_a \exp(Q(s, a))\right] - \mathbb{E}_{(s, a) \sim \mathcal{D}}[Q(s, a)]\right) + \mathcal{L}_{\text{Bellman}}(Q)$$
 
-The first term, $\log\sum_a\exp(Q(s,a))$, is logsumexp, a soft maximum over Q-values for **all actions**, including OOD actions. Reducing it requires lowering Q-values across actions. The second term restores the Q-values of state-action pairs actually observed in the dataset to their normal range. Their difference creates a penalty gap that systematically underestimates OOD actions.
+This loss looks a bit complicated, so let's take apart the roles of its two terms:
 
-CQL provides a theoretical guarantee that learned $\hat Q$ is a **lower bound** on the true $Q^\pi$: $\hat Q(s,a)\leq Q^\pi(s,a)$ for all $(s,a)$. It can further be shown that $\hat Q$ values for OOD actions are lower than those for in-distribution actions by an $\mathcal O(\alpha)$ gap. A policy derived from $\hat Q$ therefore does not overestimate any action's return. In practice, $\alpha$ is adjusted automatically through a Lagrangian so that conservatism reaches an appropriate level:
+- First term $\log \sum_a \exp(Q(s, a))$: this is the logsumexp, a soft maximum over the Q-values of **all actions** (both those in the data and the OOD actions outside it). The only way to make this term smaller is to push down the Q-values of all actions, including OOD actions.
+- Second term $- \mathbb{E}_{(s,a) \sim \mathcal{D}}[Q(s,a)]$: this term pulls up the Q-values of the (s,a) actually seen in the dataset, so that they are not pushed down too far.
+- $\alpha$: the coefficient that controls the degree of conservatism
+
+Between the push and the pull a "penalty gap" forms: the Q-values of OOD actions are systematically underestimated, while the Q-values of in-data actions stay within a reasonable range.
+
+CQL has a beautiful theoretical guarantee: the learned $\hat{Q}$ is a **lower bound** of the true $Q^\pi$, that is, $\hat{Q}(s, a) \leq Q^\pi(s, a)$ for all (s,a). It can further be shown that the value of $\hat{Q}$ on OOD actions is lower than its value on in-distribution actions by a gap of $\mathcal{O}(\alpha)$. The policy derived from $\hat{Q}$ therefore never overestimates the return of any action, which is exactly the conservatism we want.
+
+In practice α does not need to be tuned by hand. Automatic adjustment with Lagrangian duality gives just the right conservatism:
 
 $$\mathcal{L}(\alpha) = -\alpha \cdot \left(\mathbb{E}_s\left[\log\sum_a \exp(\hat{Q}(s, a))\right] - \mathbb{E}_{(s, a) \sim \mathcal{D}}[\hat{Q}(s, a)] - \xi\right)$$
 
-Here, $\xi$ is the target gap, such as 5.0. When the actual gap is below $\xi$, $\alpha$ increases; otherwise it decreases, stabilizing the gap near the target.
+Here ξ is the target gap we want (about 5.0 in the paper). When the actual gap is below ξ, α is increased to strengthen the conservative penalty. Otherwise α is decreased so that the Q-values are learned more accurately. In this way the gap stabilizes automatically near the target.
+
+Here is a simplified code implementation (based on the SAC framework):
 
 ```python
 class CQL(SAC):
     def critic_loss(self, batch):
         s, a, r, s_next, done = batch
-        # Standard Bellman error inherited from SAC.
+        # Standard Bellman error (fully inherited from SAC)
         with torch.no_grad():
             a_next = self.actor(s_next)
             q_target = torch.min(self.critic_target1(s_next, a_next),
@@ -89,11 +167,11 @@ class CQL(SAC):
         bellman_loss = F.mse_loss(self.critic1(s, a), y) + \
                        F.mse_loss(self.critic2(s, a), y)
 
-        # CQL conservative regularizer.
-        # First term: apply logsumexp to random (OOD) actions.
+        # CQL conservative regularizer
+        # First term: logsumexp over random actions (OOD)
         rand_a = torch.rand_like(a) * 2 - 1
         q_rand1 = self.critic1(s, rand_a).flatten()
-        q_curr1 = self.critic1(s, a).flatten()  # in-distribution
+        q_curr1 = self.critic1(s, a).flatten()  # in-dist
         q_next1 = self.critic1(s, a_next).flatten()
         cat_q1 = torch.cat([q_rand1, q_curr1, q_next1], dim=1)
         logsumexp_q1 = torch.logsumexp(cat_q1, dim=1).mean()
@@ -105,85 +183,122 @@ class CQL(SAC):
         return bellman_loss + conservative_loss
 ```
 
+(Note that for clarity the code above omits the symmetric computation for the second Q-network. A real implementation must do the same for Q2.)
+
 ### 2.3 IQL: Avoiding Explicit Evaluation of Out-of-Dataset Actions
 
-Implicit Q-Learning (Kostrikov et al. 2022) avoids maximizing over actions outside the dataset. It learns $V(s)$ through expectile regression, biasing $V$ toward higher-value actions in the data:
+The idea of Implicit Q-Learning (Kostrikov et al. 2022) is more thorough: since the problem is that $\max_{a'} Q(s', a')$ selects OOD actions, why not **perform no explicit evaluation of out-of-dataset actions at all**? Wouldn't that avoid extrapolation error at its root?
+
+How is it done? IQL proceeds in two steps. The first step uses expectile regression to learn the state value function $V(s)$, making $V$ lean toward the higher-valued actions in the data, while the whole process uses only actions that already appear in the dataset:
 
 $$\mathcal{L}_V = \mathbb{E}_{(s, a) \sim \mathcal{D}}\left[L_2^\tau(Q_{\bar{\theta}}(s, a) - V_\psi(s))\right]$$
 
-First compute residual $x=Q_{\bar\theta}(s,a)-V_\psi(s)$, then apply
+Here we first compute the residual $x=Q_{\bar{\theta}}(s,a)-V_\psi(s)$, the difference between Q and V, and then apply an asymmetric squared loss:
 
 $$L_2^\tau(x) = |\tau - \mathbb{1}(x < 0)| \cdot x^2$$
 
-which assigns different weights to positive and negative residuals. This is the **expectile loss**. When $\tau=0.7$, $V(s)$ lies closer to the higher $Q(s,a)$ values in the data, while training still uses only actions that appear in the dataset. After obtaining $V$, define advantage $A(s,a)=Q_{\bar\theta}(s,a)-V_\psi(s)$ and train the policy:
+This is the **expectile loss**. Let's understand it:
+
+- When $x > 0$ (Q > V, meaning this action is better than the current V estimate): the weight is τ
+- When $x < 0$ (Q < V, meaning this action is worse than the current V estimate): the weight is 1-τ
+- If τ=0.5, this is ordinary MSE, and V fits the expectation of Q
+- If τ>0.5 (say τ=0.7), positive residuals get more weight, and V(s) moves closer to the higher Q(s,a) in the data. This is a kind of "soft max", but computed only over in-data actions throughout!
+
+Once we have V, we can define the advantage function $A(s,a)=Q_{\bar\theta}(s,a)-V_\psi(s)$ and then train the policy with advantage-weighted regression:
 
 $$\mathcal{L}_\pi = -\mathbb{E}_{(s, a) \sim \mathcal{D}}\left[\exp(\beta \cdot A(s, a)) \cdot \log \pi_\theta(a \mid s)\right]$$
 
-If $A(s,a)>0$, the action is better than the baseline value for that state in the data, so its exponential weight exceeds 1. If $A(s,a)<0$, its imitation weight decreases. $\beta$ controls how strongly this difference is amplified. IQL never applies $\max$ to an out-of-dataset action, avoiding this route to extrapolation error. CQL actively lowers the value of actions outside the dataset; IQL learns its Q-function, value function, and policy only from actions in the data.
+The intuition of this loss is clear:
+
+- If $A(s,a) > 0$, this action in the data is better than the average at that state, the exponential weight $\exp(\beta A)$ is greater than 1, and we imitate this action more strongly
+- If $A(s,a) < 0$, this action is worse than average, the weight is less than 1, and we imitate it less
+- $\beta$ is the temperature coefficient, which controls how much this good-bad difference is amplified. The larger β is, the more it tends to imitate only the best actions.
+
+In the whole IQL procedure, the backup of Q uses V(s') rather than $\max_a Q(s',a)$, and the training of both V and the policy is computed only on the (s,a) inside the dataset. **Not a single step from beginning to end needs to query the Q-value of an OOD action**, so the path by which extrapolation error arises is avoided at its root. CQL actively pushes down the value of OOD actions, while IQL says "I never look at those actions at all".
 
 ### 2.4 Comparing BCQ, CQL, and IQL
 
-| Dimension                      | BCQ                           | CQL                         | IQL                        |
-| ------------------------------ | ----------------------------- | --------------------------- | -------------------------- |
-| Constraint location            | Action space                  | Value function              | Implicit (expectile + AWR) |
-| Evaluates OOD actions          | No (sampling constraint)      | Yes (logsumexp)             | No (avoids explicit query) |
-| Additional network             | VAE $\pi_\beta$               | None                        | $V$ network                |
-| Hyperparameter sensitivity     | High (perturbation magnitude) | Medium (automatic $\alpha$) | Low ($\tau,\beta$)         |
-| Performance on medium datasets | Medium                        | Strong                      | Strong                     |
-| Stability on sparse datasets   | Medium                        | Occasionally unstable       | Strong                     |
-| Implementation complexity      | High                          | Medium                      | Low                        |
+Let's put the three classic algorithms side by side:
 
-For a first implementation, IQL provides a useful baseline because its updates depend only on in-dataset actions. CQL can then be compared when explicit control over conservatism is required. BCQ is useful for understanding the approach of constraining candidate actions.
+| Dimension                      | BCQ                   | CQL                       | IQL                              |
+| ------------------------------ | --------------------- | ------------------------- | -------------------------------- |
+| Where the constraint sits      | Action space          | Value function            | Implicit (expectile + AWR)       |
+| Evaluates OOD actions          | No (sampling constraint) | Yes (logsumexp)        | No (avoids explicit queries)     |
+| Extra network                  | VAE $\pi_\beta$       | None                      | $V$ network                      |
+| Hyperparameter sensitivity     | High (perturbation magnitude) | Medium ($\alpha$ automatic) | Low ($\tau, \beta$)       |
+| Performance on medium datasets | Medium                | Strong                    | Strong                           |
+| Stability on sparse datasets   | Medium                | Occasionally unstable     | Strong                           |
+| Implementation complexity      | High                  | Medium                    | Low                              |
+
+A practical suggestion: the first time you implement offline RL, you can use IQL to establish a baseline. Its updates depend only on in-dataset actions, it has few and robust hyperparameters, and it is the simplest to implement. When you need explicit control over the degree of conservatism, try CQL. BCQ is mainly useful for helping you understand the idea of "restricting candidate actions", and is used relatively less in actual engineering.
 
 ## 3. Constraining Policy Updates with Behavior Cloning
 
-Another approach is more direct in engineering terms: **retain the on-policy or off-policy actor-critic loop and add behavior-cloning regularization directly to the policy loss**. These methods are compatible with the PPO and SAC frameworks from Chapters 8 and 9 and require only small implementation changes.
+Besides the route of "making conservative estimates at the value-function level" described above, there is another route that engineers like more: **keep the familiar on-policy / off-policy actor-critic main loop and add a behavior cloning (BC) regularizer directly to the policy loss**. The big advantage of this family is that it is fully compatible with the PPO/SAC/TD3 frameworks learned in Chapters 8 and 9 and the engineering changes are minimal, often just a few lines of code.
 
 ### 3.1 TD3+BC: Adding Behavior Cloning to the Policy Loss
 
-TD3+BC, proposed by Fujimoto and Gu 2021, uses a direct implementation: add a behavior-cloning term to the TD3 actor loss and adjust weight $\lambda$ adaptively:
+TD3+BC, proposed by Fujimoto & Gu 2021, takes this "simple but effective" philosophy to the extreme: just add an L2 behavior cloning term to TD3's Actor loss, add an adaptive weight λ, and you are done:
 
 $$\mathcal{L}_{\text{actor}} = -\mathbb{E}_{s \sim \mathcal{D}}\left[Q(s, \mu_\theta(s))\right] + \lambda \cdot \mathbb{E}_{(s, a) \sim \mathcal{D}}\left[(\mu_\theta(s) - a)^2\right]$$
 
-Here, $\lambda = \frac{\alpha}{\frac{1}{N}\sum_i |Q(s_i, \mu_{\theta_{\text{old}}}(s_i))|}$. The denominator is the scale of current Q-values, so $\lambda$ adapts automatically to the reward scale of different environments without further tuning. The paper uses the same setting, $\alpha=2.5$, for every D4RL MuJoCo task.
+This loss is very easy to understand:
 
-TD3+BC's simplicity makes it a strong offline-RL baseline. Its performance highlights a counterintuitive fact: **on many offline-RL benchmarks, simple BC regularization can approach the performance of CQL and IQL**.
+- First term $-\mathbb{E}[Q(s, \mu_\theta(s))]$: this is the ordinary TD3 Actor loss, which maximizes the Q-value, that is, improves the policy
+- Second term $\lambda \cdot \mathbb{E}[(\mu_\theta(s) - a)^2]$: this is behavior cloning. It keeps the policy output from straying too far from the action a in the data, with the L2 distance penalizing deviation.
+
+The key is that the design of the weight λ is very clever. It adapts automatically to the reward scale of different environments and needs no tuning at all:
+
+$$\lambda = \frac{\alpha}{\frac{1}{N}\sum_i |Q(s_i, \mu_{\theta_{\text{old}}}(s_i))|}$$
+
+What is the denominator? The mean absolute value of the current Q-values, that is, the scale of the return in different environments. If an environment's Q-values are generally large (for example the reward is not normalized and runs into the hundreds or thousands), the denominator is large, λ automatically becomes smaller, and the BC term has relatively less weight. If Q-values are generally small, the denominator is small, λ automatically becomes larger, and the BC constraint is stronger. The paper fixes α=2.5 and obtains good results on all D4RL MuJoCo tasks with a single set of hyperparameters.
+
+The simplicity of TD3+BC makes it a very practical strong baseline in offline RL. Its performance also points to a somewhat counterintuitive fact: **on many offline RL benchmarks, this most basic BC regularization already reaches performance close to complex algorithms such as CQL and IQL**. Never underestimate the power of simple methods.
 
 ### 3.2 AWAC: Increasing the Imitation Weight of High-Quality Actions
 
-Advantage-Weighted Actor-Critic (Nair et al. 2020) and IQL's policy loss share the same source—advantage-weighted regression—but AWAC uses an explicit Q-function rather than an expectile value function:
+Advantage-Weighted Actor-Critic (Nair et al. 2020) and the IQL policy loss actually share one source, advantage-weighted regression (AWR). But AWAC computes the advantage with an explicitly learned Q-function, rather than implicitly estimating V through expectile regression as IQL does:
 
 $$\mathcal{L}_\pi^{\text{AWAC}} = -\mathbb{E}_{(s, a) \sim \mathcal{D}}\left[\underbrace{\exp\left(\frac{A(s, a)}{\beta}\right)}_{\text{advantage weight}} \cdot \log \pi_\theta(a \mid s)\right]$$
 
-Here, $A(s,a)=Q(s,a)-V(s)$, and $\beta$ is a temperature. Actions in the data that perform above average receive greater weight, while below-average actions receive less. AWAC generalizes BC into weighted BC by imitating the better parts of the dataset more strongly.
+Here the advantage function is $A(s, a) = Q(s, a) - V(s)$ and β is the temperature coefficient. The intuition is simple: actions in the data that do better than average (A>0) have their weights amplified exponentially and we imitate them mainly, while actions that do worse than average (A<0) have their weights pushed down and we imitate them less. AWAC in effect generalizes ordinary behavior cloning into "weighted behavior cloning": instead of mindlessly imitating all actions in the data, it imitates only the good parts.
 
-AWAC's main engineering advantage is its **smooth transition from offline to online training**: it can be pretrained entirely offline and then fine-tuned with a small amount of online interaction. This is useful in applications such as physical robotics and recommender systems.
+AWAC has a very practical engineering highlight: it **supports a smooth transition from offline to online**. Pretrain on purely offline data first, then fine-tune with a small amount of online interaction, and the policy distribution does not change drastically. This is very attractive for scenarios such as real robots and recommender systems that need a "cold start plus later iteration".
 
-### 3.3 How AWAC and IQL Differ
+### 3.3 Where AWAC and IQL Differ
 
-Compare the two objectives:
+You may have noticed that the policy losses of AWAC and IQL look almost identical. Let's put them side by side:
 
 $$\mathcal{L}_\pi^{\text{AWAC}} = -\mathbb{E}\left[\exp\left(\frac{A(s, a)}{\beta}\right) \log \pi(a \mid s)\right], \quad \mathcal{L}_\pi^{\text{IQL}} = -\mathbb{E}\left[\exp\left(\beta \cdot A(s, a)\right) \log \pi(a \mid s)\right]$$
 
-They are nearly identical in form. Although $\beta$ appears in a different position, it acts as a temperature in both. The difference lies in estimating $A(s,a)$:
+The forms are almost the same. β sits in the denominator in one and the numerator in the other, but both can be seen as temperature coefficients, used in different ways. So where is the core difference? It lies in **how the advantage function A(s,a) is estimated**:
 
-- **AWAC**: $A=Q_\phi(s,a)-V_\psi(s)$, where $Q$ still uses a standard Bellman backup whose target retains maximization through $\pi$.
-- **IQL**: $A=Q_\phi(s,a)-V_\psi(s)$, but $Q$ is backed up through $V$—the target uses $V(s')$ instead of $\max_a Q(s',a)$—and $V$ uses expectile regression to favor better actions in the data.
+- **AWAC**: $A = Q_\phi(s, a) - V_\psi(s)$, where Q still goes through the standard Bellman backup. That is, the target still has the step $\max_{a'} \pi(a'|s')$, so OOD actions may still be queried.
+- **IQL**: $A = Q_\phi(s, a) - V_\psi(s)$, but the backup of Q is done through V. The target directly uses V(s') rather than $\max_a Q(s', a')$, and V is estimated with expectile regression on in-data actions, leaning toward the better actions in the data.
 
-By changing the Bellman target to $V(s')$ and removing the maximum, IQL eliminates a source of extrapolation error. AWAC retains the standard Bellman target and constrains the policy through weighted BC. This constraint is weaker than IQL's implicit constraint, so AWAC is more likely to enter OOD regions when Q-values in the dataset are noisy.
+By changing the Bellman target from $\max Q$ to $V$, IQL eliminates the path by which extrapolation error arises at its root. AWAC keeps the standard Bellman target and relies only on weighted BC to keep the policy from drifting too far. This constraint is weaker than IQL's implicit constraint, so when the Q-values in the dataset are very noisy, AWAC can still step on an OOD landmine. A seemingly tiny difference like this has a large effect on stability on sparse data.
 
 ### 3.4 Comparing AWAC, TD3+BC, and IQL
 
-| Method | Policy-loss form                    | Requires $V$ | Supports online fine-tuning |
-| ------ | ----------------------------------- | ------------ | --------------------------- |
-| TD3+BC | $-\!Q + \lambda \|\mu-a\|^2$        | No           | Medium                      |
-| AWAC   | $-\!w(A)\log\pi$, $w=\exp(A/\beta)$ | Yes          | Strong                      |
-| IQL    | $-\!\exp(\beta A)\log\pi$ (AWR)     | Yes          | Medium                      |
+Let's compare these three BC-regularization-based algorithms once more:
 
-AWAC and IQL have very similar policy-loss structures; the distinction is the source of $A$. AWAC uses an explicit Q–V difference, while IQL estimates it implicitly through expectile regression. This small difference can substantially affect stability on sparse data.
+| Method | Form of policy loss                      | Needs $V$ | Friendly to online fine-tuning |
+| ------ | ---------------------------------------- | --------- | ------------------------------ |
+| TD3+BC | $-\!Q + \lambda \|\mu - a\|^2$           | No        | Medium                         |
+| AWAC   | $-\!w(A) \log \pi$, $w = \exp(A/\beta)$  | Yes       | Strong                         |
+| IQL    | $-\!\exp(\beta A) \log \pi$ (AWR)        | Yes       | Medium                         |
+
+Note that the policy losses of AWAC and IQL are highly similar in structure, and the core difference lies in where A comes from: AWAC uses an explicit Q-V difference (with Q still going through the standard Bellman backup), while IQL implicitly estimates V with expectile regression and avoids OOD queries entirely. This detail again shows that in offline RL, **"avoiding the max over OOD actions" is a more fundamental issue than "how to add the BC regularizer"**.
 
 ## Section Summary
 
-Starting from distribution shift and extrapolation error, this section compared three approaches. BCQ restricts candidate actions to remain near the data, CQL lowers the estimated value of out-of-dataset actions, and IQL avoids explicitly maximizing over those actions. All three still use Bellman updates; they differ in how they prevent unreliable estimates from entering policy improvement.
+In this section we started from the question "why does training collapse without interaction data" and understood the essence of distribution shift and extrapolation error: the max operator in Q-learning may select actions outside the dataset, the extrapolation of a neural network in the OOD region is arbitrary, and this error is also amplified by nearly a hundred times by γ through the Bellman backup.
 
-The next section, [10.2 Offline Reinforcement Learning through Sequence Modeling](./sequence-modeling), follows a different route: it abandons Bellman updates and formulates RL as conditional sequence generation.
+For this problem we saw two broad families of solutions:
+
+1. **The conservative-valuation route**: BCQ restricts candidate actions to near the data distribution, CQL actively pushes down the Q-values of out-of-data actions, and IQL avoids taking an explicit maximum over out-of-data actions altogether
+2. **The BC-regularization route**: TD3+BC adds an L2 BC term directly to the Actor loss, which is simple and effective. AWAC uses advantage weighting for "non-uniform imitation" and also supports a smooth transition from offline to online
+
+But have you noticed that all of the methods above, however complex, still circle within the framework of the Bellman equation? They all estimate value functions and perform policy improvement, and only find ways to keep extrapolation error from blowing up. Could we perhaps abandon the Bellman equation altogether and look at offline RL in a completely different way?
+
+In the next section, [10.2 Offline Reinforcement Learning through Sequence Modeling](./sequence-modeling), we look at another route pioneered by Decision Transformer: write RL entirely as a conditional sequence generation problem and use a familiar GPT-like Transformer, with no need to learn a Q-function at all.

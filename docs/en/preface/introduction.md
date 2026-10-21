@@ -2,221 +2,192 @@
 title: Course Overview
 ---
 
-# Introduction to RL
-
-::: tip Train CartPole before you start
-
-- **[ModelScope Studio: train in the browser](https://modelscope.cn/studios/walkinglab/hands-on-modern-rl-experiment01-cartpole)**: start PPO training without installing a local environment, then inspect the reward curve and policy animation.
-- **[ModelScope Notebook: open the cloud workspace](https://modelscope.cn/my/mynotebook)**: start a CPU environment, clone the course repository, and open `notebooks/cartpole-ppo.ipynb`.
-- **[ModelScope: open the training script](https://modelscope.cn/studios/walkinglab/hands-on-modern-rl-experiment01-cartpole/file/view/master/train.py)**: run `python train.py --timesteps 30000` in a ModelScope Notebook or a local terminal.
-  :::
+# Introduction to Reinforcement Learning
 
 ::: warning 📣 Announcement
-We sincerely thank everyone for your support of this tutorial! This course is under rapid iteration — a new version is coming soon, and many sections are still being organized and refined, so we appreciate your patience. Suggestions, corrections and feedback are always welcome! If you find it useful, please give the [GitHub repository](https://github.com/walkinglabs/hands-on-modern-rl) a Star 🌟 to help speed up updates.
+We sincerely thank everyone for supporting this tutorial! The course is iterating quickly and a new version is coming soon. Many sections are still being organized and refined, so we appreciate your patience. Suggestions and corrections are always welcome. If you find the course useful, please give the [GitHub repository](https://github.com/walkinglabs/hands-on-modern-rl) a Star 🌟 to help speed up updates.
 
-**We hope this open-source tutorial gives more people the courage to push toward the frontier of intelligence, tackling ever more problems on the path to AGI.**
+**We hope this open-source tutorial gives more people the courage to push toward the upper limit of intelligence, and to solve more of the problems on the road to AGI.**
 
-Because compute resources are limited, we are looking for GPU sponsorship. If you can offer GPU access, please contact us at [physicoada@gmail.com](mailto:physicoada@gmail.com).
+Because compute is scarce, we are looking for GPU sponsorship. If you can offer GPU access, please contact us at [physicoada@gmail.com](mailto:physicoada@gmail.com).
 :::
 
-## Start with CartPole
+## Why Reinforcement Learning Matters
 
-CartPole is a standard first control task. A pole is attached to a cart by a joint, and the agent moves the cart left or right to keep the pole upright. The task is small enough to train on an ordinary laptop CPU in about half a minute; no GPU or prior RL mathematics is required.
-
-![CartPole: the cart moves left and right to keep the pole upright](../../preface/images/cartpole.gif)
-
-<div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>CartPole. The cart moves left and right to keep the pole upright. Source: <a href="https://gymnasium.farama.org/environments/classic_control/cart_pole/" target="_blank" rel="noopener noreferrer">Gymnasium</a></em>
-</div>
-
-Use one of the online links at the top of the page to run a training job before continuing. Early episode rewards usually fluctuate around 20; as the policy improves, they approach the environment limit of 500. [Chapter 1](../chapter01_cartpole/principles) explains the local setup, training script, and learning curve.
-
-For now, the goal is only to observe a policy improving through interaction. The implementation and mathematics are developed in the chapters that follow.
-
-## Why Reinforcement Learning?
-
-In 2019, Richard Sutton — one of the founding figures of reinforcement learning — wrote a short essay of less than two pages titled [_The Bitter Lesson_](http://www.incompleteideas.net/IncIdeas/BitterLesson.html). He reviewed 70 years of AI history and reached a conclusion that many researchers found hard to accept:
+In 2019, Richard Sutton, one of the founders of reinforcement learning, wrote a short essay of fewer than two pages called "[The Bitter Lesson](http://www.incompleteideas.net/IncIdeas/BitterLesson.html)". He reviewed 70 years of artificial intelligence and reached a conclusion that many researchers find hard to accept:
 
 > The biggest lesson that can be read from 70 years of AI research is that general methods that leverage computation are ultimately the most effective, and by a large margin.
 >
-> —— Rich Sutton, 2019. Sutton and his advisor Andrew Barto were jointly awarded the 2024 ACM Turing Award for laying the theoretical foundations of reinforcement learning.
+> —— Rich Sutton, 2019. Sutton and his advisor Andrew Barto shared the 2024 ACM Turing Award for laying the theoretical foundations of reinforcement learning.
 
 ![Richard S. Sutton](../../preface/images/richard_sutton.jpg)
 
-<p class="image-caption"><em>Richard S. Sutton, one of the founding figures of reinforcement learning and 2024 Turing Award laureate. Source: <a href="https://commons.wikimedia.org/wiki/File:Rich_Sutton_on_Reinforcement_Learning-_Alpha_Go_Zero_to_60_(cropped).jpg" target="_blank" rel="noopener noreferrer">Wikimedia Commons</a> (CC BY 2.0)</em></p>
+<p class="image-caption"><em>Richard S. Sutton, one of the founders of reinforcement learning and winner of the 2024 Turing Award. Source: <a href="https://commons.wikimedia.org/wiki/File:Rich_Sutton_on_Reinforcement_Learning-_Alpha_Go_Zero_to_60_(cropped).jpg" target="_blank" rel="noopener noreferrer">Wikimedia Commons</a> (CC BY 2.0)</em></p>
 
-Why is it "bitter"? Because the same story has repeated itself throughout AI history. In computer chess, researchers carefully encoded opening repertoires and endgame strategies, only to be defeated by Deep Blue's brute-force search. In speech recognition and computer vision, people hand-designed feature extractors, only to be comprehensively replaced by deep networks that learned features from data. Go took this to its extreme — researchers invested enormous effort in using human knowledge to reduce search, while AlphaGo Zero simply removed all human input, played purely from self-play, and performed even better.
+Why "bitter"? Because the same story has played out again and again in the history of AI. In computer chess, researchers carefully encoded opening theory and endgame strategy, and were beaten by Deep Blue's brute-force search. In speech recognition and computer vision, people hand-designed feature extractors, and were thoroughly displaced by deep networks that learn features from data on their own. Go took this to the extreme: researchers invested enormous effort in using human knowledge to reduce the amount of search, while AlphaGo Zero dropped all human input, played against itself from scratch, and played better.
 
-Sutton concluded: **researchers consistently try to make systems work the way they think the human mind works, but this ultimately proves counterproductive.** The two meta-techniques that truly drive breakthroughs — search and learning — are effective precisely because they can scale indefinitely with compute.
+Sutton's summary: **researchers always try to make a system work the way they think the human mind works, and in the end this turns out to backfire.** The two meta-techniques that drove real breakthroughs, search and learning, work precisely because they scale without limit as computation grows.
 
-And what is the most natural, most primitive form of "learning"? It is not sitting in a classroom listening to lectures, nor reading labeled datasets. It is what all organisms do: **act in the real world, observe consequences, and adjust behavior — that is, trial and error.**
+And what is the most natural, most primitive form of "learning"? It is not sitting in a classroom listening to lectures, and it is not reading a labeled dataset. It is what all living things do: **act in the real world, observe the consequences, and adjust behavior, which is to say, trial and error.**
 
-Think about the earliest skills you learned — walking, talking, riding a bicycle. Which of these did you learn by "reading a textbook"? Nobody gave you a checklist of "step with the left foot first, shift center of gravity forward." You just kept trying, falling, and getting back up, until one day your body automatically remembered what to do.
+Think about the first skills you ever acquired: walking, speaking, riding a bicycle. Did you learn any of them by "reading a textbook"? Nobody handed you a checklist saying "left foot first, shift your weight forward." You simply kept trying, fell, got back up, until one day your body remembered what to do.
 
-Take riding a bicycle. If you wanted to teach a child to ride, what would you do?
+Take riding a bicycle. Suppose you want to teach a child to ride. What would you do?
 
 ![Learning to ride a bike](../../preface/images/dad_teaching_bike.jpg)
 
 <div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 1: Teaching a child to ride a bike is a classic trial-and-error learning process. Source: <a href="https://commons.wikimedia.org/wiki/File:Dad_teaching_child_to_ride_a_bike.jpg" target="_blank" rel="noopener noreferrer">Wikimedia Commons</a></em>
+  <em>Figure 1: Teaching a child to ride a bicycle is a typical trial-and-error learning process. Source: <a href="https://commons.wikimedia.org/wiki/File:Dad_teaching_child_to_ride_a_bike.jpg" target="_blank" rel="noopener noreferrer">Wikimedia Commons</a></em>
 </div>
 
-You would not hand them a book called _The Physics of Bicycles and Balance Equations_, nor would you tell them before they mount: "when the frame tilts 5 degrees left, apply 10 Newtons with your right foot." Those precise rules are useless to their brain. Instead, you hold the saddle and encourage them to pedal. A scraped knee is negative feedback; the wind in their face as they ride stable is reward. After a few rounds, the brain automatically learns to adjust the center of mass through trial and error.
+You would not first hand over a copy of *The Physics and Balance Equations of Bicycles*, and you would not specify before he climbs on that "when the frame leans 5 degrees to the left, push with the right foot at 10 newtons." Such precise knowledge is useless to his brain. You just hold the back of the seat and encourage him to pedal. A fall and a scraped knee are negative feedback. Staying upright, with the wind in his face, is the reward. After a few rounds, his brain has learned on its own, through trial and error, how to adjust his center of gravity.
 
-This ability — **learning in unknown environments through trial and error, guided by eventual outcomes** — is the most instinctive form of learning for all organisms. Yet strangely, the past decade of AI largely bypassed it. We taught machines to recognize cats and dogs, translate languages, and generate images, all using the same method: give them thousands of labeled correct answers and have them imitate. But when the problem shifts from "recognition" to "decision-making" — having a robotic arm grasp a cup, having AI defeat professional players in StarCraft, or teaching a large language model to respond appropriately — you fundamentally cannot label the correct answer for every step.
+This ability, **learning by trial and error in an unknown environment, guided by the final return**, is the most instinctive way of learning for every living thing. Strangely, the past decade of artificial intelligence bypassed it. We taught machines to recognize cats and dogs, translate languages, and generate pictures, all with the same method: give them thousands upon thousands of labeled correct answers and have them imitate. But when the problem changes from "recognition" to "decision-making" (getting a robot arm to grasp a cup, getting an AI to beat professional players at StarCraft, or getting a large language model to answer questions appropriately), you simply cannot label a standard answer for every step.
 
-For these challenges that require sequential decisions in dynamic environments, **Reinforcement Learning (RL) provides a fundamentally different approach: don't tell AI how to act; tell it what is good and what is bad, and let it figure out the rest.** From Q-Learning to DQN, from PPO to DPO and GRPO — each evolution of RL has continuously expanded the boundaries of artificial intelligence.
+For these problems, which require continuous decisions in a changing world, **reinforcement learning (RL) offers a very different approach: do not tell the AI what to do, tell it only what is good and what is bad, and let it work out the rest on its own.** From Q-Learning to DQN, from PPO to DPO and GRPO, each evolution of reinforcement learning has pushed outward the boundary of what AI can do.
 
-This book will guide you through this journey hands-on with code. From the basic CartPole, all the way to using RL to unlock the reasoning capabilities of large language models. This is not just a technology — it is an entirely new perspective on understanding how intelligence emerges.
+This book takes you through that journey in code, from the most basic inverted pendulum (CartPole) to using RL to elicit reasoning in large language models. It is more than a technique. It is a new perspective on how intelligence emerges.
 
-![CartPole environment: the cart moves left and right to keep the pole balanced upright](../../preface/images/cartpole.gif)
+![CartPole inverted pendulum environment: the cart moves left and right to keep the pole balanced upright](../../preface/images/cartpole.gif)
 
 <div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 2: CartPole environment: the cart moves left and right to keep the pole balanced upright. Source: <a href="https://gymnasium.farama.org/environments/classic_control/cart_pole/" target="_blank" rel="noopener noreferrer">Gymnasium</a></em>
+  <em>Figure 2: The CartPole environment: the cart moves left and right to keep the pole balanced upright. Source: <a href="https://gymnasium.farama.org/environments/classic_control/cart_pole/" target="_blank" rel="noopener noreferrer">Gymnasium</a></em>
 </div>
 
-## What Is Reinforcement Learning?
+## The Definition of Reinforcement Learning
 
-The previous section used the "teaching a child to ride a bicycle" example to build intuition about RL. Now let us make it more precise.
+In the previous section we built intuition for reinforcement learning with the example of teaching a child to ride a bicycle. Now let's make it more precise.
 
-> Reinforcement learning is a family of computational methods for solving **sequential decision-making problems**. An **agent** exists in an **environment**. At each time step, it observes the environment's **state**, selects an **action** based on that observation; the environment receives the action, transitions to a new state, and gives the agent a scalar **reward** as the sole feedback signal. The agent's goal: maximize the **cumulative reward** over the entire interaction process.
+> Reinforcement learning is a family of computational methods for solving **sequential decision problems**. An **agent** lives in an **environment**. At each time step it observes the environment's **state** and chooses an **action** accordingly. The environment receives the action, moves to a new state, and gives the agent a scalar **reward** as its only feedback signal. The agent's goal is to maximize the **cumulative reward** over the whole interaction.
 
-Note three key elements: **sequential decision-making** (making multiple consecutive choices, where current decisions affect the future), **the only feedback is reward** (unlike supervised learning which has standard answers, the agent only knows "how many points it got"), and **the goal is cumulative return** (not greedy for single-step reward, but focusing on the long term).
+Note three key elements. **Sequential decisions**: the agent makes many choices in a row, and the current decision affects the future. **The only feedback is the reward**: unlike supervised learning, there is no standard answer, and the agent only knows "how many points it scored." **The objective is cumulative return**: it does not greedily chase single-step reward but looks at the long term.
 
 ### The Core Loop
 
-The RL interaction process is a repeating cycle:
+The interaction process of reinforcement learning is a loop that repeats continuously:
 
 <div align="center" style="margin: 2.5rem 0;">
-
-```mermaid
-graph LR
-    A["Agent"] -->|"action aₜ"| B["Environment"]
-    B -->|"state sₜ₊₁ + reward rₜ₊₁"| A
-```
-
+  <img src="../../preface/images/rl-loop.svg" alt="The core reinforcement learning loop: the agent interacts with the environment" style="max-width: 520px; width: 100%;">
+</div>
+<div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
+  <em>Figure: The core reinforcement learning loop. The agent executes an action, and the environment returns a new state and a reward.</em>
 </div>
 
-1. The agent observes the current state $s_t$ and selects action $a_t$
-2. The environment executes the action, transitions to new state $s_{t+1}$, and returns reward $r_{t+1}$
+1. The agent observes the current state $s_t$ and selects an action $a_t$
+2. The environment executes the action, moves to a new state $s_{t+1}$, and returns a reward $r_{t+1}$
 3. Return to step 1
 
 The loop produces a **trajectory**: $s_0, a_0, r_1, s_1, a_1, r_2, s_2, \ldots$
 
-Here are several important distinctions. **State** is a complete description of the environment (e.g., a chess board), while **observation** is a partial description (e.g., in Super Mario, you can only see the area around the character) — this book generally uses "state" to refer to both, and in code you will see the variable name `obs`. **Action spaces** come in two types: **discrete** (e.g., Mario only has 4 actions: left, right, jump, crouch) and **continuous** (e.g., a robotic arm's joint angles can take any real value). Different types require different algorithms.
+Several distinctions matter here. A **state** is a complete description of the environment (such as a chess board), while an **observation** is a partial description (such as the screen near the character in Super Mario). This book usually uses "state" for both, and in code you will see the variable name `obs`. **Action spaces** come in two kinds: **discrete** (Mario has only 4 actions: left, right, jump, crouch) and **continuous** (a robot arm joint angle can take any real value). Different kinds call for different algorithms.
 
-Regarding rewards, if the agent only looks at immediate single-step reward, it becomes very "short-sighted." Therefore, what the agent truly cares about is **cumulative return $G_t$** — the sum of all future rewards from the current time step $t$ until the end of the episode.
+As for rewards, if the agent looked only at the immediate single-step reward, it would become very "short-sighted." So what the agent actually cares about is the **return $G_t$**: the sum of all future rewards from the current time $t$ until the episode ends.
 
-However, simply adding up future rewards has a problem: rewards further in the future are more uncertain. Like a mouse in a maze — the small cheese right in front is immediately available, but the large cheese near the cat in the distance is full of risk. To capture "1 point in the future is worth less than 1 point now," we introduce the **discount factor $\gamma$** (ranging from 0 to 1, typically set to 0.95–0.99).
+But simply adding up future rewards has a problem: the further away a reward is, the more uncertain it is. Think of a mouse in a maze. The small piece of cheese nearby can be eaten right away, while the big piece of cheese next to the cat far away is full of risk. To express that "1 point in the future is worth less than 1 point now," we introduce the **discount factor $\gamma$** (a value between 0 and 1, usually set to 0.95 to 0.99).
 
-With the discount factor, future rewards get discounted when summed — the further away, the heavier the discount. Let us look at the formula:
+With a discount factor, future rewards are discounted when they are added up, and the further away they are, the steeper the discount. Let's look at the formula:
 
 $$G_t = r_{t+1} + \gamma\, r_{t+2} + \gamma^2\, r_{t+3} + \cdots = \sum_{k=0}^{\infty} \gamma^k\, r_{t+k+1}$$
 
-The formula looks long, but it is very intuitive when broken down:
+The formula looks a bit long, but it is intuitive once taken apart:
 
-- $r_{t+1}$ is the reward you get immediately, **no discount** (multiplied by $\gamma^0 = 1$).
-- $r_{t+2}$ is the reward two steps away, discounted once, multiplied by $\gamma^1$.
-- $r_{t+3}$ is the reward three steps away, discounted twice, multiplied by $\gamma^2$.
-- And so on: the reward at future step $k+1$ is multiplied by $\gamma^k$. Since $\gamma$ is a fraction less than 1 (e.g., 0.9), $\gamma^k$ gets smaller as steps increase (0.9, 0.81, 0.729...).
+- $r_{t+1}$ is the reward obtained immediately, with **no discount** (multiplied by $\gamma^0 = 1$).
+- $r_{t+2}$ is the reward obtained after two steps. It is discounted once, multiplied by $\gamma^1$.
+- $r_{t+3}$ is the reward obtained after three steps. It is discounted twice, multiplied by $\gamma^2$.
+- And so on: the reward at future step $k+1$ is multiplied by $\gamma^k$. Because $\gamma$ is a decimal less than 1 (say 0.9), $\gamma^k$ gets smaller as the number of steps grows (0.9, 0.81, 0.729, ...).
 
-So the value of $\gamma$ determines the agent's "horizon." Let us use the mouse below to do the math:
+So the size of $\gamma$ determines the agent's "field of vision." Let's work through a simple example:
 
 <div align="center" style="margin: 2.5rem 0;">
-
-```mermaid
-graph LR
-    S["Start 🐭"] -->|"1 step<br/>r = +1"| C1["Small cheese 🧀"]
-    S -->|"4 steps<br/>r = +10"| C2["Large cheese 🧀🧀🧀"]
-    C2 -.->|"Cat nearby 🐱"| CAT["Danger"]
-
-```
-
+  <img src="../../preface/images/mouse-cheese.svg" alt="The trade-off between immediate and distant rewards" style="max-width: 580px; width: 100%;">
+</div>
+<div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
+  <em>Figure: The discount factor determines decision preferences: the trade-off between an immediate reward and a distant reward that carries risk.</em>
 </div>
 
-The mouse has two paths:
+The agent faces two paths:
 
-- **Short-sighted path (1 step)**: Eat the small cheese immediately, reward is +1. Since it is right there, no discount is needed, so the actual value is **1 point**.
-- **Long-term path (4 steps)**: Travel 4 steps to reach the large cheese, reward is +10. Because of the distance, the reward gets discounted, multiplied by $\gamma^3$ (discounted 3 times).
+- **Immediate reward**: it is close, and the reward is +1. No discount is needed, so the actual value is **1 point**.
+- **Distant reward**: it is far away, and the reward is +10, but it carries risk. Because of the extra steps, the reward is discounted. Suppose it is multiplied by $\gamma^3$ (discounted 3 times).
 
-At this point, the value of $\gamma$ becomes decisive:
+Now the value of $\gamma$ becomes the deciding factor:
 
-- **If $\gamma = 0.1$ (short-sighted)**: The large cheese's perceived value becomes $10 \times 0.1^3 = 0.01$ points. The mouse sees 0.01 points is far less than the 1 point right in front, so it **goes straight for the small cheese**.
-- **If $\gamma = 0.9$ (far-sighted)**: The large cheese's perceived value becomes $10 \times 0.9^3 = 7.29$ points. The mouse calculates 7.29 points is far greater than the 1 point in front, so it is willing to resist the immediate temptation and **take the risk to go for the large cheese**.
+- **If $\gamma = 0.1$ (short-sighted)**: in the agent's eyes the distant reward is worth $10 \times 0.1^3 = 0.01$ points. 0.01 points is far less than the 1 point in front of it, so the agent **chooses the immediate reward**.
+- **If $\gamma = 0.9$ (far-sighted)**: in the agent's eyes the distant reward is worth $10 \times 0.9^3 = 7.29$ points. 7.29 points is much more than the 1 point in front of it, so the agent is willing to resist the temptation and **chooses the distant reward**.
 
 ![Maze Mouse Cheese](../../preface/images/maze_mouse_cheese.jpg)
 
 <div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 3: A mouse navigating a maze to find cheese is a commonly used pathfinding and decision-making model in RL. Source: <a href="https://commons.wikimedia.org/wiki/File:MAZE_Mouse_Cheese.jpg" target="_blank" rel="noopener noreferrer">Wikimedia Commons</a></em>
+  <em>Figure 3: A mouse running a maze to find cheese is a commonly used pathfinding and decision model in reinforcement learning. Source: <a href="https://commons.wikimedia.org/wiki/File:MAZE_Mouse_Cheese.jpg" target="_blank" rel="noopener noreferrer">Wikimedia Commons</a></em>
 </div>
 
-The entire RL framework is built on a philosophical stance — the **reward hypothesis**: all goals can be described as "maximizing expected cumulative reward." As long as you can quantify "good" and "bad" as numerical signals, RL has a way to make the agent learn.
+The whole edifice of RL rests on one philosophical position, the **reward hypothesis**: every goal can be described as "maximizing expected cumulative reward." As long as "good" and "bad" can be quantified as a numerical signal, RL has a way to get the agent to learn.
 
-There are also two task types: **episodic** tasks have a clear start and end (one game of Super Mario, one episode of CartPole), while **continuing** tasks have no endpoint (automated stock trading). All experiments in this book are episodic, making it convenient to measure progress by "score per episode."
+There are also two types of tasks. **Episodic** tasks have a clear start and end (one game of Super Mario, one run of CartPole). **Continuing** tasks have no end (automated stock trading). All the experiments in this book are episodic, which makes it convenient to measure progress by "score per episode."
 
-### How to Solve: Two Routes
+### Two Routes
 
-All RL algorithms answer the same question: how to choose actions to **maximize cumulative return**? The cumulative return $G_t$ is the sum of all discounted rewards the agent receives starting from time step $t$:
+Every RL algorithm answers the same question: how should we choose actions to **maximize the cumulative return**? The cumulative return $G_t$ is the sum of all discounted rewards the agent obtains from time $t$ onward:
 
 $$G_t = r_{t+1} + \gamma\, r_{t+2} + \gamma^2\, r_{t+3} + \cdots = \sum_{k=0}^{\infty} \gamma^k\, r_{t+k+1}$$
 
-It measures "how many total points were earned over the course of one episode" rather than the immediate reward at a single step. There are two fundamentally different routes to answer this question. Before diving in, let us meet a core concept — **policy $\pi$**, which is the agent's "brain," a function that maps states to actions. The ultimate training goal is to find the **optimal policy $\pi^*$**. Policies come in two types: **deterministic** policies always output the same action for the same state ($a = \pi(s)$), while **stochastic** policies output a probability distribution over actions ($\pi(a|s) = P(a|s)$) — the latter naturally balances exploration because there is always some probability of trying non-preferred actions.
+It measures "how many points the agent scored in total over a game from start to finish," and not the immediate reward of any single step. There are two very different routes to answering this question. Before that, we need one core concept, the **policy $\pi$**, which is the agent's "brain," the function that outputs an action given a state. The ultimate goal of training is to find the **optimal policy $\pi^*$**. Policies come in two kinds. A **deterministic** policy always outputs the same action for the same state ($a = \pi(s)$). A **stochastic** policy outputs a probability distribution over actions ($\pi(a|s) = P(a|s)$). The latter naturally builds in exploration, because there is always a small probability of trying a non-preferred action.
 
-So, how do we find the optimal policy? There are two fundamentally different routes:
+So how do we find the optimal policy? There are two quite different routes:
 
-**Route 1: Value-Based** — First figure out how many "points" each action is worth, then choose the highest-scoring one. Imagine walking through a maze; at every fork you see a sign: going left yields an expected total of 80 points, going right yields 30 — so you choose left. That "sign" is the **action-value function (Q-function)**, representing how many total future points you can expect after choosing a particular action in a particular state:
+**Route one: Value-Based.** First work out how many points each action is "worth," then pick the highest. Imagine you are walking through a maze, and at every fork you can see a sign: going left is expected to earn 80 points in total, going right is expected to earn 30. So you go left. This "sign" is the **action-value function (Q-function)**, which represents how many points you can expect in the future after choosing this action in this state:
 
 $$Q^{\pi}(s, a) = \mathbb{E}_{\pi}\left[G_t \mid s_t = s,\, a_t = a\right]$$
 
-The superscript $\pi$ is not an exponent. It identifies the policy used for the evaluation: the agent first takes action $a$ in state $s$, then follows policy $\pi$ thereafter. The condition $s_t=s, a_t=a$ fixes the current state and action, while $\mathbb{E}_{\pi}$ averages over the different trajectories that may follow. Consequently, the same $(s,a)$ can have different values under different subsequent policies.
+The superscript $\pi$ is not an exponent. It indicates which policy this score depends on: the agent first executes action $a$ in state $s$, and afterward keeps acting according to policy $\pi$. The condition $s_t=s, a_t=a$ fixes the current state and the current action, and $\mathbb{E}_{\pi}$ then averages over the different trajectories that may follow. So even when the current $(s,a)$ is the same, $Q^{\pi}(s,a)$ can differ if a different policy is used afterward.
 
-The star means “optimal.” $Q^*(s,a)=\max_{\pi}Q^{\pi}(s,a)$ is the optimal action value: take $a$ now, then follow whichever policy gives the highest expected return. Likewise, $\pi^*$ denotes an optimal policy. Once $Q^*$ is known, selecting the action with the largest $Q^*(s,a)$ in each state produces an optimal policy.
+The asterisk means "optimal." $Q^*(s,a)=\max_{\pi}Q^{\pi}(s,a)$ is the optimal action value: execute $a$ now, and then follow the policy that achieves the highest expected return. $\pi^*$ likewise denotes the optimal policy. Once $Q^*$ is known, choosing in each state the action with the largest $Q^*(s,a)$ yields the optimal policy.
 
-You might wonder: **if you haven't reached the end yet, how can you know how many points the future holds? How are these Q-values actually computed?**
+You are bound to wonder: **if I have not reached the end yet, how can I know how many points I will get in the future? How are these Q-values actually computed?**
 
-This is the most elegant part of RL: **start with random guesses, then correct step by step.** And the theoretical foundation that makes this possible is the **Markov Decision Process (MDP)**.
+This is the most elegant part of reinforcement learning: **start with a wild guess, then correct it step by step.** The theoretical foundation that allows this is the **Markov decision process (MDP)**.
 
-The core assumption of MDP is that "the future depends only on the present, not the past." With this foundation, we can play a mathematical trick, cutting the infinite future at any point — this is the **Bellman Equation**. It tells us that Q-values don't need to be computed by playing to the end; they can be directly decomposed into two parts:
-**Current Q-value = immediate reward + next step's Q-value**
+The core assumption of an MDP is that "the future depends only on the present, not on the past." With this foundation we can perform a mathematical magic trick and cut the infinitely long future off in the middle. This is the **Bellman equation**. It tells us that a Q-value does not have to be computed by playing all the way to the end. It can be decomposed directly into two parts:
+**current Q-value = immediate reward + next-step Q-value**
 
-With this equation, the algorithm's operation becomes extremely intuitive:
-Initially, the scores on all signs at every fork are randomly written (random initialization). You take a random step, receive 1 point reward, and see the next fork's sign reads 10 points. You immediately understand: "Oh, the true value of that last step is about 1+10=11 points!" So you take out a pen and update the sign at the previous fork to 11.
+With this equation, the way the algorithm actually works becomes very intuitive.
+At first, the scores on all the signs at the forks are scribbled at random (random initialization). You take a random step, receive a reward of 1 point, and see that the sign at the next fork says 10 points. You understand at once: "Oh, the true value of that last step was about 1+10=11 points!" So you take out a pen and change the score on the previous fork's sign to 11.
 
-Through repeated trial and error in the maze, using "next step's sign" to correct "previous step's sign," Q-Learning makes the current estimates approach the optimal action values $Q^*$, which satisfy the **Bellman optimality equation**. At that point, always choosing the highest-scoring action naturally yields the optimal policy: $a^* = \arg\max_a Q^*(s, a)$. The representative algorithms of this route range from the classic Q-Learning to DQN in the deep learning era.
+By trying and erring in the maze like this, using "the next sign" to correct "the previous sign," Q-Learning makes the current estimate gradually approach the optimal action value $Q^*$ (which satisfies the **Bellman optimality equation**). At that point, always choosing the action with the highest score naturally yields the best policy: $a^* = \arg\max_a Q^*(s, a)$. The representative algorithms of this route run from classical Q-Learning to DQN in the deep learning era.
 
-**Route 2: Policy-Based** — Skip the scoring and directly learn "when you see this, do that." Back to the maze example — instead of scoring each path, you repeatedly walk through the maze many times: when you reach the end, you strengthen confidence in every choice made along the way; when you fall into a trap, you weaken those choices. Over many walks, the probability of good actions naturally rises while the probability of bad ones falls. Formally, the policy $\pi_\theta$ is defined by parameters $\theta$, and we optimize it by maximizing expected return:
+**Route two: Policy-Based.** Skip the scoring and learn directly "what to do when you see what." Back in the maze: you stop scoring the paths and instead walk the maze many times. Reaching the exit strengthens confidence in every choice made along the way, and falling into a trap weakens it. After enough runs, the probability of good actions naturally rises and the probability of bad actions naturally falls. Formally, the policy $\pi_\theta$ is defined by parameters $\theta$, and we optimize it by maximizing the expected return:
 
 $$J(\theta) = \mathbb{E}_{\pi_\theta}\left[G_t\right], \quad \theta^* = \arg\max_\theta J(\theta)$$
 
-The representative algorithms of this route range from the basic REINFORCE to PPO, which is widely used in large model alignment today.
+The representative algorithms of this route run from basic REINFORCE to PPO, which is now widely used in large-model alignment.
 
-Both routes have shortcomings, and their weaknesses point directly to a core dilemma of RL — **Exploration vs. Exploitation**: exploit the best known action to secure reward, or take the risk of trying unknown actions to discover better strategies? Like choosing restaurants — going to the same good one every day (exploitation) means you might never discover the better one around the corner (exploration); but trying a new restaurant every day (over-exploration) means frequent disappointments. Too much exploration wastes resources; too little leads to suboptimal solutions and no further progress. Route 1 is good at scoring but not at exploring; Route 2 is good at exploring but scoring is less accurate.
+Both routes must deal with the central dilemma of RL, **exploration vs. exploitation**: exploit the best-known action and collect reward reliably, or take a risk on an unknown action to discover a better policy? It is like choosing a restaurant. If you go to the same good place every day (exploitation), you may forever miss a better one around the corner. If you try a new place every day (excessive exploration), you often end up with a bad meal. Too much exploration wastes resources and too little leaves you stuck in a suboptimal policy. Value-based methods usually add an exploration mechanism such as $\varepsilon$-greedy explicitly, while policy-based methods can adjust the degree of exploration through stochastic policies and entropy bonuses.
 
-**Actor-Critic** combines both — using Route 1's approach to train a **"Critic"** that evaluates how good each action is, and Route 2's approach to train an **"Actor"** that selects actions. Specifically:
+**Actor-Critic** puts the two together. It uses the method of route one to train a **"critic" (Critic)** that evaluates how good each action is, and the method of route two to train an **"actor" (Actor)** that chooses actions. Specifically:
 
-- **Critic** is a value function responsible for answering "in state $s$, is executing action $a$ good or bad?" It doesn't select actions directly but scores them — for example, telling you "this step is expected to earn +5 points." The more accurate the scoring, the more the Actor knows which directions are worth trying and which to avoid.
-- **Actor** is a policy function $\pi_\theta(a|s)$, responsible for answering "in state $s$, what should I do?" It adjusts its behavior based on the Critic's scores: actions that receive high scores are selected more often in the future; those scored low are selected less.
+- The **Critic** is a value function that answers "in state $s$, is executing action $a$ actually good?" It does not choose actions directly. It scores them, for example by telling you "this step is expected to earn +5 points." The more accurate the score, the better the actor knows which directions are worth trying and which to avoid.
+- The **Actor** is a policy function $\pi_\theta(a|s)$ that answers "in state $s$, what should I do?" It adjusts its behavior according to the critic's scores: actions the critic rates highly are chosen more often later, and actions rated poorly are chosen less often.
 
-The two form a virtuous cycle: the more accurate the Critic's scores, the faster the Actor improves; the more new actions the Actor tries, the richer the data the Critic sees, and the more accurate its scores become. This is like the relationship between an intern actor and an experienced director — the director points out problems in the performance, the actor improves accordingly, and the actor's new attempts give the director a deeper understanding of "what makes a good performance."
+The two form a virtuous circle: the more accurate the critic's scores, the faster the actor improves, and the more new actions the actor tries, the richer the data the critic sees and the more accurate its scores become. It resembles the relationship between a trainee actor and a veteran director: the director points out problems in the performance, the actor improves accordingly, and the actor's new attempts give the director a deeper understanding of "what makes a good performance."
 
-In RL terminology, algorithms can also be classified by **whether they learn the environment's dynamics**:
+In RL terminology, algorithms can also be divided into two further classes, according to **whether they learn how the environment works**:
 
-- **Model-Free methods**: The agent doesn't care about how the environment works internally, only about "how many points do I get if I do this?" Whether value-based, policy-based, or Actor-Critic, as long as it accumulates experience through trial and error in the environment, it is Model-Free. Like playing Super Mario — you don't need to know the game engine's code; you naturally learn how to jump by dying a few times.
-- **Model-Based methods**: The agent first builds a "world model" in its mind (a model of the environment), predicting "if I do this, what will the environment become?" For example, when AlphaGo plays Go, it knows the rules of Go (the model), and can simulate several moves ahead in its mind before making a decision.
+- **Model-Free methods**: the agent does not care how the environment works internally. It cares only about "how many points I get if I do this." Whether value-based, policy-based, or Actor-Critic, any method that accumulates experience through frantic trial and error in the environment is Model-Free. It is like playing Super Mario: you do not need to know the game engine's code, and after dying a few times you naturally learn how to jump.
+- **Model-Based methods**: the agent first builds a "world model" (a model of the environment) in its head, predicting "if I do this, what will the environment become?" For example, when AlphaGo plays Go, it knows the rules of Go (the model) and can simulate the board several moves ahead in its head before deciding.
 
-This book primarily focuses on **Model-Free** algorithms (such as DQN, PPO, DPO, etc.), because they are more general and absolutely dominate in today's large language model alignment and complex environments.
+This book focuses mainly on **Model-Free** algorithms (such as DQN, PPO, and DPO), because they are more general and overwhelmingly dominate large-language-model alignment and complex environments today.
 
 <div align="center" style="margin: 2.5rem 0;">
 
-<img src="./images/actor-critic.svg" alt="Actor-Critic architecture diagram" style="max-width: 460px; width: 100%;">
+<img src="../../preface/images/actor-critic.svg" alt="Actor-Critic architecture diagram" style="max-width: 460px; width: 100%;">
 
 </div>
 
 <div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 4: Actor-Critic architecture diagram: the Actor is responsible for executing actions, while the Critic scores actions based on environment rewards and guides the Actor to improve.</em>
+  <em>Figure 4: The Actor-Critic architecture. The Actor executes actions, and the Critic scores them based on the environment reward and guides the Actor's improvement.</em>
 </div>
 
-One final question: what do these "score tables" and "behavior manuals" actually look like? In simple environments they can be a small table — just look it up. For example, a tiny maze with only 16 cells, you just need a 16-row table, each row writing "in this cell, how many points is left/right worth" — this is the classic Q-Learning approach:
+One last question: what do these "score tables" and "behavior manuals" actually look like? In a simple environment they can be a small table you just look things up in. For a small maze with only 16 cells, you need only a 16-row table, with each row recording "how many points going left / right is worth in this cell." This is the classic Q-Learning approach:
 
 | State | $\leftarrow$ | $\rightarrow$ | $\uparrow$ | $\downarrow$ |
 | :---: | :----------: | :-----------: | :--------: | :----------: |
@@ -224,105 +195,105 @@ One final question: what do these "score tables" and "behavior manuals" actually
 | $s_1$ |   **0.7**    |      0.2      |    0.5     |     0.0      |
 |   ⋮   |      ⋮       |       ⋮       |     ⋮      |      ⋮       |
 
-Table lookup is sufficient for decision-making: in $s_0$ choose "right" (0.8 is highest), in $s_1$ choose "left" (0.7 is highest). The policy table is similar, with each row showing "the probability of going in each direction from this cell."
+A table lookup is enough to decide: in $s_0$ choose "right" (0.8 is the highest), and in $s_1$ choose "left" (0.7 is the highest). A policy table is similar, with each row recording "the probability of moving in each direction from this cell."
 
-But in Atari games, a single frame has $210 \times 160 = 33,600$ pixels, each with 128 possible colors — the number of possible states far exceeds the number of atoms in the universe. A table simply cannot hold it. **Deep Reinforcement Learning (Deep RL)** uses neural networks to "compress" this infinitely large table: the network takes state (e.g., game screen) as input and outputs Q-values or action probabilities. The network doesn't need to store every row — it **generalizes** through weights, so having seen similar screens, it can guess similar scores.
+But in an Atari game, a single frame has $210 \times 160 = 33600$ pixels, each taking one of 128 colors. The number of possible states far exceeds the number of atoms in the universe, and no table can hold it. **Deep reinforcement learning (Deep RL)** uses a neural network to "compress" this infinitely large table: the network takes the state (such as the game screen) as input and outputs Q-values or action probabilities. The network does not store rows one by one. It **generalizes** through its weights: having seen similar screens, it can guess roughly similar scores.
 
-- If the neural network learns a "score table" (input state, output Q-values for each action), it is Value-Based (e.g., DQN);
-- If it learns a "behavior manual" (input state, output action probability distribution), it is Policy-Based (e.g., REINFORCE);
-- If it learns both — one network for scoring, one for selecting actions — it is Actor-Critic (e.g., PPO).
+- If the neural network learns a "score table" (input a state, output the Q-value of each action), it is Value-Based (such as DQN);
+- If it learns a "behavior manual" (input a state, output a probability distribution over actions), it is Policy-Based (such as REINFORCE);
+- If it learns both, with one network scoring and one network choosing actions, it is Actor-Critic (such as PPO).
 
-All algorithms in this book are Deep RL.
+All algorithms in this book belong to Deep RL.
 
-### The Large Model Era
+### The Era of Large Models
 
-The RL framework discussed above — agent, environment, reward — was developed in traditional settings like games and robotics. A natural question is: **what happens when this framework meets large language models?**
+The reinforcement learning framework discussed so far (agent, environment, reward) grew up in traditional settings such as games and robotics. A natural question is: **what happens when this framework meets large language models?**
 
-In 2016, AlphaGo defeated Lee Sedol, proving RL's power in perfect-information games. But what truly brought RL into the public spotlight was the 2022 release of ChatGPT — people discovered that the key technology for making large models go from "can talk" to "talk well" was none other than reinforcement learning.
+In 2016, AlphaGo defeated Lee Sedol and demonstrated the power of reinforcement learning in perfect-information games. But what truly brought RL to the center of public attention was the release of ChatGPT in 2022. People found that the key technique for turning a large model from one that "can talk" into one that "talks well" was reinforcement learning.
 
 ![ChatGPT early interface example](../../preface/brief-history/images/chatgpt.png)
 
 <div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 5: ChatGPT brought large language models to public attention and turned RLHF from a training pipeline in papers into a key technology behind real products. Source: OpenAI <a href="https://openai.com/index/chatgpt/" target="_blank" rel="noopener noreferrer">Introducing ChatGPT</a></em>
+  <em>Figure 5: ChatGPT brought large language models into public view, and turned RLHF from a training procedure in papers into a key technology behind a real product. Source: OpenAI <a href="https://openai.com/index/chatgpt/" target="_blank" rel="noopener noreferrer">Introducing ChatGPT</a></em>
 </div>
 
-In game environments, reward signals are clear and automatic: eating a coin is +1, falling into a pit is -100. But when we want AI to learn to "speak well," a problem arises: what is a "good" response? Polite? Helpful? Safe? Human preferences are so complex that the environment cannot automatically judge how many points a response should receive.
+In a game environment, the reward signal is clear and automatic: collecting a coin is +1, falling into a pit is -100. But when we want an AI to learn to "speak well," a problem appears: what counts as a "good" answer? Polite? Helpful? Safe? Human preferences are so complex that the environment simply cannot decide automatically how many points an answer deserves.
 
-**RLHF (Reinforcement Learning from Human Feedback)** provided the first solution, completing the transformation from "can talk" to "talk well" in three stages:
+**RLHF (Reinforcement Learning from Human Feedback)** gave the first solution, completing the shift from "can talk" to "talks well" in three stages:
 
 ![InstructGPT's three-step training pipeline](../../chapter03_mdp/images/rlhf-openai-methods-diagram.webp)
 
 <div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 6: The three-step training pipeline used by OpenAI in InstructGPT: first supervised fine-tuning, then reward model training, and finally RL policy optimization. Source: OpenAI <a href="https://openai.com/index/instruction-following/" target="_blank" rel="noopener noreferrer">Aligning language models to follow instructions</a></em>
+  <em>Figure 6: The three-step training pipeline OpenAI used in InstructGPT: supervised fine-tuning first, then reward model training, and finally policy optimization with reinforcement learning. Source: OpenAI <a href="https://openai.com/index/instruction-following/" target="_blank" rel="noopener noreferrer">Aligning language models to follow instructions</a></em>
 </div>
 
-1. **Supervised Fine-Tuning (SFT)**: Fine-tune the model with high-quality dialogue examples written by humans, teaching it basic conversation format.
-2. **Reward Model Training (RM)**: Have humans rank multiple model responses, then train a scoring model that can "imitate" human preferences.
-3. **RL Optimization (RL)**: Use algorithms like PPO with the reward model's scores as the signal to further optimize the model's response strategy.
+1. **Supervised fine-tuning (SFT)**: fine-tune the model on high-quality dialogue examples written by humans so that it learns the basic conversation format.
+2. **Reward model training (RM)**: have humans rank multiple answers from the model, and train a scoring model that can "imitate" human preferences.
+3. **Reinforcement learning optimization (RL)**: use an algorithm such as PPO, with the reward model's score as the signal, to further optimize the model's answering policy.
 
-RL in the large model era has evolved two key routes. **Route 1: Preference-based alignment (RLHF / DPO)** — when the judgment standard is "do humans like it" (polite tone, safe response), the environment cannot automatically score. We first train a reward model with human annotations to "imitate" human preferences, then use it to guide RL training. DPO goes further, cleverly "hiding" the reward signal in the policy probability ratio, bypassing the explicit reward model — you will practice this pipeline hands-on in Chapters 8-9. **Route 2: Verifiable-reward pure RL (RLVR)** — when turning to math, code, or complex reasoning tasks, the correctness of answers is objectively verifiable. Frontier work like DeepSeek-R1-Zero proves that SFT and reward models are no longer necessary: as long as you give the model rule-based feedback, pure RL can drive a base model to spontaneously emerge long Chain-of-Thought reasoning and powerful reasoning capabilities. This is one of the most cutting-edge explorations on the path to AGI.
+RL in the era of large models has evolved along two key routes. **Route one: preference-based alignment (RLHF / DPO).** When the criterion is "do humans like it" (is the tone polite, is the answer safe), the environment cannot give scores automatically. We first train a reward model on human annotations to "imitate" human preferences, then use it to guide RL training. DPO goes one step further and cleverly "hides" the reward signal in the policy probability ratio, bypassing the explicit reward model. You will practice this pipeline hands-on in Chapters 8-9. **Route two: pure reinforcement learning with verifiable rewards (RLVR).** When we turn to mathematics, code, or complex reasoning tasks, the correctness of an answer is objectively verifiable. Frontier work such as DeepSeek-R1-Zero showed that neither prior SFT nor a trained reward model is needed. Given only rule-based feedback, pure reinforcement learning can drive a base model to spontaneously develop long chains of thought (Chain-of-Thought) and strong reasoning ability. This is one of the frontier explorations on AI's road toward AGI.
 
 ![DeepSeek-R1 RL training pipeline](../../chapter32_selfplay/self-play-outlook/images/deepseek_r1_pipeline.png)
 
 <div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 7: DeepSeek-R1's training pipeline pushes "RL in the large model era" toward another route: on verifiable tasks, let the model self-improve through online sampling, rule rewards, and GRPO-style optimization. Source: <a href="https://arxiv.org/abs/2501.12948" target="_blank" rel="noopener noreferrer">DeepSeek-R1 Paper</a></em>
+  <em>Figure 7: The DeepSeek-R1 training pipeline pushes "RL in the era of large models" along another route: on verifiable tasks, the model improves itself through online sampling, rule-based rewards, and GRPO-style optimization. Source: <a href="https://arxiv.org/abs/2501.12948" target="_blank" rel="noopener noreferrer">DeepSeek-R1 Paper</a></em>
 </div>
 
-Remember PPO from earlier? In the large model era, it went from being the pinnacle of game control to the foundation of the entire LLM alignment industry. But PPO requires an additional Critic network to evaluate action quality, which means enormous computational overhead for large models. **GRPO (Group Relative Policy Optimization)** was born — it replaces the Critic network with within-group relative advantages, comparing multiple responses from the same generation to learn "which is better" directly. This simplification dramatically reduces RL training costs and has become one of the mainstream choices for aligning large models in the open-source community.
+Remember PPO from earlier? In the era of large models it went from the culmination of game control to the cornerstone of the entire LLM alignment industry. But PPO needs an additional Critic network to evaluate how good actions are, which for a large model means enormous computational overhead. **GRPO (Group Relative Policy Optimization)** emerged in response. It replaces the Critic network with group-relative advantages: it compares the quality of several answers generated in the same batch and learns directly from "which one is better." This simplification greatly reduces the cost of RL training and has made GRPO one of the mainstream choices for aligning large models in the open-source community.
 
 ### The Future
 
-RL is moving from "making AI do single-step decisions" to "making AI complete entire tasks." Along this path, three directions are worth watching.
+Reinforcement learning is moving from "letting AI make single-step decisions" to "letting AI complete whole tasks." There are three directions worth watching on this road.
 
-The first direction is **Agentic RL**. Current large language models are essentially "single-turn QA machines" — you ask one question, they give one answer. But real-world tasks often require multi-turn interaction: planning a trip requires searching multiple websites for price comparison; debugging code requires repeatedly running tests, reading error messages, modifying and verifying. Agentic RL trains AI to act continuously in environments, call tools, dynamically adjust strategies based on intermediate results, and ultimately complete long-horizon complex tasks. This is the key transition from "dialogue models" to "autonomous agents," which you will practice in depth in Chapter 10.
+The first direction is **agentic reinforcement learning (Agentic RL)**. Current large language models are essentially "single-turn question-answering machines": you ask one question and they give one answer. But real tasks often need multi-turn interaction. Planning a trip means searching several websites and comparing prices, and debugging code means running tests repeatedly, reading error messages, modifying, and verifying again. Agentic RL trains an AI to act continuously in an environment, call tools, adjust its policy dynamically according to intermediate results, and finally complete long-horizon complex tasks. This is the key leap from "dialogue model" to "autonomous agent," and you will practice it in depth in Chapter 8.
 
-The second direction is **multimodal and embodied intelligence**. RL is breaking through the boundaries of pure text: vision-language models (VLMs) extend RL's reach to image understanding and visual reasoning, while embodied AI pushes RL into the physical world — letting robots learn to walk, grasp, and manipulate through trial and error in real environments. The biggest challenge is the simulation-to-reality gap (Sim-to-Real Gap): policies trained in virtual environments may fail completely in the real world. Techniques like domain randomization are helping to alleviate this problem, while Model-Based RL and self-play are opening new possibilities.
+The second direction is **multimodality and embodied intelligence**. RL is breaking past the boundary of pure text. Vision-language models (VLMs) extend RL to image understanding and visual reasoning, while embodied AI pushes RL into the physical world, letting robots learn to walk, grasp, and manipulate by trial and error in real environments. The biggest challenge is the gap between simulation and reality (Sim-to-Real Gap): a policy trained in a virtual environment may fail completely in the real world. Techniques such as domain randomization (Domain Randomization) are easing the problem, while Model-Based RL and self-play (Self-Play) are opening new possibilities.
 
-The third direction may also be the ultimate destination — **toward more general intelligence**. Returning to Sutton's "bitter lesson": general methods will ultimately prevail. From games to language, from language to vision, from vision to the physical world, every expansion of RL validates the same judgment — letting agents learn through trial and error is more effective than humans manually encoding knowledge. And the end of this road may be AGI.
+The third direction may also be the final destination: **toward more general intelligence**. Return to Sutton's "Bitter Lesson": general methods will win in the end. From games to language, from language to vision, from vision to the physical world, each expansion of reinforcement learning confirms the same judgment: having the agent learn through trial and error on its own is more effective than humans hand-coding knowledge. And the end of this road may be AGI.
 
 ---
 
-The above is the conceptual framework of reinforcement learning. If you encounter this for the first time, the terminology can feel dense — no need to dwell here. The following chapters will unfold each concept through code and experiments. Each time you encounter a concept, you will have concrete hands-on experience to match it with.
+That is the conceptual framework of reinforcement learning. On a first encounter the terminology feels dense, but there is no need to dwell here. The later chapters unfold each concept through code and experiments, and whenever you meet a concept you will have hands-on experience to attach to it.
 
 ## About This Book
 
-In 2016, AlphaGo defeated Lee Sedol, and RL stunned the public for the first time. In 2022, ChatGPT was released, and people discovered that RL was precisely the key technology for making large language models go from "can talk" to "talk well." From DeepSeek-R1 to various open-source alignment models, algorithms like RLHF, DPO, and GRPO have profoundly reshaped the entire AI industry.
+In 2016, AlphaGo defeated Lee Sedol and reinforcement learning shocked the public for the first time. In 2022, with the release of ChatGPT, people discovered that RL is the key technology that turns a large language model from one that "can talk" into one that "talks well." From DeepSeek-R1 to the many open-source aligned models, algorithms such as RLHF, DPO, and GRPO have profoundly reshaped the whole AI industry.
 
 ![AlphaGo vs Lee Sedol](../../preface/brief-history/images/alphago-game5.svg)
 
 <div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure: Game 5 of the five-game match between AlphaGo and Lee Sedol in 2016. AlphaGo won 4:1, marking the first time RL stunned the public. Source: <a href="https://commons.wikimedia.org/wiki/File:Lee_Sedol_(B)_vs_AlphaGo_(W)_-_Game_5.svg" target="_blank" rel="noopener noreferrer">Wikimedia Commons</a> (CC BY-SA 4.0)</em>
+  <em>Figure: The record of Game 5 of the 2016 five-game match between AlphaGo and Lee Sedol. AlphaGo won 4:1, marking the first time reinforcement learning shocked the public. Source: <a href="https://commons.wikimedia.org/wiki/File:Lee_Sedol_(B)_vs_AlphaGo_(W)_-_Game_5.svg" target="_blank" rel="noopener noreferrer">Wikimedia Commons</a> (CC BY-SA 4.0)</em>
 </div>
 
-However, available learning resources lag severely behind industry practice. Mainstream tutorials gloss over RL, while dedicated RL textbooks remain stuck in traditional frameworks and don't mention PPO, DPO, or GRPO. An engineer who wants to understand the RLHF pipeline must laboriously bridge classic textbooks and cutting-edge papers on their own. We set out to write this book to fill that gap.
+Yet the available learning resources lag badly behind industry practice. Mainstream tutorials gloss over RL in a single stroke, while dedicated RL textbooks stay within the traditional framework and say nothing about PPO, DPO, or GRPO. An engineer who wants to understand the RLHF pipeline has to build a bridge by hand between classic textbooks and the latest papers. We set out to write this book to fill that gap.
 
-This book represents our attempt — **to make modern reinforcement learning accessible, teaching core concepts through a blend of code, math, and intuition.**
+This book is our attempt: **to make modern reinforcement learning approachable, teaching the core concepts through a fusion of code, mathematics, and intuition.**
 
 ### A "Hands-On First, Theory Second" Learning Path
 
-Many textbooks first cover all properties of MDPs, then the Bellman equation, and only then let you touch a single line of code. In this book, **you will start training an agent from the very first line of code in Chapter 1.** When you see the CartPole go from wobbling to standing steady, when you personally use DPO to teach a large model to "speak well," and then go back to understand the underlying math, the learning process is more natural and the understanding more lasting.
+Many textbooks first cover all the properties of MDPs, then the Bellman equation, and only then allow you to touch a line of code. In this book, **you start training an agent from the first line of code in the first chapter**. When you have watched the CartPole cart go from wobbling to standing steadily, and have used DPO yourself to teach a large model to "talk well," and then go back to understand the mathematics behind it, learning is more natural and understanding lasts longer.
 
-Each chapter follows a four-step cycle: first give you runnable code to gain direct experience; then guide you to observe key phenomena on training curves; then explain mathematical principles on top of the intuition; and finally use theory to re-interpret the earlier phenomena, completing the loop from intuition to formalization.
+Every chapter follows a four-step cycle: first, a piece of runnable code that gives you direct experience. Then, guidance to the key phenomena on the training curves. Next, with intuition in hand, an explanation of the mathematical principles. Finally, a reinterpretation of the earlier phenomena through theory, which closes the loop from intuition to formalization.
 
 ### Code and Theory Together
 
-Every chapter includes runnable code examples. **Many intuitions in RL can only be built through trial and error** — tweak the learning rate, observe oscillation in the reward curve; change the clip parameter, see if the policy collapses. These experiences cannot be gained by reading formulas alone.
+Every chapter of this book contains runnable code examples. **Many intuitions in reinforcement learning can only be built through trial and error**: adjust the learning rate and watch the reward curve oscillate, change the clip parameter and see whether the policy collapses. This kind of experience cannot be gained from reading formulas alone.
 
 ### Content and Structure
 
-The book is organized into seven stages, shown in different colors in the core map below:
+The book is divided into seven parts, shown in different colors in the core map below:
 
 <div class="preface-structure-map" align="center" style="margin: 2.5rem 0;">
 
 ```mermaid
 graph TD
-    subgraph P1["Fundamentals and Classical RL (Chapters 1-4)"]
-        Q["CartPole<br/>Problem formulation and classical methods"]
+    subgraph P1["Part I · Foundations and Classical RL (Chapters 1-4)"]
+        Q["CartPole introduction<br/>Problem definition and classical methods"]
     end
 
-    subgraph P2["Deep Reinforcement Learning (Chapters 5-9)"]
-        A["Core RL problems<br/>Sequential decisions & long-term return"] --> B["Value-Based<br/>Learn action values first"]
-        A --> C["Policy-Based<br/>Learn policy directly"]
+    subgraph P2["Part II · Deep Reinforcement Learning (Chapters 5-9)"]
+        A["Core problems of RL<br/>Sequential decisions and long-term return"] --> B["Value-Based<br/>Learn action values"]
+        A --> C["Policy-Based<br/>Learn the policy directly"]
         B --> D["Q-Learning → DQN<br/>(Chapter 5)"]
         C --> E["REINFORCE<br/>(Chapter 6)"]
         D --> F["Actor-Critic convergence<br/>(Chapter 7)"]
@@ -331,26 +302,26 @@ graph TD
         G --> H["Continuous control and Model-Based RL<br/>(Chapter 9)"]
     end
 
-    subgraph P3["Advanced RL Methods (Chapters 10-12)"]
-        I["Offline RL"] --> J["Imitation, inverse and meta-RL"]
-        J --> K["Exploration, multi-agent and hierarchical RL"]
+    subgraph P3["Part III · Advanced RL Methods (Chapters 10-12)"]
+        I["Offline RL"] --> J["Imitation learning, inverse RL, and meta-RL"]
+        J --> K["Exploration, multi-agent, and hierarchical RL"]
     end
 
-    subgraph P4["LLM Alignment and Post-Training (Chapters 13-18)"]
-        L["RLHF, RLAIF and industrial training<br/>(Chapters 13-14)"] --> M["DPO, GRPO and RLVR<br/>(Chapters 15-16)"]
-        M --> N["Reasoning models and PRMs<br/>(Chapters 17-18)"]
+    subgraph P4["Part IV · LLM Alignment and Post-Training (Chapters 13-18)"]
+        L["RLHF, RLAIF, and industrial training<br/>(Chapters 13-14)"] --> M["DPO, GRPO, and RLVR<br/>(Chapters 15-16)"]
+        M --> N["Reasoning models and PRM<br/>(Chapters 17-18)"]
     end
 
-    subgraph P5["Agentic Reinforcement Learning (Chapters 19-22)"]
-        O["Tool use and multi-turn RL"] --> P["Code, browser and GUI agents"]
+    subgraph P5["Part V · Agentic Reinforcement Learning (Chapters 19-22)"]
+        O["Tool use and multi-turn RL"] --> P["Code, browser, and GUI agents"]
     end
 
-    subgraph P6["Multimodal Reinforcement Learning (Chapters 23-24)"]
-        R["Vision-Language Model RL<br/>(Chapter 23)"] --> S["Frontier Multimodal RL<br/>(Chapter 24)"]
+    subgraph P6["Part VI · Multimodal Reinforcement Learning (Chapters 23-24)"]
+        R["Vision-language model RL<br/>(Chapter 23)"] --> S["Frontier multimodal RL<br/>(Chapter 24)"]
     end
 
-    subgraph P7["Safety, Evaluation and Research Frontiers (Chapters 25-26)"]
-        T["Reward hacking and RL evaluation"] --> U["Self-play, scaling and frontiers"]
+    subgraph P7["Part VII · Safety, Evaluation, and Research Frontiers (Chapters 25-26)"]
+        T["Reward hacking and RL evaluation"] --> U["Self-Play, scaling, and research frontiers"]
     end
 
     Q --> A
@@ -392,54 +363,52 @@ graph TD
 
 </div>
 
-The diagram follows the book's seven-stage learning path. Chapters 1-4 establish the language of classical RL. Chapters 5-9 develop value-based and policy-based deep RL, bringing them together through Actor-Critic and PPO. Chapters 10-12 cover advanced settings. Chapters 13-18 then introduce LLM alignment and post-training, Chapters 19-22 move to agents that use tools and act over complete trajectories, Chapters 23-24 extend RL to vision, audio, VLA, and visual generation, and Chapters 25-26 close with safety, evaluation, and research frontiers.
+The seven parts cover the following.
 
-Here is a detailed introduction to each chapter's content.
+**Part I (Chapters 1 to 4)** starts from CartPole and builds, in turn, the problem definition of reinforcement learning, value functions, the Bellman equation, and classical solution methods.
 
-**Chapters 1-4** begin with CartPole and then establish RL problem definitions, value functions, Bellman equations, and classical solution methods.
+**Part II (Chapters 5 to 9)** enters deep reinforcement learning: DQN learns action values, policy gradients optimize the policy directly, Actor-Critic combines the two routes, PPO provides stable policy updates, and Off-Policy methods and Model-Based RL further improve sample efficiency.
 
-**Chapters 5-9** develop deep RL: DQN learns action values, policy gradients optimize policies directly, Actor-Critic combines the two routes, PPO stabilizes policy updates, and continuous-control and model-based methods broaden the setting.
+**Part III (Chapters 10 to 12)** discusses offline reinforcement learning, imitation learning, inverse reinforcement learning, meta-reinforcement learning, exploration, multi-agent reinforcement learning, and hierarchical reinforcement learning, filling in methodological tools for more complex data and environment settings.
 
-**Chapters 10-12** cover offline RL, imitation and inverse RL, meta-RL, exploration, multi-agent learning, and hierarchical RL.
+**Part IV (Chapters 13 to 18)** covers RLHF, RLAIF, DPO, GRPO, RLVR, reasoning models, process reward models, and industrial training, forming a complete post-training route for large models.
 
-**Chapters 13-18** form the LLM post-training path, from RLHF, RLAIF, and industrial training to DPO, GRPO, RLVR, reasoning models, and process reward models.
+**Part V (Chapters 19 to 22)** extends the training object from a single answer to a complete trajectory, discussing in turn multi-turn interaction, tool use, code agents, browser agents, and GUI agents.
 
-**Chapters 19-22** shift the training object from a single response to a complete trajectory, covering tool use, multi-turn interaction, code agents, browser agents, and GUI agents.
+**Part VI (Chapters 23 to 24)** first discusses vision-language model RL, then gathers audio agents, VLA, and visual generation under "frontier multimodal RL," forming a continuous route from multimodal understanding to interaction and generation.
 
-**Chapters 23-24** first cover Vision-Language Model RL, then combine audio, VLA, and visual generation in Frontier Multimodal RL, creating a continuous path from multimodal understanding to interaction and generation.
-
-**Chapters 25-26** focus on reward hacking, alignment evaluation, self-play, scaling laws, multi-agent cooperation, and research frontiers.
+**Part VII (Chapters 25 to 26)** focuses on reward hacking, reinforcement learning evaluation, Self-Play, scaling laws, multi-agent collaboration, and research frontiers.
 
 ### Target Audience
 
-This book is aimed at students, engineers, and researchers. No prior deep learning or machine learning background is required — only basic Python programming ability, linear algebra (matrix operations), calculus (partial derivatives, chain rule), and probability fundamentals (expectation, conditional probability). Most of the time, we prioritize intuition and ideas over mathematical rigor.
+This book is aimed at students, engineers, and researchers. No prior background in deep learning or machine learning is needed. You need only basic Python programming, linear algebra (matrix operations), calculus (partial derivatives, the chain rule), and the basics of probability (expectation, conditional probability). Most of the time we put intuition and ideas ahead of mathematical rigor.
 
 ## Environment and Hardware Requirements
 
-The course's experimental code is compatible with major operating systems:
+The experiment code of this course is compatible with the mainstream operating systems:
 
-- **Linux** (recommended): Ubuntu 20.04 and above, with the most complete support for the deep learning ecosystem.
-- **Windows**: Run all experiments through WSL2 (Windows Subsystem for Linux 2), easy to install.
-- **macOS**: Both Apple Silicon (M1/M2/M3/M4) and Intel Macs can run most experiments.
+- **Linux** (recommended): Ubuntu 20.04 or later, which has the most complete support for the deep learning ecosystem.
+- **Windows**: all experiments can run through WSL2 (Windows Subsystem for Linux 2), which is easy to install.
+- **macOS**: Apple Silicon (M1/M2/M3/M4) and Intel Macs can run most experiments.
 
-GPU and VRAM requirements are divided into three tiers:
+GPU and memory requirements are divided into three tiers:
 
-| Tier              | VRAM Required        | Coverage                                                                                        | Typical Hardware                    |
-| ----------------- | -------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------- |
-| Intro experiments | CPU only / 4GB+ VRAM | Classic RL experiments like CartPole, Atari, policy gradients                                   | Integrated graphics, GTX 1650, etc. |
-| Core experiments  | 24GB VRAM            | LLM-related experiments like DPO alignment, PPO training, GRPO                                  | RTX 3090, RTX 4090, A5000, etc.     |
-| Large projects    | 80GB VRAM            | A small number of large-scale model training runs (e.g., complete RLHF pipeline for 7B+ models) | A100, H100, etc.                    |
+| Tier             | VRAM required             | Coverage                                                              | Typical hardware                  |
+| ---------------- | ------------------------- | --------------------------------------------------------------------- | --------------------------------- |
+| Introductory     | CPU only / 4GB+ VRAM      | Classic RL experiments such as CartPole, Atari, and policy gradients | Integrated graphics, GTX 1650     |
+| Core             | 24GB VRAM                 | LLM-related experiments such as DPO alignment, PPO training, and GRPO | RTX 3090, RTX 4090, A5000         |
+| Large projects   | 80GB VRAM                 | A few large-scale model training runs (such as a full RLHF pipeline for 7B+ models) | A100, H100              |
 
-Most experiments are designed to run within **24GB VRAM** — a single consumer-grade GPU (like RTX 3090/4090) is sufficient for over 90% of the hands-on content in the entire book. Only a few advanced projects involving full-parameter training of large models require 80GB-class GPUs.
+Most experiments fit within **24GB of VRAM**, and one consumer GPU (such as an RTX 3090 / 4090) is enough to cover over 90% of the hands-on content in the book. Only a few advanced projects involving full-parameter training of large models require an 80GB-class GPU.
 
 ::: tip
-The cost of experiencing this course is not high. An ordinary laptop can run the intro experiments, and a consumer GPU with 24GB VRAM covers the vast majority of core content.
+Trying this course does not cost much. An ordinary laptop can run the introductory experiments, and one consumer GPU with 24GB of VRAM is enough to cover most of the core content.
 :::
 
 ## Summary
 
-- **Foundational understanding**: RL is the form of learning closest to biological instinct — optimizing behavior through trial and error and reward signals. Sutton's "bitter lesson" tells us that general methods will ultimately prevail over manually encoded human knowledge.
-- **Core theory**: RL's theoretical framework centers on the agent-environment interaction loop. Value functions and policy gradients are the two core solution routes, and Actor-Critic merges both.
-- **The large model era**: From RLHF to DPO, from PPO to GRPO and RLVR, RL has become the key technology for large language model alignment and the emergence of reasoning capabilities.
-- **The future**: Agentic RL, multimodal RL, and embodied intelligence are pushing RL from dialogue to action, from text to the physical world, toward more general intelligence.
-- This book uses a "hands-on first, theory second" teaching approach. Only basic Python programming and math foundations are needed to begin learning.
+- **Foundational understanding**: reinforcement learning is the learning method closest to biological instinct, optimizing behavior through trial and error and reward signals. Sutton's "Bitter Lesson" tells us that general methods will eventually outperform knowledge hand-coded by humans.
+- **Core theory**: the theoretical framework of RL is built around the agent-environment interaction loop. Value functions and policy gradients are the two main solution routes, and Actor-Critic fuses them.
+- **The era of large models**: from RLHF to DPO, from PPO to GRPO and RLVR, reinforcement learning has become the key technology for large language model alignment and the emergence of reasoning ability.
+- **The future**: Agentic RL, multimodal RL, and embodied intelligence are moving RL from dialogue to action and from text to the physical world, toward more general intelligence.
+- This book takes a "hands-on first, theory second" teaching path, and basic Python programming and mathematics are enough to begin.

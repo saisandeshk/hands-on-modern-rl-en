@@ -3,7 +3,8 @@ title: 8.2 Trust Regions and PPO-Clip
 ---
 
 # 8.2 Trust Regions and PPO-Clip
-## Section Overview
+
+## Reading Guide
 
 PPO's clipped surrogate objective is:
 
@@ -123,6 +124,56 @@ Using the 1.65 example from above ($\varepsilon = 0.2$, $A_t = 2$). With $r_t = 
 | $\min$ picks | $\min(3.30,\; 2.40)$                                 | **$2.40$** |
 
 Clipping compresses the larger objective value (3.30) down to 2.40. The objective becomes constant in this interval — **its dependence on $\theta$ vanishes, and the policy is no longer encouraged to increase $\pi(a_1 \mid s)$ further.**
+
+### Why Clipping Sends the Gradient to Zero
+
+To see what "the objective becomes constant" means, we first need the full definition of the clip function. $\text{clip}(x, a, b)$ is a three-piece function:
+
+$$\text{clip}(x, a, b) = \begin{cases} a & x < a \\ x & a \leq x \leq b \\ b & x > b \end{cases}$$
+
+Substituting $a = 1 - \varepsilon = 0.8$ and $b = 1 + \varepsilon = 1.2$ gives a graph made of line segments: the left and right pieces are horizontal lines (with fixed values $0.8$ and $1.2$), and the middle piece is a diagonal of slope 1.
+
+| Position of $r_t$       | clip output     | Contains $\theta$        |
+| ----------------------- | --------------- | ------------------------ |
+| $r_t < 0.8$             | always $0.8$    | No (a plain number)      |
+| $0.8 \leq r_t \leq 1.2$ | $r_t$ itself    | Yes                      |
+| $r_t > 1.2$             | always $1.2$    | No (a plain number)      |
+
+Now we work through the chain rule in full. First write out how $r_t(\theta)$ depends on $\theta$:
+
+$$r_t(\theta) = \frac{\pi_\theta(a_t\mid s_t)}{\pi_{\text{old}}(a_t\mid s_t)}$$
+
+Here $\pi_{\text{old}}$ is the old policy at sampling time and is already a fixed constant (in this section's running example, $\pi_{\text{old}}(a_1\mid s) = 0.6$). $\theta$ affects $r_t$ only through the numerator $\pi_\theta$.
+
+Expanding the gradient of the clipped term with the chain rule:
+
+$$\nabla_\theta\left[\text{clip}(r_t(\theta), 0.8, 1.2) \cdot A_t\right] = A_t \cdot \underbrace{\frac{\partial \,\text{clip}}{\partial r_t}}_{\text{clip slope}} \cdot \underbrace{\nabla_\theta r_t(\theta)}_{\text{contains } \theta}$$
+
+The dependence chain is $\theta \xrightarrow{\nabla \pi_\theta} r_t \xrightarrow{\partial \text{clip}/\partial r_t} \text{clip} \xrightarrow{\times A_t} L$. The chain rule is the product of these three derivatives, so **if any one of them is zero, the whole product is zero**. clip is a piecewise function whose pieces have different slopes:
+
+| Position of $r_t$       | clip slope $\partial \text{clip}/\partial r_t$ |
+| ----------------------- | ---------------------------------------------- |
+| $r_t < 0.8$             | $0$ (horizontal piece)                         |
+| $0.8 \leq r_t \leq 1.2$ | $1$ (diagonal piece)                           |
+| $r_t > 1.2$             | $0$ (horizontal piece)                         |
+
+Now substitute the numbers of the running example: $\pi_{\text{old}}(a_1\mid s) = 0.6$, $A_t = 2$, $\nabla_\theta r_t = \nabla_\theta \pi_\theta / 0.6$.
+
+**Case 1: $r_t = 1.65$ (above the upper bound, overshooting in the direction of the update).** clip is on a horizontal piece with slope $0$:
+
+$$\nabla_\theta[\text{clip}(r_t,0.8,1.2)\cdot A_t] = 2 \cdot 0 \cdot \frac{\nabla_\theta \pi_\theta}{0.6} = 0$$
+
+The middle factor $\partial \text{clip}/\partial r_t = 0$ cuts the dependence chain from $\theta$ to $L$: no matter how large $\nabla_\theta \pi_\theta$ is, the product stays zero. $\min$ picks the clipped term here ($2.40 < 3.30$), the gradient is zero, and the update stops. **This is exactly the design intent of PPO: the good action has already pushed its probability to 1.65 times the old value, so it should stop.**
+
+**Case 2: $r_t = 0.5$ (below the lower bound, overshooting in the opposite direction).** clip is still on a horizontal piece, and the slope is still $0$:
+
+$$\nabla_\theta[\text{clip}(r_t,0.8,1.2)\cdot A_t] = 2 \cdot 0 \cdot \frac{\nabla_\theta \pi_\theta}{0.6} = 0$$
+
+The situation is now reversed. $A_t = 2$ marks a good action that should increase $r_t$, yet $r_t$ has fallen to $0.5$, so "the update went in the wrong direction". **Pure clipping still gives a zero gradient, and the policy is stuck at $0.5$, unable to climb back into the safe zone $[0.8, 1.2]$.**
+
+Comparing the two cases: the zero gradient in Case 1 is the design intent, since the good action has already gone beyond the tolerated range and should stop. The zero gradient in Case 2 is a hazard, since the policy has gone the wrong way and is stuck there.
+
+This is the full meaning of "the objective becomes constant": it is **constant with respect to the parameters $\theta$**, which does not mean its numerical value never changes. In geometric terms, the objective curve is a horizontal line over this interval, and the slope (derivative) of a horizontal line is zero.
 
 The formula consists of three terms, each with a distinct role:
 
@@ -326,8 +377,8 @@ The choice of $\varepsilon$ directly affects training dynamics. The table below 
 | ε value | Update size | Training speed           | Stability        | Typical use case                         |
 | ------: | ----------- | ------------------------ | ---------------- | ---------------------------------------- |
 |    0.05 | very small  | very slow                | extremely stable | fine-tuning an already trained policy    |
-|     0.1 | small       | slower                   | stable           | LLM alignment (large models are fragile) |
-|     0.2 | medium      | moderate                 | moderate         | games/control tasks (a common default)   |
+|     0.1 | small       | slower                   | stable           | LLM alignment (many parameters, more fragile) |
+|     0.2 | medium      | moderate                 | moderate         | games/control tasks (default value)      |
 |     0.3 | larger      | faster                   | unstable         | quick experiments/simple tasks           |
 |     0.5 | very large  | fast but often collapses | very unstable    | not recommended                          |
 

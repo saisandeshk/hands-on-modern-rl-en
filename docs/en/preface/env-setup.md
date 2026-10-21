@@ -4,6 +4,12 @@ title: Environment Setup Guide
 
 # Environment Setup
 
+::: tip Ask a coding assistant to install it for you
+If you are using a coding assistant such as Codex, tell it your learning goal first and then ask it to do the installation:
+
+> Hello, I am about to start this reinforcement learning course and want to set up the lab environment first. Please check my operating system, Python version, and GPU/CUDA status, create a Python 3.10 environment named `rl-course`, install the dependencies needed for the minimal runnable course environment, and then run the CartPole verification program. If you hit installation problems, keep troubleshooting and fixing them. If you need administrator privileges or system-level configuration changes, ask for my confirmation first.
+:::
+
 > **Goal of this section**: build a complete development environment for this course from scratch, covering Python, PyTorch, the RL toolchain, and LLM training frameworks. Follow the steps end to end, and you will be able to run every experiment in the book.
 
 ## Minimal Working Setup (Get Running in 5 Minutes)
@@ -64,11 +70,11 @@ The first half of the course (CartPole, DQN, etc.) can be trained on CPU; a GPU 
 We recommend **Python 3.10+** (3.10, 3.11, or 3.12 are all fine). We suggest using conda to manage environments, as it makes switching CUDA versions easier.
 
 ```bash
-# Option 1: conda (recommended)
+# Using conda (recommended)
 conda create -n rl-course python=3.10 -y
 conda activate rl-course
 
-# Option 2: venv (lightweight)
+# Using venv (lightweight)
 python3.10 -m venv rl-course
 source rl-course/bin/activate  # Linux/macOS
 # rl-course\Scripts\activate   # Windows
@@ -141,17 +147,17 @@ pip install tqdm tensorboard wandb
 Different chapters use different simulators. Install them as needed.
 
 ```bash
-# Chapter 11: PyBullet robotics simulation
+# PyBullet robotics simulation
 pip install pybullet
 
-# Chapter 4: Atari games (requires ale-py)
+# Atari games (requires ale-py)
 pip install "gymnasium[atari,accept-rom-license]"
 pip install ale-py
 
-# Chapter 4: ViZDoom first-person 3D
+# ViZDoom first-person 3D
 pip install vizdoom
 
-# Chapter 4: stable-retro (classic games)
+# stable-retro (classic games)
 pip install stable-retro
 ```
 
@@ -204,7 +210,7 @@ pip install mlagents
 python -c "from mlagents_envs.environment import UnityEnvironment; print('ML-Agents ready')"
 ```
 
-Using ML-Agents also requires downloading or building Unity environments (`.exe` / `.app` / Linux executables). Pre-built environments are available from [ML-Agents GitHub Releases](https://github.com/Unity-Technologies/ml-agents/releases). For detailed usage instructions, see [Learning Resources and Reproduction Projects](../appendix_game_projects/game-projects).
+Using ML-Agents also requires downloading or building Unity environments (`.exe` / `.app` / Linux executables). Pre-built environments are available from [ML-Agents GitHub Releases](https://github.com/Unity-Technologies/ml-agents/releases). For detailed usage instructions, see [Learning Resources and Reproduction Projects](../appendix_paper_reading/learning-resources).
 
 ::: tip Unity ML-Agents use cases
 The unique value of ML-Agents is **3D spatial reasoning**: Atari uses 2D pixels, CartPole uses low-dimensional vectors, while ML-Agents provides a complete 3D physics environment (gravity, collisions, occlusion). If your research involves visual navigation, spatial reasoning, or multi-agent 3D coordination, ML-Agents is a strong complement to Gymnasium/PyBullet.
@@ -268,7 +274,7 @@ print("=" * 50)
 
 ## Common Installation Problems and Fixes
 
-### Problem 1: CUDA Version Mismatch
+### CUDA Version Mismatch
 
 **Symptoms**: `RuntimeError: CUDA out of memory` or `Found no NVIDIA driver`
 
@@ -284,7 +290,7 @@ pip uninstall torch torchvision -y
 # Then install the matching version (see the PyTorch installation section)
 ```
 
-### Problem 2: Package Version Conflicts
+### Package Version Conflicts
 
 **Symptoms**: `ImportError` or `AttributeError` indicating an incorrect package version.
 
@@ -296,7 +302,7 @@ pip list | grep -E "torch|gymnasium|transformers|trl"
 pip install --force-reinstall <package_name>
 ```
 
-### Problem 3: Apple Silicon (M-series chips) Compatibility
+### Apple Silicon (M-Series Chip) Compatibility
 
 ```bash
 # M-series chips use MPS acceleration
@@ -308,7 +314,7 @@ python -c "import platform; print(platform.processor())"
 # export PYOPENGL_PLATFORM=egl
 ```
 
-### Problem 4: MuJoCo Rendering Failure
+### MuJoCo Rendering Failure
 
 ```bash
 # On headless servers, set the environment variable

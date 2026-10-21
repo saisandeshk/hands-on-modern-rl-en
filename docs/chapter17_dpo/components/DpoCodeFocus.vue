@@ -24,19 +24,19 @@ const suppressHover = ref(false)
 const codePre = ref(null)
 
 const segments = [
-  { id: 'A', label: '偏好数据', range: [5, 10] },
-  { id: 'B', label: '序列 logprob', range: [13, 27] },
+  { id: 'A', label: 'Preference data', range: [5, 10] },
+  { id: 'B', label: 'Sequence logprob', range: [13, 27] },
   { id: 'C', label: 'Policy / Reference', range: [30, 57] },
   { id: 'D', label: 'log-ratio', range: [59, 61] },
-  { id: 'E', label: '隐式奖励差', range: [63, 67] },
+  { id: 'E', label: 'Implicit reward gap', range: [63, 67] },
   { id: 'F', label: 'DPO loss', range: [69, 78] },
-  { id: 'G', label: '反向传播', range: [81, 89] },
-  { id: 'H', label: '训练循环', range: [92, 100] }
+  { id: 'G', label: 'Backpropagation', range: [81, 89] },
+  { id: 'H', label: 'Training loop', range: [92, 100] }
 ]
 
 const focusMap = {
   overview: {
-    title: '完整 DPO 代码地图',
+    title: 'Full DPO Code Map',
     active: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'],
     compactRanges: [
       [5, 27],
@@ -49,37 +49,37 @@ const focusMap = {
     ]
   },
   data: {
-    title: '偏好数据：prompt / chosen / rejected',
+    title: 'Preference data: prompt / chosen / rejected',
     active: ['A'],
     compactRanges: [[5, 10]],
     highlight: [7, 8, 9]
   },
   logprob: {
-    title: '回答序列的 log probability',
+    title: 'Log probability of the response sequence',
     active: ['B'],
     compactRanges: [[13, 27]],
     highlight: [18, 20, 21, 26, 27]
   },
   models: {
-    title: 'Policy 更新，Reference 冻结',
+    title: 'Policy updated, reference model frozen',
     active: ['C'],
     compactRanges: [[30, 57]],
     highlight: [32, 38, 45, 46, 52]
   },
   ratio: {
-    title: 'DPO 的 log-ratio 与隐式奖励',
+    title: 'DPO log-ratio and implicit reward',
     active: ['D', 'E'],
     compactRanges: [[59, 67]],
     highlight: [60, 61, 64, 65, 66, 67]
   },
   loss: {
-    title: 'DPO loss：-logsigmoid',
+    title: 'DPO loss: -logsigmoid',
     active: ['E', 'F'],
     compactRanges: [[63, 78]],
     highlight: [64, 70, 75, 76]
   },
   train: {
-    title: 'DPO 反向传播与训练循环',
+    title: 'DPO backpropagation and training loop',
     active: ['G', 'H'],
     compactRanges: [[81, 100]],
     highlight: [83, 85, 86, 87, 95, 96]
@@ -92,8 +92,8 @@ const isExpanded = computed(
 )
 const activeTitle = computed(() => props.title || config.value.title)
 const toggleLabel = computed(() => {
-  if (pinned.value) return '收起完整代码'
-  return isExpanded.value ? '固定完整代码' : '展开完整代码'
+  if (pinned.value) return 'Collapse full code'
+  return isExpanded.value ? 'Pin full code' : 'Expand full code'
 })
 
 const highlighted = computed(() => new Set(config.value.highlight))
@@ -202,7 +202,7 @@ function handleMouseLeave() {
       </span>
     </button>
 
-    <div class="dpo-code-focus-segments" aria-label="DPO 代码结构">
+    <div class="dpo-code-focus-segments" aria-label="DPO code structure">
       <button
         v-for="segment in segments"
         :key="segment.id"
@@ -217,8 +217,12 @@ function handleMouseLeave() {
     </div>
 
     <button class="dpo-code-focus-status" type="button" @click="togglePinned">
-      <span>{{ isExpanded ? '完整代码视图' : '局部重点视图' }}</span>
-      <span>{{ pinned ? '点击收起局部视图' : '点击固定完整代码' }}</span>
+      <span>{{ isExpanded ? 'Full code view' : 'Focused view' }}</span>
+      <span>
+        {{
+          pinned ? 'Click to return to focused view' : 'Click to pin full code'
+        }}
+      </span>
     </button>
 
     <pre

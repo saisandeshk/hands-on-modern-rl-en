@@ -5,7 +5,7 @@ from rollout_worker import RolloutWorker
 
 class GRPOAgentTrainer:
     """
-    编排 Agentic RL 训练循环。
+    Orchestrate the agentic RL training loop.
     rollout -> reward -> train -> repeat
     """
 
@@ -21,12 +21,12 @@ class GRPOAgentTrainer:
 
     def fit(self, prompts: list, n_steps: int = 50):
         """
-        主训练循环。
-        prompts: 训练用的 prompt 列表
-        n_steps: 训练步数
+        Main training loop.
+        prompts: list of training prompts
+        n_steps: number of training steps
         """
         for step in range(n_steps):
-            # ---- Rollout 阶段 ----
+            # ---- Rollout phase ----
             batch_trajectories = []
             for prompt in prompts:
                 group = []
@@ -35,7 +35,7 @@ class GRPOAgentTrainer:
                     group.append(traj)
                 batch_trajectories.append(group)
 
-            # ---- Reward 归一化（GRPO 的组内比较）----
+            # ---- Reward normalization (GRPO's within-group comparison)----
             all_rewards = []
             for group in batch_trajectories:
                 group_rewards = [t["reward"] for t in group]
@@ -50,7 +50,7 @@ class GRPOAgentTrainer:
                     )
                 all_rewards.extend(group_rewards)
 
-            # ---- Train 阶段 ----
+            # ---- Train phase ----
             train_data = []
             for group in batch_trajectories:
                 for traj in group:
@@ -67,7 +67,7 @@ class GRPOAgentTrainer:
 
             loss = self.policy.train_step_with_advantage(train_data)
 
-            # ---- 记录指标 ----
+            # ---- Log metrics ----
             mean_reward = sum(all_rewards) / len(all_rewards)
             self.history.append(
                 {

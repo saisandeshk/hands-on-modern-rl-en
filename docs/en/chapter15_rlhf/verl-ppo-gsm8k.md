@@ -165,7 +165,7 @@ In practice, prefer veRL's built-in script: it tracks veRL version changes and h
 
 For GSM8K, you do not need to train a Reward Model. You can directly validate the final answer with rules. This is different from RLHF in Section 13.4: RLHF uses an RM to produce preference signals, while math reasoning uses **verifiable rewards**. Section 15.3 will discuss the RLVR paradigm in detail; here we start with a simple implementation.
 
-This repository provides the course adaptation here: [`code/chapter15_rlhf/verl_gsm8k/gsm8k_reward.py`](https://github.com/walkinglabs/hands-on-modern-rl/blob/main/code/chapter15_rlhf/verl_gsm8k/gsm8k_reward.py). If you are working inside the veRL repository, you can also create the same file manually:
+This repository provides the course adaptation here: [`code/chapter08_rlhf/verl_gsm8k/gsm8k_reward.py`](https://github.com/walkinglabs/hands-on-modern-rl/blob/main/code/chapter08_rlhf/verl_gsm8k/gsm8k_reward.py). If you are working inside the veRL repository, you can also create the same file manually:
 
 ```python
 # gsm8k_reward.py
@@ -240,7 +240,7 @@ Why no Reward Model? Because GSM8K answers are **objectively verifiable**: corre
 
 ## 13.8.5 Single-GPU Training Script
 
-Based on veRL's official PPO scripts, this repository provides a single-GPU + 0.5B launch script here: [`code/chapter15_rlhf/verl_gsm8k/run_qwen2_5_0_5b_ppo_single_gpu.sh`](https://github.com/walkinglabs/hands-on-modern-rl/blob/main/code/chapter15_rlhf/verl_gsm8k/run_qwen2_5_0_5b_ppo_single_gpu.sh). The full content is:
+Based on veRL's official PPO scripts, this repository provides a single-GPU + 0.5B launch script here: [`code/chapter08_rlhf/verl_gsm8k/run_qwen2_5_0_5b_ppo_single_gpu.sh`](https://github.com/walkinglabs/hands-on-modern-rl/blob/main/code/chapter08_rlhf/verl_gsm8k/run_qwen2_5_0_5b_ppo_single_gpu.sh). The full content is:
 
 ```bash
 #!/bin/bash

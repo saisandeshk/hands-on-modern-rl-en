@@ -4,13 +4,13 @@ import torch
 
 
 def completion_mask_until_eos(completion_ids, eos_token_id):
-    """保留第一个 EOS 及其之前的 token，屏蔽后续 padding。"""
+    """Keep the first EOS and all tokens before it; mask the padding that follows."""
     is_eos = completion_ids.eq(eos_token_id)
     eos_seen_before = is_eos.cumsum(dim=-1) - is_eos.to(torch.long)
     return eos_seen_before.eq(0)
 
 
-# [A] 组采样：每个 prompt 生成 group_size 个回答，并保留原始 token 边界
+# [A] Group sampling: generate group_size responses per prompt and keep the original token boundaries
 def sample_groups(model, tokenizer, prompts, group_size=8, max_new_tokens=256):
     expanded_prompts = [prompt for prompt in prompts for _ in range(group_size)]
     prompt_batch = tokenizer(expanded_prompts, padding=True, return_tensors="pt")
@@ -56,7 +56,7 @@ def sample_groups(model, tokenizer, prompts, group_size=8, max_new_tokens=256):
     return responses, group_ids, batch
 
 
-# [B] 规则奖励：数学答案正确、格式规范就给分
+# [B] Rule-based reward: score points for a correct math answer and a well-formed format
 def rule_reward(response, ground_truth):
     reward = 0.0
     boxed = re.search(r"\\boxed\{([^}]+)\}", response)
@@ -77,7 +77,7 @@ def score_responses(responses, ground_truths, group_size=8, device="cpu"):
     return torch.tensor(rewards, dtype=torch.float32, device=device)
 
 
-# [C] 组内优势：用同题目的回答均值替代 Critic 基线
+# [C] Group-relative advantage: replace the critic baseline with the mean over responses to the same prompt
 def group_advantages(rewards, group_size=8, eps=1e-8):
     grouped_rewards = rewards.view(-1, group_size)
     group_mean = grouped_rewards.mean(dim=1, keepdim=True)
@@ -92,7 +92,7 @@ def group_advantages(rewards, group_size=8, eps=1e-8):
     return advantages.reshape(-1)
 
 
-# [D] 只返回回答部分的逐 token log probability，形状为 [B, T]
+# [D] Return only the per-token log probability of the response part, with shape [B, T]
 def per_token_logprobs(model, input_ids, attention_mask, completion_length):
     outputs = model(input_ids=input_ids, attention_mask=attention_mask)
     logits = outputs.logits[:, :-1, :]
@@ -107,13 +107,13 @@ def per_token_logprobs(model, input_ids, attention_mask, completion_length):
 
 
 def masked_sequence_mean(values, mask):
-    """每段回答先按有效 token 求平均，防止长回答获得更大权重。"""
+    """Average over valid tokens within each response first, so long responses do not get more weight."""
     mask = mask.to(values.dtype)
     token_count = mask.sum(dim=-1).clamp_min(1.0)
     return (values * mask).sum(dim=-1) / token_count
 
 
-# [E-F] 原始 GRPO：逐 token ratio、clip、KL，再按回答长度归一化
+# [E-F] Original GRPO: per-token ratio, clip, and KL, then normalize by response length
 def grpo_objective_from_logprobs(
     new_logprobs,
     old_logprobs,
@@ -129,7 +129,7 @@ def grpo_objective_from_logprobs(
     clipped_ratio = torch.clamp(token_ratio, 1.0 - clip_eps, 1.0 + clip_eps)
     clipped = clipped_ratio * token_advantages
 
-    # DeepSeekMath 式 (4)：D_KL(policy || ref) 的逐 token 无偏正值估计
+    # DeepSeekMath Eq. (4): per-token unbiased, non-negative estimate of D_KL(policy || ref)
     log_ratio_ref = ref_logprobs - new_logprobs
     per_token_kl = torch.exp(log_ratio_ref) - log_ratio_ref - 1.0
 
@@ -171,7 +171,7 @@ def grpo_loss(
         completion_length,
     )
 
-    # 单次更新时 old policy 就是采样 policy；detach 保留 ratio 的梯度。
+    # With a single update, the old policy is the sampling policy; detach keeps the gradient of the ratio.
     if old_logprobs is None:
         old_logprobs = new_logprobs.detach()
 
@@ -194,7 +194,7 @@ def grpo_loss(
     )
 
 
-# [G] 训练步骤：采样、打分、组内归一化、再反向传播
+# [G] Training step: sample, score, normalize within the group, then backpropagate
 def train_step(
     policy_model,
     ref_model,
@@ -225,7 +225,7 @@ def train_step(
     return metrics
 
 
-# [H] GRPO 训练循环：每轮都在线生成新回答
+# [H] GRPO training loop: generate fresh responses online every iteration
 def train_grpo(policy_model, ref_model, optimizer, tokenizer, dataloader):
     ref_model.eval()
     for prompts, ground_truths in dataloader:

@@ -8,15 +8,15 @@ If you opened this appendix, it is probably because a formula in the main text s
 
 These formulas can look intimidating, but the underlying tools are not that many: scalars, vectors, matrices, probability, expectation, derivatives, gradients, entropy, and KL divergence. Once you understand what each word means, and how they combine inside reinforcement learning formulas, the notation becomes far less mysterious.
 
-This appendix does not organize math by algorithm. It follows a more natural learning order:
-
-mathematical objects -> linear operations -> probability and expectation -> stochastic estimation -> recursive equations -> optimization and gradients -> distribution distance -> full RL formulas.
+This appendix does not stack up formulas algorithm by algorithm. It follows the natural order in which mathematics is learned: first meet the mathematical objects, then learn operations and equations, then move on to probability, stochastic estimation, and optimization, and finally assemble these tools back into the complete derivations of reinforcement learning.
 
 ## Learning Route
 
 The whole appendix can be summarized as one line:
 
-**mathematical objects -> linear algebra -> probability and expectation -> stochastic estimation -> Bellman recursion -> optimization and gradients -> distribution distance -> RL derivations.**
+mathematical objects → linear operations → probability and expectation → stochastic estimation → recursive equations → optimization and gradients → distribution distance → complete RL formulas.
+
+The corresponding articles are listed below.
 
 ## Appendix Map
 
@@ -76,7 +76,7 @@ If you can translate a complicated formula back into this two-state example, mat
 The sidebar divides the content into four math modules. You do not need to read everything at once. There are three useful modes:
 
 1. **Systematic catch-up**: start from D.1.1 and read in order.
-2. **Just-in-time lookup**: if Bellman matrix form is confusing, read D.1.2; if GAE is confusing, read the probability and calculus sections; if KL constraints are confusing, read D.4.2.
+2. **Just-in-time lookup**: if Bellman matrix form is confusing, read D.1.2; if GAE is confusing, read D.2.4 and D.3.5; if KL constraints are confusing, read D.4.2.
 3. **Quick review**: use each module's formula summary and exercises after finishing the corresponding topic.
 
 If the sidebar feels too large, read only the first page of each module first:
@@ -98,12 +98,12 @@ After these four pages, return to the detailed topics whenever a formula in the 
 
 A **scalar** is a single number. A reward $r=2$ is a scalar, and a discount factor $\gamma=0.9$ is also a scalar. In RL, the following values are all scalars:
 
-| Symbol  | Meaning                            | Typical values |
-| ------- | ---------------------------------- | -------------- |
-| r       | Immediate reward                   | 2, -1, 0.5     |
-| gamma   | Discount factor                    | 0.9, 0.99, 0.5 |
-| alpha   | Learning rate                      | 0.001, 3e-4    |
-| epsilon | Exploration rate or clipping range | 0.1, 0.2       |
+| Symbol | Meaning                            | Typical values |
+| ------ | ---------------------------------- | -------------- |
+| r      | Immediate reward                   | 2, −1, 0.5     |
+| γ      | Discount factor                    | 0.9, 0.99, 0.5 |
+| α      | Learning rate                      | 0.001, 3×10⁻⁴  |
+| ε      | Exploration rate or clipping range | 0.1, 0.2       |
 
 A scalar gives the numerical value of a reward. Another basic element of an environment is the state. The collection of all possible states forms a **set**.
 
@@ -154,9 +154,9 @@ Suppose an environment has three states and the current value estimates are:
 
 | State | Value |
 | ----- | ----- |
-| s1    | 3     |
-| s2    | 5     |
-| s3    | 2     |
+| s₁    | 3     |
+| s₂    | 5     |
+| s₃    | 2     |
 
 Put all numbers into one column and treat them as a single object:
 
@@ -285,11 +285,11 @@ The result matches the transition rule: from $s_1$ the next state is $s_2$, whos
 
 For three states, suppose the transition relationship is:
 
-| Current state | to s1 | to s2 | to s3 |
-| ------------- | ----- | ----- | ----- |
-| s1            | 0.1   | 0.7   | 0.2   |
-| s2            | 0.0   | 0.3   | 0.7   |
-| s3            | 0.5   | 0.5   | 0.0   |
+| Current state | → s₁ | → s₂ | → s₃ |
+| ------------- | ---- | ---- | ---- |
+| s₁            | 0.1  | 0.7  | 0.2  |
+| s₂            | 0.0  | 0.3  | 0.7  |
+| s₃            | 0.5  | 0.5  | 0.0  |
 
 Written as a matrix:
 
@@ -429,15 +429,15 @@ then $w$ and $\phi(s,a)$ must have the same length. If $w\in\mathbb{R}^d$, then 
 Shape checking is just as important in neural networks. Consider a simple two-layer network:
 
 ```text
-input state features, 128 dimensions -> hidden layer, 64 dimensions -> action logits, 2 dimensions
+Input (state features) 128 dimensions → hidden layer 64 dimensions → output (action probabilities) 2 dimensions
 ```
 
 The weight matrix shapes are:
 
 | Layer   | Weight matrix | Shape    |
 | ------- | ------------- | -------- |
-| Layer 1 | W1            | 128 x 64 |
-| Layer 2 | W2            | 64 x 2   |
+| Layer 1 | W₁            | 128 × 64 |
+| Layer 2 | W₂            | 64 × 2   |
 
 Forward propagation:
 
@@ -461,11 +461,11 @@ This article established five basic objects in linear algebra:
 
 | Object   | Role in RL                         | Example           |
 | -------- | ---------------------------------- | ----------------- |
-| Scalar   | Single reward or hyperparameter    | r=2, gamma=0.9    |
+| Scalar   | Single reward or hyperparameter    | r=2, γ=0.9        |
 | Set      | Possible states and actions        | $S=\{s_1, s_2\}$  |
-| Function | Value function and policy function | v(s), pi(a\|s)    |
-| Vector   | All state values together          | **v**=[3, 5, 2]^T |
-| Matrix   | Transitions among all states       | P in R^(n x n)    |
+| Function | Value function and policy function | v(s), π(a\|s)     |
+| Vector   | All state values together          | **v**=[3, 5, 2]ᵀ  |
+| Matrix   | Transitions among all states       | P ∈ ℝⁿˣⁿ          |
 
 Their relationships are: scalars form vectors, vectors form matrices, and matrix-vector multiplication implements probability weighting. The next article combines these objects into a full system of equations: the matrix form of the Bellman equation $v = r + \gamma Pv$.
 

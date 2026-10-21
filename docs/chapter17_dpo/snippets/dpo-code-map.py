@@ -2,15 +2,15 @@ import torch
 import torch.nn.functional as F
 
 
-# [A] 一批偏好数据：同一个 prompt 下有 chosen 和 rejected
+# [A] A batch of preference data: each prompt has a chosen and a rejected response
 example = {
-    "prompt": "用户说：学数学完全没用，对吧？",
-    "chosen": "数学确实不一定每天都直接用到，但它能训练抽象和推理能力。",
-    "rejected": "对，数学基本没用，别学了。",
+    "prompt": "User says: Studying math is completely useless, right?",
+    "chosen": "Math isn't necessarily used directly every day, but it trains abstraction and reasoning.",
+    "rejected": "Yes, math is basically useless. Don't bother studying it.",
 }
 
 
-# [B] 只计算回答部分的序列 log probability
+# [B] Compute the sequence log probability over the response tokens only
 def sequence_logprob(model, input_ids, attention_mask, labels):
     outputs = model(input_ids=input_ids, attention_mask=attention_mask)
     logits = outputs.logits[:, :-1, :]
@@ -27,7 +27,7 @@ def sequence_logprob(model, input_ids, attention_mask, labels):
     return answer_logprobs.sum(dim=-1)
 
 
-# [C] Policy 会更新，Reference 冻结，只当作训练前的参照物
+# [C] The policy is updated; the reference model is frozen and serves only as a pre-training baseline
 def dpo_forward(policy_model, ref_model, batch, beta=0.1):
     chosen_logps = sequence_logprob(
         policy_model,
@@ -56,17 +56,17 @@ def dpo_forward(policy_model, ref_model, batch, beta=0.1):
             batch["rejected_labels"],
         )
 
-    # [D] log-ratio：相对于 Reference，Policy 对回答的概率提升了多少
+    # [D] Log-ratio: how much the policy has raised the response probability relative to the reference model
     chosen_logratio = chosen_logps - ref_chosen_logps
     rejected_logratio = rejected_logps - ref_rejected_logps
 
-    # [E] DPO logits：好回答的隐式奖励减去坏回答的隐式奖励
+    # [E] DPO logits: implicit reward of the good response minus implicit reward of the bad response
     dpo_logits = beta * (chosen_logratio - rejected_logratio)
     chosen_rewards = beta * chosen_logratio.detach()
     rejected_rewards = beta * rejected_logratio.detach()
     reward_margin = chosen_rewards - rejected_rewards
 
-    # [F] DPO loss：让 chosen 相对 rejected 的优势越来越明显
+    # [F] DPO loss: make the margin of chosen over rejected larger and larger
     loss = -F.logsigmoid(dpo_logits).mean()
     metrics = {
         "loss": loss.detach(),
@@ -78,7 +78,7 @@ def dpo_forward(policy_model, ref_model, batch, beta=0.1):
     return loss, metrics
 
 
-# [G] 训练步骤：只更新 Policy，不更新 Reference
+# [G] Training step: update only the policy, never the reference model
 def train_step(policy_model, ref_model, optimizer, batch, beta=0.1):
     loss, metrics = dpo_forward(policy_model, ref_model, batch, beta=beta)
 
@@ -89,7 +89,7 @@ def train_step(policy_model, ref_model, optimizer, batch, beta=0.1):
     return metrics
 
 
-# [H] DPO 训练循环：偏好 batch 反复喂给同一个对比损失
+# [H] DPO training loop: preference batches are repeatedly fed to the same contrastive loss
 def train_dpo(policy_model, ref_model, optimizer, dataloader, beta=0.1):
     ref_model.eval()
     for batch in dataloader:

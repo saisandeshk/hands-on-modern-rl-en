@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 
 class Policy:
-    """包装一个语言模型，提供 generate() 和 train_step_with_advantage() 两个接口。"""
+    """Wrap a language model and expose two interfaces: generate() and train_step_with_advantage()."""
 
     def __init__(self, model, tokenizer, lr=1e-5, clip_eps=0.2, kl_coef=0.04):
         self.model = model
@@ -15,14 +15,14 @@ class Policy:
         self.ref_model = None  # reference model for KL penalty
 
     def set_ref_model(self, ref_model):
-        """保存一份初始权重的拷贝，用作 KL 散度计算的锚点。"""
+        """Save a copy of the initial weights to serve as the anchor for the KL divergence computation."""
         self.ref_model = ref_model.to(self.model.device).eval()
         for parameter in self.ref_model.parameters():
             parameter.requires_grad_(False)
 
     @torch.no_grad()
     def generate(self, prompt: str, max_new_tokens=128) -> str:
-        """推理模式：给定 prompt，生成文本。"""
+        """Inference mode: given a prompt, generate text."""
         self.model.eval()
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
         pad_token_id = self.tokenizer.pad_token_id
@@ -40,7 +40,7 @@ class Policy:
         return self.tokenizer.decode(completion_ids, skip_special_tokens=True)
 
     def _token_logprobs(self, model, prompt: str, response: str) -> torch.Tensor:
-        """保留回答中每个 token 的 log probability，并保留梯度。"""
+        """Keep the log probability of every response token, with gradients retained."""
         prompt_inputs = self.tokenizer(prompt, return_tensors="pt")
         response_inputs = self.tokenizer(
             response,
@@ -60,21 +60,21 @@ class Policy:
 
     @torch.no_grad()
     def get_logprobs(self, prompt: str, response: str) -> torch.Tensor:
-        """无梯度地记录采样策略对回答中每个 token 的 log probability。"""
+        """Record, without gradients, the sampling policy's log probability for every response token."""
         return self._token_logprobs(self.model, prompt, response)
 
     @torch.no_grad()
     def _get_ref_logprobs(self, prompt: str, response: str) -> torch.Tensor:
-        """计算参考策略对回答中每个 token 的 log probability。"""
+        """Compute the reference policy's log probability for every response token."""
         return self._token_logprobs(self.ref_model, prompt, response)
 
     def train_step_with_advantage(self, trajectories: list):
         """
-        一个原始 GRPO 训练步。
+        One original-GRPO training step.
         trajectories: list of ([(turn_prompt, turn_response), ...], advantage)
 
-        每条多轮轨迹只有一个结果优势；ratio、clip、KL 逐 token 计算。
-        环境 observation 只进入下一轮 prompt，不进入动作 token 的 loss。
+        Each multi-turn trajectory has a single outcome advantage; the ratio, clipping, and KL penalty are computed per token.
+        Environment observations only enter the next turn's prompt, not the loss on action tokens.
         """
         self.model.train()
         self.optimizer.zero_grad()
@@ -87,7 +87,7 @@ class Policy:
                 if new_logprobs.numel() == 0:
                     continue
 
-                # 每批轨迹只更新一次，因此采样策略就是本次前向的 detach 版本。
+                # Each batch of trajectories is updated only once, so the sampling policy is the detached version of this forward pass.
                 old_logprobs = new_logprobs.detach()
                 ratio = torch.exp(new_logprobs - old_logprobs)
                 advantage_tensor = new_logprobs.new_tensor(advantage)
@@ -114,7 +114,7 @@ class Policy:
                 turn_token_losses.append(per_token_loss.reshape(-1))
 
             if turn_token_losses:
-                # 每条轨迹先按自己的动作 token 数归一化，再对轨迹求平均。
+                # Normalize each trajectory by its own number of action tokens first, then average over trajectories.
                 trajectory_losses.append(torch.cat(turn_token_losses).mean())
 
         if not trajectory_losses:

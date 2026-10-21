@@ -1,226 +1,262 @@
 # 17.4 Formal Verifier
 
-Discriminative PRMs may learn incorrect labels, and generative PRMs may produce a fluent but incorrect proof. For the squared error in Section 17.1, humans can easily judge; but when the proof involves dozens of steps of algebra, the evaluation model itself may also make mistakes.
+The previous two sections covered two kinds of PRM: the discriminative PRM gives a score, and the generative PRM gives an explanation. At bottom, though, both are models. Both can pick up wrong labels from their training data, and both can give fluent but wrong judgments in unfamiliar domains. A human spots the missing square in Section 17.1 at a glance. In a complex algebraic proof of dozens of steps, or a number theory problem that cites an obscure lemma, the evaluator itself may miscalculate and produce a judgment that looks reasonable but is wrong.
 
-If the problem has already been written in formal languages such as Lean4, Coq, or Isabelle, the candidate proof can be submitted to a proof checker. The checker does not score based on whether the proof "looks reasonable," but rather verifies whether each proof step conforms to the rules of the formal system. This provides more deterministic feedback, but it also introduces a new prerequisite task: natural language problems must first be correctly formalized.
+When a problem is already written in a formal language such as Lean4, Coq, or Isabelle, candidate proofs can be handed to a **proof checker**. The checker does not judge whether a proof "looks reasonable." It verifies the proof term against the rules of the chosen formal system. For the same environment, the same statement, and the same proof, the result is deterministic and no longer depends on probabilities output by an evaluator model.
 
-This section follows the line of "natural language problem → formal proposition → candidate tactic → core checker." First, we explain where the determinism comes from, then examine how AlphaProof, AlphaGeometry, and DeepSeek-Prover-V2 search for proofs, and finally discuss the scope of formalization, data, and computational costs.
+This brings a new prerequisite task, however: the natural-language problem must first be translated correctly into the formal language. The translation is itself a hard problem. If it is wrong, then even a proof that passes proves a statement different from the original problem. This section follows the line "natural-language problem → formal statement → candidate tactics → kernel check": first we see where this deterministic feedback comes from, then how AlphaProof, AlphaGeometry, and DeepSeek-Prover-V2 search for proofs, and finally the limits of formal methods.
+
+A formal verifier replaces model judgment with a proof checker such as Lean4 or Coq, and its reward is binary:
+
+$$
+r = \mathbb{1}[\text{the Lean kernel accepts the proof}]
+$$
+
+A candidate proof is Lean4 code made of a sequence of tactics, and the kernel check verifies that the proof term produced by these tactics is valid. $\mathbb{1}[\cdot]$ is the indicator function: it equals 1 if the check passes and 0 otherwise. Compared with the step classification in 17.2, this reward carries no probabilistic noise from human step labels, but it still depends on the formalization, the theorem library, the axioms, and a correct implementation of the trusted kernel. The checker only verifies that "the formal statement has been proved." It does not verify whether that statement faithfully expresses the original natural-language problem.
 
 <img src="../../chapter20_prm_search/images/formal-verifier-pipeline.svg" alt="A natural-language problem is formalized, converted into candidate proofs, and checked by a proof kernel for binary reward">
 
-## 1. Why Formal Checking Can Provide Deterministic Feedback
+## Why Formal Checking Can Provide Deterministic Feedback
 
-Generative PRMs judge whether a sentence is reasonable, still relying on model probability. A formal checker, however, requires the candidate proof to construct a proof term for the target proposition. Let us first compare what is omitted in the same proof when expressed in natural language versus Lean4.
+A generative PRM decides whether a sentence is right by relying on statistical regularities the model has learned, so it is probabilistic at bottom. A formal checker is different: it requires the candidate proof to actually construct a proof term for the target statement. Comparing what the same proof omits in natural language and in Lean4 shows where the determinism comes from.
 
-### 1.1 Differences Between Formal Languages and Natural Languages
+### Formal Language vs. Natural Language
 
-Mathematical proofs can be expressed in two languages:
+Take the proof that "$\sqrt{2}$ is irrational." Written in the two languages, it looks very different.
 
-**Natural Language** (informal):
+**Natural-language version**:
 
 ```text
-Proof that √2 is irrational:
-Assume √2 = p/q, where p and q are coprime.
-Then p² = 2q², so p is even.
-Let p = 2k, substitute to get 2k² = q², so q is also even.
-This contradicts the assumption that p and q are coprime. Therefore, √2 is irrational.
+Prove that sqrt(2) is irrational:
+Suppose sqrt(2) = p/q, with p and q coprime.
+Then p^2 = 2q^2, so p is even.
+Let p = 2k. Substituting gives 2k^2 = q^2, so q is also even.
+This contradicts the coprimality of p and q. Hence sqrt(2) is irrational.
 ```
 
-This is easy for humans to read, but the "so" often omits intermediate lemmas, and the meaning of symbols may depend on context.
+A human reads this smoothly, but each "so" skips a large number of intermediate steps. Why does $p^2=2q^2$ imply that $p$ is even? Why is a number even if its square is even? What exactly is the definition of coprime? All of this relies on the reader's mathematical common sense and need not be written out.
 
-**Formal Language** (Lean4):
+**Formal version** (Lean4 code, only the beginning is shown):
 
 ```lean
 theorem sqrt_two_irrational : Irrational (√2) := by
   intro h
   rcases h with ⟨p, q, h1, h2⟩
-  -- Assume √2 = p/q
+  -- Suppose √2 = p/q
   have h3 : p^2 = 2 * q^2 := by
     have : (√2)^2 = (p/q)^2 := by rw [h1]
     simp at this
     rw [div_pow] at this
     field_simp at this
     linarith
-  -- ...
-  sorry  -- (placeholder for the proof)
+  -- ... many more lines follow
+  sorry  -- placeholder meaning "proof not yet given"
 ```
 
-This code is only for illustrative purposes, and the `sorry` is a placeholder meaning "proof is not provided here." It cannot be considered as a valid verification result. A proof submitted to a verifier must remove the `sorry` and allow the Lean kernel to check each tactic step incrementally. If the check passes, it means that the proof terms generated by the tactics conform to the rules under the current axioms, theorems, and formalized proposition. It cannot guarantee that the natural language original problem has been correctly translated, nor can it rule out assumptions introduced by the selected axioms.
+Note the `sorry` in this code. It is only a placeholder and does not count as a real proof. A proof submitted to the verifier must have every `sorry` removed, so that the Lean kernel can check, one by one, the proof term produced by each tactic. Passing the check means that, under the chosen axioms, theorem library, and formalized statement, this proof term obeys the rules. It does not guarantee that the natural-language problem was translated correctly, and it does not rule out problems in the chosen axioms themselves.
 
-### 1.2 Characteristics of Lean4 Verifier
+### Properties of the Lean4 Verifier
 
-Several features of Lean4 make it suitable for providing process feedback:
+A proof checker such as Lean4 has several properties that make it especially suited to supplying process feedback:
 
-- **Deterministic Checking**: Given a formal system, axioms, and a correct implementation, the system checks whether the representation of a proof satisfies the rules.
-- **Automation**: The compilation process is automatic, requiring no human judgment.
-- **Extensibility**: New mathematical structures and theorems can be defined.
-- **Community Support**: [Mathlib](https://github.com/leanprover-community/mathlib4) has already formalized university-level mathematics.
+- **Deterministic checking**: given the formal system, the axioms, and the implementation, checking the same proof repeatedly gives the same result.
+- **Fully automatic**: the check is completed automatically at compile time and needs no human judgment.
+- **Extensible**: one can define new mathematical structures, prove new theorems, and add new theorem libraries.
+- **Community foundation**: [Mathlib](https://github.com/leanprover-community/mathlib4) has already formalized a large body of university-level mathematics, so one does not start from scratch.
 
-### 1.3 The Limits of Formalization
+### Where Formalization Applies
 
-However, formalization also has its costs:
+Formal checking is highly deterministic, but it comes at a large cost:
 
-- **Domain-Specific**: Lean4 is primarily used for mathematics. Other domains (natural language reasoning, code logic) lack mature formalization systems.
-- **Data Scarcity**: Lean4 code is relatively scarce, leading to insufficient pre-training data for LLMs on Lean4.
-- **High Barrier to Entry**: Writing Lean4 code requires specialized training, and most mathematicians are not familiar with it.
+- **Very restricted domain**: Lean4 is used mainly for mathematics. For tasks such as natural-language reasoning and open-domain question answering, there is no mature formal system.
+- **Extremely scarce data**: the total amount of Lean4 code is several orders of magnitude smaller than general natural-language corpora, so LLMs have seriously insufficient pretraining data on it.
+- **High barrier to entry**: writing Lean4 code requires specialized training. Most mathematicians are unfamiliar with it, let alone ordinary engineers.
 
-## 2. How AlphaProof and AlphaGeometry Search for Proofs
+::: details What is a tactic in Lean4?
+A tactic can be understood as a "proof instruction." For example:
 
-A proof checker can only answer "Is this step in compliance with the rules?" and will not actively suggest the next step. To automatically solve new problems, a strategy model is needed to generate tactics, a value model to estimate the state of a proof, and a search mechanism to try different approaches.
+- `rw [h1]`: substitute hypothesis h1 into the current goal
+- `simp`: automatically simplify the goal using simple simplification rules
+- `linarith`: automatically solve simple inequalities over integers or reals using linear arithmetic
+- `intro h`: introduce a hypothesis h
 
-In July 2024, DeepMind announced [AlphaProof and AlphaGeometry 2](https://deepmind.google/discover/blog/ai-solves-imo-problems-at-silver-medal-level/) which collectively solved four problems from the International Mathematical Olympiad (IMO) 2024, achieving scores in the silver medal range. AlphaProof is responsible for formalizing proofs in algebra and number theory, while AlphaGeometry 2 handles geometry problems.
+After each tactic runs, the proof state changes: the goal may be solved, or it may be broken into several smaller subgoals. The Lean kernel verifies that each tactic executes legally, and reports an error immediately if it does not.
+:::
 
-### 2.1 Architecture of AlphaProof
+## How AlphaProof and AlphaGeometry Search for Proofs
 
-AlphaProof integrates the reinforcement learning style of AlphaZero, proof search, and the Lean checker:
+A proof checker can only answer "is this step legal?" It does not tell the system what tactic to write next. To solve new problems automatically, we also need a policy model that recommends which tactic to use next, a value model that estimates how far the current proof state is from success, and a search algorithm that allocates compute among candidate actions.
+
+In July 2024, DeepMind announced that [AlphaProof and AlphaGeometry 2](https://deepmind.google/discover/blog/ai-solves-imo-problems-at-silver-medal-level/), used together, solved 4 problems from the International Mathematical Olympiad (IMO) 2024, with a total score in the silver-medal range. AlphaProof handles formal proofs in areas such as algebra and number theory, and AlphaGeometry 2 handles the geometry problems.
+
+### The Architecture of AlphaProof
+
+AlphaProof connects AlphaZero-style reinforcement learning, proof search, and Lean checking into a closed loop:
 
 ```text
-┌────────────────────────────────────────────────────┐
-│ 1. Problem Formalization: Translate mathematical problems into Lean4           │
-│                                                                                   │
-│ 2. AlphaZero-style Search:                                                         │
-│    - Policy Network: Recommends the next Lean4 tactic                            │
-│    analogously to the policy network in AlphaZero.                                │
-│    - Value Network: Evaluates the current proof state                            │
-│    - Search Algorithm: Allocates computation among candidate tactics              │
-│                                                                                   │
-│ 3. Lean4 Verifier: Automatically verifies each tactic                             │
-│                                                                                   │
-│ 4. Self-Play Training: Trains the policy and value networks using search results  │
-└────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────┐
+│ 1. Formalization: translate the natural-language       │
+│    math problem into a Lean4 statement                 │
+│                                                        │
+│ 2. AlphaZero-style search:                             │
+│    - Policy network: recommends the next Lean4 tactic  │
+│    - Value network: judges whether the current proof   │
+│      state is worth searching further                  │
+│    - Search algorithm: allocates compute among         │
+│      candidate tactics                                 │
+│                                                        │
+│ 3. Lean4 verifier: automatically checks legality       │
+│    after each tactic runs                              │
+│                                                        │
+│ 4. Self-play training: use successful proofs found by  │
+│    search to update the networks                       │
+└────────────────────────────────────────────────────────┘
 ```
 
-It follows the structure of [AlphaGo Zero](https://www.nature.com/articles/nature24270), which "proposes actions through policy, evaluates states through value, and uses search to generate better training targets." In Go, the actions are placing stones; in formal proof, the actions are tactics. The proof state, termination conditions, and data generation methods remain different from those in a game of Go.
+This structure follows the classic architecture of [AlphaGo Zero](https://www.nature.com/articles/nature24270): the policy network proposes actions, the value network evaluates states, and search produces better training targets than single-step greedy choice. The difference is that an action in Go is placing a stone, while an action in formal proof is a tactic, and the proof state, the termination condition, and the way data is generated all differ from a board game.
 
-### 2.2 How AlphaProof Constructs the Training and Search Loop
+### How AlphaProof Builds the Training and Search Loop
 
-**Design I: Constructing a Formalized Training Problem**
+**Design one: how do we get formal training problems?**
 
-Natural language problems must first be converted into Lean propositions. During the training phase, DeepMind uses a formalizer to convert approximately one million informal problems into formalized ones, forming training databases of varying difficulty. The six official competition problems from IMO 2024, however, are manually translated by experts, and it is not acceptable to mix automatically formalized training data with competition inputs.
+A natural-language problem must first become a Lean statement, and this step cannot be skipped. During training, DeepMind used a formalizer to automatically convert about one million informal problems into formal ones, building a training library of varying difficulty. Note, however, that the six official IMO 2024 problems were translated by hand by experts. The automatic formalization of training data should not be confused with the competition input.
 
-The formalizer may misinterpret quantifiers, variable scopes, or implicit conditions. Lean can only check whether "the translated proposition is provable," so the system also needs to independently verify whether the formal proposition accurately reflects the original problem.
+An autoformalizer can make all kinds of mistakes: misreading a quantifier, getting the range of a variable wrong, dropping an implicit condition in the problem. Lean can only check whether "the translated statement has been proved," so the system must separately verify that the formal statement faithfully corresponds to the original problem. If the translation is wrong, everything done afterward is wasted effort.
 
-**Design II: Large-Scale Training with Lean4**
+**Design two: where does large-scale Lean4 training data come from?**
 
-The training database includes both automatically converted formal propositions from natural language problems and related problems generated during the search process. AlphaProof attempts to prove or disprove these propositions, and the results passed by Lean are then used to update the policy. Public materials do not provide sufficient details to reproduce the full data ratio.
+The training library holds not only the formal statements converted automatically from natural-language problems, but also related problems produced by the search process itself. AlphaProof keeps trying to prove or disprove these statements, and uses the results that pass the Lean check to update the policy and value networks. The public material does not give enough detail to reproduce the full data mixture.
 
-**Design III: Lean Checking Enters the Search Loop**
+**Design three: Lean checking goes directly into the search loop**
 
-Each node corresponds to the current proof state, and each action corresponds to a candidate tactic. The Lean checker first eliminates invalid actions, and the trajectories that complete the proof become reinforcement learning signals. Public descriptions describe this process as a combination of the AlphaZero algorithm and proof search, without the need to limit it to a particular undisclosed MCTS implementation.
+Each node of the search tree corresponds to a current proof state, and each edge corresponds to a candidate tactic. At each node the Lean checker performs a first filter: an illegal tactic is eliminated at once and the search does not continue below it. Only a whole trajectory that reaches a leaf with a completed proof becomes a positive sample for reinforcement learning.
 
-### 2.3 Performance of AlphaProof
+Putting the three designs together: the formalizer decides "is the problem right?", the search algorithm decides "which direction to try?", and the Lean kernel decides "is this step legal?" The binary reward appears only when a whole trajectory is complete, but the legality check happens immediately at every node. This is exactly the process feedback described in 17.1, except that the feedback comes from a deterministic checker and not from a neural network.
 
-In the six problems of IMO 2024, AlphaProof solved two algebra problems and one number theory problem, while AlphaGeometry 2 solved one geometry problem. Combined, the two systems scored 28 points (out of a maximum of 42), reaching the silver medal range for that year. Failures on the remaining problems may occur at different stages, such as formalization, candidate generation, or search budget, and cannot be attributed solely to the final failure.
+### AlphaProof's Results
 
-### 2.4 How AlphaGeometry Handles Geometry Problems
+Of the 6 problems in IMO 2024, AlphaProof solved 2 algebra problems and 1 number theory problem, and AlphaGeometry 2 solved 1 geometry problem. Together the two systems scored 28 points (out of 42), reaching the silver-medal range for that year. The remaining 2 problems went unsolved, and the cause could be a wrong formalization, candidate generation that never covered the correct path, or an insufficient search budget. We cannot conclude which stage failed merely from the fact that a problem was not solved.
 
-To address the shortcomings of AlphaProof in geometry, DeepMind released [AlphaGeometry 2](https://www.nature.com/articles/s41586-024-07819-5)—a specialized formal system for solving geometry problems.
+### How AlphaGeometry Handles Geometry Problems
 
-AlphaGeometry 2 combines a neural language model with a symbolic reasoning engine: the language model proposes auxiliary constructions, and the symbolic system performs deduction and verification. Synthetic geometry problems enrich the training data, while auxiliary lines enable the system to open proof paths that would otherwise be inaccessible.
+Geometry problems differ from algebra and number theory, and AlphaProof did not work well on geometry, so DeepMind built [AlphaGeometry 2](https://www.nature.com/articles/s41586-024-07819-5) specifically for it.
 
-In the IMO 2024, after receiving human-formalized problems, AlphaGeometry 2 completed the 4th problem in 19 seconds. This case illustrates that dedicated formal systems can quickly check and compose geometric relationships, but the conversion from natural language to formal input remains outside the system's boundaries.
+It takes a neuro-symbolic route: a neural language model proposes auxiliary constructions (auxiliary lines and points), while a symbolic reasoning engine performs deductive reasoning and deterministic checking. The system also generated a large number of synthetic geometry problems to supplement its training data. Many geometry problems stay unsolved because no one thought of which auxiliary line to add; once the line is added, the symbolic system can run through the rest of the deduction by itself.
 
-## 3. How DeepSeek-Prover-V2 Generates Verifiable Proofs
+In IMO 2024, after receiving a problem that had been formalized by hand, AlphaGeometry 2 solved Problem 4 in just 19 seconds. This case shows that a dedicated formal system can check and combine geometric relations very quickly, but the translation from a natural-language problem to a formal input was still done by humans outside the boundary of the system.
 
-AlphaProof demonstrates that search and the verifier can collaborate. Open-source work must also answer questions about how to construct training data, how to decompose complex theorems, and how to use binary pass signals for reinforcement learning. DeepSeek-Prover-V2 provides another set of verifiable implementations.
+::: details Why geometry needs a separate system
+Geometry proofs differ from algebra proofs in an important way. Algebra proofs mostly consist of rewriting and transforming equalities and inequalities, and the tactics are mostly rewrite rules. Geometry proofs often require "adding an auxiliary construction," such as drawing a line, constructing an altitude, or taking a midpoint. These constructions do not exist in the original problem, and the system must work out where to add them. The space of auxiliary lines is too large for pure symbolic search, so a language model is used to propose potentially useful constructions, which are then handed to the symbolic system for verification.
+:::
 
-[DeepSeek-Prover-V2](https://arxiv.org/abs/2504.21801) (2025.04) is DeepSeek's open-source work on formal PRM. Its goals are:
+## How DeepSeek-Prover-V2 Generates Checkable Proofs
 
-- To train an open-source model using Lean4 + RL that can solve math competition problems
-- To advance the industrial usability of formal PRM
+AlphaProof showed that search and a checker can work together, but it is not open source. The open-source community had to answer several questions: how do we construct the training data? How do we break complex theorems into smaller ones? How do we use the binary pass signal for RL? DeepSeek-Prover-V2 provides a reproducible open-source implementation.
 
-### 3.1 Method of Prover-V2
+[DeepSeek-Prover-V2](https://arxiv.org/abs/2504.21801) (April 2025) is DeepSeek's open-source formal proving work, with the goals of:
 
-DeepSeek-Prover-V2 starts from natural language proof sketches, breaks down complex theorems into smaller sub-goals, and completes each with a dedicated proof model.
+- training an open-source model that can solve math competition problems, using Lean4 and RL
+- advancing the industrial usability of formal process feedback
 
-**Improvement One: Recursive Proof Search**
+### The Method of Prover-V2
 
-Prover-V2 employs **recursive theorem proving** — breaking a difficult theorem into several sub-goals, which are further decomposed until the sub-goals can be independently proven.
+**Improvement one: recursive proof search that breaks big theorems into small lemmas**
+
+For a complex theorem, proving it in one shot is too hard. Prover-V2 uses the idea of **recursive theorem proving**: decompose a hard theorem into several subgoals, keep decomposing any subgoal that is still hard, until the subgoals are simple enough to prove directly.
 
 ```text
-Main Goal: Prove A
-  ├── Sub-goal 1: Prove B (If B holds, then A holds)
-  │     ├── Sub-sub-goal 1.1: Prove C
-  │     └── Sub-sub-goal 1.2: Prove D
-  └── Sub-goal 2: Prove E
+Main goal: prove A
+  ├── Subgoal 1: prove B (if B holds, A holds)
+  │     ├── Sub-subgoal 1.1: prove C
+  │     └── Sub-subgoal 1.2: prove D
+  └── Subgoal 2: prove E
 ```
 
-This decomposition transforms a long proof into small lemmas with clear dependencies. Earlier sub-goals can serve as premises for subsequent sub-goals, and the verified local proofs are finally combined to form a complete proof.
+This decomposition turns one long proof into small lemmas with clear dependencies. Subgoals that have already been proved can be used directly as premises for the later subgoals, and finally all the locally verified proofs are assembled into the complete proof.
 
-**Improvement Two: Binary Reward**
+**Improvement two: the purest binary reward**
 
-Prover-V2 uses a binary reward system: a reward of 1 for a successful proof and 0 for a failed one. For the same formalized proposition and proof, the result from Lean4 is deterministic. If the natural language problem is incorrectly formalized, even if the proof passes, the reward still corresponds to an incorrect proposition. Therefore, the checker reduces the noise in proof verification but cannot eliminate errors in data and translation.
+Prover-V2 uses the cleanest binary outcome reward: 1 if the proof passes the Lean check, 0 if it fails, with no intermediate scores. For the same formal statement and the same proof, the Lean4 check result is fully deterministic. But it bears repeating: if a natural-language problem is formalized incorrectly, then even a proof that passes earns a reward that corresponds to a wrong statement. The checker removes noise from proof judgment, but it cannot remove data errors or translation errors.
 
-**Improvement Three: Generating Training Data with Verified Proofs**
+**Improvement three: generate training data automatically from proofs that pass the check**
 
-DeepSeek automatically generates a large amount of Lean4 theorems and proofs for training. The generation process includes:
+DeepSeek automatically generated a large number of Lean4 theorems and proofs for training. The process is roughly:
 
-- Using an LLM to generate Lean4 propositions from natural language math problems
-- Using the proof model to recursively solve sub-goals
-- Taking the found proofs as training data
+- use an LLM to translate natural-language math problems into Lean4 statements
+- use the proof model to recursively decompose and solve the subgoals
+- take the proofs that were found and passed the Lean check as training data
 
-### 3.2 Prover-V2's Performance
+### Prover-V2's Results
 
-The paper reports that the 671B model achieves 82.4% Pass@32 on MiniF2F-test, and reaches 88.9% when the candidate budget is increased to Pass@8192. It also solves 47 out of 658 problems in PutnamBench. The significant difference in the number of candidates means that the 88.9% cannot be interpreted as the success rate of a single proof attempt. It indicates that increasing the formal proof search budget can cover more problems, while the computational cost also increases with the number of candidates.
+The paper reports that the 671B model reaches 82.4% on MiniF2F-test with Pass@32, and 88.9% when the candidate budget is raised to Pass@8192; it also solves 47 of the 658 problems in PutnamBench. The candidate counts here differ by two orders of magnitude, so 88.9% cannot be read as a single-attempt proof success rate.
 
-## 4. Where Can Formal Verification Be Applied
+We need to be clear about what Pass@k means: it measures the probability that "at least one of $k$ independent attempts succeeds." If the single-attempt success rate is $p$, then
 
-Formal checking makes the judgment of "whether a step is correct" more reliable, but it does not automatically formalize all problems. Before applying formal verification, one must sequentially check: whether the task can be defined precisely, whether perceptual or natural language input can be reliably translated, and whether the cost of proof search is acceptable.
+$$\text{Pass}@k = 1-(1-p)^k$$
 
-The feedback from formal PRM is more deterministic, but applying it requires the following conditions:
+This is exactly the coverage formula from Section 16.3. Working backward, here are the single-attempt success rates implied by these numbers:
 
-### 4.1 Domain-Specific Constraints
+- Pass@32 = 82.4%: the single-attempt success rate is about $p=5.3\%$ (since $(1-0.053)^{32}\approx0.176$)
+- Pass@8192 = 88.9%: the single-attempt success rate needs to be only about $p=0.03\%$ (since $(1-0.0003)^{8192}\approx0.111$)
 
-Lean4 is mainly used for mathematics. For other domains:
+The two settings differ by more than 100 times. When reporting formal proving results, the candidate budget must be stated, or the number has no meaning. These numbers also show that increasing the search budget for formal proofs does cover more problems, but the compute cost grows linearly with the number of candidates.
 
-- **Code Logic**: Tools like Dafny, F\*, and Coq can be used, but they require the specification and invariants to be written first.
-- **Natural Language Reasoning**: Only some tasks can be translated into logical constraints, and open-ended problems are difficult to fully formalize.
-- **Multimodal Reasoning**: Perceptual results themselves carry uncertainty, and typically only the symbolic reasoning part can be formalized.
+## Where Formal Verification Can Be Used
 
-Therefore, the current best coverage is in mathematical proofs and program verification with clear specifications; open-ended language tasks can only be formalized for parts with well-defined boundaries.
+Formal checking makes "judging whether a step is correct" extremely reliable, but it does not automatically solve every problem. It does not even solve the problem of "what the problem is." To apply formal process feedback, check in order: can the task be given a precise definition? Can the natural-language input be translated reliably? Is the cost of proof search acceptable?
 
-### 4.2 Scarcity of Formalized Data
+### Restricted Domains
 
-The corpus and theorem library of Lean4 are much smaller than general natural language corpora, and "code lines" cannot be directly converted to "text tokens." As a result, the model's ability to learn tactics, library interfaces, and proof patterns is limited by the coverage of the data, making it prone to failure in syntax, theorem retrieval, and proof search. The quality of automatic formalization and the cost of checking further limit the number of problems that can be covered.
+Systems such as Lean4 currently cover mainly mathematics. In other domains:
 
-### 4.3 Translation Cost
+- **Code logic**: tools such as Dafny, F\*, and Coq can be used, but a complete formal specification and invariants must be written first. Most code lacks even a precise specification, let alone a formal proof.
+- **Natural-language reasoning**: only a tiny fraction of tasks can be turned into logical constraints, and open-domain problems cannot be fully formalized.
+- **Multimodal reasoning**: perception results (images, speech) carry uncertainty themselves, so usually only a small part of the purely symbolic reasoning can be formalized.
 
-Formalizing PRM requires translating the task into Lean4. A single error in quantifier or type translation may lead the checker to prove a proposition different from the original problem. Reliable systems need to preserve the correspondence between natural language and formal propositions, and semantic deviations must be detected by human review, testing, or another translation verification system.
+The best coverage today is in mathematical proof and in program verification with clear specifications; open-ended language tasks can at most have their sharply bounded parts formalized.
 
-### 4.4 Training Cost
+### Scarcity of Formal Data
 
-Proof search repeatedly generates tactics and invokes the Lean checker. As the number of branches and the depth of the proof increase, the number of checks also rises rapidly. The actual cost depends on caching, parallelism, the theorem library, and the search budget; public data is insufficient to summarize all systems with a fixed multiple.
+Lean4 corpora and theorem libraries are several orders of magnitude smaller than general natural-language corpora, and "lines of code" cannot be converted directly into "text tokens." The tactic usage, library interfaces, and proof patterns a model can learn are all limited by data coverage, so it tends to fail at syntax, theorem retrieval, and proof search. The quality of autoformalization and the cost of checking further limit the range of problems that can be covered.
 
-### 4.5 How to Expand the Coverage of Formal Checking
+### Translation Cost
 
-Expanding the coverage requires separately addressing the three issues of input translation, proof generation, and domain specification.
+Formal feedback requires translating the task into Lean4. This is no small amount of work: a mistranslated quantifier, a wrong type, or a missing implicit condition can make the checker prove a statement entirely different from the original problem. A reliable system must keep the correspondence between the natural-language problem and the formal statement, and must have human review, tests, or a separate translation checker to catch semantic drift. If the translation is wrong, every proof that follows is meaningless.
 
-#### Automatic Formalization
+### Training Cost
 
-Letting LLMs learn to automatically translate natural language into Lean4 is the direction of research such as [AlphaProof's formalizer](https://deepmind.google/discover/blog/ai-solves-imo-problems-at-silver-medal-level/) and [Autoformalization with Large Language Models](https://arxiv.org/abs/2205.12615).
+During proof search, tactics are generated repeatedly and the Lean checker is called again and again. When the branching factor and the proof depth grow, the number of checks grows quickly. The actual cost depends on caching strategy, parallelism, theorem library size, and search budget, and the public material is not enough to summarize all systems with a fixed multiplier.
 
-#### Lean4 and LLM Hybrid
+### How to Expand the Coverage of Formal Checking
 
-A middle-ground approach is to let LLMs first propose natural language reasoning steps, then translate the key lemmas that can be formalized into Lean4 for checking. Steps not formalized still need to be evaluated separately; the entire natural language reasoning cannot be considered proven just because some lemmas pass.
+To use formal checking more widely, three problems must be solved separately: input translation, proof generation, and domain specifications.
 
-#### Extension to Other Domains
+#### Direction One: Autoformalization
 
-Code can be checked with tools like Dafny, F\*, etc., for specifications and invariants. Physical and biological tasks can only be handed over to formal systems when objects, assumptions, and rules can be precisely defined. Perceptual data and open semantics still require probabilistic models or human judgment.
+Teach an LLM to translate natural language into Lean4 automatically. This is the formalizer in AlphaProof and the direction of studies such as [Autoformalization with Large Language Models](https://arxiv.org/abs/2205.12615). The quality of automatic translation is currently one of the biggest bottlenecks.
 
-#### Neural-Symbolic Integration
+#### Direction Two: Hybrid Lean4 and LLM Verification
 
-Language models are responsible for proposing lemmas and candidate steps, while formal systems are responsible for checking rules. Between the two, failure information must be preserved: which tactic is invalid, which subgoal remains unsolved, and whether the natural language proposition is translated consistently. Only when the "generate—check—refine" loop is complete can formal feedback guide the next search.
+A compromise: have an LLM first propose a natural-language proof idea, then translate the key lemmas that can be formalized into Lean4 for checking. Note that passing the check for some lemmas does not mean the whole natural-language argument is correct. The steps that were not formalized still have to be evaluated separately.
 
-## Summary
+#### Direction Three: Extension to Other Domains
 
-Formal PRM uses systems like Lean4 to check candidate proofs. AlphaProof and DeepSeek-Prover-V2 demonstrate that language models can be responsible for proposing candidates and guiding the search direction, while proof checkers are responsible for verifying formal rules.
+Code can be checked for specifications and invariants with tools such as Dafny and F\*. Tasks in physics and biology can be handed to a formal system only when the objects of study, the assumptions, and the rules can all be precisely defined. Perceptual data and open-semantics problems still have to rely on probabilistic models or human judgment.
 
-The boundaries of formal feedback are also clear: Lean data is much less than natural language corpora, automatic formalization may alter the problem's meaning, and proof search requires a large number of candidates. It is suitable for tasks with precise rules and cannot directly replace the outcome rewards or model evaluation in open language tasks.
+#### Direction Four: Neuro-Symbolic Integration
 
-Thus far, we have reviewed the three approaches to PRM:
+The most practical pattern today is for the language model to propose lemmas, recommend candidate steps, and suggest auxiliary constructions, while the formal system checks them by rule. Complete failure information must be kept between the two: which tactic is illegal? Which subgoal is unsolved? Is the natural-language statement consistent with the formal one? Only when the "generate, check, revise" loop is complete can formal feedback really guide the next round of search.
 
-- **Discriminative PRM** (17.2): High labeling cost, but low inference cost
-- **Generative PRM** (17.3): Can explain reasoning, but depends on the evaluation model's capability
-- **Formal PRM** (17.4): Deterministic feedback, but only covers tasks that can be formalized
+## Section Summary
 
-The next two sections will return the evaluator to the generation process: Section 17.5 uses step scores to guide Beam Search, ToT, and MCTS; Section 17.6 compares multiple complete reasonings and aggregates the answer.
+Formal process feedback replaces neural network judgment with a proof checker such as Lean4: a candidate proof must construct a proof term for the target statement, and the kernel checks it by fixed rules. The results of AlphaProof and DeepSeek-Prover-V2 show that this division of labor, in which a generative model proposes candidates and search directions and a proof checker verifies the combination of formal rules, can already handle some hard competition math problems. The coverage is still limited by formal data, translation quality, and search budget.
+
+The limits of formal feedback are also clear, however: Lean data is far scarcer than natural-language corpora, autoformalization can change the meaning of a problem, proof search needs a large number of candidates, and only domains that can be formalized are covered. It suits tasks with precise rules and cannot directly replace outcome rewards or model evaluation in open-ended language tasks.
+
+With this, we have seen all three technical routes for PRMs:
+
+- **Discriminative PRM** (17.2): high annotation cost, but fast inference and high throughput, suited to large-scale training
+- **Generative PRM** (17.3): can explain its judgments and is efficient in annotation, but inference is also costly and depends on the evaluator model's ability
+- **Formal verification** (17.4): feedback is deterministic (within the formal system), but it covers only tasks that can be formalized, and translation and search are costly
+
+The next two sections put these evaluators back into the generation process: 17.5 covers how to use step scores to guide search algorithms such as Beam Search, ToT, and MCTS, and 17.6 covers how to compare multiple complete reasoning chains and aggregate their answers.

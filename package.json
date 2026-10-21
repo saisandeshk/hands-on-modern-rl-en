@@ -20,7 +20,8 @@
     "verify:bilingual": "node scripts/check-bilingual-sync.mjs",
     "verify:english": "node scripts/check-english-quality.mjs",
     "sitemap": "node scripts/generate-sitemap.mjs",
-    "fix:headings": "node scripts/fix-heading-numbers.mjs"
+    "fix:headings": "node scripts/fix-heading-numbers.mjs",
+    "verify:code-links": "node scripts/check-code-links.mjs"
   },
   "keywords": [
     "walkinglabs",

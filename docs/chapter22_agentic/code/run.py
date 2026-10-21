@@ -5,12 +5,12 @@ from environment import SandboxEnv
 from policy import Policy
 from trainer import GRPOAgentTrainer
 
-# 加载一个小模型
+# Load a small model
 model_name = "Qwen/Qwen2.5-0.5B-Instruct"
 model = AutoModelForCausalLM.from_pretrained(model_name)
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-# 初始化各组件
+# Initialize the components
 env = SandboxEnv(timeout=10)
 policy = Policy(model, tokenizer, lr=5e-5)
 ref_model = AutoModelForCausalLM.from_pretrained(model_name)
@@ -18,15 +18,15 @@ policy.set_ref_model(ref_model)
 
 
 TASK_EXPECTED_OUTPUTS = {
-    "写 Python 代码计算 F(10)，规定 F(0)=0、F(1)=1，并且只输出结果。": "55",
-    "写 Python 代码判断字符串 'racecar' 是否为回文，并且只输出 True 或 False。": "True",
-    "写 Python 代码把 [5, 1, 4, 2, 8] 从小到大排序，并且只输出排序后的列表。": "[1, 2, 4, 5, 8]",
+    "Write Python code to compute F(10), with F(0)=0 and F(1)=1. Print only the result.": "55",
+    "Write Python code to test whether 'racecar' is a palindrome. Print only True or False.": "True",
+    "Write Python code to sort [5, 1, 4, 2, 8] in ascending order. Print only the sorted list.": "[1, 2, 4, 5, 8]",
 }
 
 
-# 定义可验证 reward：最后一行必须等于该题的期望输出
+# Define a verifiable reward: the last line must equal the expected output for the task
 def code_reward(trajectory):
-    """如果某次代码执行的最后一行等于期望输出，reward = 1。"""
+    """If the last line of any code execution equals the expected output, reward = 1."""
     expected = TASK_EXPECTED_OUTPUTS[trajectory["prompt"]]
     for interaction in trajectory["interactions"]:
         obs = interaction.get("observation", "")
@@ -36,10 +36,10 @@ def code_reward(trajectory):
     return 0.0
 
 
-# 训练 prompts
+# Training prompts
 prompts = list(TASK_EXPECTED_OUTPUTS)
 
-# 开始训练
+# Start training
 trainer = GRPOAgentTrainer(
     policy=policy,
     env=env,

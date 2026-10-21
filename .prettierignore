@@ -2,3 +2,5 @@ node_modules
 docs/.vitepress/dist
 docs/.vitepress/cache
 package-lock.json
+docs/public/katex.min.js
+docs/public/auto-render.min.js

@@ -2,99 +2,76 @@
 title: 5.2 DQN Architecture and Implementation
 ---
 
-# 5.2 DQN Architecture and Implementation
-## Section Guide
+# 5.2 DQN Structure and Implementation
 
-**Core ideas**
+## Reading Guide
 
-- Understand the Q-network and its loss: approximate $Q(s,a)$ with a neural network and train it by minimizing squared TD error.
-- Understand why experience replay breaks sample correlation and improves data efficiency.
-- Understand why the target network stabilizes bootstrapped targets by delaying parameter updates.
+**Key Ideas**
 
-**Key formula**
+- Master the architecture and loss function of the Q-network: a neural network approximates $Q(s,a)$ and is trained with the mean squared TD error.
+- Understand how experience replay breaks sample correlation and improves data efficiency.
+- Understand how the target network stabilizes the training target by delaying parameter updates.
+
+**Key Formulas**
 
 $$
-\mathcal{L}(\theta)
-=
-\mathbb{E}\left[
-\left(
-r + \gamma (1 - d)\max_{a'} Q(s', a'; \theta^-)
-- Q(s, a; \theta)
-\right)^2
-\right]
+\mathcal{L}(\theta) = \mathbb{E}\left[\left( r + \gamma (1 - d) \max_{a'} Q(s', a'; \theta^-) - Q(s, a; \theta) \right)^2\right]
 $$
 
-> **DQN loss (MSE TD error)**
+> **Deep Q-network loss function (MSE TD error):**
 >
-> - $\theta$: parameters of the Q-network (trainable "student")
-> - $\theta^-$: parameters of the target network (slow-moving copy used for targets)
-> - $Q(s,a;\theta)$: the student's current prediction
-> - $d$: done flag; if episode ends, $d=1$ and there is no next-state value
-> - $r + \gamma(1-d)\max_{a'}Q(s',a';\theta^-)$: TD target computed using the target network
-> - the outer expectation is approximated in practice by sampling minibatches from the replay buffer
+> - $\theta$: the parameters of the Q-network, the "student" being trained.
+> - $\theta^-$: the parameters of the target network, a slowly updated copy used specifically to generate the "reference answer."
+> - $Q(s, a; \theta)$: the Q-network's score for the current state-action pair, that is, "the student's answer."
+> - $d$: the termination flag. If the episode really terminates, $d=1$ and there is no next-state value; otherwise $d=0$.
+> - $r + \gamma (1-d) \max_{a'} Q(s', a'; \theta^-)$: the TD target, the immediate reward plus the discounted best future score given by the target network, that is, "the reference answer."
+> - The outer $\mathbb{E}$: the expectation over all possible transitions $(s, a, r, s')$, which in practice is approximated by random sampling from the experience replay buffer.
 
-In the previous section, we answered "why DQN is needed": Q-tables do not scale, and naive neural network Q-Learning becomes unstable because of correlated samples and moving targets.
+The previous section answered "why DQN is needed": the Q table cannot hold continuous states and pixel input, and connecting a neural network directly to Q-Learning runs into sample correlation and a moving target. Now we turn to the second question: **how exactly does DQN organize this idea into an algorithm that can be trained?**
 
-Now we answer the next question:
+What happens if we use only one network, which both selects actions and computes Q values and also generates the TD target? A concrete example illustrates this.
 
-**How does DQN organize the idea into an algorithm that can actually train?**
+**Step one: compute the TD target.** Suppose in some state the network predicts $Q(s, a) = 5.0$, and the network output for the next state is $\max Q(s', a') = 8.0$. Then:
 
-If we use only one network for everything (select actions, predict $Q$, and compute TD targets), the TD target changes as soon as we update the network parameters. That creates a "chase the moving target" loop.
+$$\text{TD Target} = r + \gamma \times 8.0 = 1.0 + 0.99 \times 8.0 = 8.92$$
 
-Let's make that concrete.
+$$\text{TD Error} = 8.92 - 5.0 = 3.92$$
 
-1. **Compute TD target.** Suppose the network predicts $Q(s,a)=5.0$ and for the next state $\max Q(s',a')=8.0$. With reward $r=1$ and $\gamma=0.99$:
+**Step two: update the parameters by gradient descent.** The network adjusts its parameters according to the TD error and pulls $Q(s, a)$ toward 8.92. So far everything is normal.
 
-$$
-\text{TD Target} = 1 + 0.99 \times 8.0 = 8.92
-$$
+**Step three: the problem shows up.** The key is that the Q value of $s'$ is computed with the same set of parameters. After the parameter update, $\max Q(s', a')$ changes as well, perhaps from 8.0 to 4.0. The next time the same TD target is computed:
 
-$$
-\text{TD Error} = 8.92 - 5.0 = 3.92
-$$
+$$\text{TD Target}' = 1.0 + 0.99 \times 4.0 = 4.96$$
 
-2. **Update parameters by gradient descent.** The network moves $Q(s,a)$ toward 8.92.
+The "reference answer" jumps from 8.92 to 4.96, a difference of almost a factor of two. The network has just caught up with 8.92, and the target has run off to 4.96. When it catches up with 4.96, the target runs off somewhere else. The Q values oscillate violently or even diverge.
 
-3. **The issue:** since $Q(s',a')$ is computed by the same parameters, after the update, $\max Q(s',a')$ may change drastically (say from 8.0 to 4.0). Then the same target becomes:
+This is what Sutton & Barto call the "deadly triad": function approximation, bootstrapping, and off-policy learning, which make training extremely unstable when all three are present.
 
-$$
-\text{TD Target}' = 1 + 0.99 \times 4.0 = 4.96
-$$
+DQN's answer consists of three components. The Q-network replaces the table and outputs a value estimate for each action. Experience replay shuffles the samples obtained from continuous interaction so that a training batch no longer reflects only the most recent steps. The target network is a frozen copy of the Q-network used specifically to compute the TD target, and its parameters are hard-copied from the Q-network only every C steps, so the target stays still between two copies. Putting the three together gives the deep Q-network in the usual sense.
 
-The "answer key" jumped. The network cannot converge if the label changes as fast as the model updates.
+A reminder: in Chapter 4 we learned the core idea of **TD methods**: the value estimate can be updated after a single step, without waiting for a whole episode to end. The TD target is $r + \gamma V(s')$, that is, "the reward already in hand plus the estimated value of the next state." The TD target in a deep Q-network has exactly the same structure, with $V(s')$ replaced by $\max_{a'} Q(s', a')$, because Q-Learning evaluates action values and not state values.
 
-This is part of what Sutton and Barto describe as the **deadly triad**: function approximation + bootstrapping + off-policy learning can lead to instability.
+Let us take the three components apart one by one.
 
-DQN's answer is three components:
+## The Q-Network and the Loss Function
 
-1. Q-network (learn $Q(s,a;\theta)$)
-2. experience replay (randomize training data)
-3. target network (stabilize TD targets)
+As noted above, using only one network makes the TD target move together with the parameters. DQN's solution is to maintain **two networks with the same structure but different update rhythms**:
 
-Let's unpack them one by one.
+- **The Q-network** (parameters $\theta$): responsible for selecting actions and for daily training, and updated by gradient descent at every step. This is the "student."
+- **The target network** (parameters $\theta^-$): a frozen copy of the Q-network used specifically to compute the TD target. Its parameters are hard-copied from the Q-network every C steps and do not move at all between two copies. This is the "grader."
 
-## Q-Network and Loss
+The two networks have exactly the same structure, and the difference lies only in the rhythm of the parameter updates. This design decouples "prediction" from "generating the reference answer," so the Q-network faces a stable optimization target for a stretch of time.
 
-DQN maintains two networks with identical architecture but different update schedules:
+### The Architecture of the Q-Network
 
-- **Q-network** with parameters $\theta$: updated every gradient step
-- **target network** with parameters $\theta^-$: a frozen copy used only to compute TD targets; updated periodically by copying from the Q-network
-
-This decouples "prediction" from "target generation." For a while, the student trains against a stable teacher.
-
-### Q-network architecture
-
-The Q-network does one job: given a state $s$, output a Q-value for each discrete action.
-
-For LunarLander, the input is an 8D vector; the output has 4 Q-values corresponding to four discrete actions.
+What the Q-network does is simple: it receives a state $s$ and outputs the Q value of each action. In LunarLander, the input is an 8-dimensional vector describing the lander's position, velocity, attitude, and leg-contact status. The output is 4 Q values, corresponding to the four discrete actions "no thrust," "left thruster," "main engine," and "right thruster."
 
 ```python
 import torch
 import torch.nn as nn
 
-
 class QNetwork(nn.Module):
-    """Q-network: input a state, output Q-values for all actions."""
+    """Q-Network: takes a state and outputs the Q value of each action"""
 
     def __init__(self, state_dim, action_dim, hidden_dim=128):
         super().__init__()
@@ -103,131 +80,132 @@ class QNetwork(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, action_dim),
+            nn.Linear(hidden_dim, action_dim)
         )
 
     def forward(self, x):
-        return self.net(x)
+        return self.net(x)  # output shape: (batch_size, action_dim)
 ```
 
-Why output all action Q-values at once instead of a single value? Because one forward pass gives scores for all actions, and selecting the best action requires only an `argmax` -- no need to run the network separately for each action. For CartPole (state_dim=4, action_dim=2), this network has about 17,000 parameters: lightweight enough, and sufficient to express nonlinear relationships in low-dimensional control tasks. For Atari games with 84x84x4 pixel inputs, a CNN is needed instead of an MLP, but for vector-state tasks like LunarLander, a simple MLP suffices.
+This code is very concise: a three-layer fully connected network with two hidden layers of 128 neurons each and ReLU activations. The input is the state vector, and the output is the Q value of each action. For LunarLander (`state_dim=8, action_dim=4`), the network still has only a few tens of thousands of parameters, light enough and still sufficient to express the nonlinear relationships in a low-dimensional control task.
 
-The Q-network's training objective is to make its output Q-values as close as possible to the "true" Q-values. But we do not know the true Q-values -- if we could look them up in a table, we would not need a neural network. So we construct training targets the same way Q-Learning does:
+Why does the network output the Q values of all actions instead of a single one? Because one forward pass gives the scores of all actions, with no need to run the network once per action. To select an action we only take the `argmax` of the output: whichever action has the largest Q value is chosen.
+
+For Atari games, the input is an 84×84×4 stack of pixel frames, and a fully connected network is no longer enough: it has too many parameters and cannot capture the spatial structure of images. DeepMind's original paper used a convolutional neural network (CNN): a few convolutional layers first extract image features, and a fully connected layer then outputs the Q values. For low-dimensional vector input such as LunarLander, however, a simple MLP is enough. In the hands-on part of this chapter we first use an MLP to observe DQN on LunarLander, and leave the CNN architecture for the visual game project.
+
+The training goal of the Q-network is to make the network's output Q values as close as possible to the "true" Q values. But we do not know what the true Q values are; if we could look them up, we would not need a neural network. So we construct the training target in the same way as Q-Learning:
 
 $$\text{TD Target} = r + \gamma (1-d) \max_{a'} Q(s', a')$$
 
-Then minimize the mean squared error between the network output and the TD target:
+Then we minimize the mean squared error between the network output and the TD target:
 
 $$\mathcal{L}(\theta) = \mathbb{E}\left[\left( r + \gamma (1-d) \max_{a'} Q(s', a'; \theta^-) - Q(s, a; \theta) \right)^2\right]$$
 
-This formula looks complex, but we can identify each symbol's "role":
+This formula looks complicated, so let us first sort out the "role" of each symbol in it:
 
-| Symbol                                           | Meaning (intuitive)                                                       | Role                                        |
-| ------------------------------------------------ | ------------------------------------------------------------------------- | ------------------------------------------- |
-| $\theta$                                         | Q-Network parameters (the network being trained)                          | Student -- the examinee                     |
-| $\theta^-$                                       | Target network parameters (frozen copy of Q-network)                      | Answer key -- held by the examiner          |
-| $Q(s, a; \theta)$                                | Student's current answer: "I think this step is worth $X$"                | Network prediction                          |
-| $r$                                              | Immediate reward actually received for this step                          | Points already in hand                      |
-| $d$                                              | Whether the episode truly terminated                                      | Cuts off future value at termination        |
-| $\gamma (1-d) \max_{a'} Q(s', a'; \theta^-)$     | From the new state, the target network's highest future score, discounted | "How much more can be earned in the future" |
-| $r + \gamma (1-d) \max_{a'} Q(s', a'; \theta^-)$ | TD Target -- "what this step should be worth"                             | Answer key                                  |
+| Symbol | Meaning (intuitive reading) | Role |
+| ------------------------------------------------ | ------------------------------------------------ | ---------------------------- |
+| $\theta$ | The parameters of the Q-network (the network being trained) | The student, the one taking the exam |
+| $\theta^-$ | The parameters of the target network (a frozen copy of the Q-network) | The reference answer in the grader's hands |
+| $Q(s, a; \theta)$ | The student's current answer: "I think this step is worth $X$ points" | The network's prediction |
+| $r$ | The immediate reward actually received at this step | Points already in the pocket |
+| $d$ | Whether the episode truly terminated | Cuts off future value at termination |
+| $\gamma (1-d) \max_{a'} Q(s', a'; \theta^-)$ | From the new situation, the best future score given by the target network, discounted | "The most that can still be earned in the future" |
+| $r + \gamma (1-d) \max_{a'} Q(s', a'; \theta^-)$ | The TD target: "how many points this should be worth" | The reference answer |
 
-Now let us assemble this loss function step by step:
+Now let us assemble this loss function step by step.
 
-**Building block 1: TD Target -- the answer key**
+**First building block: the TD target, the reference answer**
 
 $$y = r + \gamma (1-d) \max_{a'} Q(s', a'; \theta^-)$$
 
-TD Target is "immediate reward + discounted highest future score." If this step has reached a true terminal state, $d=1$, the future term is zeroed out, and the target is only the immediate reward $r$. Note that $Q$ here uses the target network's parameters $\theta^-$, not the currently-trained $\theta$ -- the answer key must not change along with the student.
+The TD target is "the immediate reward plus the discounted best future score." If this step has reached a true terminal state, $d=1$ and the future term is zeroed out, so the target is only the immediate reward $r$. Note that the $Q$ here uses the target network's parameters $\theta^-$, and not the $\theta$ being trained. The reference answer must not change along with the student.
 
-**Building block 2: TD Error -- how far the prediction is from the answer key**
+**Second building block: the TD error, how far the prediction is from the reference answer**
 
 $$\delta = y - Q(s, a; \theta) = r + \gamma (1-d) \max_{a'} Q(s', a'; \theta^-) - Q(s, a; \theta)$$
 
-TD Error is "answer key minus student's answer." In tabular methods, we directly move the Q-value toward the TD target by $\alpha \cdot \delta$. But in a neural network, we cannot directly change a single Q-value -- we can only indirectly affect all Q-values by modifying parameters $\theta$.
+The TD error is "the reference answer minus the student's answer." In a tabular method, we directly move the Q value by $\alpha \cdot \delta$ toward the TD target. In a neural network we cannot change a single Q value directly. We can only affect all Q values indirectly by modifying the parameters $\theta$.
 
-**Building block 3: Squaring -- penalize large errors, tolerate small ones**
+**Third building block: the square, punishing large errors and tolerating small ones**
 
 $$\mathcal{L}(\theta) = \mathbb{E}\left[\delta^2\right] = \mathbb{E}\left[\left(y - Q(s, a; \theta)\right)^2\right]$$
 
-Why square rather than use $\delta$ directly? Two reasons. First, $\delta$ can be positive or negative, and they can cancel each other when averaged -- the mean might be near 0, making it look like there is no error, when in fact the predictions may be wildly off. After squaring, values are always positive and cannot cancel. Second, squaring is lenient with small errors (off by 0.1 costs 0.01) but harsh with large errors (off by 1.0 costs 1.0; off by 3.0 costs 9.0) -- this forces the network to prioritize correcting its most egregious predictions.
+Why square instead of using $\delta$ directly? There are two reasons. First, $\delta$ can be positive or negative, and the signs cancel each other, so the average is close to 0 and looks like there is no error, even though the predictions may be wildly off. After squaring, the value is always positive and cannot be cancelled by sign. Second, squaring is lenient with small errors (an error of 0.1 costs 0.01) and harsh with large errors (an error of 1.0 costs 1.0, and an error of 3.0 costs 9.0), which forces the network to correct the most outrageous predictions first.
 
-**Building block 4: Expectation -- average over all samples**
+**Fourth building block: the expectation, averaging over all samples**
 
 $$\mathcal{L}(\theta) = \mathbb{E}\left[\left(y - Q(s, a; \theta)\right)^2\right]$$
 
-The outer $\mathbb{E}$ means "average over all possible transitions $(s, a, r, s')$." In practice, we cannot enumerate all transitions, so we approximate this expectation by randomly sampling a batch from the experience replay buffer -- this is what the "stochastic" in SGD means.
+The outer $\mathbb{E}$ means "average over all possible transitions $(s, a, r, s')$." In practice we cannot enumerate all transitions, so we sample a batch at random from the experience replay buffer to approximate this expectation. This is the meaning of the "stochastic" in SGD (stochastic gradient descent).
 
-Putting all four building blocks together: the DQN training process is continuously sampling from the replay buffer, computing the TD Target (answer key), comparing it with the network output (student's answer), computing the mean squared error loss, and updating parameters $\theta$ via backpropagation. The essence is exactly the same as the tabular Q-Learning method -- only now we update parameters via gradient descent instead of directly modifying table entries.
+Putting the four blocks together: the training process of a deep Q-network is to keep sampling from the experience replay buffer, compute the TD target (the reference answer), compare it with the network output (the student's answer), compute the loss as a mean squared error, and then update the parameters $\theta$ by backpropagation. In essence it is exactly the same as the tabular Q-Learning method, except that the parameters are now updated by gradient descent instead of directly modifying numbers in a table.
 
-But there is a crucial detail we have mentioned repeatedly but not yet explained: how exactly does "taking the expectation" and "random sampling" work? Why can't we just use the most recent data the agent experienced? This leads to the second component.
+There is, however, a key detail we have mentioned repeatedly but not yet explained: how exactly do the "expectation" and the "random sampling" above work in practice? Why can we not simply train on the single piece of data the agent has just experienced? This leads to the second component.
 
 ## Experience Replay
 
-The outer $\mathbb{E}$ in the loss function requires averaging over all transitions -- but what does "all transitions" mean? In supervised learning, training data is pre-collected and shuffled, with each mini-batch's samples approximately independent. Reinforcement learning is completely different: each step the agent takes produces one experience $(s, a, r, s', d)$, and consecutive steps' experiences describe tiny variations of the same situation.
+The outer $\mathbb{E}$ of the loss function asks us to average over all transitions, but what does "all transitions" mean? In supervised learning the training data is collected in advance and shuffled, so the samples in each mini-batch are approximately independent. Reinforcement learning is nothing like this: each step the agent takes produces one experience $(s, a, r, s', d)$, and the experiences of consecutive steps describe tiny changes of the same scene.
 
-This means if you train the network on data just experienced, adjacent samples are nearly identical -- in CartPole, consecutive frames' observation vectors may differ only in a few decimal places. Deep learning requires approximately independent and identically distributed (i.i.d.) data; training with such highly correlated data causes the gradient direction to be dominated by recent steps, and the network "forgets" what it previously learned.
+This means that if we train the network directly on the data just experienced, adjacent samples are almost identical. In CartPole, the observation vectors of two consecutive frames may differ only in the digits after the decimal point. Deep learning requires data to be approximately independent and identically distributed (i.i.d.), and when training on such highly correlated data the gradient direction is dominated by the experience of the last few steps, and the network "forgets" what it learned before.
 
-This is not an abstract theoretical concern. DeepMind's 2015 DQN paper conducted comparison experiments: without experience replay, the Atari Breakout agent would repeatedly learn the strategy of "bounce the ball to the left," because for hundreds of consecutive frames the ball bounces on the left side; when the ball returns to the right, the network has forgotten how to play the right side and must relearn from scratch. With experience replay, a single batch might simultaneously contain scenes like "ball in upper left," "ball at right edge," and "ball about to hit ground," enabling the network to learn to handle all situations simultaneously. A similar phenomenon occurs in autonomous driving: if you train only on the most recent 10 seconds of continuous data, the model may only handle "sunny straight roads" and have no idea what to do on rainy curves.
+This is by no means an abstract theoretical worry. In its 2015 DQN paper DeepMind ran a comparison experiment: without experience replay, the agent on Atari Breakout repeatedly learns the policy of "bounce the ball to the left," because for hundreds of consecutive frames the ball bounces on the left. When the ball returns to the right, the network has already forgotten how to play the right side and has to learn it again from scratch. With experience replay, a batch can contain very different scenes at once, such as "ball in the upper left," "ball at the right edge," and "ball about to land," and only then can the network learn to handle all kinds of situations at the same time. A similar phenomenon appears in autonomous driving: if the model is trained only on the most recent 10 seconds of continuous data, it may learn to handle only "a straight road on a sunny day" and have no idea how to respond to a curve in the rain.
 
-Experience Replay's solution is simple but effective: store all experienced transitions $(s, a, r, s', d)$ in a buffer, and randomly sample a small batch each time you train. Random sampling breaks temporal correlation -- a single batch might contain early failures and later successes simultaneously, making the gradient direction more diverse.
+The solution of experience replay is simple but effective: store every transition $(s, a, r, s', d)$ that has been experienced in a buffer, and sample a small batch at random for each training step. Random sampling breaks temporal correlation. A batch may contain failed experience from early training and successful experience from later, so the gradient directions are more diverse.
 
-What exactly gets stored? Each interaction step produces a 5-tuple:
+What exactly is stored? Each interaction step produces one five-tuple:
 
-| Component | Meaning          | CartPole example                                                           |
-| --------- | ---------------- | -------------------------------------------------------------------------- |
-| $s$       | Current state    | `[0.03, 0.12, -0.05, -0.32]` (position, velocity, angle, angular velocity) |
-| $a$       | Action taken     | `0` (push left)                                                            |
-| $r$       | Reward received  | `1.0` (pole still standing, +1 per step)                                   |
-| $s'$      | Next state       | `[0.03, -0.05, -0.06, 0.18]` (new observation after action)                |
-| $d$       | Whether terminal | `False` (pole still standing)                                              |
+| Component | Meaning | CartPole example |
+| ---- | ---------- | -------------------------------------------------------- |
+| $s$ | Current state | `[0.03, 0.12, -0.05, -0.32]` (position, velocity, angle, angular velocity) |
+| $a$ | Action taken | `0` (push left) |
+| $r$ | Reward received | `1.0` (the pole has not fallen; +1 each step) |
+| $s'$ | Next state | `[0.03, -0.05, -0.06, 0.18]` (the new observation after the action) |
+| $d$ | Whether terminated | `False` (the pole is still upright) |
 
-The replay buffer is a collection of such 5-tuples. As the agent continues interacting, the buffer gradually fills. Below is actual content a CartPole training replay buffer might store:
+The replay buffer is a collection of such five-tuples. As the agent keeps interacting, the buffer gradually fills up. Here is what a replay buffer might actually store during CartPole training:
 
-| #   | $s$ (state)                  | $a$ (action) | $r$ (reward) | $s'$ (next state)            | $d$ (terminal) | Source                  |
-| --- | ---------------------------- | ------------ | ------------ | ---------------------------- | -------------- | ----------------------- |
-| 1   | `[0.01, 0.12, 0.05, -0.32]`  | `1` (right)  | `1.0`        | `[0.01, 0.15, 0.04, -0.28]`  | `False`        | Episode 2, opening      |
-| 2   | `[0.02, 0.31, -0.12, 0.89]`  | `0` (left)   | `1.0`        | `[0.01, 0.28, -0.10, 0.85]`  | `False`        | Episode 8, mid-game     |
-| 3   | `[0.05, 0.44, 0.21, 1.02]`   | `1` (right)  | `1.0`        | `[0.06, 0.48, 0.24, 1.10]`   | `True`         | Episode 8, pole fell    |
-| 4   | `[0.00, 0.02, 0.01, -0.05]`  | `0` (left)   | `1.0`        | `[0.00, -0.01, 0.01, -0.03]` | `False`        | Episode 45, pole stable |
-| 5   | `[-0.03, -0.18, 0.08, 0.55]` | `1` (right)  | `1.0`        | `[-0.03, -0.14, 0.09, 0.50]` | `False`        | Episode 102, mid-game   |
+| # | $s$ (state) | $a$ (action) | $r$ (reward) | $s'$ (next state) | $d$ (terminated) | Source |
+| --- | ---------------------------- | ----------- | ----------- | ---------------------------- | ----------- | ------------------ |
+| 1 | `[0.01, 0.12, 0.05, -0.32]` | `1` (push right) | `1.0` | `[0.01, 0.15, 0.04, -0.28]` | `False` | Episode 2, start |
+| 2 | `[0.02, 0.31, -0.12, 0.89]` | `0` (push left) | `1.0` | `[0.01, 0.28, -0.10, 0.85]` | `False` | Episode 8, midway |
+| 3 | `[0.05, 0.44, 0.21, 1.02]` | `1` (push right) | `1.0` | `[0.06, 0.48, 0.24, 1.10]` | `True` | Episode 8, pole fell |
+| 4 | `[0.00, 0.02, 0.01, -0.05]` | `0` (push left) | `1.0` | `[0.00, -0.01, 0.01, -0.03]` | `False` | Episode 45, pole very stable |
+| 5 | `[-0.03, -0.18, 0.08, 0.55]` | `1` (push right) | `1.0` | `[-0.03, -0.14, 0.09, 0.50]` | `False` | Episode 102, midway |
 
-Note several things:
+A few things to note:
 
-- Entry 3 has $d=\text{True}$: the pole fell, ending the episode. In the TD Target, $(1-d)=0$, zeroing out future value, leaving only the immediate reward $r=1.0$. This experience teaches the network "pushing right in this state causes the pole to fall."
-- Entry 4 is from episode 45: the pole is almost stationary, with state vector near zero. This teaches the network "keeping the pole near vertical by doing nothing is also good."
-- Different entries come from different times and different episodes. During training, randomly drawing a batch means the network sees opening, mid-game, failure, and success states simultaneously, not dominated by any single phase.
+- In entry 3, $d=\text{True}$: the pole fell and the episode ended. In the TD target, $(1-d)=0$, so the future value is zeroed out and only the immediate reward $r=1.0$ remains. This experience teaches the network that "pushing right in this state makes the pole fall."
+- Entry 4 comes from episode 45: the pole hardly moves, and the state vector is close to zero. This experience teaches the network that "when the pole is nearly vertical, staying still is also good."
+- Different entries come from different times and different episodes. When a batch is drawn at random during training, the network sees starts, midgames, failures, and successes at the same time and is not dominated by a single phase.
 
-During training, 64 such experiences are randomly drawn; each one tells the network: "In this state, I took this action, got this score, and the environment changed to this." The network adjusts its Q-value predictions accordingly, so next time it encounters a similar state, it can make better judgments.
+During training, 64 such experiences are drawn at random, and each tells the network: "in this state, this action was taken, the result was this many points, and the environment became this." The network adjusts its Q-value predictions accordingly so that it can make better judgments when it meets similar states next time.
 
-![Experience replay buffer: store historical transitions, random sampling breaks temporal correlation](../../chapter07_dqn/images/experience-replay-tikz.svg)
+![Experience replay buffer: stores historical transitions, and random sampling breaks temporal correlation](../../chapter07_dqn/images/experience-replay-tikz.svg)
 
 ```python
 import random
 from collections import deque
 
-
 class ReplayBuffer:
-    """Replay buffer: store and sample (s, a, r, s', done) transitions."""
+    """Experience replay buffer: stores and samples (s, a, r, s', done) transitions"""
 
     def __init__(self, capacity=10000):
-        self.buffer = deque(maxlen=capacity)  # automatically evicts oldest data when full
+        self.buffer = deque(maxlen=capacity)  # old data is evicted automatically when capacity is exceeded
 
     def push(self, state, action, reward, next_state, done):
-        """Store one experience."""
+        """Store one experience"""
         self.buffer.append((state, action, reward, next_state, done))
 
     def sample(self, batch_size):
-        """Randomly sample a batch of experiences."""
+        """Randomly sample a batch of experiences"""
         batch = random.sample(self.buffer, batch_size)
         states, actions, rewards, next_states, dones = zip(*batch)
-        return (
-            torch.FloatTensor(states),
-            torch.LongTensor(actions),
-            torch.FloatTensor(rewards),
-            torch.FloatTensor(next_states),
-            torch.FloatTensor(dones),
-        )
+        return (torch.FloatTensor(states),
+                torch.LongTensor(actions),
+                torch.FloatTensor(rewards),
+                torch.FloatTensor(next_states),
+                torch.FloatTensor(dones))
 
     def __len__(self):
         return len(self.buffer)
@@ -235,84 +213,94 @@ class ReplayBuffer:
 
 Experience replay has three benefits:
 
-1. **Breaks temporal correlation**: random sampling ensures each training batch comes from different time periods, with diverse gradient directions, preventing being trapped in recent experience.
-2. **Improves data efficiency**: each experience can be sampled multiple times for training, rather than being used once and discarded. In a neural network, one experience can influence Q-value estimates for all states, making reuse valuable.
-3. **Smooths training**: old and new experiences are mixed together, preventing the network from overfitting to recent experience.
+1. **Breaking temporal correlation**: random sampling ensures that each batch of training data comes from different time periods, so the gradient directions are diverse and the network is not trapped in the most recent experience.
+2. **Improving data efficiency**: each experience can be sampled many times for training instead of being thrown away after one use. In a neural network, one experience can influence the Q-value estimates of all states, so reusing it is valuable.
+3. **Smoothing the training process**: old and new experience are mixed together, so the network does not overfit to the most recent experience.
 
-The replay buffer size is a hyperparameter that needs tuning. Too small, and the buffer lacks diversity. Too large, and very stale experience (generated by much older, worse policies) persists and may slow convergence. In practice, common capacities are $10^4$ to $10^6$.
+The size of the replay buffer is a hyperparameter that needs tuning. If it is too small, the experience in the buffer is not diverse enough and training works poorly. If it is too large, outdated experience from long ago (produced by a Q-network that was not yet accurate at the time) is still sampled and may slow convergence. Commonly used capacities in practice are $10^4$ to $10^6$.
 
-Experience replay solves "where data comes from" and "sample correlation." But one problem remains unsolved: the TD Target $r + \gamma \max_{a'} Q(s', a'; \theta^-)$ in the loss function can itself be unstable. If the TD Target changes along with the network parameters, the network faces a new target after every update, making optimization hard to converge. This leads to the third and final component.
+Experience replay solves the problems of "where the data comes from" and "sample correlation." One problem remains unsolved, however: the TD target $r + \gamma \max_{a'} Q(s', a'; \theta^-)$ in the loss function can itself be unstable. If the TD target changes in step with the network parameters, the network faces a new target after every update, and the optimization becomes hard to converge. This leads to the third and last component.
 
-## Target Network
+## The Target Network
 
-Q-Learning's update target is $r + \gamma \max_{a'} Q(s', a')$. In tabular methods, this target is relatively stable -- because $Q(s', a')$ lives in an independent table cell, updating $Q(s, a)$ does not change $Q(s', a')$. But in a neural network, parameters are shared: updating $Q(s, a)$ may simultaneously change $Q(s', a')$'s value. That is, the network modifies its own predictions while also changing the target it will chase next step.
+The update target of Q-Learning is $r + \gamma \max_{a'} Q(s', a')$. In a tabular method this target is relatively stable, because $Q(s', a')$ lives in a separate table cell, and updating $Q(s, a)$ does not change $Q(s', a')$. In a neural network the parameters are shared: updating $Q(s, a)$ may also change the value of $Q(s', a')$. That is, while the network modifies its own predictions, it also changes the target it has to approach next.
 
-The Target Network's solution is equally straightforward: maintain two networks. One Q-Network $\theta$ for action selection and daily updates; another target network $\theta^-$ dedicated to computing TD targets. The target network's parameters do not participate in gradient descent, but are periodically copied from the Q-Network:
+The solution of the target network is also simple: maintain two networks, a Q-network $\theta$ used to select actions and for daily updates, and a target network $\theta^-$ used specifically to compute the TD target. The target network's parameters do not take part in gradient descent. They are copied from the Q-network every fixed number of steps:
 
 ```python
-# Every target_update steps, copy Q-network parameters to the target network
+# Every target_update steps, copy the Q-network's parameters to the target network
 if step % target_update == 0:
     target_net.load_state_dict(q_net.state_dict())
 ```
 
-When computing TD targets, use the target network:
+Use the target network when computing the TD target:
 
 ```python
-# Use target network to compute TD target (stable target)
+# Compute the TD target with the target network (a stable target)
 with torch.no_grad():
     td_target = reward + gamma * target_net(next_state).max() * (1 - done)
 ```
 
-This way, between two parameter copies, the TD target is fixed -- the target does not move around. The Q-Network can peacefully learn toward a stable target instead of chasing a constantly moving one. Updating the target network every fixed number of steps is like periodically moving the target to a new position, giving the Q-Network a more accurate target to pursue.
+As a result, between two parameter copies the TD target is fixed, and the target no longer moves around. The Q-network can learn calmly toward a stable target instead of chasing a moving one. Updating the target network every fixed number of steps amounts to moving the target to a new position from time to time, giving the Q-network a more accurate target to chase.
 
-The target network's update frequency is another hyperparameter. Updating too frequently (e.g., every step) makes the target network nearly identical to the Q-Network, negating its stabilizing effect. Updating too rarely (e.g., every 10000 steps) makes the TD targets too stale, and the Q-Network may learn from outdated information. In practice, common update frequencies are every 100 to 1000 steps.
+The update frequency of the target network is another hyperparameter. If it is updated too often (for example, at every step), the target network is almost identical to the Q-network and does not stabilize anything. If it is updated too rarely (for example, only every 10000 steps), the TD target given by the target network is too stale, and what the Q-network learns may be outdated information. Update frequencies commonly used in practice are once every 100 to 1000 steps.
 
-## Building DQN from Scratch
+## Implementing DQN from Scratch
 
-We have now broken down the Q-network, experience replay, and target network from conceptual and formula perspectives. Let us shift perspective: suppose you want to write a DQN from scratch -- what is the approach?
+So far we have taken apart the Q-network, experience replay, and the target network from the angle of concepts and formulas. Now let us change perspective: if you had to write a DQN from scratch, what would the line of thought be?
 
-The approach is not complex -- first build the network, then prepare the data, then define the update logic, and finally assemble everything into a training loop. Using CartPole as an example (state_dim=4, action_dim=2), we will build it step by step. Each step will explain why parameters are set this way and what happens with different values.
+The idea is not complicated: build the network first, then prepare the data, then define the update logic, and finally assemble everything into a training loop. Using CartPole as the example (`state_dim=4, action_dim=2`), we build it step by step. At every step we explain why each parameter is set as it is and what would happen with another value.
 
-### Define the Q-Network
+### Defining the Q-Network
 
-First thing: write a network that takes a state as input and outputs Q-values for each action. CartPole's observation is a 4-dimensional vector (cart position, velocity, pole angle, angular velocity); actions are 2 discrete choices (push left, push right). So the network needs to map a 4-dimensional input to a 2-dimensional output.
+The first thing is to write a network that takes a state and outputs the Q value of each action. The CartPole observation is a 4-dimensional vector (cart position, velocity, pole angle, angular velocity), and the actions are 2 discrete choices (push left, push right). The network therefore has to map a 4-dimensional input to a 2-dimensional output.
 
 ```python
 import torch
 import torch.nn as nn
 
-
 class QNetwork(nn.Module):
     def __init__(self, state_dim, action_dim, hidden_dim=128):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(state_dim, hidden_dim),   # input -> hidden
-            nn.ReLU(),                          # activation
-            nn.Linear(hidden_dim, hidden_dim),  # hidden -> hidden
+            nn.Linear(state_dim, hidden_dim),   # input layer → hidden layer
+            nn.ReLU(),                          # activation function
+            nn.Linear(hidden_dim, hidden_dim),  # hidden layer → hidden layer
             nn.ReLU(),
-            nn.Linear(hidden_dim, action_dim),  # hidden -> output
+            nn.Linear(hidden_dim, action_dim),  # hidden layer → output layer
         )
 
     def forward(self, x):
         return self.net(x)  # output shape: (batch_size, action_dim)
 ```
 
-Implementation choices explained:
+Here are the implementation choices, one by one:
 
-- **Two hidden layers**: one hidden layer has limited expressiveness; three or more layers easily overfit on 4-dimensional input. Two layers is a common starting point for low-dimensional tasks.
-- **hidden_dim=128**: total parameters approximately $4 \times 128 + 128 \times 128 + 128 \times 2 \approx 17000$. 64 is a bit small; 256 is a bit large; 128 strikes a balance between precision and efficiency, and transfers well to LunarLander. Atari pixel inputs require CNN instead of MLP.
-- **ReLU activation**: fast to compute (just check positive/negative), gradient is constant 1 in the positive region (no vanishing gradient), output is unbounded (does not constrain Q-value range). Sigmoid/Tanh suffer from vanishing gradients and output range limitations.
-- **No activation on output layer**: Q-values can be any real number. ReLU would truncate negative values; Sigmoid/Tanh would limit the output range.
-- **Output all action Q-values at once**: selecting an action requires only one forward pass plus `argmax`, rather than running the network separately for each action. The limitation is that this only handles discrete actions; continuous actions require Actor-Critic (Chapter 7).
+- **Two hidden layers**: One layer has limited expressive power, and three or more layers easily overfit a 4-dimensional input. Two layers are a common starting point for low-dimensional tasks.
+- **`hidden_dim=128`**: The total number of parameters is about $4 \times 128 + 128 \times 128 + 128 \times 2 \approx 17000$. 64 is on the small side and 256 on the large side; 128 balances accuracy and efficiency and is also enough when migrating to LunarLander. Atari pixel input needs a CNN in place of the MLP.
+- **ReLU activation**: It is fast to compute (it only checks the sign), its gradient is constantly 1 on the positive side so it does not vanish, and its output has no upper bound so it does not limit the range of Q values. Sigmoid/Tanh suffer from vanishing gradients and a restricted output range.
+- **No activation on the output layer**: Q values can be any real number. ReLU would truncate negative values, and Sigmoid/Tanh would limit the output range.
+- **Output the Q values of all actions at once**: Choosing an action needs only one forward pass plus `argmax`, with no need to run the network once per action. The limitation is that it handles only discrete actions, and continuous actions need Actor-Critic (Chapter 7).
 
-### Define the Replay Buffer
+::: details Why these choices?
+**Why two hidden layers?** A network with one hidden layer can in theory work too, but its expressive power is limited: it can only learn a linear combination of the inputs followed by one nonlinear transformation. Two hidden layers let the network learn more complex state-action mappings, such as the nonlinear relationship "when the pole leans right and its speed is growing, the value of pushing right rises sharply." Three or more layers would of course also work, but the CartPole state has only 4 dimensions, and a network that is too deep easily overfits and trains more slowly.
 
-Second thing: prepare a container for historical experience, sampling randomly during training to break correlation. Each step the agent takes produces a transition $(s, a, r, s', d)$; the replay buffer accumulates these transitions.
+**Why `hidden_dim=128`?** 64 also runs, but the capacity is on the small side and the Q-value approximation may not be precise enough. 256 or even 512 is too many parameters for CartPole (over 100 thousand), which makes training slower and prone to overfitting. 128 is an empirical balance point: the network has about 17000 parameters in total, which is very light for CPU training. It is equally sufficient when migrating to LunarLander (`state_dim=8, action_dim=4`). With Atari pixel input, a CNN is needed in place of the MLP.
+
+**Why ReLU instead of Sigmoid or Tanh?** There are three reasons. First, ReLU is fast to compute, since it only checks whether the input is greater than 0, while Sigmoid and Tanh need exponentials. Second, the ReLU gradient is constantly 1 on the positive side, which eases the vanishing-gradient problem in multi-layer networks. The gradient of Sigmoid is at most 0.25, so after two stacked layers the signal has already decayed to 0.0625. Third, Q values can be large (the cumulative return in CartPole can exceed 200), and Sigmoid squashes the output into $(0, 1)$ and Tanh into $(-1, 1)$, which would severely limit the range of Q values that can be expressed.
+
+**Why no activation function on the output layer?** The Q value is the expected cumulative return of an action and in theory can be any real number. With ReLU, a negative Q value ("this action is terrible") would be truncated to 0, and the network could not express "this action should be actively avoided." With Sigmoid or Tanh, the Q value would be restricted to $(0,1)$ or $(-1,1)$, while the actual returns in CartPole far exceed this range.
+
+**Why output the Q values of all actions at once?** This is far more efficient than "input the state and the action, output a single Q value": choosing an action takes one forward pass followed by `argmax`, instead of running the network once for each action. The drawback is that it handles only discrete actions and cannot be migrated directly to continuous action spaces (that needs Actor-Critic methods, which we cover in Chapter 7).
+:::
+
+### Defining Experience Replay
+
+The second thing is to prepare a container for historical experience and sample from it at random during training to break correlation. Every step the agent takes produces one transition $(s, a, r, s', d)$, and the replay buffer simply accumulates these transitions.
 
 ```python
 import random
 from collections import deque
-
 
 class ReplayBuffer:
     def __init__(self, capacity=10000):
@@ -336,29 +324,32 @@ class ReplayBuffer:
         return len(self.buffer)
 ```
 
-Implementation choices explained:
+Here are the implementation choices, one by one:
 
-- **capacity=10000**: CartPole training over 500 episodes produces thousands to tens of thousands of transitions; 10000 retains roughly the last few dozen to a hundred episodes. Too small means insufficient diversity; too large retains outdated experience that slows convergence. LunarLander commonly uses $10^4$ to $10^5$; Atari uses $10^5$ to $10^6$.
-- **deque(maxlen=capacity)**: automatically evicts the oldest element when full, with $O(1)$ head deletion compared to `list`, and more flexible than numpy arrays.
-- **FloatTensor and LongTensor**: states, rewards etc. use FloatTensor for mathematical operations; actions use LongTensor because `gather` requires integer indices. dones uses FloatTensor because we later compute `(1 - dones)` multiplication.
+- **`capacity=10000`**: 500 episodes of CartPole training produce thousands to tens of thousands of transitions, and 10000 entries keep roughly the most recent few dozen to a hundred episodes. If it is too small, the experience is not diverse enough, and if it is too large, outdated experience is retained and slows convergence. LunarLander commonly uses $10^4$ to $10^5$, and Atari uses $10^5$ to $10^6$.
+- **`deque(maxlen=capacity)`**: When full, the oldest element is evicted automatically. Removal from the head is $O(1)$, unlike a `list`, and it is more flexible than a numpy array.
+- **`FloatTensor` and `LongTensor`**: States, rewards, and so on use `FloatTensor` to take part in math operations. Actions use `LongTensor` because `gather` requires integer indices. `dones` uses `FloatTensor` because a `(1 - dones)` multiplication comes later.
 
-### Define the Loss Function and Parameter Update
+::: details Why is the capacity 10000?
+Each CartPole episode usually lasts 10 to 200 steps, so 500 episodes of training produce thousands to tens of thousands of transitions. 10000 entries retain roughly the experience of the most recent few dozen to a hundred episodes, enough to provide diverse training samples. If it is too small (for example 1000), the experience in the buffer is not diverse enough and training is easily dominated by the last few episodes. If it is too large (for example $10^6$), very early experience is retained, when the Q-network was still poor and produced low-quality "reference answers," and sampling this old experience slows convergence instead.
+:::
 
-Third thing: the core update logic. This is the most critical part of DQN -- combining the Q-network, target network, and experience replay into one complete gradient update. We first define the `DQNAgent` class initialization, then write the `update` method.
+### Defining the Loss Function and Parameter Update
 
-Why do we need two networks? The Q-network outputs Q-values and selects actions while being continuously updated by gradient descent. The target network is a frozen copy of the Q-network, dedicated to computing TD targets. If we used only one network, it would modify predictions and simultaneously use the just-modified version of itself to generate "answer keys" -- like a student changing the answer key while taking an exam -- forever unable to catch up. The two networks have clear division of labor: the Q-network is the "student," the target network is the "examiner." The examiner updates its answers only periodically (via hard copy), so between updates, the student has a stable target to pursue.
+The third thing is the core update logic. This is the most important part of the whole DQN: it combines the Q-network, the target network, and experience replay to complete one full gradient update. We first define the initialization of the `DQNAgent` class and then write the `update` method.
+
+Why do we need two networks? The Q-network outputs Q values and selects actions, and is updated by gradient descent all the time. The target network is a frozen copy of the Q-network used specifically to compute the TD target. If only one network were used, the network would change its prediction while also using its freshly changed self to produce the "reference answer," like a student changing the reference answer while taking the exam, which can never be caught up with. The two networks have a clear division of labor: the Q-network is the "student" and the target network is the "grader." The grader updates the answer only from time to time (through a hard copy), and between two updates the student has a stable target to chase.
 
 ```python
 import torch.optim as optim
 from torch.nn.utils import clip_grad_norm_
-
 
 class DQNAgent:
     def __init__(self, state_dim, action_dim, lr=1e-3, gamma=0.99):
         self.action_dim = action_dim
         self.gamma = gamma
 
-        # Q-network (student) and target network (examiner)
+        # Q-network (the student) and target network (the grader)
         self.q_net = QNetwork(state_dim, action_dim)
         self.target_net = QNetwork(state_dim, action_dim)
         self.target_net.load_state_dict(self.q_net.state_dict())
@@ -368,37 +359,57 @@ class DQNAgent:
         self.buffer = ReplayBuffer(capacity=10000)
 ```
 
-Initialization parameters explained:
+Here are the initialization parameters, one by one:
 
-- **lr=1e-3**: Adam's default learning rate, also a common DQN starting point. Too large causes Q-value oscillation without convergence; too small shows no improvement in 500 episodes. When unstable, first try reducing to $5 \times 10^{-4}$.
-- **gamma=0.99**: discount factor. 0.99 makes rewards 100 steps in the future decay to $0.99^{100} \approx 0.366$, balancing immediate and future. 0.9 is too myopic; 0.999 causes too much variance.
-- **target_net synchronized initialization**: both networks have the same parameters, ensuring early TD targets and Q-values are in the same magnitude.
-- **target_net.eval()**: evaluation mode disables Dropout and BatchNorm randomness. The current MLP has no such layers, but this is good practice.
-- **Optimizer only contains q_net parameters**: the target network does not participate in gradient updates, only gets hard-copied via `update_target()`.
+- **`lr=1e-3`**: The default learning rate of Adam and also a common starting point for DQN. If it is too large, the Q values oscillate and do not converge, and if it is too small, no improvement is visible in 500 episodes. When training is unstable, lower it first to $5 \times 10^{-4}$.
+- **`gamma=0.99`**: The discount factor. With 0.99, a reward 100 steps later decays to $0.99^{100} \approx 0.366$, balancing the present and the future. 0.9 is too short-sighted and 0.999 has too much variance.
+- **Synchronized initialization of `target_net`**: The two networks have the same parameters, which keeps the early TD target and the Q values on the same scale.
+- **`target_net.eval()`**: Evaluation mode turns off the random behavior of Dropout and BatchNorm. The current MLP has no such layers, but this is a good habit.
+- **The optimizer contains only the `q_net` parameters**: The target network does not take part in gradient updates and is only hard-copied through `update_target()`.
 
-Now write the core `update` method:
+::: details Why do we need two networks?
+The parameters $\theta$ of the Q-network are updated by gradient descent at every step. The TD target is computed as $y = r + \gamma \max_{a'} Q(s', a'; \theta)$. If the parameters of the Q-network were used here as well, the TD target would change after every update of $\theta$. The network would be chasing a moving target: at this step it thinks the TD target should be 5.0, after the parameter update the "reference answer" becomes 3.0, and at the next step it has to chase again.
+
+The solution of the target network is to maintain two independent networks. The Q-network $\theta$ selects actions and handles daily updates. The target network $\theta^-$ is used only to compute the TD target, and its parameters are hard-copied from the Q-network every C steps. Between two copies the TD target is fixed, so the target stops moving and the Q-network can learn calmly.
+
+This problem does not exist in tabular Q-Learning, because $Q(s, a)$ and $Q(s', a')$ are different cells of the table, and updating one does not affect the other. A neural network shares parameters, and changing one output affects all outputs, so an extra mechanism is needed to decouple them.
+:::
+
+::: details Why must target_net be initialized in sync?
+If the target network used randomly initialized parameters and the Q-network used another set of random parameters, the Q-value outputs of the two networks could be on completely different scales, for example the Q-network outputs -5.0 and the target network outputs 200.0. This would make the TD target extremely large or small, the MSE loss would explode, and the gradients would push the parameters far away. `load_state_dict(q_net.state_dict())` makes the two networks start from the same point, so at least in early training the TD target and the Q values are on the same scale.
+:::
+
+::: details Why is lr 1e-3 and not another value?
+The learning rate controls the step size of each parameter update. $10^{-3}$ is Adam's default in most deep learning tasks. If it is too large, the Q values oscillate violently: this step predicts 5.0, the next jumps to -3.0, the TD target jumps around too, and training cannot converge. If it is too small, convergence is extremely slow, and 500 episodes may show no improvement at all. If training is unstable, the usual first step is to lower it to $5 \times 10^{-4}$ or $1 \times 10^{-4}$, rather than changing the network structure right away.
+:::
+
+::: details Why is gamma 0.99?
+The discount factor controls how much the agent values future rewards. 0.99 means a reward 100 steps later decays to $0.99^{100} \approx 0.366$. 0.9 decays faster, with $0.9^{100} \approx 2.7 \times 10^{-5}$, so the agent looks almost only at the next few steps. 0.999 decays extremely slowly, and the variance of the Q-value estimate grows, because estimating the cumulative return in the far future makes the uncertainty grow exponentially. 0.99 is the empirical starting point for most RL tasks.
+:::
+
+Now let us write the core `update` method:
 
 ```python
     def update(self, batch_size):
-        """Core update: one batch of forward pass + backward pass."""
+        """Core update: forward and backward pass over one batch"""
         if len(self.buffer) < batch_size:
             return 0.0
 
         # Sample a batch from the replay buffer
         states, actions, rewards, next_states, dones = self.buffer.sample(batch_size)
 
-        # Q-network forward pass
+        # Forward pass of the Q-network
         q_values = self.q_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)
 
-        # Target network forward pass
+        # Forward pass of the target network
         with torch.no_grad():
             next_q_max = self.target_net(next_states).max(dim=1)[0]
             targets = rewards + self.gamma * next_q_max * (1 - dones)
 
-        # Compute MSE Loss
+        # Compute the MSE loss
         loss = nn.MSELoss()(q_values, targets)
 
-        # Backward pass and parameter update
+        # Backpropagation and parameter update
         self.optimizer.zero_grad()
         loss.backward()
         clip_grad_norm_(self.q_net.parameters(), max_norm=10)
@@ -407,23 +418,45 @@ Now write the core `update` method:
         return loss.item()
 ```
 
-`update()` is DQN's computational core. Step by step:
+`update()` is the computational core of the whole DQN. Let us take it apart step by step:
 
-- **Buffer check**: skip when `len(self.buffer) < batch_size`. Early in training, the buffer has fewer than 64 entries; `random.sample` would raise an error.
-- **gather**: from `(B, action_dim)` output, pick the Q-value corresponding to the actual action taken.
-- **torch.no_grad()**: target network is frozen, no computation graph built. Gradients flow only through `q_values`; `targets` is a constant.
-- **.max(dim=1)[0]**: take the maximum value per row, i.e., $\max_{a'} Q(s', a'; \theta^-)$. `[0]` gets values, `[1]` gets indices.
-- **TD Target**: `rewards + gamma * next_q_max * (1 - dones)`. When terminal, `dones=1`, zeroing out future value.
-- **MSE Loss**: $\frac{1}{B}\sum (y_i - Q_i)^2$. Penalizes large errors more than L1 (error of 2: MSE penalizes 4 vs L1 penalizes 2).
-- **zero_grad -> backward -> clip -> step**: PyTorch's standard four-step update pattern.
+- **Buffer check**: When `len(self.buffer) < batch_size`, it returns immediately. Early in training the buffer has fewer than 64 entries, and `random.sample` would raise an error.
+- **`gather`**: From the `(B, action_dim)` output, pick the Q value corresponding to the action actually taken, using the action index.
+- **`torch.no_grad()`**: The target network is frozen and no computation graph is built. The gradient flows only through `q_values`, and `targets` is a constant.
+- **`.max(dim=1)[0]`**: Take the maximum of each row, that is, $\max_{a'} Q(s', a'; \theta^-)$. `[0]` takes the values and `[1]` takes the indices.
+- **TD target**: `rewards + gamma * next_q_max * (1 - dones)`. At termination `dones=1` and the future value is zeroed.
+- **MSE loss**: $\frac{1}{B}\sum (y_i - Q_i)^2$. It penalizes large errors more strongly than L1 (for an error of 2, MSE gives a penalty of 4 and L1 gives 2).
+- **`zero_grad` → `backward` → `clip` → `step`**: PyTorch's fixed four-step update pattern.
 
-### Action Selection and Target Network Sync
+::: details Intuition for the gather operation
+`self.q_net(states)` outputs shape `(B, 2)`, and each row holds the Q values of the two actions. The loss function, however, needs only the Q value of the action actually executed. `gather(1, actions.unsqueeze(1))` picks one number from each row according to the column index given by `actions`:
 
-Fourth thing: add action selection and target network updates.
+```
+q_net output:                actions:    gather result:
+[[ 0.3,  0.8],              [1,          [0.8,    ← row 0 takes column 1
+ [ 1.2, -0.5],               0,           1.2,    ← row 1 takes column 0
+ [-0.1,  0.6],               1,           0.6,    ← row 2 takes column 1
+ ...]                         ...]         ...]
+```
+
+`actions.unsqueeze(1)` changes the shape from `(B,)` to `(B, 1)`, since `gather` needs the index and the input tensor to have matching dimensions. `.squeeze(1)` squeezes the result from `(B, 1)` back to `(B,)`.
+:::
+
+::: details Why gradient clipping with max_norm=10?
+The loss surface of reinforcement learning is more rugged than that of supervised learning. A batch may mix samples with a TD error of 0.1 and samples with a TD error of 50, and the gradient from the latter may push the parameters far away. `max_norm=10` is an empirical value, and many OpenAI experiments also use 10 or 0.5. If it is too large (100), it is as good as no clipping, and if it is too small (1), it limits the learning speed. If the loss suddenly spikes during training and then does not come down, try reducing this value.
+:::
+
+::: details Why Adam and not SGD?
+Adam uses more than the current gradient. It also maintains a first-order momentum (an exponential moving average of the gradient) and a second-order momentum (an exponential moving average of the squared gradient), and it adjusts the effective learning rate of each parameter automatically. The gradient variance of DQN is large, since a batch may contain large and small values, and Adam's adaptivity helps stabilize training. Plain SGD is more sensitive to the learning rate and needs more careful tuning.
+:::
+
+### Action Selection and Target Network Synchronization
+
+The fourth thing is to add action selection and the target-network update.
 
 ```python
     def select_action(self, state, epsilon):
-        """epsilon-greedy action selection."""
+        """ε-greedy action selection"""
         if random.random() < epsilon:
             return random.randint(0, self.action_dim - 1)
         with torch.no_grad():
@@ -431,20 +464,24 @@ Fourth thing: add action selection and target network updates.
         return q_values.argmax(dim=1).item()
 
     def update_target(self):
-        """Hard update: copy Q-network parameters to target network."""
+        """Hard update: copy the Q-network parameters to the target network"""
         self.target_net.load_state_dict(self.q_net.state_dict())
 ```
 
-Implementation choices explained:
+Here are the implementation choices, one by one:
 
-- **epsilon-greedy**: early in training, Q-network predictions are nearly random; always choosing `argmax` would forever repeat the actions that happened to score high initially. epsilon-greedy forces exploration with probability $\varepsilon$, guaranteeing the agent can visit all state-action pairs. Later, $\varepsilon$ decays so the agent mainly exploits learned knowledge.
-- **unsqueeze(0)**: `state` shape is `(4,)`, network expects `(B, 4)`. `unsqueeze(0)` inserts a batch dimension to make it `(1, 4)`.
-- **argmax(dim=1).item()**: `(1, 2)` -> argmax -> `(1,)` -> `.item()` -> Python int. `env.step()` requires a plain integer, not a tensor.
-- **Hard update**: directly $\theta^- \leftarrow \theta$, as in the original DQN paper. Soft update $\theta^- \leftarrow \tau \theta + (1-\tau) \theta^-$ is smoother and is an improvement in later algorithms like DDPG.
+- **ε-greedy**: Early in training the Q-network's predictions are almost random, and always taking the `argmax` would repeat the action that happened to score high forever. ε-greedy forces exploration with probability $\varepsilon$, and once it decays to a small value later on, the agent turns to exploitation.
+- **`unsqueeze(0)`**: `state` has shape `(4,)`, and the network expects `(B, 4)`. `unsqueeze(0)` inserts the batch dimension and gives `(1, 4)`.
+- **`argmax(dim=1).item()`**: `(1, 2)` → `argmax` → `(1,)` → `.item()` → Python int. `env.step()` needs a plain integer and cannot take a tensor.
+- **Hard update**: Directly $\theta^- \leftarrow \theta$, as in the original DQN paper. The soft update $\theta^- \leftarrow \tau \theta + (1-\tau) \theta^-$ is smoother and is an improvement from later algorithms such as DDPG.
 
-### Training Loop
+::: details Why ε-greedy and not another exploration strategy?
+Early in training the Q-network's predictions are almost random, and if it only takes the `argmax`, the agent keeps repeating the one or two actions that happened to score high at first and never discovers a better policy. ε-greedy forces random exploration with probability $\varepsilon$, which guarantees that the agent has a chance to visit all state-action pairs. Late in training $\varepsilon$ decays to a small value, and the agent mainly exploits what it has learned. More advanced exploration strategies (such as Noisy Networks and intrinsic curiosity) are discussed in later chapters.
+:::
 
-The last thing: assemble all components into a training loop.
+### The Training Loop
+
+The last thing is to assemble all the parts into the training loop.
 
 ```python
 import gymnasium as gym
@@ -474,61 +511,77 @@ for episode in range(num_episodes):
         agent.update_target()
 ```
 
-Hyperparameter choices explained:
+Here are the hyperparameter choices, one by one:
 
-- **num_episodes=500**: CartPole-v1's "solve" threshold is 100 consecutive episodes averaging >= 475; DQN typically reaches this in 200-400 episodes. 500 is sufficient. Not converging is usually not an episode-count problem but rather other hyperparameters being wrong.
-- **batch_size=64**: 32 has high gradient variance and is unstable; 256 buries key samples in ordinary experience. 64 or 128 is the common range from the original DQN paper.
-- **epsilon_start=1.0**: initially completely random; Q-network output is meaningless, so 100% exploration ensures uniform coverage of the state space.
-- **epsilon_end=0.01**: retain 1% randomness as a safety net. With zero exploration, Q-network errors can never be corrected.
-- **epsilon_decay=0.995**: after 100 episodes $\approx 0.61$, after 200 $\approx 0.37$, after 400 $\approx 0.14$. The first half explores adequately; the second half gradually shifts to exploitation. 0.95 is too fast; 0.999 is too slow.
-- **target_update_freq=10**: synchronize target network every 10 episodes. Too frequent means no effective target network; too sparse means targets are too stale. LunarLander typically updates every 1000 steps.
-- **float(done)**: Gymnasium returns booleans; converting to float enables `(1 - dones)` multiplication.
-- **update every step**: collect and train simultaneously, maximizing data utilization. When the buffer is too small for a batch, `update` internally skips.
+- **`num_episodes=500`**: The criterion for "solving" CartPole-v1 is an average of $\geq 475$ over 100 consecutive episodes, and DQN usually reaches it in 200 to 400 episodes. 500 episodes are enough. Failure to converge is usually not a matter of the number of episodes but of other hyperparameters being wrong.
+- **`batch_size=64`**: 32 has large gradient variance and is unstable, and 256 drowns the key samples in ordinary experience. 64 or 128 is the common range in the original DQN paper.
+- **`epsilon_start=1.0`**: Fully random at the start. The freshly initialized Q-network outputs meaningless values, and 100% exploration ensures uniform coverage of the state space.
+- **`epsilon_end=0.01`**: Keeps 1% randomness as a safety net. With exploration eliminated completely, the Q-network can never correct itself when it judges wrongly.
+- **`epsilon_decay=0.995`**: After 100 episodes $\approx 0.61$, after 200 $\approx 0.37$, and after 400 $\approx 0.14$. The first half explores thoroughly, and the second half shifts gradually toward exploitation. 0.95 is too fast and 0.999 too slow.
+- **`target_update_freq=10`**: Sync the target network every 10 episodes. Too often is as good as having no target network, and too rarely makes the target too old. LunarLander usually counts in steps, updating every 1000 steps.
+- **`float(done)`**: Gymnasium returns a boolean, which has to be converted to a float before it can take part in the `(1 - dones)` multiplication.
+- **`update` at every step**: Train while collecting, which maximizes data usage. When the buffer holds fewer than a batch, `update` skips internally.
 
-This completes a full DQN built from scratch. The core of the entire implementation is the `update()` method -- forward pass to compute Q-values and TD Target, MSE for loss, backpropagation to update parameters. All other code (network definition, replay buffer, action selection, training loop) serves this logic.
+::: details Comparison of epsilon decay speeds
+After each episode $\varepsilon \leftarrow \varepsilon \times \text{epsilon\_decay}$. The effect of different decay factors:
 
-## Learning vs. Inference: Two Modes of the Same Network
+| Decay factor | After 100 episodes | After 200 episodes | After 400 episodes | Effect |
+| --------- | --------- | --------- | --------- | ------------------------------ |
+| 0.95 | 0.006 | — | — | Too fast: the policy hardens before any exploration |
+| 0.99 | 0.366 | 0.134 | 0.018 | Somewhat fast; usable for some tasks |
+| **0.995** | **0.606** | **0.368** | **0.135** | **Balanced: explore in the first half, exploit in the second** |
+| 0.999 | 0.905 | 0.819 | 0.670 | Too slow: still very random after 500 episodes |
 
-The training phase and inference phase use the same Q-network, but operate completely differently:
+:::
 
-|                       | Training (learning)                                               | Inference (use)                                   |
-| --------------------- | ----------------------------------------------------------------- | ------------------------------------------------- |
-| Action selection      | epsilon-greedy: random exploration with probability $\varepsilon$ | Pure greedy: $a = \arg\max_{a'} Q(s, a'; \theta)$ |
-| Experience collection | Each step stored in replay buffer                                 | Not needed                                        |
-| Parameter update      | Sample from replay buffer, compute loss, backprop                 | Do not update parameters                          |
-| Target network        | Used to compute TD Target, periodically copied                    | Not used                                          |
-| Network mode          | `q_net.train()`                                                   | `q_net.eval()`                                    |
+::: details Why call update at every step?
+In this training loop, every action step is immediately followed by one round of sampling from the buffer and training. This is the approach of the original DQN paper: train while collecting data, which maximizes data usage. Some implementations train only after each episode ends, but that uses data less efficiently and converges more slowly. When the buffer holds fewer than a batch, `update` skips internally, so there is no need to worry about too little data early in training.
+:::
 
-During training, exploration is needed because the agent must discover better strategies -- if it only chose the currently-best action from the start, it might never reach more valuable regions. During inference, exploration is disabled because we want to evaluate what the network **actually learned**, not observe its random-walk luck.
+At this point a complete DQN has been built from scratch. The core of the whole implementation is the `update()` method: the forward pass computes the Q values and the TD target, MSE computes the loss, and backpropagation updates the parameters. The rest of the code (the network definition, the replay buffer, action selection, and the training loop) all serves this logic.
 
-The code difference is one line:
+## Learning and Inference: Two Uses of the Same Network
+
+The training phase and the inference phase use the same Q-network, but run it in completely different ways:
+
+| | Training (learning) | Inference (use) |
+| -------- | --------------------------------------- | -------------------------------------------- |
+| Action selection | ε-greedy: explore randomly with probability $\varepsilon$ | Pure greedy: $a = \arg\max_{a'} Q(s, a'; \theta)$ |
+| Experience collection | Store each step in the replay buffer | Not needed |
+| Parameter update | Sample from the replay buffer, compute the loss, backpropagate | No parameter updates |
+| Target network | Takes part in computing the TD target, copied periodically | Not used |
+| Network mode | `q_net.train()` | `q_net.eval()` |
+
+Exploration is needed in training because the agent has to discover better policies. If it only ever picks the action it currently believes is best, it may never reach more valuable regions. Exploration is turned off at inference because we want to evaluate **what the network has really learned**, and not the luck of its random wandering.
+
+The difference in code is a single line:
 
 ```python
-# Training: may explore randomly
+# May explore randomly
 action = agent.select_action(state, epsilon=0.1)
 
-# Inference: purely greedy
+# Fully greedy
 action = agent.select_action(state, epsilon=0.0)
 ```
 
-When `epsilon=0.0`, `random.random() < 0.0` is always false, always taking the `argmax` branch. This is why evaluation disables exploration -- otherwise evaluation results are contaminated with random actions, making it impossible to judge how well the network itself has learned.
+With `epsilon=0.0`, `random.random() < 0.0` is always false, so the `argmax` branch is always taken. This is why exploration has to be turned off during evaluation: otherwise random actions mix into the evaluation result, and we cannot tell whether the network itself has learned well.
 
-## Complete Deep Q-Network Algorithm
+## The Complete Deep Q-Network Algorithm
 
-The three components' collaboration in the training loop is shown below:
+The collaboration of the three components in the training loop is as follows:
 
 ```mermaid
 flowchart TD
     subgraph DQN Training Loop
-        A["Agent interacts with environment"] --> B["Experience (s,a,r,s') stored in replay buffer"]
-        B --> C["Randomly sample a batch from replay buffer"]
-        C --> D["Q-Network computes Q(s,a; theta)"]
-        C --> E["Target-Net computes r + gamma(1-d) max Q(s',a'; theta-)"]
+        A["Agent interacts with the environment"] --> B["Experience (s,a,r,s') is stored in the replay buffer"]
+        B --> C["Randomly sample a batch from the replay buffer"]
+        C --> D["Q-Network computes Q(s,a; θ)"]
+        C --> E["Target-Net computes r + γ(1-d) max Q(s',a'; θ⁻)"]
         D --> F["Compute Loss = MSE(TD Target - Q)"]
         E --> F
-        F --> G["Gradient descent updates Q-Network parameters theta"]
+        F --> G["Gradient descent updates Q-Network parameters θ"]
         G --> H{"Every C steps?"}
-        H -->|"Yes"| I["theta- <- theta (copy params to target network)"]
+        H -->|"Yes"| I["θ⁻ ← θ (copy parameters to the target network)"]
         H -->|"No"| A
         I --> A
     end
@@ -539,19 +592,19 @@ flowchart TD
     style I fill:#e3f2fd,stroke:#1976d2,color:#000
 ```
 
-Putting the three components together, the complete DQN training procedure is:
+Putting the three components together, the complete training procedure of the deep Q-network is as follows:
 
 $$
 \begin{aligned}
 & \textbf{Algorithm: Deep Q-Network (DQN)} \\[6pt]
-& \textbf{1:}\ \text{Initialize Q-network parameters } \theta\text{, target network } \theta^- \leftarrow \theta\text{, replay buffer } \mathcal{D} \\
+& \textbf{1:}\ \text{Initialize the Q-network parameters } \theta\text{, the target network } \theta^- \leftarrow \theta\text{, and the replay buffer } \mathcal{D} \\
 & \textbf{2:}\ \textbf{for}\ \mathrm{episode} = 1, 2, \ldots\ \textbf{do} \\
-& \textbf{3:}\ \quad \text{Obtain initial state } s \\
+& \textbf{3:}\ \quad \text{Obtain the initial state } s \\
 & \textbf{4:}\ \quad \textbf{for}\ t = 1, 2, \ldots\ \textbf{do} \\
 & \textbf{5:}\ \qquad a \leftarrow \varepsilon\text{-greedy}(Q(s, \cdot\,; \theta)) \\
 & \textbf{6:}\ \qquad \text{Execute } a\text{, observe } r, s', d \\
 & \textbf{7:}\ \qquad \mathcal{D}.\mathrm{push}(s, a, r, s', d) \\
-& \textbf{8:}\ \qquad \text{Sample batch } \{(s_i, a_i, r_i, s'_i, d_i)\}_{i=1}^{B} \text{ from } \mathcal{D} \\
+& \textbf{8:}\ \qquad \text{Sample a batch } \{(s_i, a_i, r_i, s'_i, d_i)\}_{i=1}^{B} \text{ from } \mathcal{D} \\
 & \textbf{9:}\ \qquad y_i \leftarrow r_i + \gamma (1 - d_i) \max_{a'} Q(s'_i, a'; \theta^-) \\
 & \textbf{10:}\ \qquad \mathcal{L}(\theta) \leftarrow \frac{1}{B} \sum_{i=1}^{B} \bigl(y_i - Q(s_i, a_i; \theta)\bigr)^2 \\
 & \textbf{11:}\ \qquad \theta \leftarrow \theta - \alpha \nabla_\theta \mathcal{L} \\
@@ -562,24 +615,24 @@ $$
 \end{aligned}
 $$
 
-where $\varepsilon\text{-greedy}$ means explore randomly with probability $\varepsilon$, and choose $a = \arg\max_{a'} Q(s, a'; \theta)$ with probability $1-\varepsilon$.
+Here $\varepsilon\text{-greedy}$ means exploring at random with probability $\varepsilon$ and choosing $a = \arg\max_{a'} Q(s, a'; \theta)$ with probability $1-\varepsilon$.
 
-Compared to the tabular Q-Learning method from Chapter 3, DQN makes only three changes: replaces the table with a neural network (generalization), adds experience replay (breaks correlation), and adds a target network (stabilizes targets). The core TD Error logic -- "the gap between prediction and reality" -- remains completely unchanged.
+Compared with the tabular Q-Learning method of Chapter 3, the deep Q-network makes only three changes: a neural network replaces the table (generalization), experience replay is added (breaking correlation), and a target network is added (stabilizing the target). The core TD error logic, "the gap between prediction and reality," is unchanged.
 
 <details>
-<summary>Exercise: When the replay buffer is full, old experiences get evicted. What if a "critical experience" (like the first time reaching the goal) gets evicted?</summary>
+<summary>Question to think about: once the replay buffer is full, old experience is evicted. What if a "key experience" (such as reaching the goal for the first time) gets evicted?</summary>
 
-In standard experience replay, old experiences are evicted on a first-in-first-out (FIFO) basis. It is indeed possible for a critical experience to be evicted. However, since the replay buffer is not yet full early in training, critical experiences usually get sampled many times. Additionally, a DQN improvement -- Prioritized Experience Replay (PER) -- gives higher sampling probability to experiences with larger TD errors, so "surprising" experiences are less likely to be ignored. We will discuss this improvement in [5.4 DQN Improvements](./dqn-family).
+In standard experience replay, old experience is evicted in first-in-first-out (FIFO) order. It is indeed possible for a key experience to be evicted, but since the buffer is not yet full early in training, key experiences are usually sampled many times. In addition, one improved version of DQN, Prioritized Experience Replay, gives experiences with a large TD error a higher sampling probability, so that "surprising" experiences are not easily overlooked. We discuss this improvement in [5.4 DQN Improvements](./dqn-family).
 
 </details>
 
-Now we have disassembled DQN's three components. Next, let us put them into a complete training run on LunarLander -- [Hands-on: LunarLander](./lunar-lander).
+Now that we have taken apart the three components of the deep Q-network, let us put them into one complete training run on LunarLander and observe them: [Hands-On: LunarLander](./lunar-lander).
 
-## Section Summary
+## Summary
 
-- The **Q-network** approximates $Q(s,a)$ with a neural network, outputting Q-values for all actions in one forward pass, using `gather` to select the actually-taken action's score.
-- The **loss function** is assembled from four building blocks: TD Target (answer key), TD Error (prediction gap), squaring (penalize large errors), and expectation (batch average).
-- **Experience replay** stores transitions from continuous interaction in a buffer, with random sampling breaking temporal correlation and improving data efficiency.
-- The **target network** provides stable TD targets through delayed parameter copying and `torch.no_grad()`, avoiding "chasing yourself."
-- **Training and inference** use the same Q-network: during training, epsilon-greedy exploration + parameter updates; during inference, pure greedy + frozen parameters.
-- Data flow for one parameter update: sample batch -> Q-network forward -> target network forward -> TD Target -> MSE Loss -> backpropagation -> parameter update.
+- **The Q-network** approximates $Q(s,a)$ with a neural network, outputs the Q values of all actions in one forward pass, and uses `gather` to pick out the score of the action actually executed.
+- **The loss function** is assembled from four building blocks: the TD target (the reference answer), the TD error (the prediction gap), the square (punishing large errors), and the expectation (the batch average).
+- **Experience replay** stores the transitions obtained from continuous interaction in a buffer, and random sampling breaks temporal correlation and improves data efficiency.
+- **The target network** provides a stable TD target through delayed parameter copying and `torch.no_grad()`, avoiding "chasing itself."
+- **Training and inference** use the same Q-network: training uses ε-greedy exploration plus parameter updates, while inference uses pure greedy selection with frozen parameters.
+- The data flow of one parameter update: sample a batch → Q-network forward pass → target-network forward pass → TD target → MSE loss → backpropagation → parameter update.

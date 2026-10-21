@@ -1,154 +1,274 @@
 # 16.4 Hybrid Thinking and Budget Control
 
-Section 16.3 explains that the same model can achieve higher success rates by using more candidates, revisions, or search. Now, consider two requests placed in the same service queue: the first is "Translate 'hello' into Chinese," and the second is "Prove that a sequence converges." If both are processed in the long-think mode, the translation request will unnecessarily increase latency. If both are answered directly, the proof question is prone to errors in intermediate steps.
+The previous section covered Test-Time Scaling: with parameters fixed, success rates can be raised through more sampling, more revision, and more search. But this brings a direct engineering problem: not every request can be given the full budget.
 
-**Hybrid Thinking** enables a single model to support both direct answering and deep thinking behaviors. The problem is then divided into three layers: how to coexist two modes during training, how to choose during inference whether to allocate the budget to a long chain or multiple short answers, and how to compress redundant steps once the model has learned long thinking. Finally, the deployment system must ensure that mode switching, answer consistency, and graceful shutdown when the budget is exhausted are all under control.
+Imagine two requests arriving at an inference service at the same time:
+
+1. "Translate hello into Chinese," which needs no expanded reasoning and can be answered directly.
+2. "Prove that the sequence $a_n = (1+\frac{1}{n})^n$ converges," which needs several steps of derivation and also verification.
+
+If both enter long-thinking mode, the translation request wastes a few seconds of latency and thousands of tokens of cost for nothing. If both are answered directly, the proof problem will most likely go wrong in an intermediate step.
+
+This is the problem **Hybrid Thinking** solves: one model supports two modes at once, answering simple questions directly and expanding long reasoning for complex ones, while keeping the budget controllable. This section looks at four questions in turn: how the two modes coexist in one model, how the budget is set, whether the same budget should go to one long chain or to several short answers, and how redundant thinking steps are compressed once a model has learned long thinking.
 
 <img src="../../chapter19_reasoning/images/hybrid-thinking-routing.svg" alt="A request is routed between direct answering and extended reasoning under a budget constraint">
 
-## 1. How a Single Model Can Support Two Modes
+## One Model Supporting Two Thinking Modes
 
-The most straightforward approach is to maintain two separate models: one for fast answering and one for complex reasoning. However, this approach leads to two sets of weights, two sets of deployment, and potential synchronization issues between the two models. Hybrid Thinking instead shares a single set of parameters and uses training samples or control tokens to specify the current mode.
+An idea that comes easily is to maintain two models: a "fast model" for simple question answering and a "thinking model" for complex reasoning. But this has three costs:
 
-### 1.1 How DeepSeek V3.1 Provides Two Modes
+- Two sets of weights must be deployed and maintained separately.
+- Knowledge updates fall out of sync: what the fast model learns, the thinking model may not yet know, and vice versa.
+- GPU memory use doubles, and so does cost.
 
-[DeepSeek V3.1](https://api-docs.deepseek.com/news/news250821) (2025.08) publicly demonstrates this interface: a single model supports both "Think" and "Non-Think" modes, with the API exposed through `deepseek-reasoner` and `deepseek-chat`. The public documentation confirms that the model supports two modes, with improvements in thinking efficiency and tool capabilities. However, it does not disclose the specific training data or loss details for each mode.
+The approach of Hybrid Thinking is to **share a single set of parameters, and use training samples or control markers to specify which mode the model should output in**.
 
-- **Single Model**: Does not maintain two independent "think model" and "non-think model"
-- **Mode Switching**: Requests are routed to either the think or non-think interface
-- **Shared Capabilities**: Both modes are derived from the same model version, and knowledge and tool capabilities can be synchronized
+### DeepSeek V3.1: A Dual-Interface Design
 
-To train such a model, the data must cover both long reasoning and direct answering. Otherwise, one mode may dominate and suppress the other. Whether the mode is selected by the user, a template, or the model itself depends on the product interface. It cannot be inferred solely from the "dual-mode" result what the specific training process was.
+[DeepSeek V3.1](https://api-docs.deepseek.com/news/news250821), released in August 2025, is one example of making this dual mode a public product interface. On a single model version it exposes two API endpoints:
 
-### 1.2 How Qwen3 Trains Two Output Types
+- `deepseek-chat`: Non-Think mode, answers directly
+- `deepseek-reasoner`: Think mode, expands long reasoning
 
-The [Qwen3 Technical Report](https://arxiv.org/abs/2505.09388) (2025.05) proposes a more systematic Hybrid Thinking approach. All Qwen3 model series (from 0.6B to 235B) support two modes:
+Three things can be confirmed from the public description:
 
-Qwen3 learns two types of outputs using the same set of model parameters. The chat template or user setting tells the model whether to generate a long reasoning process or a direct answer:
+1. **It really is the same model**, not two independent models.
+2. **The mode is switched at request time**, with routing deciding which path to take.
+3. **Knowledge and tool capabilities are shared**, and the two modes are updated in sync.
 
-- Training data contains a mixture of thinking and non-thinking samples.
-- Thinking samples: complete long Chain-of-Thought (CoT) plus the answer.
-- Non-thinking samples: short direct answers.
-- The template controls whether thinking is enabled.
+Public material does not disclose the details of each kind of training data and loss, so the specific training procedure cannot be inferred backward from the result of "dual mode." What can be determined is that the training data must cover both long-reasoning answers and direct answers, or one mode will crowd out the other. If the model is trained only on long text, its ability to give short answers degrades.
 
-Sharing parameters avoids maintaining two completely independent models, but the choice of mode still requires request settings or upper-level routing. The model cannot decide to make the most cost-effective decision simply because "it looks like a math problem." Section 16.5 will continue to address this issue.
+### Qwen3: A Systematic Dual-Mode Scheme
 
-### 1.3 How the Thinking Budget Limits the Length of Reasoning
+The earlier [Qwen3 technical report](https://arxiv.org/abs/2505.09388) (May 2025) proposed a more systematic scheme. The whole Qwen3 family (from 0.6B to 235B) supports both modes, and the training method is described more clearly.
 
-The Qwen3 technical report further discusses the **thinking budget**: the deployment side allocates a token budget for the reasoning process, allowing the same model to form different quality-delay trade-off points. The parameter names and implementations may vary across different inference services, but the following pseudo-code illustrates the interface meaning:
+Its core approach is **mixed training data plus template control**:
+
+- The training data mixes two kinds of samples:
+  - **thinking samples**: a full long reasoning chain plus the final answer
+  - **non-thinking samples**: a short answer given directly, with no intermediate reasoning
+- At inference time, the chat template or user settings tell the model whether it should currently generate long reasoning or answer directly.
+
+The parameters are the same set, and the control markers activate different behavior modes: on seeing the thinking marker the model expands reasoning step by step, and on seeing the direct-answer marker it outputs the conclusion.
+
+Sharing parameters avoids the cost of maintaining two models, but one problem remains unsolved: **who decides which mode to use right now?** Relying entirely on the user to choose manually gives a poor experience, and letting the model judge for itself may lead to wrong judgments. This question is left for Section 16.5 on adaptive thinking. In this section we first assume that the choice of mode has already been made by the user or a router, and look at how the budget is controlled.
+
+### Thinking Budget: Controlling the Length of Thought
+
+Even in thinking mode, the model cannot be allowed to derive without limit. Qwen3 proposed the **thinking budget**: at deployment, the reasoning process is allotted a cap on tokens, so that one model can form different "quality versus latency" operating points.
+
+Different services may use different parameter names and implementations. The meaning can be shown with pseudocode:
 
 ```python
-# Qwen3 thinking budget example
+# Illustration of a thinking budget interface
 response = client.chat.completions.create(
     model="qwen3-235b-a22b",
-    messages=[{"role": "user", "content": "Prove that √2 is irrational"}],
-    extra_body={"thinking_budget": 2000}  # Service-side illustrative parameter
+    messages=[{"role": "user", "content": "Prove that the square root of 2 is irrational"}],
+    extra_body={"thinking_budget": 2000}  # the thinking part uses at most 2000 tokens
 )
 ```
 
-This upper limit directly affects three deployment metrics:
+This cap directly affects three deployment metrics:
 
-- A small budget shortens the waiting time for high-frequency requests.
-- The token limit restricts the worst-case cost of a single call.
-- A large budget leaves more room for checking and revising difficult problems.
+- **Small budget** (for example 500 tokens): frequent simple requests are not slowed by long thinking, and p99 latency stays under control.
+- **Cost upper bound**: a single call has a ceiling on its worst-case cost.
+- **Large budget** (for example 8000 tokens): competition and proof problems have enough room to expand the derivation, check for errors, and go back to revise.
 
-Budget control also introduces truncation issues: if the system stops generating in the middle of a proof, the remaining tokens may not be sufficient to write the final answer. Therefore, training and deployment must separately address length efficiency, stopping conditions, and answer preservation. One cannot equate an API limit with the model having learned to correctly conclude at any truncation point.
+One model with different budgets amounts to picking different operating points on the same "accuracy versus latency" curve: translation and summarization use a small budget and return quickly, while competitive programming and mathematical proofs use a large budget to secure accuracy.
 
-## 2. Choosing Between Long Reasoning and Parallel Short Answers
+There is one easily misused point here, though: **a budget cap does not mean the model will wrap up correctly**. If a proof is cut off midway, the model may not have time to write the final answer: it has thought for 3,000 tokens and is cut off before the conclusion is output. Training and deployment must therefore be handled separately:
 
-Once entering "tasks requiring more computation," the next decision is how to spend the computation. For knowledge-based question-answering, multiple short answers voting may already be sufficient; for problems requiring continuous proofs, a long chain that retains intermediate states may be more valuable. The NoThinking experiment compares these two approaches under the same budget.
+- At training time, let the model learn to wrap up sensibly under different budget conditions.
+- At deployment time, either reserve tokens for the final answer or trigger a wrap-up as the budget approaches.
 
-In April 2025, Ma et al. compared long reasoning with NoThinking in their paper [Reasoning Models Can Be Effective Without Thinking](https://arxiv.org/abs/2504.09858). The paper used the DeepSeek-R1-Distill-Qwen series of models and found that, under low token budgets or low latency conditions, multiple shorter answers can be a competitive approach.
+## One Long Chain vs. Several Short Answers
 
-### 2.1 How to Compare the Two Approaches Under the Same Budget
+Once the principle is settled that hard problems get more budget and easy ones less, there is still a choice to make: after a task enters the "needs more compute" category, how should the budget be spent?
 
-Experiments control the total token usage or wall-clock delay, comparing two approaches: Thinking uses a longer trajectory to complete one or a few attempts; NoThinking skips explicit long reasoning and independently generates more complete answers, then uses a task validator or confidence score to select the best answer. The paper covers seven types of tasks, including mathematics, formal proofs, and code. The conclusions focus on the low-budget regime and cannot be generalized to "NoThinking is better on all tasks."
+For the same total budget of 4,000 tokens, there are two extreme ways to spend it:
 
-### 2.2 Why NoThinking Works on Some Tasks
+1. **Thinking mode**: generate one long reasoning chain of about 4,000 tokens, going deep along a single path.
+2. **NoThinking mode**: skip explicit long reasoning, generate eight short answers of about 500 tokens each, and vote for the best.
 
-A long chain concentrates the budget on a single solution path. When the early steps go wrong, the subsequent calculations depend on the incorrect prefix. Multiple short answers disperse the budget across different starting points, covering a richer set of methods. It also relies on two conditions: the short answers themselves must have a certain success rate, and the system must be able to judge which answer is better. When the single-trial success rate is too low or the task lacks a validator, increasing the number of short answers may not be helpful.
+The April 2025 paper by Ma et al., [Reasoning Models Can Be Effective Without Thinking](https://arxiv.org/abs/2504.09858), systematically compared the two allocations.
 
-These experiments compare two ways of allocating computation: using the budget to extend a single reasoning chain or to generate more independent candidates. For easy questions where the single-trial success rate is already high, more sampling helps cover the correct answer. For tasks requiring continuous derivation, long reasoning is more valuable. The choice depends on both the task difficulty and the reliability of the validator.
+### Comparison Under the Same Budget
 
-## 3. How Long2Short Compresses Reasoning Chains
+The paper's experimental design is to **control the total token budget (or wall-clock latency) and compare the effect of the two allocations**. They used the DeepSeek-R1-Distill-Qwen family of models and compared across seven kinds of tasks, including math, formal proving, and code.
 
-Long reasoning training first prioritizes success rate, and the model may thus learn to repeatedly check and restate. When deploying, it is not sufficient to simply use hard truncation: if the truncation point falls before the conclusion, the model may not even have the chance to output an answer. The goal of Long2Short is to enable the model to learn, during training, to retain necessary steps and remove redundant ones.
+A concrete reading of "the same budget": with a total budget of 4,000 tokens,
 
-Reasoning with reinforcement learning may lead to longer responses, as longer trajectories provide more opportunities for trial, checking, and recovery. This has three direct reasons:
+- Thinking mode: 1 × 4000 tokens, keeping the complete, continuous derivation process.
+- NoThinking mode: 8 × 500 tokens, eight independent attempts, with the answer chosen by voting or a verifier.
 
-- **Reward signals encourage "getting the answer right"**, and longer CoT means more opportunities for checking, thus increasing the probability of getting the answer right.
-- **Reflection and verification behaviors are reinforced**, and the model learns to "check again."
-- **There is no explicit length constraint**, so the model has no motivation to compress CoT.
+The experimental conclusions concentrate in the **low-budget range**, and they cannot be extrapolated to "NoThinking is better on all tasks."
 
-Length increases are only valuable if they improve accuracy; repeated restatements and ineffective checks directly increase deployment costs. This leads to the long2short problem: how to transfer the planning and correction capabilities learned in long reasoning to shorter responses while maintaining the task success rate?
+### When Several Short Answers Are Better
 
-[Kimi k1.5](https://arxiv.org/abs/2501.12599) compares four specific approaches: model weight merging, Shortest Rejection Sampling, DPO, and long2short RL. They respectively approach the problem from model parameters, supervised samples, preference data, and RL rewards.
+One long chain concentrates the whole budget on a single solution method. The risk is that if the early direction is chosen wrongly, the following thousands of tokens all continue deriving on a wrong prefix, drifting further and further.
 
-### 3.1 Getting Short Responses from Long Models
+Several short answers spread the budget over different starting points and cover a richer set of solution methods. This depends on two conditions:
 
-When multiple samples are drawn for the same question, the length of the correct answer often varies. Shortest Rejection Sampling selects the shortest correct answer from multiple correct responses as the SFT sample; DPO treats shorter correct answers as preference samples and longer or incorrect answers as rejected samples. These two methods first ensure the answer is correct, then learn the difference in length, avoiding the model learning to shorten responses by omitting steps.
+1. A short answer must itself have some single-attempt success rate ($p$ cannot be too low).
+2. The system must be able to judge which answer is better (the verifier is reliable, or the voting mechanism is effective).
 
-Model weight merging takes a different approach: it directly averages the weights of long and short CoT models, observing whether the long reasoning capabilities can be partially transferred to the short model. It does not generate new compressed text, nor does it guarantee that each capability of the merged model lies between those of the two models. Therefore, it still requires full evaluation.
+When both conditions hold, as in knowledge question answering and simple math problems, voting over several short answers may be more cost-effective than one long chain.
 
-### 3.2 Comparing Answer Lengths Within a Group in RL
+Conversely, if the task requires **continuous state retention**, a long chain that can keep intermediate state is more valuable. When writing a complex algorithm, functions defined earlier are called later. In a multi-step proof, each step depends on the conclusion of the previous one. A long proof cannot be split into eight independent short proofs and voted on, because the later derivation depends on the earlier conclusions.
 
-In long2short RL, the model continues training from a model that has already achieved a good balance between correctness and length. It shortens the allowed rollout length. For Kimi k1.5, the length reward is computed as a relative comparison within a group of answers: shorter correct answers receive higher length rewards; shorter incorrect answers do not receive positive rewards.
+So this is a question of choosing a compute allocation according to task type:
 
-Let the length of the $i$-th answer be $\operatorname{len}(i)$, and let $l_{\min}$ and $l_{\max}$ be the shortest and longest lengths within the group, respectively. We first compute
+- **Does it need continuous derivation dependencies?**
+  - Better for Thinking (one long chain): yes (proofs, code, multi-step planning)
+  - Better for NoThinking (several short answers): no (question answering, multiple choice, simple calculation)
+- **Single-attempt success rate of a short answer?**
+  - Better for Thinking (one long chain): low
+  - Better for NoThinking (several short answers): medium to high
+- **Is there a reliable verifier?**
+  - Better for Thinking (one long chain): works even without one
+  - Better for NoThinking (several short answers): preferably yes
+
+## Long2Short: Compressing Long Reasoning Chains
+
+Long-thinking training has a side effect: to raise accuracy, the model may learn to check repeatedly, repeat itself, and even go around in circles. Solving the length problem with a hard cutoff at deployment is risky: if the cutoff falls before the conclusion, the model has no time to output the answer. What is needed is to **let the model learn at the training stage to keep necessary steps and delete redundant ones, without losing accuracy**. This is the long2short problem.
+
+### Why Reasoning Chains Get Longer
+
+In reasoning RL training, answers growing longer is a common phenomenon, with three direct causes:
+
+1. **The reward for correct answers encourages long trajectories**: a longer reasoning chain means more chances to check, a higher probability of a correct answer, and the model tends to think longer.
+2. **Reflection and verification behaviors get reinforced**: checking really can find errors, so it is selected indirectly by the outcome reward.
+3. **There is no explicit length constraint**: when the reward contains only "correct" and nothing for "saving tokens," the model has no incentive to compress its answers.
+
+Increased length is valuable only when it really improves accuracy. Repetition and ineffective checking only add deployment cost. Long2short aims to transfer the planning and correction abilities learned in long reasoning into shorter answers.
+
+The Kimi k1.5 technical report (2025) compared four methods, each working at a different level:
+
+- **Model weight merging**
+  - Level of action: parameters
+  - Core idea: directly average the weights of a long-CoT model and a short-CoT model
+- **Shortest Rejection Sampling**
+  - Level of action: supervised data (SFT)
+  - Core idea: from several correct answers, pick the shortest one for supervised fine-tuning
+- **DPO**
+  - Level of action: preference data
+  - Core idea: treat "short and correct" as chosen and "longer or wrong" as rejected
+- **long2short RL**
+  - Level of action: RL reward
+  - Core idea: add a within-group length reward in RL and shorten the rollout cap at the same time
+
+### Supervised Compression
+
+The first three methods all start from "already having a long model that can solve the problem correctly but outputs very long answers," and arrive at a "short model that outputs shorter answers and can still solve the problem correctly."
+
+**Shortest Rejection Sampling** is the most direct: for the same problem, have the long model generate several answers, filter out the correct ones, and pick the **shortest** among the correct answers as SFT data. What the short model learns are examples that are "both correct and as concise as possible."
+
+**DPO** (Direct Preference Optimization) takes the preference-learning route: for the same problem, the "short and correct" answer serves as the preferred sample (chosen), and the "longer but also correct" or "wrong" answers serve as the rejected samples. The preference the model learns is: when all can solve it correctly, prefer the short one.
+
+**Model weight merging** directly averages the weights of a long-CoT model and a short-CoT model. It does not generate new compressed text, and it does not guarantee that each ability of the merged model lies between those of the two, so a full evaluation is required after use.
+
+### Compressing with Reinforcement Learning
+
+The finest-grained method is long2short RL: continue training from a model that has already reached a good balance between accuracy and length, shortening the permitted rollout length cap while adding a length term to the reward.
+
+Kimi k1.5's length reward makes a relative comparison within the group of answers to the same problem, **avoiding setting one fixed target length for all answers** (for example, requiring every problem to be answered within 1,000 tokens):
+
+1. Sample $G$ answers for the same problem and first mark which are correct and which are wrong.
+2. Compare lengths among the correct answers: the shorter the answer, the higher its length reward.
+3. A wrong answer cannot earn a positive reward merely for being "shorter": get the answer right first, then talk about conciseness.
+
+The length term coefficient is
 
 $$
-\lambda_i = 0.5 - \frac{\operatorname{len}(i) - l_{\min}}{l_{\max} - l_{\min}}.
+\lambda_i=0.5-\frac{\operatorname{len}(i)-l_{\min}}{l_{\max}-l_{\min}},
 $$
 
-$\lambda_i$ decreases as the answer length increases. The final length reward is determined by combining $\lambda_i$ with the correctness of the answer. If all answers in the group have the same length, the length term is set to 0. This design learns to "prefer shorter answers among those that can solve the problem," without requiring a fixed target length for all questions in advance.
+where $\operatorname{len}(i)$ is the token length of the $i$-th answer, and $l_{\min}$ and $l_{\max}$ are the shortest and longest lengths in this group. The shortest correct answer gets $+0.5$ and the longest gets $-0.5$. If all answers in a group have the same length, the length term is set to 0.
 
-For three correct responses of 800, 1,200, and 2,000 tokens, the normalized lengths are $0$, about $0.33$, and $1$. Their length coefficients are therefore $0.5$, about $0.17$, and $-0.5$. The comparison is relative to the current response group rather than to one universal target length.
+Let's walk through this formula with three answers to the same problem. Suppose their lengths are 800, 1200, and 2000 tokens, so $l_{\min}=800$ and $l_{\max}=2000$:
 
-### 3.3 Effect Before and After Compression
+- **Answer A** is 800 tokens long. Its normalized length is $0$, so $\lambda_i=0.5$.
+- **Answer B** is 1200 tokens long. Its normalized length is $400/1200\approx0.33$, so $\lambda_i\approx0.17$.
+- **Answer C** is 2000 tokens long. Its normalized length is $1$, so $\lambda_i=-0.5$.
 
-The paper reports that the long2short RL model achieves a Pass@1 of 60.8 on AIME 2024, with an average of 3,272 tokens used. This number only indicates the quality–length trade-off in the given experiment; when selecting a deployment model, one should plot the full curve rather than comparing only a single score.
+Consider the final reward in two cases:
 
-### 3.4 How to Coordinate Training Compression with Inference Budget
+- **Case 1: A and B are correct, C is wrong.** The length term and the correctness term point the same way: A, the shortest and correct, gets the highest reward, and C, the longest and wrong, suffers both the length penalty and the error penalty. This is the ideal case.
+- **Case 2: C is the only correct one.** Here the correctness term must outweigh the length term: although C is long, it is the only correct answer and should still receive a high reward. The length reward and the correctness reward together achieve this: first make sure the answer is correct, and the length reward prefers shorter answers only among those that are all correct.
 
-Long2short and thinking budget are complementary:
+::: details Why use relative length within the group and not absolute length
+Why not directly reward "all answers stay under 1,000 tokens"? Because the length different problems need is inherently different: a simple multiple-choice question may be explained in 200 tokens, while a competition proof may need 5,000. If a fixed absolute length target is set, the model may omit necessary steps just to stay short.
 
-- **Long2short** is **training-stage compression**—it modifies the model to prefer generating shorter CoT.
-- **Thinking budget** is **inference-stage control**—it does not change the model, but limits the computation per request by setting a service ceiling.
+Within-group relative comparison solves this: lengths are compared among the several answers to the same problem and are not compared directly across different problems. What the model learns is "for this problem, be as short as possible provided the answer is right," and not "every problem must be short."
+:::
 
-During deployment, the two controls can be combined:
+The Kimi k1.5 report says its long2short RL model reaches a Pass@1 of 60.8 on AIME 2024 using only 3,272 tokens on average. This number is only one quality-versus-length operating point in the experiments. When choosing a model to deploy, one should plot the complete "length versus accuracy" curve, and not compare the score at a single point.
 
-```text
-Training stage: long2short RL trains the model to generate shorter CoT
-Inference stage: thinking budget sets a safe upper limit
-```
+### Combining Training-Time Compression with Inference Budgets
 
-## 4. How to Control Modes and Budget During Deployment
+Long2short and the thinking budget are two complementary layers of control, acting at different stages:
 
-After training to obtain two modes and a shorter reasoning chain, the service interface is the final step. Each request must sequentially make three decisions: whether to enter the thinking mode, the maximum allowed computation, and how to produce a complete answer once the budget is exhausted.
+- **Long2short is compression at the training stage**: it changes the model's own output distribution so that the model tends to generate more compact reasoning chains, moving the usual operating point toward shorter lengths.
+- **The thinking budget is control at the inference stage**: it does not change the model and only sets a hard cap on the server side, truncating the worst-case tail length.
 
-Once the mode switch is determined, training and deployment must address three issues: how to select the mode, how to evaluate the capability differences between the two modes, and how to wrap up the process when the budget is exhausted.
+The two can be combined: first train the model to be more efficient with long2short RL, then set a safety cap with a thinking budget at deployment. The former changes the distribution and the latter cuts the tail.
 
-### 4.1 Determining Whether to Think
+## Modes and Budgets at Deployment
 
-Users can explicitly choose the mode, or the router can select it based on the task, historical success rate, and latency goals. If the model is involved in the decision, the choice should still be recorded, and the cost of mistakenly enabling long thinking and mistakenly disabling thinking should be separately evaluated.
+After training the dual-mode ability and compressing the long chain more efficiently, the details of the service interface come last. Once a request enters the service, three decisions must be made in turn:
 
-### 4.2 Ensuring Consistency Between the Two Modes
+1. **Should it enter thinking mode?**
+2. **After entering thinking, how much budget at most?**
+3. **When the budget is nearly used up, how do we ensure a complete answer is output?**
 
-When a deterministic question appears in two modes and produces conflicting answers, it indicates that at least one path is unreliable. During training, shared data or consistency objectives can be introduced. During deployment, the two modes should be evaluated separately, and it should not be assumed that shared parameters will naturally ensure identical answers. For open-ended questions, it is acceptable for the answers to differ, with the evaluation focusing on factual accuracy and task outcomes rather than exact word-by-word consistency.
+Once the mode switch is settled, three more engineering problems must be handled well.
 
-### 4.3 Ending the Reasoning When the Budget is Exhausted
+### Who Decides Whether to Think
 
-Hard truncation may stop the response in the middle of a step. A more reliable interface should reserve tokens for the final answer and trigger a convergence when the budget is nearly exhausted. Training data can also cover different budget conditions. If the budget is exhausted without a reliable conclusion, the system should return an incomplete status or a degraded solution, and should not package any intermediate conclusion as a definitive answer.
+There are three ways to implement mode selection:
 
-## Summary
+- **Explicit user choice**: pass a flag in the API parameters, and let the caller decide.
+- **Automatic router judgment**: train a small router from task type, historical success rate, and latency target.
+- **The model judges for itself**: let the model read the input once and decide for itself whether to expand its thinking.
 
-Hybrid Thinking uses mode switching to avoid unnecessary long reasoning for simple tasks, while the thinking budget sets a computational limit for complex tasks. long2short shortens the reasoning chain from the training stage, and the two can be used in combination.
+Whichever approach is adopted, the decision should be recorded, and the cost of the two kinds of error should be evaluated separately:
 
-The four case studies address issues at different levels:
+- **Wrongly turning on long thinking** (a simple question enters thinking mode): what is wasted is latency and cost.
+- **Wrongly turning off thinking** (a hard question gets a direct answer): what is lost is the task success rate.
 
-- **V3.1**: A single model provides both Think and Non-Think interfaces.
-- **Qwen3**: Thinking Mode Fusion + thinking_budget parameter.
-- **Kimi k1.5**: long2short RL actively compresses CoT.
-- **NoThinking Study**: Compares using the same budget for a single long chain versus multiple short answers.
+The costs of the two errors are quite different, and the routing thresholds should differ accordingly: better to let some simple questions spend a little extra thinking than to misjudge a hard question as simple and answer it wrongly.
 
-Fixed mode switches still require users or routers to pre-judge the task difficulty. [16.5 Adaptive Thinking](./adaptive-thinking) further allows the model to dynamically decide the depth of reasoning based on the input.
+### Answers in the Two Modes Must Be Consistent
+
+For one deterministic question, such as "What is 1+1?", if Think mode answers 2 and Non-Think mode answers 3, then at least one of the modes is unreliable.
+
+At training time, shared data or a consistency objective can be added to reduce such conflicts, but at deployment we cannot assume that "shared parameters naturally guarantee consistent answers." The outputs of the two modes must be evaluated separately, with consistency checks on key factual questions.
+
+For open-ended questions (such as writing a passage of prose), it is normal for the two modes to produce different outputs, and the evaluation should focus on factual correctness and task completion, not word-for-word agreement.
+
+### How to Wrap Up When the Budget Is Nearly Used Up
+
+The problem with a hard cutoff is the greatest: the answer stops in the middle of "next we need to prove...", the conclusion is never output, and the user gets incomplete text.
+
+A more robust interface design does three things:
+
+1. **Reserve tokens for the final answer**: with a thinking budget of 4,000, thinking uses at most 3,500, leaving 500 for the final answer.
+2. **Trigger a wrap-up as the budget approaches**: monitor tokens used, and when close to the cap, have the model begin to conclude rather than continue expanding new steps.
+3. **Cover different budget conditions in the training data**: let the model see tight-budget situations during training and learn to summarize within a limited length.
+
+If the budget runs out and there is still no reliable conclusion, the system should return an unfinished status, or fall back to a simpler answer, and **must not package an arbitrary guess from an intermediate step as a definite answer** returned to the user.
+
+## Section Summary
+
+Hybrid Thinking solves a practical deployment problem: do not let easy questions waste thinking cost, and do not let hard questions be answered wrongly for lack of budget.
+
+- **One model, two modes**: DeepSeek V3.1 exposes Think/Non-Think interfaces on the same model, and Qwen3 lets the two outputs coexist through mixed training data and template markers. Sharing parameters avoids the cost of maintaining two models, but mode selection still needs a router or a user's judgment.
+- **Thinking Budget**: set a token cap on thinking, so one model forms different quality-versus-latency operating points. Note the problem with hard truncation: space must be left for the final answer.
+- **Trade-off between depth and breadth**: the NoThinking experiments show that in the low-budget range, voting over several short answers can compete with one long chain, provided the short answers have enough single-attempt success and the aggregation is reliable. Tasks that need continuous derivation still suit a long chain better.
+- **Long2short compression**: four methods compress reasoning chains at four levels: parameters, supervision, preference, and RL. What Kimi k1.5's within-group length reward $\lambda_i$ learns is "prefer the shorter one among equally correct answers," and not forcing every problem to be short.
+- **Two layers of control working together**: at the training stage, long2short changes the length distribution, and at the inference stage the budget sets a hard cap. The two are complementary.
+- **Three things at deployment**: for mode judgment, evaluate the cost of the two kinds of misjudgment separately; for answers in the two modes, evaluate consistency separately; when the budget runs out, reserve answer tokens or honestly return an unfinished status.
+
+The four cases each cover a level: **DeepSeek V3.1** offers two interfaces from one model at the product level; **Qwen3** forms a complete scheme at the training level from mixed data, template control, and thinking_budget; **Kimi k1.5** actively compresses reasoning chain length with long2short RL at the efficiency level; the **NoThinking study** compares the trade-off between a long chain and parallel short answers under the same budget at the strategy level.
+
+Whether it is a fixed mode switch or a fixed budget cap, a user or router has to judge the task difficulty in advance. What if the judgment is wrong, and a problem that looks very short is actually very hard, or one that looks very long has a very direct answer? The next section's **adaptive thinking** hands this judgment to the model: it decides how long to think dynamically from the input and its current progress.

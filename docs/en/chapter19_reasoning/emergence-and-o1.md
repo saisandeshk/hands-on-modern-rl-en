@@ -1,155 +1,247 @@
 # 16.1 From Language Models to Reasoning Models
 
-Let us first consider a scenario where a standard language model is likely to fail. When faced with a competition math problem, it may read the question and immediately generate the most familiar formula; if the first step is chosen incorrectly, the subsequent tokens only continue along this erroneous path. The same applies to code tasks: the model can write a patch in one go, but it may not first identify the problem, run tests, and then revise the plan based on the results of failed attempts.
+In the earlier chapters, from PPO and DPO to GRPO, we have been discussing how to use reinforcement learning to make language models better match human preferences and score higher on math and code tasks. Look at a slightly difficult solution trajectory and you will see a common phenomenon: the model reads the problem and immediately starts writing the answer. If it picks the wrong formula in the first step, the next several hundred tokens all continue down that wrong path.
 
-The reasoning model changes this execution process. Before providing the final answer, the model can expand intermediate steps, compare candidate methods, invoke tools, and check the results. Additional computation is valuable only when these behaviors improve the success rate, so the training objective, reasoning budget, and result validation must all be adjusted accordingly.
+This is much like a student who takes an exam without scratch paper and writes the answer straight away: if the direction is wrong from the start, the more is written, the further off it goes. When people solve hard problems, they first list the conditions, try two methods, cross out and start over when something looks wrong, and substitute the result back to check. This is what a **reasoning model** does: before giving the final answer, it first carries out intermediate thinking within the same generation trajectory, compares candidate methods, calls tools to check results, and overturns its work and starts again when necessary.
 
-Chapter 16 follows this transformation: Section 16.1 first explains why reasoning models emerge; Section 16.2 enters the pure RL training of R1-Zero; Sections 16.3 and 16.4 and 16.5 address how to increase reasoning computation while keeping parameters fixed; Sections 16.6 further discusses how to present and supervise the reasoning content. This section first answers four questions: what changes in the product form, what reasoning behaviors have been observed in public experiments, what aspects are reinforced by RL, and how the system distinguishes reasoning from the final answer.
+With this intermediate computation, new questions follow. How should the training objective change so that these intermediate steps truly raise the success rate and do not just waste compute? How much compute is worth investing at inference time? Should a simple translation and a complex proof get the same length of thinking? Should the reasoning process the model generates itself be shown to the user? Chapter 16 follows this line of change. This section first explains what changed in the product form, then looks at the reasoning behaviors observed in research and what RL actually reinforces in them, and finally at how a system separates "thinking" from "the answer."
 
 <img src="../../chapter19_reasoning/images/reasoning-model-loop.svg" alt="Comparison between direct generation and a reasoning model's problem-solving loop">
 
-## 1. o1 How to Bring Reasoning Capabilities into the Product
+## The Limits of Sequential Generation in Ordinary Language Models
 
-Still using the math problem as an example, a direct answer model only performs a single continuous generation. In contrast, a reasoning model allows for a process of "listing conditions—trying methods—checking—revising" before arriving at the answer. The significance of o1 lies in embedding this process into a callable product, enabling users to trade more waiting time for higher task success rates.
+Let's start with the most common failure scenario. Suppose the model faces a quadratic equation problem:
 
-### 1.1 o1 How to Train Longer Reasoning Processes
+> Solve the equation $x^2 - 5x + 6 = 0$.
 
-OpenAI highlighted in the [o1 release note](https://openai.com/index/learning-to-reason-with-llms/) the emphasis on training and reasoning computation: the model learns, through large-scale reinforcement learning, how to organize longer internal reasoning. As the training computation and per-problem thinking time increase, the evaluation performance also improves. Since the official release did not disclose the full reward composition, we cannot simplify o1 as "only rewarding the final answer." What can be determined, however, is that reinforcement learning directly optimizes the effectiveness of reasoning chains in complex tasks.
-
-At the time of its release, o1 significantly outperformed GPT-4o on several reasoning benchmarks:
-
-- **AIME 2024**: GPT-4o achieved approximately 12% on single responses, while o1 reached about 74%. When using majority voting across 64 responses, o1 achieved approximately 83%;
-- **Codeforces**: o1's Elo rating was 1673, placing it in the 89th percentile among evaluated human players;
-- **GPQA Diamond**: o1 achieved approximately 77% on single responses, while GPT-4o achieved about 51%.
-
-The reasoning computation used for single responses, majority voting, and re-ranking differs. When presenting metrics together, it is essential to retain the evaluation methodology to prevent readers from conflating "model strength" with "more sampling."
-
-For the missing comparison point, GPT-4o reached about 56% with 64-response consensus on AIME 2024. If a model's single-sample accuracy is $p=0.12$, 64 samples contain at least one correct answer with probability $1-(1-0.12)^{64}\approx99.97\%$. Finding a correct candidate and selecting it are different problems: correlated errors and answer aggregation still limit majority voting. o1's approximately 74% single-response result therefore cannot be explained simply by candidate coverage.
-
-o1 does not display its internal Chain-of-Thought (CoT) to users, only returning the final answer or a curated explanation. This approach reduces the risk of internal reasoning being directly copied and prevents users from inspecting the model's actual reasoning process step by step. Therefore, the system also needs to establish credibility through verifiable answers, citations, and external evaluations.
-
-### 1.2 Reasoning Budget as a Product Interface
-
-After models can benefit from more thinking, the server also needs to decide how much computation to allocate per request. OpenAI introduced the `reasoning_effort` parameter when officially releasing o1 in December 2024. Developers can choose between a lower or higher reasoning investment. This parameter does not guarantee a fixed number of tokens; instead, it expresses a tier in terms of quality, latency, and cost.
-
-- **Low effort:** short reasoning and low latency for translation, rewriting, simple questions, and format conversion.
-- **Medium effort:** moderate checking for ordinary coding and medium-difficulty mathematics.
-- **High effort:** longer derivations for competition problems, multi-constraint planning, and complex debugging.
-
-In the same month, OpenAI previewed o3, and it was officially released in April 2025. The official report on o3 continued to expand the computational resources allocated to RL training compared to inference computation, and it outperformed o1 under the same latency and cost conditions. The important change is not in a particular number on an ever-updating leaderboard, but rather in the product interface, which now allows the system to adjust the reasoning investment according to the task.
-
-Sections 16.3–16.5 will break down this interface: how additional computation can be used, how a fixed budget can be set, and how the model dynamically selects a budget based on the task.
-
-### 1.3 o3 and o4-mini Bring Reasoning into Tool Calls
-
-Released in April 2025 were [o3 and o4-mini](https://openai.com/index/introducing-o3-and-o4-mini/), and there was no "complete o4" released at the same time. These two models integrated tools such as web search, Python execution, file and image analysis into the same problem-solving process:
-
-- The model can actively call tools (search, code execution, image analysis) during the reasoning process.
-- The results of the tool calls influence the next step of reasoning.
-- This forms a loop of "think → call a tool → think again → call a tool again."
-
-This working style is typically referred to as **agentic reasoning**: the model reads feedback from the external environment during multiple rounds of reasoning and decides the next action. It is directly related to the tool calls and environment interaction discussed in [Chapter 19 on Agentic RL](../chapter22_agentic/overview).
-
-## 2. How Competitive Programming Validates Reasoning Training
-
-Baseline scores can only indicate that results have improved, but they cannot explain what the model does during the problem-solving process. Competitive programming provides a more observable environment: whether the code compiles, whether the tests pass, and whether the results improve after modifications, can all be recorded by tools.
-
-After the release of o1, a direct question arises: do these behaviors come from a large number of manually written reasoning chains, or can they be reinforced through result feedback?
-
-In February 2025, OpenAI published [Competitive Programming with Large Reasoning Models](https://arxiv.org/abs/2502.06807) (arXiv:2502.06807). The paper did not disclose the full training details, so the following discussion will focus only on behaviors and computational allocations that can be directly observed from the experiments.
-
-### 2.1 Comparison of End-to-End RL with Specialized Pipelines
-
-Traditionally, tasks on platforms like Codeforces typically use specialized pipelines:
+After reading the problem, an ordinary language model may generate the following:
 
 ```text
-Problem → Compiler + Test Case Generation → Program Synthesis → Selecting the Optimal Solution
+This is a quadratic equation, so we can use the quadratic formula.
+The quadratic formula is x = (-b ± √(b²-4ac)) / 2a.
+Substitute a=1, b=-5, c=6.
+Discriminant = 25 - 24 = 1.   ← suppose it is miscomputed as -1 here
+So x = (5 ± √-1)/2.            ← everything after continues in the complex domain
+x = (5 ± i)/2.
 ```
 
-Each step in this pipeline is handled by a dedicated module, such as search algorithms, program generation, and test filtering. The reasoning model in the paper incorporates all these behaviors into a single generation trajectory and achieves better results on the reported Codeforces setup. This comparison indicates that end-to-end training can learn to organize candidate generation, execution testing, and solution modification. However, the conclusions are still constrained by the model, the task, and the computational budget.
+If the first substitution or calculation is wrong, every later step continues that error. The model does not stop to check "how can the discriminant be negative?", and it does not back up to try factoring instead. The root lies in the mechanism of traditional autoregressive generation: tokens are generated one after another, and once the earlier tokens are fixed, the later ones can only continue under the conditional probability.
 
-### 2.2 How Multi-Stage Reasoning Behaviors Emerge
+The same holds in code tasks. A model can write a complete patch in one go, but it does not first run the tests to locate the problem and then revise its approach according to the error message. Hundreds of lines of code are hard to get right in one pass, and reliable software development depends on compiling, testing, locating errors, and making local changes. What a single continuous LLM generation lacks is exactly this "check and correct" loop.
 
-The paper also documents the multi-stage reasoning behaviors exhibited by o1/o3 when solving Codeforces problems, including:
+## o1 Turns Thinking into a Product Interface
 
-- **Generating Multiple Candidate Solutions**: The model generates multiple solutions and compares their strengths and weaknesses.
-- **Execution Verification**: Using tools to execute code and check whether the results match expectations.
-- **Self-Correction**: Re-deriving solutions after discovering errors.
-- **Strategy Switching**: Switching from greedy algorithms to dynamic programming, and then to backtracking.
+In September 2024, OpenAI released o1, and reasoning models moved from a research concept to a callable product. o1 uses internal reasoning before giving an answer and allows the system to trade more inference-time compute for a higher success rate on complex tasks. Later interfaces went further and abstracted reasoning investment into adjustable levels.
 
-The training process did not explicitly encode the "try greedy first, then dynamic programming" as a fixed procedure. However, high-quality pre-training data may have already exposed the base model to these methods. The role of reinforcement learning (RL) is to increase the probability of trajectories that pass tests, making the comparison of candidates, execution verification, and error correction more stable. Clear reward signals provide selection pressure, and the base model's existing knowledge and sampling coverage determine which behaviors can be reinforced.
+### Training Long Reasoning Chains
 
-### 2.3 How Training and Inference Compute Power Are Divided
+What OpenAI made public in the [o1 release notes](https://openai.com/index/learning-to-reason-with-llms/) focuses on training and inference compute: the model uses large-scale RL to learn how to organize longer internal reasoning, and as training compute and per-problem thinking time increase, evaluation performance rises with both. The full reward composition has not been published, so o1 cannot be simplified to "uses only a final-answer reward." What can be said with certainty is that RL directly optimized how effective the chain of thought is on complex tasks.
+
+When o1 was released it clearly surpassed GPT-4o on several reasoning benchmarks. Special attention must be paid to the evaluation method here, because **the number of samples itself also affects the score**:
+
+- **AIME 2024**
+  - Evaluation method: single answer
+  - GPT-4o: about 12%
+  - o1: about 74%
+- **AIME 2024**
+  - Evaluation method: consensus of 64
+  - GPT-4o: about 56%
+  - o1: about 83%
+- **Codeforces**
+  - Evaluation method: Elo rating
+  - GPT-4o: —
+  - o1: 1673
+- **GPQA Diamond**
+  - Evaluation method: single answer
+  - GPT-4o: about 51%
+  - o1: about 78%
+
+The Codeforces Elo of 1673 places o1 at the 89th percentile of the human contestants evaluated.
+
+The second set of numbers is the easiest to misread. GPT-4o scores about 12% on a single attempt, and after drawing 64 answers and choosing by majority it can reach about 56%. Sampling does raise the score, but that part of the difference comes from investing more compute at evaluation time. o1 reaches about 74% with a single attempt, already higher than GPT-4o's 64-sample consensus, and given a 64-sample consensus o1 reaches about 83%. Single answers, majority selection, and reranking use different amounts of inference compute, so the evaluation method must be kept when reporting a metric.
+
+A concrete number shows the gap: if the single-attempt accuracy of a model is $p=0.12$, the probability that at least one of 64 samples is correct is $1-(1-0.12)^{64}\approx 99.97\%$. However, "a correct answer appears among the candidates" and "the system can pick out the correct answer" are two different problems, and majority voting is still affected by correlated errors and by how answers are merged. The 74% for o1's single attempt shows that one pass of internal reasoning has already raised the solve rate significantly, and we cannot infer further from these results that every attempt went through the same checking steps.
+
+o1 does not show its internal CoT (Chain of Thought) to the user and returns only the final answer or an organized explanation. This reduces the risk of the internal reasoning being copied directly, and it also prevents users from checking, step by step, the reasoning the model actually went through. The system has to build trust with verifiable answers, citations, and external evaluation.
+
+### reasoning_effort: The Reasoning Budget Interface
+
+Once a model can benefit from more thinking, the server side must also decide how much compute to invest in each request. When OpenAI released the full version of o1 in December 2024, it added `reasoning_effort`, which lets developers choose lower or higher reasoning investment. This parameter does not promise a fixed number of tokens. It expresses a level on the trade-off among quality, latency, and cost.
+
+The three levels can be understood through everyday scenarios:
+
+- **Low**
+  - Thinking length: short
+  - Per-problem latency: low
+  - Suitable requests: translation, rewriting, simple question answering, format conversion
+- **Medium**
+  - Thinking length: medium
+  - Per-problem latency: medium
+  - Suitable requests: routine code writing, medium-difficulty math problems
+- **High**
+  - Thinking length: long
+  - Per-problem latency: high
+  - Suitable requests: competition problems, multi-constraint planning, complex debugging
+
+The difference among the three levels can be understood this way: translating "hello" into Chinese needs only short thinking; routine code writing needs checking of medium length; competition problems and multi-constraint planning merit waiting for a longer derivation. OpenAI previewed o3 the same month and formally released it in April 2025. The official report says o3 further scaled up both RL training compute and inference compute and surpassed o1 at the same latency and cost. The important change here is not any one leaderboard number that keeps being updated, but that the product interface now lets the system adjust reasoning investment by task.
+
+Sections 16.3 to 16.5 take this interface apart in turn: how extra compute can be used, how a fixed budget is set, and how the model chooses its budget dynamically according to the task.
+
+### o3 and o4-mini: Tools Join the Reasoning Loop
+
+What was released in April 2025 was [o3 and o4-mini](https://openai.com/index/introducing-o3-and-o4-mini/); there is no "full o4" released in the same launch. These two models put tools such as web search, Python execution, file reading, and image analysis into the same solving process, forming a closed loop:
+
+- During reasoning the model can **actively call tools** (search, code execution, image analysis).
+- The results of tool calls **in turn influence the next step of reasoning**.
+- This forms a cycle of "think → call a tool → think again → call a tool again."
+
+Here is a concrete cycle: while proving a combinatorics problem, the model first guesses a recurrence by reasoning, then calls Python to check the first 20 terms, finds that the 17th term does not satisfy the recurrence, returns to reasoning to revise the conjecture, and checks again until all terms agree. Tool results enter the generation process like environment feedback, and reasoning no longer depends only on the knowledge inside the parameters.
+
+This way of working is usually called **agentic reasoning**: the model reads feedback from the external environment over multiple rounds of reasoning and then decides the next action. It is directly related to the tool calls and environment interaction discussed in [Chapter 19 on Agentic RL](../chapter22_agentic/overview).
+
+## Reasoning Behaviors Observed in Competitive Programming
+
+Benchmark scores can only show that results improved, and they cannot explain what the model does in the process of solving. Competitive programming provides an environment especially suited to observation: whether code compiles, whether tests pass, and whether results improve after a modification can all be recorded automatically by tools.
+
+After o1 was released, one direct question was whether these behaviors (checking, correcting, switching methods) come from a large amount of hand-written reasoning-chain SFT data, or whether they can be reinforced through outcome feedback.
+
+In February 2025, OpenAI published [Competitive Programming with Large Reasoning Models](https://arxiv.org/abs/2502.06807) (arXiv:2502.06807). The paper does not disclose the full training details, so below we discuss only the behaviors and compute allocation that can be observed directly from the experiments.
+
+### End-to-End RL vs. a Specialized Pipeline
+
+Traditionally, competition tasks such as Codeforces usually use a specially designed pipeline in which each module handles one stage:
+
+```text
+Problem understanding → test case generation → candidate program synthesis → compile and execute → pick the best solution
+```
+
+Every step of this pipeline is handled by a dedicated module, such as a search algorithm, program generation, and test filtering. The reasoning model in the paper puts these behaviors into a single generation trajectory: the model itself decides when to generate candidates, when to run tests, and when to revise its approach according to test results, and it achieved better results in the reported Codeforces setting. This comparison shows that end-to-end training can learn to organize candidate generation, test execution, and revision of the approach, but the conclusion is still limited by the model, the task, and the compute budget.
+
+### The Emergence of Multi-Stage Reasoning Behavior
+
+The paper records multi-stage reasoning behaviors that appeared when o1 / o3 solved Codeforces problems, behaviors that were not explicitly programmed in training:
+
+- **Generating multiple candidate solutions**: the model generates several different solutions itself and compares their ideas and complexity.
+- **Execution and verification**: it actively executes code with tools and uses test cases to see whether results match expectations.
+- **Self-correction**: after finding that a test fails, it rereads the error message, locates the problem, and revises the code.
+- **Strategy switching**: it switches from a greedy algorithm to dynamic programming and then to backtracking search, until a feasible solution is found.
+
+The training process did not write "first try greedy, then try dynamic programming" as a fixed procedure, but high-quality pretraining data may already have shown the base model these algorithmic paradigms. The role of RL is to raise the probability of trajectories that pass the tests, so that candidate comparison, execution and verification, and error correction appear more reliably. A clear outcome reward supplies the selection signal, while the knowledge the base model already has and the range of sampling coverage determine which behaviors are available to be reinforced.
+
+A simple numerical example helps in understanding this selection process. Let $\pi(k)$ be the probability that the model generates a trajectory of type $k$, and let $s_k$ be the success rate of that type. The average success rate is the weighted average over the types:
+
+$$
+S = \sum_k \pi(k)\, s_k.
+$$
+
+Suppose for some problem the model generates the short path "write the answer directly" with probability $\pi(\text{short})=0.05$ (success rate $0.01$), the long path "write tests first, then debug" with probability $\pi(\text{long})=0.1$ (success rate $0.4$), and other paths with the remaining probability. Early in training, the contribution of these two types to the average success rate is $0.05\times0.01+0.1\times0.4\approx0.04$. After RL updates according to the outcome reward, the probability distribution tilts toward high-success trajectories, for example becoming $\pi(\text{short})=0.02$ and $\pi(\text{long})=0.35$, and the same contribution becomes $0.02\times0.01+0.35\times0.4\approx0.14$. The success rate $s_k$ of any single trajectory type has not changed. What changed is the probability that the model chooses it, yet the overall success rate has risen more than threefold. This is the within-group comparison mechanism of GRPO that [Section 16.2](./r1-zero-pure-rl-reasoning) develops in detail.
+
+### The Division of Labor Between Training Compute and Inference Compute
 
 The paper also reports a key trade-off:
 
-- **Increasing Training Compute**: The model's foundational capabilities improve, but the number of reasoning tokens per problem remains largely unchanged.
-- **Increasing Inference Compute** (letting the model think longer): With fixed training compute, performance can be further improved.
+- **Increasing training compute**: the model's base ability improves (it has seen more algorithmic paradigms and mastered more programming patterns), but the number of reasoning tokens per problem stays essentially the same.
+- **Increasing inference compute** (letting the model think longer): with training compute fixed, performance can improve further, because the model can try more candidates and do more verification on the same problem.
 
-Training compute determines which methods the model has already mastered, while inference compute determines how many attempts and checks the model can make on a given problem. Section 16.3 will further compare these two types of compute.
+Training compute decides "which weapons the model already has," and inference compute decides "how many shots to fire on the current problem." For example, for the same model, doubling training lets it understand more algorithmic paradigms (such as network flow and segment trees), and doubling the inference budget lets it verify two more candidate implementations on the same problem. It is like an exam: studying well beforehand (sufficient training) is the foundation, but leaving time to check during the exam (inference budget) can also earn more points. Section 16.3 compares these two kinds of compute further.
 
-## 3. Is RL Creating or Activating Capability?
+## Emergence and Activation: The Role of RL
 
-After observing that the model checks and corrects its own reasoning, we must also address the source of its capabilities. If all changes are attributed to RL "creating reasoning," we would overlook the knowledge the base model has already learned from pre-training data, including mathematical, coding, and language patterns. The "emergence" reported by o1 and R1-Zero needs to be understood in two layers:
+After observing that models check and correct themselves, a natural question is where these abilities come from. If we attribute all the change to RL "creating reasoning ability from scratch," we overlook the math, code, and language patterns the base model has already learned from pretraining data. The "emergence" reported for o1 and R1-Zero should be understood at two levels:
 
-**Meaning One: Reasoning Behaviors Never Explicitly Appeared in Training Data**
+**First meaning: reasoning behaviors never appeared explicitly in the training data**
 
-R1-Zero has never seen any manually annotated CoT (Chain-of-Thought) in training data, yet after training, it autonomously generates long reasoning chains, performs reflection, and conducts verification. This "emergence" is relative to the training data — the model was not explicitly taught to do so.
+R1-Zero did not use human-annotated CoT as RL cold-start data, yet after training it autonomously generates long chains of thought, reflects, and verifies. This "emergence" is relative to the supervised data of that training stage: the model was not shown, case by case in this stage, when to check and when to switch methods.
 
-**Meaning Two: Is All Reasoning Ability Created by the RL Phase?**
+**Second meaning: whether reasoning ability is created entirely from scratch by the RL stage**
 
-Subsequent replication experiments (e.g., SimpleRL-Zoo, Open-R1) show that the base model could already generate correct reasoning with a certain probability before RL. RL reallocates the probabilities of these trajectories based on rewards, making effective methods appear more frequently, and may also form new strategies by combining existing behaviors. Therefore, when analyzing the effects of RL, we must simultaneously examine the base model's capabilities, the sampling coverage, and the changes in post-training probabilities.
+Later replication experiments (such as SimpleRL-Zoo and Open-R1) show that before RL the base model can already generate correct reasoning with some probability, though the probability is very low. RL redistributes the probability of these trajectories according to the reward, so that effective methods appear more often, and it may also form new strategies from combinations of existing behaviors.
 
-This distinction is important in practice:
+An analogy helps with this distinction: a student already knows how to check an answer but rarely actually does it in exams. If the grading scheme makes solutions that went through an effective check more likely to earn high marks, this low-frequency behavior may gradually stabilize. RL here is closer to redistributing probability over candidate behaviors that already exist, and we cannot assert from changes in output alone that it created verification ability from scratch.
 
-- First, perform multiple sampling on the base model to estimate whether correct trajectories already exist.
-- Then, compare the success rate and behavior distribution before and after RL to determine whether the issue is a lack of capability or whether effective trajectories are too rare.
-- Finally, decide whether to supplement with more pre-training or SFT (Supervised Fine-Tuning) data, or to increase RL data and compute.
+Therefore, when analyzing the effect of RL, we should check three elements together:
 
-The experiments with DeepSeek-R1 also support this distinction: pre-training provides knowledge and basic reasoning capabilities, while RL makes the reasoning behaviors that can receive rewards appear more stably.
+- **Base capability**: first sample many times from the base model and estimate whether correct trajectories already exist (even with low probability).
+- **Sampling coverage**: whether the sampling temperature and group size $G$ in training are large enough to catch those low-probability but correct trajectories.
+- **Probability change**: the change in success rate and behavior distribution before and after RL, to judge whether the problem is mainly "cannot do it at all" or "can do it but unstably."
 
-For example, sample one mathematics problem 100 times from the base model. Suppose 72 responses jump directly to an incorrect answer, 22 contain reasoning with a calculation error, and 6 contain a complete correct derivation with verification. The base model is not wholly incapable: correct trajectories already have 6% probability. Group-based RL can use those six trajectories as positive evidence and raise their probability. If no correct trajectory appears even under broad sampling, the missing capability must first be supplied by pretraining or SFT.
+These three points determine the next direction: when the base model cannot solve the problem at all, first add pretraining or SFT; when the base model occasionally answers correctly, RL amplifies the probability of those trajectories. DeepSeek-R1's experiments also support this distinction: pretraining provides knowledge and basic reasoning ability, and RL makes the reasoning behaviors that earn reward appear more reliably.
 
-## 4. How Reasoning Models Organize Output and Tools
+::: details A concrete base-model sampling example
+Suppose we sample 100 times from the base model on the same math problem:
 
-After training the model to perform verification and correction, the system must organize these behaviors into a stable interface. At least three types of content need to be distinguished: the reasoning state used for further computation within the model, the actions that can be passed to tools for execution, and the final answer returned to the user. When all these are mixed in a single text stream, the verifier finds it difficult to extract the answer, and the tools struggle to determine when to execute.
+- **Gives a wrong answer directly**
+  - Occurrences: 72
+  - Characteristic: no intermediate steps, guesses the result
+- **Has reasoning but a calculation error**
+  - Occurrences: 22
+  - Characteristic: writes down formulas but makes algebra mistakes
+- **Complete reasoning and correct answer**
+  - Occurrences: 6
+  - Characteristic: includes checking and verification, and the result is correct
 
-Public models adopt different interfaces, which can be compared based on three independent questions:
+The base model is not "unable at all." It has a 6% probability of generating a correct trajectory. RL does not need to create this ability from scratch. It only needs to raise the probability of the third class from 6% to something higher while pushing down the first two classes. This is exactly why GRPO in [Section 16.2](./r1-zero-pure-rl-reasoning) requires "sample a group of answers for the same problem, with some right and some wrong in the group": without these 6 correct samples as positive examples, the within-group comparison has no learning signal.
+:::
 
-| Interface Question                  | Representative Approach                                                                      | Issues to be Further Addressed                                                           |
-| ----------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Whether to engage in long reasoning | DeepSeek V3.1, Qwen3 support both reasoning and non-reasoning modes within the same model    | How to determine which mode is needed for the current task                               |
-| How much computation to invest      | OpenAI `reasoning_effort`, Qwen3 thinking budget, Claude effort                              | How to align the budget with the task difficulty                                         |
-| What to show to the user            | OpenAI provides reasoning summaries, while models like DeepSeek-R1 can output reasoning text | Whether the displayed content can be checked, and whether it leaks sensitive information |
+## How Reasoning Models Organize Their Output
 
-Model names and interfaces may change, but these three questions remain stable. They correspond respectively to Section 16.4 on modes and budgets, Section 16.5 on adaptive allocation, and Section 16.6 on the display of reasoning chains.
+Once training can reinforce checking and correcting, the system still has to organize these behaviors into a stable interface. At least three kinds of content must be distinguished, and mixing them in one text stream causes trouble:
 
-The display method affects user verification, data distillation, and security monitoring, which will be discussed separately in Section 16.6. Here, we first examine how the training format separates the reasoning segment from the answer segment.
+1. **The reasoning state the model uses internally to continue computing** (drafts, abandoned paths, intermediate checks)
+2. **Actions that can be handed to tools for execution** (run code, search the web, read files)
+3. **The final answer returned to the user**
 
-### 4.1 How to Separate Reasoning Tokens from Answer Tokens
+If the three are mixed together, a verifier has difficulty extracting the answer, and a tool has difficulty telling whether "this sentence is something I should execute or just thinking."
 
-Traditional LLM outputs consist of a single token sequence: `<answer token>`. In contrast, reasoning models output an additional segment of "reasoning tokens": `<reasoning token> <delimiter> <answer token>`.
+Public models adopt different interfaces, which can be compared along three independent questions:
 
-In engineering implementation, this is typically achieved through special tokens:
+- **Whether to enter long thinking**
+  - Representative approach: DeepSeek V3.1 and Qwen3 support thinking and non-thinking modes in the same model
+  - Problem still to solve: how to judge which mode the current task needs
+- **How much compute to invest**
+  - Representative approach: OpenAI `reasoning_effort`, Qwen3 thinking budget, Claude effort
+  - Problem still to solve: how to match the budget to task difficulty
+- **What to show the user**
+  - Representative approach: OpenAI provides reasoning summaries, and models such as DeepSeek-R1 can output reasoning text
+  - Problem still to solve: whether the displayed content can be checked and whether it leaks sensitive information
+
+Model names and interfaces will be updated, but these three questions remain stable. They correspond respectively to the modes and budgets of 16.4, the adaptive allocation of 16.5, and the display of reasoning chains in 16.6. The display method affects user inspection, data distillation, and safety monitoring, and Section 16.6 treats it on its own. Here we first look at how the training format separates the reasoning segment from the answer segment.
+
+### Separating Thinking from the Answer with Special Tokens
+
+The output of a traditional LLM is a single token sequence: `<answer tokens>`. A reasoning model's output has an extra "reasoning token" segment, so the structure becomes `<reasoning tokens> <separator> <answer tokens>`.
+
+In engineering practice this is usually implemented with special tokens:
 
 ```text
 <|begin_of_thought|>
-The user's question is to solve... Let me first understand the problem...
-Possible approaches include...
-First approach: ... This approach has the issue of...
-Second approach: ... This approach seems feasible...
-Let me verify it...
-Yes, the second approach yields the correct result.
+The user's question is to solve x²-5x+6=0... let me first understand the problem.
+This is a quadratic equation, so we can use the quadratic formula or factoring.
+Try factoring first: find two numbers whose product is 6 and sum is -5... -2 and -3.
+So it can be written as (x-2)(x-3)=0.
+Wait, let me verify: (x-2)(x-3) = x²-5x+6 ✓
+Let me confirm again with the quadratic formula...
+Both methods give x=2 or x=3.
 <|end_of_thought|>
 <|begin_of_solution|>
-The final answer is X.
+The solutions of the equation x²-5x+6=0 are x=2 or x=3.
 <|end_of_solution|>
 ```
 
-After splitting, the system can extract only the answer to be passed to the outcome verifier, or apply length constraints or process evaluations on the reasoning segment. The delimiter itself does not automatically provide correctness labels, but it establishes clear data boundaries for Hybrid Thinking, thinking budget, and long2short.
+After the separation, the system can:
 
-## Summary
+- **Extract only the answer segment** and hand it to the outcome verifier, avoiding mistaking reasoning text for the answer.
+- **Impose a length constraint on the reasoning segment**, limiting the cap on thinking tokens.
+- **Apply process evaluation (PRM) to the reasoning segment** and outcome evaluation to the answer segment.
+- **Hide the reasoning segment at display time**, showing the user only the organized answer.
 
-o1 makes "investing more reasoning computation" a callable product capability, while o3 and o4-mini further integrate tool feedback into the reasoning process. Competitions in programming experiments further demonstrate that end-to-end RL can reinforce behaviors such as candidate generation, execution validation, and error correction; the pre-trained model's existing knowledge and coverage range still limit what RL can reinforce.
+The separator itself does not automatically provide a correctness label, but it establishes a clear data boundary for the later Hybrid Thinking, thinking budget, and long2short compression: the system knows which part is the "scratch work" and which part is the "submitted paper."
 
-[16.2 R1-Zero Pure Reinforcement Learning Reasoning](./r1-zero-pure-rl-reasoning) will elaborate on rewards, intra-group comparisons, and behavioral changes, specifically explaining how these reasoning behaviors can be formed during training without going through SFT cold start.
+## Section Summary
+
+- An ordinary language model generates in one continuous pass, and after a first-step error can only continue along the wrong path; a reasoning model carries out intermediate computation before the answer, compares candidate methods, checks results, and overturns its work when necessary.
+- o1 turned longer thinking into a callable product capability, and `reasoning_effort` made reasoning budget an interface parameter; o3 and o4-mini went further and connected tool feedback to the reasoning process.
+- Research on competitive programming records four behaviors: candidate generation, execution and verification, self-correction, and strategy switching. Pretraining supplies knowledge and basic reasoning ability, and RL raises the probability of trajectories that can pass verification. When analyzing the benefit of training, first estimate the base model's sampling success rate and distinguish "cannot do it at all" from "can do it but unstably."
+- Separating the reasoning segment from the answer segment with special tokens establishes a clear data boundary for answer extraction, budget control, process evaluation, and display strategy.
+
+[16.2 R1-Zero: How Pure Reinforcement Learning Elicits Reasoning](./r1-zero-pure-rl-reasoning) follows the line of reward design, within-group comparison, and behavior change to explain concretely how these reasoning behaviors form step by step in training when there is no SFT cold start.

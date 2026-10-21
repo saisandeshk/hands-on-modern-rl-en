@@ -1,99 +1,134 @@
 # 25.5 Evaluation Protocols and Reproducibility
 
-Suppose two teams evaluate the same coding model. Team A uses one prompt, extracts the first code block, and allows five samples. Team B uses a chat template, executes the last code block, and allows one sample. They can report different pass rates without changing the model at all.
+Every defense in the previous sections depends on independent evaluation: hidden tests, paired conditions, one-shot gates. For these checks to work at all, the evaluation itself has to be reproducible.
 
-An evaluation result is produced by a complete protocol: task version, prompt, chat template, sampling budget, answer extractor, environment, verifier, and statistical summary. A **harness** turns that protocol into versioned, repeatable code. This section explains how to choose what to measure, detect contamination, test prompt sensitivity and distribution shift, and preserve long-horizon trajectories so another researcher can reproduce the conclusion.
+In practice, the same model on the same set of problems can receive two different scores. The first time, we use temperature `0`, generate once per problem, and extract the answer from the last line; the second time, we use temperature `0.8`, generate 16 times per problem, and let the verifier pick the best answer. The model parameters have not changed, yet the evaluation protocol has changed the question.
 
-## 25.5.1 First Define What the Evaluation Is Measuring
+This section learns how to turn one reinforcement learning evaluation into a repeatable experiment. A harness puts the data, prompts, sampling parameters, tool budget, answer extraction, scoring method, and statistical method into one fixed procedure.
 
-A good RL benchmark must satisfy five principles:
+We need a harness because a bare score cannot say whether an improvement comes from model training, from multiple sampling, from the prompt template, or from answer parsing. Only when these conditions are fixed can numbers be compared across two models, two training runs, and two papers.
+
+A benchmark name is not enough to describe a result. Consider a small evaluation with only three problems: the model answers problems 1 and 3 correctly and problem 2 incorrectly, so the per-problem scores are `1, 0, 1` and the final accuracy is $2/3$. Several steps are hidden here: the problem is first filled into a prompt template, the model generates an answer under the given temperature and length, the answer extractor then finds the final answer in the response, and the scorer finally judges right or wrong. A change in any step may change these three per-problem results.
+
+The formula below is a **teaching notation this book uses to decompose the evaluation pipeline**, not a fixed formula prescribed by any particular paper. It writes in one line the data, prompt, generation, and scoring stages emphasized by the [lm-evaluation-harness paper](https://arxiv.org/abs/2405.14782):
+
+$$
+\hat M=\operatorname{Aggregate}
+\left(\operatorname{Score}(y_i,z_i)\right),
+\qquad
+y_i\sim\pi_\theta(\cdot\mid p(x_i);c).
+$$
+
+Here $x_i$ is the $i$-th problem, $p(x_i)$ is the complete input obtained by filling the problem into the template, $c$ records the temperature, maximum length, and tool budget, $y_i$ is the answer the model generates, and $z_i$ is the reference answer or success condition. `Score` first obtains the result for each problem, and `Aggregate` then combines these results into the final metric $\hat M$. Hence a change to any one item changes the meaning of $\hat M$.
+
+```mermaid
+flowchart LR
+    A[Fix the data version] --> B[Render the prompt]
+    B --> C[Generate within the budget]
+    C --> D[Extract the answer or trajectory]
+    D --> E[Verify the per-problem result]
+    E --> F[Group and compute statistics]
+    F --> G[Produce a reproducible report]
+```
+
+This pipeline gives the main line of the section: first decide what we want to measure, then isolate data and prompts, then fix the inference budget and scorer, and only at the end aggregate into a score. If any stage is not versioned, the final number cannot be reproduced. The section unfolds along this pipeline: first set the five standards of evaluation, then handle data contamination, prompt sensitivity, and out-of-distribution generalization, then distinguish capability evaluation from behavior evaluation, and finally land on long-horizon tasks and standardized harnesses.
+
+## 25.5.1 Five Standards for Evaluation
+
+Suppose we want to evaluate a code-repair agent. We give it ten repositories, each with one bug. Reporting only "fixed 7" is not enough: whether the public tests cover the real bug, whether the ten repositories contain only one kind of error, whether the tasks were seen by the model, whether the hard repositories all fail, and whether the difference between two runs is merely sampling fluctuation all remain unanswered.
+
+These five questions correspond to verifiability, representativeness, difficulty stratification, contamination resistance, and statistical rigor. Together they determine how strong a conclusion a benchmark score can support. Below we continue to expand each item along this code-repair task.
 
 ### Verifiability
 
-The answer to each test sample must be **machine-verifiable**. Formally defined: there exists a function $\text{Verify}: \mathcal{Y} \times \mathcal{Y} \to \{0, 1\}$, such that for any $(y_{\text{pred}}, y_{\text{gold}})$, the correctness can be determined deterministically.
+A code-repair task can run tests: a patch that passes the hidden tests counts as a success, and otherwise as a failure. This property of being repeatedly judgeable by a machine is called verifiability.
 
-- **Math problems**: Extract the final number and compare it with the standard answer (e.g., [GSM8K](https://arxiv.org/abs/2110.14168), MATH)
-- **Code problems**: Run on test cases and check the pass rate (e.g., [HumanEval](https://arxiv.org/abs/2107.03374), MBPP, LiveCodeBench)
-- **Logic problems**: Use a SAT solver or theorem prover to verify (e.g., MiniF2F, PutnamBench)
+Writing "run the tests and return pass or fail" in mathematical notation, we can denote it $\text{Verify}(y,z)\in\{0,1\}$. Here $y$ is the patch the model submitted and $z$ is the success condition defined by the hidden tests; passing is recorded as 1 and failing as 0. This formula is only a teaching way of writing a binary verifier. [HumanEval](https://arxiv.org/abs/2107.03374) executes generated programs with unit tests, while [GSM8K](https://arxiv.org/abs/2110.14168) extracts the final number from the answer and compares it with the reference; they show two different kinds of verifiable tasks.
 
-Tasks that are not verifiable (open-ended writing, creative generation) can only be evaluated by human or RM evaluation — both of which are unreliable.
+Open-ended writing, safety behavior, and long-horizon agent tasks cannot be fully compressed into one binary result, so human review, environment state, and multidimensional metrics are also needed.
+
+- **Math problems**: extract the final number and compare with the reference answer ([GSM8K](https://arxiv.org/abs/2110.14168), [MATH](https://arxiv.org/abs/2103.03874))
+- **Coding problems**: run on test cases and look at the pass rate ([HumanEval](https://arxiv.org/abs/2107.03374), MBPP, [LiveCodeBench](https://arxiv.org/abs/2403.07974))
+- **Logic problems**: verify with a SAT solver or theorem prover (MiniF2F, PutnamBench)
+
+Open-ended writing and creative generation rarely have a unique machine-judgeable answer, and usually require human evaluation, pairwise preferences, or a reward model. Their noise and bias need to be measured through inter-rater agreement, blind review, and independent spot checks.
 
 ### Coverage
 
-Benchmark should cover the real distribution that models may encounter. Formally:
+A benchmark has to cover the real tasks the model may meet. Suppose about 60% of product requests are code modifications, 30% are tool calls, and 10% are ordinary question answering, while the test set contains only grade-school math problems; even if the model gets 90% on the test set, that score does not cover the task paths the product actually has to walk.
 
-$$\mathcal{D}_{\text{test}} \sim P_{\text{real}}, \quad P_{\text{real}} \approx P_{\text{test}}$$
-
-If $\mathcal{D}_{\text{test}}$ is biased toward a certain type of problem, the model may fail on other types. GSM8K is a typical example of this — it only contains elementary math problems, and the model GSM8K achieves 90% accuracy on it, which does not represent its ability to solve advanced math problems.
+So before designing an evaluation, first list the categories, frequencies, and high-risk scenarios of the deployed tasks, and then check whether the test set covers these parts. [HELM](https://arxiv.org/abs/2211.09110) records scenarios, adaptation methods, and metrics separately, precisely to avoid letting one narrow benchmark stand for all of a model's capabilities. GSM8K can measure grade-school math reasoning, but we cannot infer from it that the model can do advanced mathematics or operate tools reliably.
 
 ### Difficulty Stratification
 
-Evaluate by difficulty level to avoid "average scores masking extreme performance":
+An average score can also hide the level at which a model starts to fail. Suppose ten problems include eight basic ones and two hard ones, and the model answers six basic problems correctly but fails both hard ones; the total score is still 60%. Looking only at 60%, a reader cannot see that the success rate has already dropped to 0 when the model meets hard problems.
+
+The solution is to assign difficulty to the problems in advance and to report the number of problems and the score of each level together:
 
 ```python
-# Difficulty stratified evaluation
+# Difficulty-stratified evaluation
 def stratified_eval(model, dataset):
     results = {"easy": [], "medium": [], "hard": []}
     for x, y in dataset:
         pred = model(x)
-        difficulty = classify_difficulty(x)  # Use a difficulty classifier
+        difficulty = classify_difficulty(x)  # use a difficulty classifier
         results[difficulty].append(verify(pred, y))
     return {k: np.mean(v) for k, v in results.items()}
 ```
 
-The MATH dataset is divided into five difficulty levels (Level 1-5), and DeepSeek-R1 reports scores for each level. Reporting stratified scores provides a more accurate reflection of the model's capability distribution than a single overall score.
+The [MATH dataset paper](https://arxiv.org/abs/2103.03874) provides difficulty labels from Level 1 to Level 5 for its problems. When evaluating on MATH, we can report accuracy directly by these five levels; for a self-built dataset, we need to state who assigned the difficulty labels and on what basis. Stratified scores describe the capability boundary better than a single total score.
 
 ### Contamination Resistance
 
-The test set must be **strictly confidential**, and the training data must undergo decontamination checks. See Section 35.2 for details.
+The final test set should be isolated as far as possible from training and tuning, and decontamination checks should be run against whatever training data is accessible. Public benchmarks cannot be kept secret for long, so continually updated data or one-shot hidden test sets are also needed.
 
 ### Statistical Rigor
 
-It is not sufficient to report "Model A achieves 60% on MATH, Model B 55%" — this could simply be sampling noise. One should perform:
+We cannot just report "Model A gets 60% on 100 problems and Model B gets 55%." If we switch to a different batch of problems, both scores may change; a gap of 5 percentage points is not necessarily stable.
 
-- **Confidence Interval**: For $n$ test samples with accuracy $p$, the 95% CI is $p \pm 1.96\sqrt{p(1-p)/n}$
-- **Paired comparison**: use paired bootstrap intervals or a test suited to paired binary outcomes when two models answer the same items
-- **Bootstrap**: Estimate variance through resampling of the test set
+Look first at Model A. It answers 60 of 100 problems correctly, $p=0.60$; under the normal approximation, the standard error is about $\sqrt{0.6\times0.4/100}=0.049$, and the 95% interval is roughly 50.4% to 69.6%. This hand calculation shows that with few samples, a single percentage conveys more certainty than the evidence supports. In an actual report, one can choose among the following methods according to the type of data:
 
-[Blackwell et al.](https://arxiv.org/abs/2410.03492) show why benchmark scores should be accompanied by uncertainty estimates rather than treated as exact constants.
+- **Confidence intervals**: for binomial accuracy, the Wilson interval can be used; only when the sample is large enough and $p$ is not close to 0 or 1 is the normal approximation $p \pm 1.96\sqrt{p(1-p)/n}$ appropriate
+- **Paired tests**: for the same set of binary problems, McNemar's test can be used; for continuous per-problem scores, a paired bootstrap or permutation test can be used
+- **Bootstrap**: resample by examples and estimate the score difference and its confidence interval
 
-## Contamination and Leakage Detection
+[The uncertainty-quantification study by Blackwell et al.](https://arxiv.org/abs/2410.03492) discusses specifically how to give confidence judgments for benchmark scores and model rankings; the [lm-evaluation-harness paper](https://arxiv.org/abs/2405.14782) summarizes common sources of error from the standpoint of reproducible-evaluation engineering. The 95% normal approximation is only an introductory demonstration; when the sample is small, the accuracy is close to 0 or 1, or two models are compared on the same set of problems, the Wilson interval and paired methods should be used respectively.
 
-[Section 25.2](./modern-incidents) explains how contamination can imitate RLVR progress on public mathematics benchmarks. This section turns that concern into systematic detection methods.
+## 25.5.2 Data Contamination and Leakage
+
+Suppose the bugs, reference patches, and unit tests in a code-repair test all come from a public repository. The model may have seen the entire commit history during pretraining. A patch that passes the tests can then come from analysis and debugging, or from reproducing memory.
+
+[Section 25.2 on spurious gains in RLVR](../chapter30_alignment_failures/modern-incidents) discussed the same kind of risk on public math benchmarks. This section organizes contamination detection into an executable procedure.
 
 ### Three Types of Contamination
 
 #### 1. Explicit Contamination
 
-Training data and test data **completely overlap** on the same sample:
+Identical samples appear in both the training data and the test data. For example, the training corpus already contains the statement, reference answer, and complete solution of a problem, and the test uses that problem verbatim. After the model answers correctly, we cannot tell whether it reasoned on the spot or reproduced an answer it had seen.
 
-$$\exists (x, y) \in \mathcal{D}_{\text{train}}, \quad (x, y) \in \mathcal{D}_{\text{test}}$$
-
-This is the easiest to detect, and can be identified with n-gram overlap.
+This is the easiest type of contamination to detect. We can first normalize the training text and the test text, and then use long-string or n-gram overlap to recall suspicious samples. The [GPT-3 paper](https://arxiv.org/abs/2005.14165) checked the 13-gram overlap between the test sets and the training corpus before evaluation, and a short program later in this section shows how such a check works.
 
 #### 2. Approximate Contamination
 
-Training data contains **rewritten, translated, or paraphrased versions** of test samples:
+The training data contain **rewrites, translations, or paraphrases** of the test samples. For example, the training data say "The warehouse has 20 crates, 6 items per crate," and the test problem is changed to "The store received 20 packages, 6 items per package"; the surface wording has changed, but the quantitative relationship and the answer are the same.
 
-$$\exists (x', y') \in \mathcal{D}_{\text{train}}, \quad \text{sim}(x', x_{\text{test}}) > \tau$$
+Verbatim matching misses this case. We can first use vector retrieval to recall semantically similar training samples, and then use more precise rules or human judgment to decide whether they share the key structure of the same problem. The similarity threshold needs to be calibrated on known duplicates and known unrelated samples, and "semantically similar" cannot be equated directly with "contaminated."
 
-Detection requires semantic similarity (embedding distance) or judgment from an LLM.
+#### 3. Task Similarity and Capability Transfer
 
-#### 3. Implicit Contamination (Most Difficult)
-
-Training data does not directly contain test samples, but the training task is highly similar to the test task — the model learns the **task pattern** rather than **specific answers**:
+The training data do not contain the test samples, but the training tasks are similar to the test tasks, and the model may learn a transferable solving process:
 
 - Training data: 2000 university physics problems
-- Test data: GSM8K (elementary math)
-- Phenomenon: Physics training teaches the model the "read problem → formulate equation → compute → verify" pattern, indirectly improving math performance
+- Test data: GSM8K (grade-school math)
+- Phenomenon: physics training taught the model a "read the problem → write the equation → compute → verify" pattern, which indirectly improves math
 
-Implicit contamination cannot be fully detected, and can only be indirectly assessed through **Holdout Tasks** (using tasks of a type the model has never seen before).
+This is capability transfer and cannot be recorded directly as data contamination. If the research question is "does training bring cross-task generalization," holdout tasks of different problem types should be added to separate memorization, in-distribution generalization, and cross-task transfer.
 
 ### Detection Methods
 
 #### N-gram Overlap
 
-The simplest detection method — 13-gram overlap:
+A 13-gram is a fragment of 13 consecutive tokens. If many 13-grams from a test problem also appear in the training text, that problem deserves further inspection. The program below first takes the 13-gram sets of the two texts and then computes what fraction of the test fragments coincide with the training text:
 
 ```python
 def ngram_contamination(train_text, test_text, n=13):
@@ -103,27 +138,28 @@ def ngram_contamination(train_text, test_text, n=13):
     return len(overlap) / len(test_ngrams)
 ```
 
-OpenAI's 2020 study ([arXiv:2005.14165](https://arxiv.org/abs/2005.14165)) used 13-gram overlap to filter out text that was duplicated with the benchmark from the training corpus. This was one of the earliest practices for decontamination.
+The [contamination analysis in the GPT-3 paper](https://arxiv.org/abs/2005.14165) used 13-gram overlap to check benchmarks against the training corpus. `13` is the setting that study adopted under its tokenization and data conditions, not a constant that applies to all Chinese text, code, and short problems; in actual use, $n$ and the overlap threshold must be calibrated with known duplicate samples.
 
 #### Membership Inference
 
-Train a classifier to determine whether "this sample was in the training set":
+Membership inference tries to judge whether a sample looks more like a training member or a non-member. The simplest attack compares the sample's loss with a reference distribution, and a classifier can also be trained to combine loss, compression rate, and the difference from a reference model. A low loss provides only a suspicious signal: common sentences, fixed templates, and text that is easy to predict anyway also get low loss. Membership-inference results therefore need to be reported together with known members, known non-members, and control sets matched in content difficulty.
 
-$$\text{MIA}(x) = \begin{cases} 1, & \text{if } p_{\text{model}}(x) > \tau \\ 0, & \text{otherwise} \end{cases}$$
+#### Perplexity Anomalies
 
-If MIA achieves significantly higher accuracy on the test set than random guessing, it suggests that the test set contains samples from the training set.
+A language model assigns a probability to the next token. If every token in a passage receives an abnormally high probability, the model's average loss on that passage will be very low, and the perplexity will fall accordingly. The standard definition is
 
-#### Perplexity Anomaly
+$$
+\operatorname{PPL}(x_{1:N})=
+\exp\!\left(-\frac{1}{N}\sum_{i=1}^{N}\log p_\theta(x_i\mid x_{<i})\right).
+$$
 
-Calculate the model's perplexity on the test set:
+Here $x_i$ is the $i$-th token, $x_{<i}$ is the text before it, and $p_\theta$ is the probability the model gives to the correct next token. It can be understood as how "surprised" the model is by the passage: the lower the perplexity, the easier the text is for the model to predict. [The training-data extraction study by Carlini et al.](https://www.usenix.org/conference/usenixsecurity21/presentation/carlini-extracting) showed the link between low perplexity and memorization analysis, but it also needs a reference model and control samples to help rule out common text.
 
-$$\text{PPL}_{\text{test}} = \exp\left(-\frac{1}{N}\sum_i \log p_{\text{model}}(x_i)\right)$$
-
-If the PPL is much lower than that of a similar difficulty control set, the model may have "memorized" the test set.
+So if a test sample's perplexity is far lower than that of a control set matched in content and difficulty, it can be listed for further inspection. Template repetition, domain familiarity, and problems that are simply easy also produce low perplexity, so this metric alone cannot prove that the model has seen the original problem.
 
 #### Temporal Splitting
 
-Split the test set by time — only use items added after the model's release date:
+Split the test set by time, using only new problems from after the model's release date:
 
 ```python
 # Continuously updated benchmark with LiveCodeBench, LMSYS Arena
@@ -133,57 +169,61 @@ test_data = [
 ]
 ```
 
-This is the most reliable anti-contamination method — LiveCodeBench, LMSYS Chatbot Arena all use this approach.
+A temporal split can exclude original problems that appeared only after the model's training cutoff. LiveCodeBench continually collects newly released competition problems precisely to reduce the contamination risk of public code benchmarks. A temporal split still cannot rule out problem-type transfer, and it requires that the creation time of the problems and the model's data cutoff be trustworthy. Chatbot Arena is mainly an online comparison of human preferences, and should not be treated as the same kind of "new problems after the release date" evaluation.
 
-### Practical Engineering for Decontamination
+### Decontamination Engineering
 
-Industrial-grade decontamination pipeline:
+An industrial-grade decontamination pipeline:
 
-1. **N-gram Filtering** (13-gram): Remove 90% of explicit contamination
-2. **Embedding Retrieval** (cosine similarity > 0.9): Remove similar contamination
-3. **MinHash LSH**: Fast approximate detection ([Deduplicating Training Data, arXiv:2107.06499](https://arxiv.org/abs/2107.06499))
-4. **Continuous Benchmark Updates**: Monthly update with new data to test set
+1. **N-gram filtering**: identify long-string coincidences; the value of $n$ must be validated by text length and language
+2. **Embedding retrieval**: recall paraphrases and approximate samples, then review them manually or with a more precise matcher
+3. **MinHash LSH**: fast approximate detection ([Deduplicating Training Data, arXiv:2107.06499](https://arxiv.org/abs/2107.06499))
+4. **Continually added benchmarks**: update the test set with new data every month
 
-Decontamination reduces known overlap but cannot prove that every semantic variant was absent from pretraining. Fresh tasks, temporal splits, and programmatically generated controls provide stronger evidence than one string-matching pass.
+Decontamination can only reduce known overlap. Opaque sources of web data, problem rewriting, and repeated fitting of a benchmark during development still make it hard to prove "no contamination" completely.
 
-## Prompt Sensitivity Analysis
+## 25.5.3 Prompt Sensitivity
 
-For the same model and task, semantically equivalent prompts can change both absolute scores and model rankings. This phenomenon is called **prompt sensitivity**.
+The same coding problem can be written as "complete the function `solve`" or as "return only the completed function, with no explanation." The two instructions ask for the same algorithm, but the second additionally restricts the output format. If the answer extractor accepts only pure code, the explanatory text under the first prompt may cause a correct program to be marked wrong.
+
+For the same model and the same task, changing only a semantically equivalent phrasing of the instruction can change both the absolute score and the model ranking. This phenomenon is called **prompt sensitivity**.
 
 ### Experimental Evidence
 
-[Mizrahi et al.](https://arxiv.org/abs/2401.00595) generate semantically equivalent instructions across tasks in LMentry, BIG-Bench Lite, and BIG-Bench Hard, then compare several model families. The result is methodological: a single prompt does not identify a stable model score or ranking.
+Mizrahi et al. 2024 generated semantically equivalent instructions for several tasks in LMentry, BIG-Bench Lite, and BIG-Bench Hard, and compared several model families. The paper found that prompt rewriting changes both absolute performance and relative ranking.
 
-![Semantically equivalent prompts can change model scores and rankings](../../chapter30_alignment_failures/images/multi-prompt-evaluation.png)
+![Semantically equivalent prompts change model scores and rankings](../../chapter30_alignment_failures/images/multi-prompt-evaluation.png)
 
 <div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 1: Multi-prompt evaluation exposes variation hidden by one canonical instruction. Source: <a href="https://arxiv.org/abs/2401.00595" target="_blank" rel="noopener noreferrer">State of What Art? A Call for Multi-Prompt LLM Evaluation</a>.</em>
+  <em>Figure 1: Four semantically equivalent prompts for a homophone task produced clearly different accuracies, and the relative ordering among models also varied with the prompt. Source: <a href="https://arxiv.org/abs/2401.00595" target="_blank" rel="noopener noreferrer">State of What Art? A Call for Multi-Prompt LLM Evaluation</a></em>
 </div>
 
-### Sensitivity Sources
+This figure matters more than "a given model fluctuates by a few percentage points": a single prompt can overestimate a model and can also change the conclusion of a comparison between models.
 
-1. **Format Requirements**: "Answer with a number between 0 and 100" vs "Please provide the reasoning process before answering with a number"
-2. **CoT Trigger**: "think step by step" vs "explain your reasoning" vs No CoT
-3. **Few-shot Quantity**: There is a significant difference in results between 0-shot, 4-shot, and 8-shot scenarios
-4. **Answer Extraction Format**: Using regex `\\boxed\{(.+?)\}` vs `"answer: (.+?)"`
+### Sources of Sensitivity
+
+1. **Format requirements**: "Answer with a number between 0 and 100" vs. "Give your reasoning first, then answer with a number"
+2. **CoT triggers**: "think step by step" vs. "explain your reasoning" vs. no CoT
+3. **Number of few-shot examples**: 0-shot, 4-shot, and 8-shot results differ significantly
+4. **Answer-extraction format**: using the regex `\\boxed\{(.+?)\}` vs. `"answer: (.+?)"`
 
 ### Standardization Methods
 
-#### 1. Multi-prompt Averaging
+#### Multi-Prompt Averaging
 
-For each test sample, use $K$ prompt templates and take the average:
+Suppose the same model gets 70% and 50% under two equivalent templates, "answer directly" and "give the final answer." Reporting only the former overestimates its stable performance, and reporting only the latter underestimates it. The simplest treatment is to fix $K$ equivalent templates in advance, run the full test set with each, and average:
 
 $$\text{Score}(\pi) = \frac{1}{K} \sum_{k=1}^K \text{Score}_{\text{prompt}_k}(\pi)$$
 
-#### 2. Reporting Variance
+In this example, $K=2$ and the average score is $(70\%+50\%)/2=60\%$. The formula here is only an arithmetic aggregation; for why multiple templates should be run and how a single template changes model rankings, see directly the [multi-prompt evaluation study by Mizrahi et al.](https://arxiv.org/abs/2401.00595).
 
-Not only report the average score, but also report the variance:
+#### Per-Template Reporting
 
-$$\text{Score} \pm 1.96 \cdot \frac{\sigma}{\sqrt{K}}$$
+An average still hides a gap like "70% versus 50%," so one should also publish each template's score, the standard deviation across templates, and the best and worst templates. Several prompt templates are usually not independent, identically distributed samples drawn from some population, so $\text{average}\pm1.96\sigma/\sqrt K$ cannot be mechanically treated as a reliable 95% confidence interval. When two models need to be compared, a paired bootstrap should be run on the same problems and the same templates, or a method such as [PromptEval](https://arxiv.org/abs/2405.17202), designed specifically to estimate the distribution of performance across prompts, can be used.
 
-#### 3. Prompt Standardization
+#### Prompt Standardization
 
-lm-eval-harness defines a **uniform prompt format specification**, ensuring all models are evaluated on the same prompt.
+lm-eval-harness writes the task data, prompt template, answer processing, and metric implementation as versionable configuration. When comparing models, the task version and template still have to be fixed; if different models use different chat templates, this difference should also be written into the report.
 
 ```python
 # lm-eval-harness standardized prompt
@@ -197,96 +237,83 @@ Therefore, the answer is \\boxed{{{answer}}}.
 
 ### Engineering Recommendations
 
-Models trained with reinforcement learning (RL) are particularly sensitive to prompts — because RL encourages the model to highly adapt to the prompt format in the training distribution. **When reporting RL results, it is essential to perform multi-prompt averaging**, otherwise the conclusions may be dominated by "lucky prompt templates."
+Post-training may increase the model's adaptation to the training prompt format. Key conclusions should be rechecked on at least one set of pre-agreed equivalent templates; if only single-template results are reported, the template must be published together with a statement of the sensitivity risk. Multi-template averaging is one option, and the worst-template score and the cross-template variance also provide useful information.
 
-## Out-of-Distribution Robustness
+## 25.5.4 Out-of-Distribution Generalization
 
-Models may perform well on the training distribution, but can degrade sharply on out-of-distribution (OOD) data. This is a unique issue of RL training — RL tends to "overfit" to the reward signal of the training distribution.
+The training tasks contain only lists of length at most 100, while the deployment tasks include lists of length 10,000 with repeated values and missing entries. A program may pass all of its training tests and still time out or return wrong results at the new input scale. The paired-condition check in the previous section examined behavior switching with the condition; here we examine a different kind of change: the input leaves the training distribution while the meaning of the task stays the same, and the question is whether the model can keep working.
+
+A model may perform well on the training distribution but degrade sharply out of distribution (OOD). This problem exists in all machine learning methods; when reinforcement learning keeps optimizing a narrow reward, it can also push the policy further toward behavior that is valid only under the training conditions.
 
 ### OOD Evaluation Methods
 
-#### 1. Distribution Shift Testing
+#### Distribution-Shift Tests
 
 Construct distribution shifts:
 
-- **Style Shift**: Train with academic language, test with slang
-- **Domain Shift**: Train with math problems, test with physics problems
-- **Format Shift**: Train with LaTeX, test with Markdown
+- **Style shift**: train with academic language, test with slang
+- **Domain shift**: train on math problems, test on physics problems
+- **Format shift**: train with LaTeX, test with Markdown
 
-#### 2. Adversarial Perturbation
+#### Adversarial Perturbations
 
-Apply small perturbations to the input and check the model's stability:
+Apply small perturbations to the input that preserve the meaning of the task, then compare per-problem results before and after the perturbation. For example, change "Return only the number" to "Output just the number," or rename an irrelevant variable; if the answer changes accordingly, record one stability failure.
 
-$$\text{RobustScore}(x) = \text{Score}(\pi(x)) - \max_{\|\delta\| \leq \epsilon} |\text{Score}(\pi(x + \delta)) - \text{Score}(\pi(x))|$$
+Character substitution, synonym rewriting, and case conversion can all serve as candidate perturbations, but for each perturbation we must first confirm that it did not change the correct answer. In evaluation, the original accuracy, the post-perturbation accuracy, and the per-problem flip rate should be reported separately, and there is no need to squeeze them into a "robustness score" of unknown origin. The minimum functionality tests and invariance tests proposed by [CheckList](https://arxiv.org/abs/2005.04118) give a concrete method for this design of "change only one factor, then observe whether the behavior should stay the same."
 
-Character substitution, synonym replacement, and case transformation are common types of perturbations.
-
-#### 3. Counterfactual Evaluation
+#### Counterfactual Samples
 
 Construct counterfactual samples:
 
 - Original sample: "A train travels 60 km/h for 2 hours. How far?"
 - Counterfactual: "A bicycle travels 20 km/h for 3 hours. How far?"
 
-If the model answers correctly on the original sample but incorrectly on the counterfactual, it suggests that the model has learned surface patterns rather than the underlying principles.
+If the model is right on the original sample and wrong on the counterfactual, it has learned a surface pattern and not the underlying principle.
 
-### Out-of-Distribution (OOD) Risk in RL Training
+### OOD Risk in RL Training
 
-After training with RLHF/GRPO, models often suffer from **Alignment Tax**—the trade-off where alignment improvements come at the cost of foundational capabilities:
+Distribution shift has another form that is directly tied to RL training. After RLHF/GRPO training, we need to check the **alignment tax**: whether basic task capability declines while safety or preference metrics improve. Section 25.4 already discussed its three sources and mitigations; here we stress only the measurement requirement: a fixed drop cannot be inferred from a few model scores of unknown origin. The reliable approach is to save the SFT and RL checkpoints on the same base model, and run paired measurements with the same prompts, sampling budget, scorer, and data version.
 
-- **Model — Llama-2-70B**
-  - MMLU (SFT): 86.0%
-  - MMLU (RLHF): 84.5%
-  - Change: -1.5%
-- **Model — Claude 1**
-  - MMLU (SFT): 75.0%
-  - MMLU (RLHF): 73.8%
-  - Change: -1.2%
-- **Model — GPT-4 (est.)**
-  - MMLU (SFT): 89.0%
-  - MMLU (RLHF): 87.5%
-  - Change: -1.5%
+A capability decline can come from several mechanisms. For example, after the reward keeps preferring conservative answers, the model is more likely to refuse on uncertain questions; when capability tasks are not part of the retained data, the policy distribution may also gradually drift away from the region where it used to answer correctly. The evaluation needs to record the refusal rate, answer accuracy, and output length separately to judge where the decline occurs.
 
-**Cause**: RLHF rewards "alignment-friendly" responses, and the model learns to "play it safe"—when uncertain, it tends to refuse or provide vague answers, thereby sacrificing foundational capabilities.
+### Mitigating the Alignment Tax
 
-### Mitigating Alignment Tax
+- **KL penalty**: subtract the KL divergence from the reference policy in the policy reward, limiting how far the model goes to please the reward; [InstructGPT](https://arxiv.org/abs/2203.02155) gives the complete training setup for this class of PPO objectives
+- **Capability-retention data**: mix SFT data into RL training as periodic review
+- **Multi-objective evaluation and training**: track accuracy, helpfulness, and safety separately; if they are combined into one training objective, publish the weight of each term and keep the individual metrics, so that the total score does not mask the degradation of any one item
 
-- **KL Penalty**: RLHF adds $\beta \cdot \text{KL}(\pi_\theta \| \pi_{\text{SFT}})$, constraining the deviation from the reference model.
-- **Capability Preservation Data**: Intermixing SFT data during RL training and periodically revisiting it.
-- **Multi-Objective RL**: Optimizing for accuracy, helpfulness, and safety simultaneously ([Reward Weighted Regression, arXiv:2305.18290](https://arxiv.org/abs/2305.18290)).
+## 25.5.5 Capability Evaluation and Behavior Evaluation
 
-## Behavior Evaluation vs. Capability Evaluation
+The failures in the earlier sections already hinted at one distinction: an agent that deletes the tests and an agent that cannot find the bug both appear as task failures in a capability evaluation, yet the directions for repair are entirely different. The former has the ability to write a correct patch but chose to delete the test after it failed; the latter lacks the ability and could not find the bug location from the start.
 
-Traditional benchmarks evaluate **capability** (capability) — "Can the model solve this problem?" However, after RL training, models also need to be evaluated on their **behavior** — "How will the model behave in this context?"
+Traditional benchmarks mainly evaluate **capability**, that is, whether the model can complete a task. A model after RL training also needs to be evaluated for **behavior**, that is, which actions the model will choose in a setting with tools, permissions, and feedback.
 
 ### Capability Evaluation
 
-Formal definition: Given input $x$ and the golden answer $y^*$, evaluate:
+A capability evaluation first places the model on a fixed batch of tasks and then checks how many it completes. For example, fixing 42 of 100 code bugs gives a capability success rate of 42%. [HumanEval](https://arxiv.org/abs/2107.03374) measures code generation by executing unit tests, [GSM8K](https://arxiv.org/abs/2110.14168) measures mathematical reasoning by comparing the final number, and [MMLU](https://arxiv.org/abs/2009.03300) measures knowledge and reasoning with multi-subject multiple-choice questions. All three fix the task input and the success condition in advance.
 
-$$\text{Capability}(\pi) = \mathbb{E}_{x \sim \mathcal{D}}[\text{Verify}(\pi(x), y^*)]$$
-
-- MMLU, GSM8K, and HumanEval are all examples of capability evaluation
-- Advantages: Objective and reproducible
-- Disadvantages: Ignores the model's behavior in multi-turn dialogues and long-term interactions
+- MMLU, GSM8K, and HumanEval are all capability evaluations
+- Advantages: objective and repeatable
+- Disadvantages: they ignore the model's behavior in multi-turn dialogue and long-term interaction
 
 ### Behavior Evaluation
 
-Formal definition: Given a context $\mathcal{S}$ and a set of desired behaviors $\mathcal{B}$, evaluate:
+A behavior evaluation first has to construct a situation that exposes choices. Take the code agent again: after a test fails, the environment allows both "keep locating the bug" and "delete the failing test." Both actions can change the subsequent state, but only the former complies with the task specification. The evaluator must write down in advance which behaviors are allowed, which are forbidden, and which require human review, and then record the fraction of choices the model makes in matched scenarios.
 
-$$\text{Behavior}(\pi, \mathcal{S}) = \mathbb{E}_{\text{trajectories from }\mathcal{S}}\bigg[\frac{1}{T}\sum_{t=1}^T \mathbf{1}[\pi(s_t) \in \mathcal{B}]\bigg]$$
+[The model behavior evaluation study by Perez et al.](https://arxiv.org/abs/2212.09251) uses groups of scenarios to measure behaviors such as sycophancy and power-seeking. It reminds us that a behavior rate must be interpreted together with the scenario definition: if the model echoes a wrong opinion 12 times in 50 sycophancy scenarios, we can report a sycophancy rate of 24%; this number cannot be added directly to a code accuracy.
 
 Behavior evaluation focuses on:
 
-- **Sycophancy**: Whether the model flatters the user by agreeing with incorrect views
-- **Honesty**: Whether the model admits uncertainty
-- **Helpfulness vs. Harmlessness**: How the model balances these two aspects
-- **Power-seeking**: Whether the model attempts to acquire more resources (scheming)
+- **Sycophancy**: whether the model echoes wrong opinions to please the user
+- **Honesty**: whether the model admits uncertainty
+- **Helpfulness vs. harmlessness**: how the model trades them off
+- **Power-seeking**: whether the model tries to acquire more resources (scheming)
 
-### Methods for Behavioral Evaluation
+### Methods of Behavior Evaluation
 
-#### 1. Scenario Testing
+#### Scenario Testing
 
-Construct specific scenarios to observe how the model responds:
+Construct concrete scenarios and see how the model reacts:
 
 ```python
 scenario = {
@@ -298,93 +325,105 @@ response = model(scenario["user"])
 behavior_label = human_annotate(response, scenario)
 ```
 
-#### 2. Sycophancy Benchmarks
+#### Sycophancy Evaluation
 
-Perez et al. 2022 ([arXiv:2212.09251](https://arxiv.org/abs/2212.09251)) designed the Sycophancy benchmark — evaluating whether a model flatters the user by agreeing with their incorrect views:
+Perez et al. 2022 ([arXiv:2212.09251](https://arxiv.org/abs/2212.09251)) designed the sycophancy evaluation, which tests whether a model caters to the user when facing a wrong user opinion:
 
 - User asks: "I think climate change is a hoax, agree?"
-- Honest response: Explain scientific evidence and politely disagree
-- Flattering response: "Yes, you're right!"
+- Non-sycophantic answer: explain the scientific evidence and politely disagree
+- Sycophantic answer: "Yes, you're right!"
 
-#### 3. Honesty Benchmarks
+#### Honesty Evaluation
 
-[Honesty Is the Best Policy, arXiv:2312.01350](https://arxiv.org/abs/2312.01350): Measures the honesty of a model when it is uncertain about the answer.
+[Honesty Is the Best Policy, arXiv:2312.01350](https://arxiv.org/abs/2312.01350): measures a model's honesty on uncertain questions.
 
-### Challenges in Behavioral Evaluation
+### Difficulties of Behavior Evaluation
 
-- **Subjectivity**: What counts as "compliance" and what counts as "courtesy" can vary significantly among different annotators.
-- **Multi-turn Interaction**: Behaviors often emerge in long dialogues, making single-turn evaluation insufficient.
-- **Data Scarcity**: Designing behavior scenarios requires knowledge of psychology and sociology.
+- **Strong subjectivity**: what counts as "sycophantic" and what counts as "polite" differs among annotators
+- **Multi-turn interaction**: behavior usually shows up in long conversations, and single-turn evaluation is insufficient
+- **Scarce data**: designing behavioral scenarios requires knowledge of psychology and sociology
 
-In industrial practice, both Anthropic and OpenAI have dedicated "behavior evaluation teams" that assess changes in Claude and GPT on a monthly basis.
+Real release evaluations usually report capability, behavior, and safety scenarios separately, and rerun them as regression tests after each model version update. "Once a month" or a fixed team name is not part of the evaluation method; what really needs to be reproducible is the scenario set, the annotation guidelines, the model version, and the judging procedure.
 
-## Challenges in Evaluating Long-Term Tasks
+Behavior-evaluation scenarios mostly last one or a few turns of dialogue. Once a task stretches to hundreds of steps, the object of evaluation changes again: an early mistake changes the entire trajectory that follows.
 
-[Chapter 22: Computer Use](../chapter25_computer_use/training), [Chapter 20: SWE-Agent](../chapter23_rl_based_swe/swe-bench-and-rlvr) — these agentic tasks are far more challenging to evaluate than single-turn question-answering tasks. A task may last for several hours and involve hundreds or even thousands of decision steps.
+## 25.5.6 Long-Horizon Tasks
 
-### Characteristics of Long-Term Tasks
+Suppose a browser agent has to book a refundable plane ticket. It first picks the wrong date, and then every search, price comparison, and form it fills in is built on the wrong date. The final "payment not completed" only gives the outcome of the whole trajectory and cannot say whether the error occurred in understanding the date, filtering flights, or the payment step.
 
-- **Dimension — Steps**
-  - Single-Turn Task: 1
-  - Long-Term Task: 100–10,000
-- **Dimension — Evaluation Time**
-  - Single-Turn Task: Seconds
-  - Long-Term Task: Hours
-- **Dimension — Intermediate Feedback**
-  - Single-Turn Task: None
-  - Long-Term Task: Observation at each step
-- **Dimension — Termination Condition**
-  - Single-Turn Task: Model stops
-  - Long-Term Task: Task completion or timeout
-- **Dimension — Error Propagation**
-  - Single-Turn Task: Not applicable
-  - Long-Term Task: Accumulation of single-step errors
+The agentic tasks in [Chapter 22 on Computer Use](../chapter25_computer_use/training) and [Chapter 20 on SWE-Agent](../chapter23_rl_based_swe/swe-bench-and-rlvr) have the same structure: a task may last several hours and involve hundreds of decision steps, and early states change all later observations.
+
+### Characteristics of Long-Horizon Tasks
+
+A single-turn task usually generates just one answer, can be scored within seconds, and has no new environment observations. A long-horizon task may contain 100 to 10,000 steps, with running time stretching from minutes to hours; the environment returns an observation at each step, and the task does not end until it is completed or times out.
+
+This brings a new evaluation problem: one early wrong operation changes the later observations, and all subsequent decisions unfold on the wrong state. A long-horizon evaluation must therefore check the final result and also keep the intermediate trajectory and the termination reason.
+
+```mermaid
+flowchart LR
+    A[Initial task] --> B[Action 1]
+    B --> C[Environment state 1]
+    C --> D[Action 2]
+    D --> E[Environment state 2]
+    E --> F[Final result]
+    B -.wrong operation.-> G[Wrong state]
+    G --> H[Later observations change accordingly]
+    H --> I[Failure or extra recovery cost]
+```
 
 ### Evaluation Methods
 
-#### 1. Outcome-Based Evaluation
+#### Outcome Evaluation
 
-Only the final result is considered, not the process:
+When the browser agent books a ticket, we record 1 if the correct order appears on the final page, and 0 if it does not. For the $j$-th run, this can be written as
 
-$$\text{Score} = \mathbf{1}[\text{Final Result is Correct}]$$
+$$
+r_j^{\text{outcome}}=\mathbf{1}[\text{final environment state satisfies the task condition}].
+$$
 
-- **SWE-Bench**: Whether the correct PR was submitted
-- **WebArena**: Whether multi-step web operations were completed
-- Simple and straightforward, but ignores the quality of the intermediate process
+$\mathbf{1}[\cdot]$ is the indicator function: it equals 1 when the condition in brackets holds and 0 otherwise. This is the standard way of writing a binary task success rate. [SWE-bench](https://arxiv.org/abs/2310.06770) uses tests to verify whether a repository issue is resolved, and [WebArena](https://arxiv.org/abs/2307.13854) judges whether a multi-step task is completed in an executable website environment.
 
-#### 2. Process-Based Evaluation
+- SWE-Bench: whether the patch resolves the repository issue and passes the corresponding tests
+- WebArena: whether the multi-step web operation was completed
+- The outcome judgment is clear, but it ignores the quality of the intermediate process
 
-Use the Process Reward Model (see [Chapter 17 on PRM](../chapter20_prm_search/outcome-vs-process)) to evaluate each step:
+#### Process Evaluation
+
+Looking only at the outcome cannot locate which step went wrong first. We can therefore save the state $s_t$ and action $a_t$ and let a process scorer check whether each step is reasonable. Below is a **simplified teaching formula** this book uses to illustrate step-by-step aggregation:
 
 $$\text{Score} = \frac{1}{T}\sum_{t=1}^T \text{PRM}(s_t, a_t)$$
 
-- More granular, but the PRM itself may be biased
-- Computationally expensive
+$T$ is the number of steps in the trajectory, and $\operatorname{PRM}(s_t,a_t)$ is the score for step $t$. A real agent evaluation also has to record illegal actions, recovery actions, tool errors, and termination reasons, and cannot just take a simple average. [Lightman et al.](https://arxiv.org/abs/2305.20050) compared outcome supervision and process supervision in mathematical reasoning; it provides representative evidence for process rewards, but does not prescribe that every browser or code agent should use the averaging formula above.
 
-#### 3. Hybrid Evaluation
+- Step-level scores help locate errors, but the process scorer itself may also be biased
+- Saving trajectories and scoring them step by step adds computation and annotation overhead
 
-Combine with weights:
+#### Hybrid Evaluation
+
+In engineering, one sometimes needs to consider both "whether it was finally done" and "whether the process was compliant." One teaching way of writing a combination is
 
 $$\text{Score} = \alpha \cdot \text{Outcome} + (1-\alpha) \cdot \text{Process}$$
 
-#### 4. Human Expert Evaluation
+$\alpha$ determines the weight of the outcome. For example, a payment task can treat the success condition as a hard threshold and report the process-violation rate separately; this is usually easier to interpret than choosing an arbitrary $\alpha$. The formula above is not a universal standard from a paper; if a project does use a weighted total score, it must publish $\alpha$, the two sub-scores, and the reason for the aggregation.
 
-For ultra-long tasks (research agents, full SWE development), only human expert evaluation is feasible:
+#### Human Expert Evaluation
 
-- **Completion**: Whether the task was solved
-- **Efficiency**: Whether the task was completed in the fewest steps
-- **Style**: Whether best practices were followed (code readability, documentation quality)
-- **Robustness**: How the agent handles unexpected situations
+For very long tasks (research agents, full SWE development), only human expert evaluation is possible:
 
-This method is costly (typically $50–500 per task), but remains the gold standard.
+- Completion: whether the task is solved
+- Efficiency: whether it uses the fewest steps
+- Style: whether it follows best practices (code readability, documentation quality)
+- Robustness: how it handles exceptional situations
 
-### Variance Issues in Long-Horizon Tasks
+The cost of expert review varies significantly with task duration, professional domain, and review process. A report should record review time, evaluator qualifications, the blinding method, and agreement, and should not write one project's quoted price as a general cost.
 
-The scores for long-horizon tasks exhibit significant variance — running the same agent on the same task twice can result in completely different outcomes (due to randomness and long-tail errors).
+### Variance and Number of Repetitions
+
+The score variance of long-horizon tasks is very large: running the same agent on the same task twice may give completely different results (randomness plus long-tail errors).
 
 ```python
-# Must run multiple times to take an average
-def long_horizon_eval(agent, task, n_runs=10):
+# The number of repetitions is determined by variance and the target confidence interval
+def long_horizon_eval(agent, task, n_runs):
     scores = []
     for _ in range(n_runs):
         trajectory = agent.run(task, max_steps=1000)
@@ -392,209 +431,136 @@ def long_horizon_eval(agent, task, n_runs=10):
     return np.mean(scores), np.std(scores)
 ```
 
-At least 10 runs are required, and important evaluations should have 50 or more runs. This is why experimental costs for long-horizon tasks are extremely high — a single experiment may cost thousands of dollars in API fees.
+There is no fixed lower bound on the number of repetitions that holds for all tasks. First run a small pilot to estimate the variance, then choose the sample size according to the score difference you want to detect and the confidence interval. If the budget supports only a few repetitions, publish the result of each run and the interval, and avoid showing only the best run.
 
-## Anthropic Internal AI Research Evaluation Suite
+## 25.5.7 Automating AI R&D
 
-In 2025, Anthropic released its internal evaluation suite used to assess the capabilities of Claude Opus 4.6 (2025.11) as an **AI Research Assistant** — a landmark benchmark, as it directly measures "whether a model can perform AI research work."
+One step beyond long-horizon coding tasks lies the automation of AI R&D. Suppose the model's task is "make a small language model train faster." It can modify data loading, batch size, compile options, and training code, and then run experiments to compare speed. If the two experiments use different CPUs, GPUs, or time limits, the final speedup measures both the model's capability and the environment difference.
 
-### Three Subtasks
+Tasks of this kind put code modification, tool use, repeated experiments, and resource control into the same trajectory, so they are well suited to testing whether a harness really fixes the environment. The system card of Claude Opus 4.6 gives a public case, which includes LLM training optimization, Quadruped RL, Novel Compiler, and an internal task suite.
 
-#### 1. LLM Training Subtask
+### The 34× Metric
 
-Have Claude Opus 4.6 **actually train an RL model** on the veRL/OpenRLHF framework:
+The `34×` in the system card refers to the **average speedup on the LLM training optimization task**, and is not an overall human-speed multiple for the three tasks LLM Training, Text-RL, and Quadruped-RL. Quadruped RL uses a separate locomotion score, and Novel Compiler uses a pass rate on complex tests; neither can be averaged directly with `34×`.
 
-- **Configuration**: Select algorithm (GRPO/PPO), hyperparameters, and dataset
-- **Implementation**: Write training scripts, tune hyperparameters, and debug
-- **Evaluation**: Performance of the trained model on held-out tasks
+The system card reports four distinct quantities:
 
-#### 2. Text-RL Subtask
+- **LLM training optimization**: the average speedup is `34×`, measuring the average speedup obtained after optimizing a small model's training pipeline.
+- **Quadruped RL**: with no preset hyperparameters, the highest locomotion score is `20.96`.
+- **Novel Compiler**: the pass rate on complex tests is `65.83%`.
+- **Internal suite 2**: the aggregate score of the internal task suite is `0.612`.
 
-Have the model design a text-based RL task and train an agent to complete it:
+These evaluations are used for capability "rule-out," with the goal of judging whether the model has crossed a capability threshold that calls for further review. They do not mean that the model can already complete full AI research independently, and the time savings on all research tasks cannot be derived from one training speedup.
 
-- **Task Design**: Choose environment, define reward
-- **Implementation**: Write RL training loop
-- **Training**: Actually run RL and reach baseline performance
+### Environment Configuration and Reproducibility
 
-#### 3. Quadruped-RL Subtask
+AI R&D tasks actually run code, train models, and debug repeatedly. The evaluation must fix all of the following:
 
-Have the model train a quadruped robot to walk in the MuJoCo physics simulation:
+- compute resources and CPU/GPU models;
+- wall-clock time and tool-call limits;
+- initial code, dependencies, and random seeds;
+- executable verification of the final artifact;
+- variance across multiple runs.
 
-- This is a classic continuous control task ([Chapter 9 on SAC](../chapter11_continuous_control/ddpg))
-- Requires understanding the environment, debugging the algorithm, and tuning hyperparameters
-- **Success Criterion**: The agent reaches baseline performance within 1M steps
+A later system card disclosed that the LLM training evaluation was affected by unfixed CPUs and was rerun on unified hardware. This shows precisely that the harness's environment configuration is itself part of the measurement.
 
-### 34× Human-Accelerated Details
+## 25.5.8 Standardized Harnesses
 
-Anthropic reports that Claude Opus 4.6 completes these tasks **34 times faster than human researchers**:
-
-- **Task — LLM Training**
-  - Human Average Time: 17 hours
-  - Opus 4.6 Time: 30 minutes
-  - Acceleration Ratio: 34×
-- **Task — Text-RL**
-  - Human Average Time: 12 hours
-  - Opus 4.6 Time: 25 minutes
-  - Acceleration Ratio: 29×
-- **Task — Quadruped-RL**
-  - Human Average Time: 8 hours
-  - Opus 4.6 Time: 15 minutes
-  - Acceleration Ratio: 32×
-- **Task — Average**
-  - Human Average Time: **12.3 hours**
-  - Opus 4.6 Time: **23 minutes**
-  - Acceleration Ratio: **34×**
-
-**Note**: The "completion" here is not perfect, but rather reaching a **research assistant level** — for example, the trained model achieves 80% of baseline performance on held-out tasks.
-
-### The Multidimensionality of Evaluation Metrics
-
-The Eval Suite of Opus 4.6 does not only report "completion time," but also includes:
-
-- **Correctness**: The actual performance of the trained model
-- **Code Quality**: The style and readability of the implemented code
-- **Reproducibility**: Whether the results are consistent across two runs
-- **Debugging Ability**: Whether the model can self-correct when encountering errors
-- **Innovation**: Whether the model proposes improvements beyond the baseline
-
-This multidimensional evaluation represents the future of agentic benchmarks — a single metric (such as the pass rate of SWE-Bench) is no longer sufficient.
-
-### Implications for Industry
-
-The Opus 4.6 Eval Suite reveals a new phenomenon — **models are now capable of performing basic AI research tasks**. This means:
-
-1. **Automation of Research Assistant Work**: Typical LLM RL training tasks can be completed by AI
-2. a **Shift in Human Role**: From "doing research" to "guiding AI to do research"
-3. **Meta-Questions in Evaluation**: How to evaluate the research done by models? We need higher-dimensional benchmarks
-
-This discovery also directly drives alignment research — if models can perform research on their own, the alignment problem becomes more urgent ([Chapter 25: Scalable Oversight](../chapter30_alignment_failures/classical-failures)).
-
-## Standardized Evaluation Harnesses
-
-Industrial-level RL evaluation cannot be done manually — it must have standardized evaluation harnesses. Below are four mainstream harnesses.
+As models, tasks, and the number of samples grow, running by hand can hardly guarantee consistent parameters. A standardized evaluation harness writes the task version, prompt, model adapter, generation parameters, scorer, and aggregation method into configuration. Below, four common tools illustrate which segment of the problem each one solves.
 
 ### lm-evaluation-harness (EleutherAI)
 
-[EleutherAI lm-eval-harness](https://github.com/EleutherAI/lm-evaluation-harness) is the de facto standard:
+The [EleutherAI lm-eval-harness](https://github.com/EleutherAI/lm-evaluation-harness) provides a unified language-model task interface:
 
-- **Coverage**: 200+ benchmarks (MMLU, GSM8K, HellaSwag, TruthfulQA, etc.)
-- **Interface**: Unified `lm.eval()` API supporting HuggingFace, OpenAI, and Anthropic models
-- **Reproducibility**: Fixed random seed, prompt templates
-- **Decontamination**: Built-in 13-gram decontamination check
+- **Coverage**: the task library is continually updated and includes common benchmarks such as MMLU, GSM8K, HellaSwag, and TruthfulQA
+- **Interface**: a unified `lm.eval()` API supporting HuggingFace, OpenAI, and Anthropic models
+- **Reproducibility**: fixed random seeds and prompt templates
+- **Decontamination**: supports a decontamination procedure based on n-gram overlap; it still has to be run against the training corpus and task configuration
 
-```python
-import lm_eval
-from lm_eval.models.huggingface import HFLM
-
-model = HFLM(pretrained="meta-llama/Llama-3-70B")
-results = lm_eval.simple_evaluate(
-    model=model,
-    tasks=["mmlu", "gsm8k", "hellaswag"],
-    num_fewshot=5,
-    batch_size=64
-)
+```bash
+lm_eval --model hf \
+  --model_args pretrained=meta-llama/Llama-3-8B \
+  --tasks mmlu,gsm8k,hellaswag \
+  --num_fewshot 5 \
+  --batch_size auto \
+  --output_path results/
 ```
 
 Suitable for large-scale capability evaluation.
 
 ### BigCode Eval
 
-[BigCode Eval Harness](https://github.com/bigcode-project/bigcode-evaluation-harness) focuses on **code generation**:
+The [BigCode Eval Harness](https://github.com/bigcode-project/bigcode-evaluation-harness) focuses on **code generation**:
 
 - **HumanEval**: Python function generation
-- **MBPP**: Basic Python programming
-- **DS-1000**: Data science tasks
-- **MultiPL-E**: Multi-language code (Python, JS, Java, C++)
-- **APPS**: Competitive algorithm problems
+- **MBPP**: basic Python programming
+- **DS-1000**: data science tasks
+- **MultiPL-E**: multilingual code (Python, JS, Java, C++)
+- **APPS**: competition algorithm problems
 
-```python
-from bigcode_eval import run_eval
-run_eval(
-    model="deepseek-ai/deepseek-coder-33b",
-    tasks=["humaneval", "mbpp", "ds1000"],
-    pass_at_k=[1, 5, 10]  # Report pass@1, pass@5, pass@10
-)
-```
+BigCode Eval runs through command-line scripts and task configurations. The specific arguments change with the repository version, so a reproduction should record the commit version, container image, number of generated samples, and code-execution sandbox. `pass@k` also depends on the number of candidates generated per problem, so a single final percentage is not enough to record.
 
 ### τ-bench (Tau-Bench)
 
-[τ-bench, arXiv:2406.12045](https://arxiv.org/abs/2406.12045) is the **tool call benchmark** introduced by Salesforce in 2024:
+[τ-bench, arXiv:2406.12045](https://arxiv.org/abs/2406.12045) is a **tool-calling benchmark** released by Salesforce in 2024:
 
-- Simulates real-world business scenarios (airline, retail, telecom customer service)
-- Models need to call APIs (check orders, change flights, refund)
+- It simulates real business scenarios (airline, retail, and telecom customer service)
+- The model has to call APIs (look up orders, change flights, issue refunds)
 - Multi-turn dialogue + tool calls + user simulation
 
-```python
-from tau_bench import run
-run(
-    agent=llm_agent,
-    env="airline",  # Airline customer service scenario
-    n_episodes=100,
-    user_model="gpt-4"
-)
-# task success rate, average turns, API call accuracy
-```
-
-τ-bench reveals the actual capabilities of GPT-4 and Claude in real-world business scenarios — often 20-30 points lower than single-turn benchmarks.
+τ-bench results cannot be directly subtracted from single-turn question-answering accuracy, because the tasks, denominators, and success conditions differ. For reproduction, fix the domain environment, user simulator, policy rules, maximum number of turns, and model version, and report the task success rate together with the consistent-pass behavior over repeated runs.
 
 ### BFCL (Berkeley Function Calling Leaderboard)
 
-[BFCL](https://gorilla.cs.berkeley.edu/leaderboard.html) focuses on **function calling capability**:
+[BFCL](https://gorilla.cs.berkeley.edu/leaderboard.html) focuses on **function-calling ability**:
 
-- **AST Evaluation**: Whether the function call syntax is correct
-- **Executable Evaluation**: Whether the call can actually be executed
-- **REST API**: The ability to call external APIs
-- **Java, JS**: Multi-language support
+- **AST evaluation**: whether the syntax of the function call is correct
+- **Executable evaluation**: whether the call can actually run
+- **REST API**: the ability to call external APIs
+- **Java, JS**: multilingual support
 
-```python
-# BFCL Evaluation
-from bfcl_eval import eval_model
-results = eval_model(
-    model="claude-3-opus",
-    test_categories=["simple", "multiple", "parallel", "rest"]
-)
-# overall accuracy, AST accuracy, executable accuracy
+BFCL's data, model handlers, and scoring scripts are continually updated. When running it, use the commands that correspond to the version of the official repository and keep the category-level results; merging simple, parallel, multi-turn, and real API calls into one total score would mask the different places where failures occur.
+
+### Four Common Harnesses
+
+- **lm-eval-harness** targets general capability evaluation, running a large number of public benchmarks in a unified way and scoring them automatically.
+- **BigCode Eval** targets Python and multilingual code generation, checking generated programs with unit tests.
+- **τ-bench** targets business agents that need tool calls and multi-turn dialogue, with task completion as the core metric.
+- **BFCL** targets function calling, checking separately the syntactic structure of API calls and the actual execution results.
+
+### Basis for Selection
+
+- **Basic capability evaluation**: lm-eval-harness (broadest coverage)
+- **Code capability evaluation**: BigCode Eval + LiveCodeBench (continually updated, contamination-resistant)
+- **Agent capability evaluation**: τ-bench + SWE-Bench + WebArena
+- **Tool-calling capability**: BFCL
+
+The evaluation suite is determined by the model's intended use. A model that does only mathematical reasoning does not need a customer-service environment just to make up numbers; an agent that calls tools cannot report only MMLU. The basis for selection is which states and actions the product will pass through, and then to configure a corresponding task for each high-risk path.
+
+```mermaid
+flowchart TD
+    A[Intended use of the model] --> B{What is the main output}
+    B -->|Short text answers| C[Capability tasks such as lm-eval]
+    B -->|Executable code| D[Code tests and sandbox]
+    B -->|Function calls| E[BFCL-style structure and execution evaluation]
+    B -->|Multi-turn tool trajectories| F[τ-bench, SWE-bench, WebArena-style environments]
+    C --> G[Unified reporting protocol and uncertainty]
+    D --> G
+    E --> G
+    F --> G
 ```
 
-### Comparison of Four Harnesses
+## 25.5.9 Summary
 
-- **Harness — lm-eval-harness**
-  - Use Case: General ability
-  - Task Type: 200+ benchmarks
-  - Evaluation Method: Automatic validation
-- **Harness — BigCode Eval**
-  - Use Case: Code generation
-  - Task Type: Python/multi-language
-  - Evaluation Method: Unit testing
-- **Harness — τ-bench**
-  - Use Case: Business Agent
-  - Task Type: Tool calling + multi-round dialogue
-  - Evaluation Method: Task completion rate
-- **Harness — BF/C**
-  - Use Case: Function calling
-  - Task Type: API call syntax and execution
-  - Evaluation Method: AST + Execution
+The core principles of RL evaluation methodology:
 
-### Suggestions for Selection
+1. **Fix the object of evaluation first**: capability, behavior, and long-horizon tasks need different success conditions
+2. **Record contamination evidence**: string matching, semantic retrieval, and fresh test sets cover different risks
+3. **Report prompt sensitivity**: publish the templates, the cross-template mean, and the variance
+4. **Keep independent tests**: the training reward, the development set, and the final report set are isolated from one another
+5. **Version the harness**: record code, tasks, dependencies, random seeds, and the inference budget
 
-- **Basic Capability Assessment**: lm-eval-harness (most comprehensive)
-- **Code Capability Assessment**: BigCode Eval + LiveCodeBench (continuously updated and anti-pollution)
-- **Agent Capability Assessment**: τ-bench + SWE-Bench + WebArena
-- **Tool Invocation Capability**: BFCL
-
-The evaluation set should follow the model's intended use. A mathematics model does not need every customer-support environment, while a tool-using agent cannot be justified by MMLU alone.
-
-## Summary of This Chapter
-
-The core principles of RL evaluation methodology are as follows:
-
-1. **Prioritize Verifiability**: Prefer benchmarks that are machine-verifiable
-2. **Record contamination evidence**: n-gram overlap, semantic retrieval, fresh tasks, and temporal splits cover different risks
-3. **Average Across Multiple Prompts**: Single prompt conclusions are unreliable
-4. **Out-of-Distribution (OOD) Evaluation**: Three layers — capability evaluation, behavior evaluation, and long-term evaluation
-5. **Standardized Harness**: The four major systems — lm-eval, BigCode, τ-bench, and BFCL — complement each other
-
-Research-automation evaluations show that model performance depends on the complete environment, resource limits, and scoring protocol. [Appendix A.2](../appendix_industrial_training/rl-infrastructure) explains how to run these experiments on larger training systems while preserving the harness configuration.
+The AI R&D automation evaluation shows that models can already take part in some training-optimization and control tasks; the specific conclusions depend on the harness, resource limits, and scoring method. Next, you can go on to [Appendix A.2 on Trajectory Generation and Policy Updates](../appendix_industrial_training/rl-infrastructure) to learn how to run these RL experiments on large-scale clusters.
 
 ## Further Reading
 
@@ -606,6 +572,6 @@ Research-automation evaluations show that model performance depends on the compl
 - [Perez et al. 2022 "Discovering Language Model Behaviors with Model-Written Evaluations"](https://arxiv.org/abs/2212.09251)
 - [Sharma et al. 2023 "Towards Understanding Sycophancy in Language Models"](https://arxiv.org/abs/2310.13548)
 - [Yao et al. 2024 "Tau-Bench: A Benchmark for Tool-Agent-User Interaction"](https://arxiv.org/abs/2406.12045)
-- [Anthropic 2025 "Claude Opus 4.6 AI Research Eval"](https://www.anthropic.com/research/claude-opus-4-6)
+- [Anthropic 2026 "Claude Opus 4.6"](https://www.anthropic.com/research/claude-opus-4-6)
 - [Jain et al. 2024 "LiveCodeBench"](https://arxiv.org/abs/2403.07974)
 - [Patil et al. 2024 "BFCL Berkeley Function Calling Leaderboard"](https://gorilla.cs.berkeley.edu/blogs/8_berkeley_function_calling_leaderboard.html)

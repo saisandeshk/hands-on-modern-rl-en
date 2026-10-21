@@ -2,147 +2,195 @@
 title: 4.3 Reward Function Design
 ---
 
-# 4.3 Reward Design
+# 4.3 Reward Function Design
 
-In the previous sections, we discussed value estimation methods and how data is collected. But whether we are doing DP, MC, or TD, and whether we are on-policy or off-policy, the target of every update ultimately comes from the same upstream source: the reward function.
+## Reading Guide
 
-The last section answered “where does the data come from.” In this section, we go one step further upstream and ask: **how does the reward determine the direction of optimization, and why is it so hard to write a good reward?**
+**Key Ideas**
 
-::: info Core Concept
-The reward function defines “what is worth pursuing.” The algorithm does not see human intent; it only sees a scalar signal. If that signal is misaligned with the real objective, the stronger the optimization, the larger the deviation.
+- Understand how a reward function translates "the task we want done" into an optimizable scalar signal.
+- See why giving points only at the goal is the most "correct" design yet the hardest to learn from, and why dense feedback can speed up learning but may change the task itself.
+- Understand why Goodhart's law is especially deadly in RL: the stronger the optimization, the more visible the gap between the proxy reward and the true objective.
+- Learn how weights and scales in a multi-objective reward lead to behavioral bias.
+- Learn the basic path from hand-written rewards to preference learning (RLHF), and why a reward model can be over-optimized.
+
+In the previous sections we discussed methods of value estimation: DP uses bootstrapping, MC uses the return of a whole episode, and TD takes a compromise between the two. We also discussed where data comes from: on-policy methods sample it themselves, and off-policy methods reuse experience. You may have noticed that, whichever algorithm is used, the direction of its updates comes from the same source. That source is the **reward**.
+
+Let us pause and think. The last section answered "where does the data come from," but what is inside the data? It contains four-tuples of the form $(s, a, r, s')$. What the algorithm sees is not your intention, and not the sentence "reach the goal." It sees a number $r$. At every step it receives a number, and then it tries to make the discounted sum of those numbers as large as possible. If the number is written correctly, the algorithm moves in the direction you want. If the number is written wrongly, even by a small amount, the stronger the optimization, the further it drifts.
+
+This is the central question of this section: **how does the reward determine the direction of optimization, and why is it so hard to write a good reward?**
+
+::: info Key Concept
+The reward function defines "what is worth pursuing." What the algorithm sees is not human intent but a scalar signal. If this signal disagrees with the true objective, the stronger the optimization, the larger the deviation.
 :::
 
-Let’s start with a tiny grid world to see how rewards change the task. The agent starts at the bottom-left and aims to reach the terminal goal at the top-right. Actions are up/down/left/right. We can write three different reward rules:
+Let us start from a minimal example. Imagine a simple grid world: the agent starts at the bottom-left corner, and the goal is to reach the end point at the top-right. There are only four actions: up, down, left, and right. The map, the states, and the actions are all fixed. We change only one thing: the reward rule.
 
-| Reward Rule | Reward Per Step | Reaching Goal | Hitting Wall / Out of Bounds |
-| ----------- | --------------- | ------------- | ---------------------------- |
-| Rule A      | $0$             | $+1$          | $0$                          |
-| Rule B      | $-0.01$         | $+1$          | $0$                          |
-| Rule C      | $+0.02$         | $+1$          | $0$                          |
+| Reward rule | Reward per step | Reaching the goal | Hitting a wall or going out of bounds |
+| -------- | ---------- | -------- | ---------- |
+| Rule A | $0$ | $+1$ | $0$ |
+| Rule B | $-0.01$ | $+1$ | $0$ |
+| Rule C | $+0.02$ | $+1$ | $0$ |
 
-These three environments have exactly the same map, states, and actions; the only thing that changes is the reward. Rule A cares only about whether the goal is eventually reached. Rule B additionally tells the agent that “taking fewer steps is better.” Rule C, however, accidentally tells the agent that “as long as you stay alive and keep moving, you get points.” Without a time limit, under Rule C the agent may learn to loop near the goal, because looping keeps collecting reward and can be “more profitable” than finishing quickly.
+Look at Rule A first. It seems the most "correct": I give you 1 point only when you reach the goal and say nothing otherwise. Isn't that the cleanest definition of the objective?
 
-The numbers make the difference visible. Suppose one route reaches the goal in $8$ steps and another takes $20$. Under Rule A, both receive $1$. Under Rule B, counting the terminal reward separately, their totals are $1-8\times0.01=0.92$ and $1-20\times0.01=0.80$, so the shorter route is better. Under Rule C, walking in a loop for $100$ steps earns $100\times0.02=2$ before the goal reward is even counted. Continuing to move can therefore become more profitable than completing the task.
+Rule B adds something: each step costs 0.01 points. You may think, "Why deduct points? Isn't that adding something extra?" Don't rush; plug the numbers in and compute first.
 
-This highlights the most important fact about rewards: **in the same environment, changing the reward changes the task as the agent perceives it**. The state and action spaces describe what the agent can do. The transition probabilities describe what happens after it acts. The reward function describes what outcomes are worth pursuing.
+Rule C is even stranger: each step gives 0.02 points? Doesn't this encourage the agent to wander around?
 
-## The Role of the Reward Function
+Let us work through concrete routes. Suppose the shortest route from the start to the goal takes 8 steps, and another, longer route takes 20 steps.
 
-In the MDP 5-tuple $\langle \mathcal{S}, \mathcal{A}, P, R, \gamma \rangle$, rewards are commonly written as
+Under Rule A: what is the total return of walking 8 steps to the goal? Eight 0s, and a +1 at the end, add up to 1. And walking 20 steps? Twenty 0s and a final +1 also give 1. Do you see the problem? In the eyes of Rule A, reaching the goal in 8 steps and reaching it in 20 steps are **equally good**. It does not even care whether you walk in circles, as long as you touch the goal in the end.
+
+Under Rule B, let us compute. The 8-step route: eight times -0.01, plus +1 at the goal, gives a total of $1 - 8 \times 0.01 = 0.92$. The 20-step route gives $1 - 20 \times 0.01 = 0.80$. Now the short route is better than the long one: the agent has to reach the goal, and also reach it **quickly**. That -0.01 is not a punishment. It tells the agent that "time has a cost."
+
+And Rule C? A quick calculation shows something is wrong. If the agent does not go to the goal and circles near the goal instead, say for 100 steps, how many points can it collect? $100 \times 0.02 = 2$. That already exceeds the +1 at the goal! If the environment has no time limit, why would it go to the goal at all? Isn't circling and collecting points forever better?
+
+These three environments have exactly the same map, exactly the same available actions, and exactly the same physical rules (transition probabilities). **Only the reward was changed, and the task changed with it.** Rule A says "just reach the goal," Rule B says "reach the goal quickly," and Rule C says "just keep walking, the goal does not even matter."
+
+This is the weight of the reward function. The state space defines "what you can see," the action space defines "what you can do," and the transition probabilities define "how the world changes after you act." But **the reward defines what you "should" do**.
+
+## Starting Point: Writing a Task as a Number
+
+In the MDP five-tuple $\langle \mathcal{S}, \mathcal{A}, P, R, \gamma \rangle$, the most common way to write the reward is
 
 $$
 R(s,a)
 $$
 
-or, when rewards also depend on the next state, as
+If the reward also depends on the next state (the more common case), we write
 
 $$
 R(s,a,s').
 $$
 
-The meaning is straightforward: when the agent chooses action $a$ in state $s$, the environment transitions to some next state $s'$, and this one-step transition produces an immediate scalar feedback signal (a real number).
+What does this expression mean? Let us take it apart. The agent is in state $s$ and chooses action $a$, and the environment as a result moves to some next state $s'$. After this whole event has happened, the environment gives the agent a number, and that number is $R$. It is a scalar, that is, an ordinary real number.
 
-For example, represent grid-world states by coordinates. Let $s=(1,1)$, choose $a=\text{right}$, and arrive at $s'=(2,1)$. If every step costs $0.01$, then
-
-$$
-R\big((1,1),\text{right},(2,1)\big)=-0.01.
-$$
-
-$R$ receives the original state, action, and next state as three concrete inputs, and it returns one reward number. Here that number is $-0.01$.
-
-What reinforcement learning truly maximizes is not a single-step reward, but the discounted return from the current time onward:
+Here is a concrete example. Use the grid world again, with states denoted by coordinates. Suppose the current state is $s = (1,1)$ (near the bottom-left corner), and the agent chooses the action $a = \text{right}$ and arrives at $s' = (2,1)$. If we adopt Rule B (each step costs 0.01), the reward for this step is:
 
 $$
-G_t=R_{t+1}+\gamma R_{t+2}+\gamma^2R_{t+3}+\cdots .
+R\big((1,1), \text{right}, (2,1)\big) = -0.01.
 $$
 
-Here $\gamma$ is the discount factor. The closer $\gamma$ is to 1, the more the agent cares about the distant future; the smaller $\gamma$ is, the more it prefers immediate reward. In one sentence: the reward function scores each step, and the return aggregates those scores into a long-term objective.
+You see, $R$ takes three concrete things, "the original state, the action, and the next state," and outputs one number. The number output here is -0.01.
 
-Suppose the next three rewards are $0$, $0$, and $1$, with $\gamma=0.9$. The return from the current time is
-
-$$
-G_t=0+0.9\times0+0.9^2\times1=0.81.
-$$
-
-The environment gives a reward only on the third step, while the return converts that future reward into a value at the current time. With $\gamma=0.5$, the same reward sequence has return $0.25$.
-
-This also explains why reward design determines behavior. The algorithm does not see the true human intention; it sees only this scalar signal. In our minds, we want “keep the pole upright stably,” “get to the maze exit,” or “give the user a helpful answer.” What the algorithm actually optimizes is the expected sum of numbers. If the numbers are not aligned with the intention, then the stronger the optimizer, the faster the misalignment can be amplified.
-
-To understand reward, we also need to separate it from the value function from the previous section. In Section 3.1 we defined the state value function:
+But, you may ask, reinforcement learning does not maximize the reward of a single step. In Section 3.1 we defined that what the agent really maximizes is the **discounted return** starting from the current time:
 
 $$
-V^\pi(s)=\mathbb{E}_\pi[G_t\mid S_t=s].
+G_t = R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \cdots.
 $$
 
-Reward $R$ is the immediate signal provided by the environment after a one-step transition. Value $V^\pi$ is an estimate of how much long-term return can be obtained from a state under policy $\pi$. Reward is part of the task specification; value is a quantity computed by the learning algorithm from rewards and experience.
+The three dots "$\cdots$" mean the sum goes on until the episode ends. Let us "translate" this expression into words: starting now (step $t$), I take the reward of every following step, but the farther the future, the smaller the coefficient multiplying the reward, and this coefficient is a power of $\gamma$. The next step's reward is multiplied by $\gamma^0 = 1$ (no discount), the step after that by $\gamma^1 = \gamma$, the step after that by $\gamma^2$, and so on.
 
-Return to the three-cell corridor from Section 3.1:
-
-$$
-S\xrightarrow{-1}M\xrightarrow{-1}G.
-$$
-
-The immediate reward from $S$ to $M$ is $-1$, and from $M$ to $G$ is also $-1$. If $\gamma=1$, then
+Why discount? Let us get a feeling with concrete numbers. Suppose the rewards of the next three steps are 0, 0, 1 in turn (no reward for the first two steps, and 1 point for reaching the goal at the third), and take $\gamma = 0.9$. The return computed from the current time is:
 
 $$
-V(S)=-2,\qquad V(M)=-1,\qquad V(G)=0.
+G_t = 0 + 0.9 \times 0 + 0.9^2 \times 1 = 0.81.
 $$
 
-These numbers are not rewards directly given by the environment. They are the long-term evaluation obtained by aggregating future rewards. If we changed each step reward from $-1$ to $+1$, the values would change completely, and the policy preference would change as well. A value function has no meaning independent of the reward definition; it is always “value under a particular reward.”
-
-## Signal Shapes
-
-Once the role of reward in an MDP is clear, the next question is: what does the reward signal look like? Different signal shapes directly affect how hard learning is and what kinds of behaviors emerge.
-
-The most conservative reward design looks only at the final outcome. For example, in a maze we can give $+1$ upon reaching the exit and $0$ otherwise:
+What happened? The 1 point at the third step, discounted back to "now," is worth only 0.81. If we change $\gamma$ to 0.5 (more short-sighted), the same three steps give:
 
 $$
-R(s,a,s')=
+G_t = 0 + 0.5 \times 0 + 0.5^2 \times 1 = 0.25.
+$$
+
+The 1 point at the third step is now worth only 0.25. The closer $\gamma$ is to 1, the more "far-sighted" the agent is, and a point in the future matters almost as much as a point now. The smaller $\gamma$ is, the more "short-sighted" the agent is, and points in hand count for more.
+
+Put the two together: $R$ is the **per-step** immediate feedback, and $G_t$ is the **long-term objective** that folds all future feedback into a current value. The reward function gives "how much this step earns," and the return computes "how much in total if I keep going from now on."
+
+This also explains why reward design determines behavior: the object the algorithm optimizes is the expectation of $G_t$, and every point of $G_t$ comes from the reward function. If there is a deviation between the reward and your true intention, the more fully the optimization proceeds, the more thoroughly this deviation is exploited.
+
+Having understood the reward itself, we still need to distinguish it from the "value" seen in the previous section. Recall the definition of the state value function:
+
+$$
+V^\pi(s) = \mathbb{E}_\pi[G_t \mid S_t = s].
+$$
+
+The two expressions look a bit alike, but they are entirely different things. Let us separate them using the simplest three-cell corridor of Section 3.1:
+
+$$
+S \xrightarrow{-1} M \xrightarrow{-1} G.
+$$
+
+From $S$ to $M$ the immediate reward is -1, and from $M$ to $G$ the immediate reward is also -1. The episode ends upon reaching $G$. If $\gamma = 1$ (no discount), what are the values of these three states?
+
+- At $G$: the goal has been reached and there are no later rewards, so $V(G) = 0$.
+- At $M$: one step to $G$ earns -1, and nothing afterward, so $V(M) = -1 + \gamma V(G) = -1$.
+- At $S$: one step to $M$ earns -1, and the value from $M$ is -1, so $V(S) = -1 + \gamma V(M) = -2$.
+
+Now do you see the difference? $R$ is **given directly by the environment**: it is part of the task definition, a rule you wrote. $V^\pi$ is **computed**: under some policy $\pi$, an estimate of the total return obtainable from this state in the future. Value always depends on the reward for its existence: change every step's reward from -1 to +1, and the entire value function flips, and the learned policy turns completely around.
+
+## The First Difficulty: Too Little Reward at the Goal
+
+Good, now we know how to write a task as a reward. What does the most "honest" reward look like? It is Rule A: give +1 only on reaching the goal and 0 at all other times.
+
+$$
+R(s,a,s') =
 \begin{cases}
-+1, & s'\text{ is the goal state},\\
++1, & s' \text{ is the goal state}, \\
 0, & \text{otherwise}.
 \end{cases}
 $$
 
-This is called a **sparse reward**. The advantage is that it is clean: we almost never hard-code our process preferences; we only tell the agent what the terminal objective is. The disadvantage is equally clear: the learning signal arrives too rarely. In a large maze, the agent may wander randomly for thousands of steps without ever reaching the exit, and the entire trajectory is all zeros. It knows it did not succeed, but it has no clue which steps were “closer to success.”
+This kind of reward has a name: **sparse reward**. Why is it attractive? Because it is clean. You hardly impose any of your own preferences. You say only "I want you to reach the goal," without saying "which route you should take," and without saying "I will give you a small reward to encourage you when you get close." In theory, this is the task itself.
 
-Suppose one maze episode allows at most $50$ steps. If the agent has not reached the exit during the first $49$ steps, all $49$ rewards are $0$; only a lucky transition into the exit at step $50$ produces $+1$. If the exit is never reached, the algorithm sees $[0,0,\ldots,0]$ and cannot tell from reward alone whether step $17$ or step $36$ was more promising.
+But, as you should already have felt from the computation of Rule A, there is a problem. Let us magnify it. Suppose the maze is not 3 cells but a large 20×20 grid, and one episode allows at most 50 steps. The agent knows nothing at the beginning and can only walk randomly.
 
-In contrast, a **dense reward** provides feedback at every step. For example, in a grid world we can reward the change in distance to the goal:
+In its first episode it walked randomly for 49 steps without touching the exit. What are the rewards of these 49 steps? All 0. And step 50? It did not touch it either, still 0. After a whole episode, what the algorithm sees is $[0, 0, 0, \ldots, 0]$, fifty 0s.
 
-$$
-R_{\text{dense}}(s,a,s')=d(s,\text{goal})-d(s',\text{goal}).
-$$
+The second episode: fifty 0s again.
 
-Here $d(s,\text{goal})$ denotes the distance from state $s$ to the goal. If the next state is closer to the goal, the difference is positive; if it is farther, the difference is negative. The meaning is: do not wait until the terminal state to provide feedback; at each step, tell the agent whether it moved toward the goal.
+The third episode: still fifty 0s.
 
-If the current state is $4$ cells from the goal and the next state is $3$ cells away, the reward is $4-3=+1$. If a wrong move increases the distance from $4$ to $5$, the reward is $4-5=-1$. These two numbers immediately distinguish moving toward the goal from moving away from it.
+The agent knows that it "did not succeed," because it did not receive that +1 at the end. But does it know **which step was "closer to success"**? No. At step 17 it once reached a place only two cells from the goal, and then took the wrong direction and wandered off. But the reward at step 17 is also 0, no different from the other 49 steps. From this string of 0s the algorithm cannot see that "step 17 was actually promising."
 
-Another common case is **delayed rewards**. Rewards are not completely sparse, but the key feedback arrives only after a long delay. In CartPole, each step receives $+1$ as long as the pole has not fallen, and the episode ends only at failure. Superficially, every step has a reward. But the real cause of failure may have occurred dozens of steps earlier: a slightly wrong push direction gradually destabilizes the system, and only later does the pole fall. Game tasks and LLM generation are similar. A preference score for an entire answer may be given only after the whole text finishes, yet the mistake that caused the low score may have appeared in the first sentence.
+This is the fundamental problem of sparse rewards: **there is too little learning signal**. The agent may have to explore randomly for a long time before it bumps into the goal once, and only then can it begin to learn.
 
-So “sparse,” “dense,” and “delayed” are not mutually exclusive labels. They describe the _shape_ of the learning signal: how often it appears, how early it arrives, and whether it can clearly indicate which steps are good and which are bad.
+You may think: that is easy, why not just tell it at every step whether "the step just taken moved closer or farther"? This leads to the **dense reward**.
 
-We can place all three descriptions on one $50$-step trajectory. Giving $+1$ only for success at step $50$ is sparse. Giving $+1$ or $-1$ at every step according to distance change is dense. An incorrect action at step $8$ that causes failure only at step $40$ has a delayed consequence. A task can have dense rewards and delayed effects at the same time.
-
-## Reward Shaping
-
-Sparse rewards are clean but hard to learn from; dense rewards are easier to learn from but can introduce bias. Can we get the learning efficiency of dense signals without changing the original objective? **Reward shaping** aims to do exactly that.
-
-The core idea is to add a shaping term $F(s, s')$ on top of the original reward $R$, so that the agent receives extra feedback at each step:
+In a grid world, the most direct dense reward is this: compute the distance from the current state to the goal, compute the distance again after a step, and use the decrease in distance as the reward.
 
 $$
-R'(s, a, s') = R(s, a, s') + F(s, s').
+R_{\text{dense}}(s, a, s') = d(s, \text{goal}) - d(s', \text{goal}).
 $$
 
-The question is how to design $F$. A poor shaping term can completely change the optimal policy. The earlier “positive per-step reward leads to looping” is a classic shaping side effect. Ng, Harada, and Russell (1999) proved that if the shaping term satisfies a **potential-based** form (Potential-Based Reward Shaping, PBRS), the optimal policy is invariant under the transformation[^6]:
+Here $d(s, \text{goal})$ denotes the Manhattan distance from state $s$ to the goal (horizontal difference plus vertical difference). Let us compute concrete numbers: suppose the current state is 4 cells from the goal and one step to the right leaves only 3 cells, so the reward is $4 - 3 = +1$. If it goes in the wrong direction and the distance grows from 4 cells to 5, the reward is $4 - 5 = -1$.
+
+This is great! There is feedback at every step: approaching gives positive points and moving away gives negative points. The agent does not need to wait until the goal to know whether it is doing the right thing, since it knows after each step whether that step was good. The learning signal suddenly becomes dense.
+
+But wait. Before we cheer for this clever trick, recall Rule C. Rule C also gives a reward at every step, and what went wrong? The agent learned to circle and farm points. Could this distance reward have a similar problem?
+
+The good news is that this particular distance reward is safe. Let us verify: in a 5×5 grid, suppose the agent walks back and forth between (5,4) and (4,4). From (5,4) to (4,4) the distance goes from 1 to 2, and the reward is -1. Walking back, the reward is +1. Over one round trip the total reward is 0, so there is no free lunch. It is unlike the +0.02 per step of Rule C, where circling really does accumulate points.
+
+The bad news is that **you cannot guarantee that every "dense reward" you come up with is this safe**. What if the extra reward you design has a loophole? How can extra feedback be added so that it helps learning without changing the optimal policy?
+
+::: details Bonus: The Mathematics of Potential-Based Reward Shaping (PBRS)
+Ng, Harada, and Russell proved in 1999 that one special form of extra reward guarantees that the optimal policy does not change, called **Potential-Based Reward Shaping (PBRS)**.
+
+The idea is to define a "potential score" $\Phi(s)$ for each state, similar to gravitational potential energy in physics (the closer to the goal, the higher the potential), and let the extra reward be strictly the difference of potentials between adjacent states:
 
 $$
 F(s, s') = \gamma \Phi(s') - \Phi(s).
 $$
 
-Here $\Phi(s)$ is a **potential function** defined on the state space. The interpretation is intuitive: moving from lower potential to higher potential yields positive feedback; moving the other way yields punishment. The key point is that this shaping form is equivalent to adding a state-dependent shift to the $Q$ function, without changing the relative ordering of actions.
+Training uses $R' = R + F$.
 
-A typical example: in a grid world, use $\Phi(s) = -d(s, \text{goal})$ (negative distance to the goal) as the potential. The closer to the goal, the higher the potential. Each step toward the goal yields a positive shaping reward; stepping away yields a negative shaping reward. This supplies a dense “move toward the goal” signal, but because it satisfies the PBRS form, the optimal policy is exactly the same as in the sparse terminal-reward version.
+**Why does this not change the optimal policy?** Let us compute the discounted sum of all the extra rewards along a trajectory $s_0 \to s_1 \to \cdots \to s_T$:
+
+$$
+\sum_{t=0}^{T-1} \gamma^t F(s_t, s_{t+1}) = \sum_{t=0}^{T-1} \gamma^t [\gamma \Phi(s_{t+1}) - \Phi(s_t)].
+$$
+
+After expansion, all the intermediate terms cancel (a telescoping sum):
+- $\gamma \Phi(s_1) - \Phi(s_0)$
+- $\gamma^2 \Phi(s_2) - \gamma \Phi(s_1)$
+- $\gamma^3 \Phi(s_3) - \gamma^2 \Phi(s_2)$
+- ...
+- $\gamma^T \Phi(s_T) - \gamma^{T-1} \Phi(s_{T-1})$
+
+Only $-\Phi(s_0) + \gamma^T \Phi(s_T)$ remains at the end. Setting the potential of the terminal state to 0 leaves only the constant $-\Phi(s_0)$, which depends only on the starting point and not on the path taken. A path that originally had a higher return therefore still has a higher return after adding this constant, and the ordering of policies is unchanged.
+
+The distance-change reward we used earlier is exactly a special case of PBRS: take $\Phi(s) = -d(s,\text{goal})$ and $\gamma=1$, and we get $F = d(s) - d(s')$.
 
 Now substitute actual numbers. Let $\gamma=0.9$. The current state is $4$ cells from the goal, so $\Phi(s)=-4$; the next state is $3$ cells away, so $\Phi(s')=-3$. The shaping term is
 
@@ -152,374 +200,297 @@ $$
 
 If the move increases the distance from $4$ to $5$, then $\Phi(s')=-5$ and the term becomes $0.9\times(-5)-(-4)=-0.5$. The same formula gives positive feedback for approaching the goal and negative feedback for moving away.
 
-The limitation of PBRS is that a reasonable potential function must be available in advance. In a maze, distance is easy to compute; in complex tasks, constructing a useful potential is hard. Also, PBRS guarantees **optimal-policy invariance**, not that the learning dynamics are unchanged; the scale of shaping signals can still affect convergence speed and stability.
+**Limitation**: PBRS requires that you can write a reasonable potential function $\Phi(s)$. Distance is easy to compute in a maze, but for states such as "how is this conversation going," it is hard to define a potential. Moreover, PBRS guarantees only that the optimal policy does not change, and does not guarantee faster or more stable learning.
+:::
 
-> **Practical note**: when the task has a clear progress metric (e.g., distance to goal, percentage of completion), PBRS is the safest shaping method. Without a clear potential, be cautious with arbitrary shaping terms.
+PBRS solves the problem of "how to safely add intermediate rewards when there is a clear notion of progress," but for some tasks even "progress" is hard to define. Besides potential shaping, researchers have proposed other approaches to sparse rewards:
 
-## How Do We Combine Multiple Reward Terms?
+::: details Bonus: Other Advanced Methods for Sparse Rewards
+**HER (Hindsight Experience Replay)**: Even if a trajectory did not reach the original goal, it still "successfully reached somewhere." HER relabels the failed trajectory as "successfully reached the place it actually reached," so that experience that was all zeros produces a learning signal. It is especially suitable for goal-conditioned tasks such as robot pushing and navigation.
 
-In real systems, reward is often not a single signal, but a combination of multiple sub-rewards. Different papers have developed very different composition strategies: some sum terms with fixed weights; some switch terms dynamically; some let models generate reward terms. We organize the landscape by strategy type below.
+**Intrinsic curiosity (ICM)**: In extremely sparse environments where the agent cannot even reach "meaningful states," one can directly reward exploration itself. Train a model to predict the next state, and give an extra "curiosity reward" to states with large prediction error (unseen, novel ones). But this introduces the "TV problem": if the environment has a TV screen playing random images, the agent may keep staring at the TV, because random images can never be predicted accurately and can yield curiosity reward forever. For example, suppose one transition has extrinsic reward $0$ and curiosity reward $4$. With a curiosity weight of $0.01$, the total reward is only $0.04$; with a weight of $1$, it becomes $4$. If random television frames keep producing prediction error near $4$, an overly large weight can make watching the television more attractive than searching for actual game score.
 
-**Static weighted sum: the most common, and the hardest to tune**
+**GAIL (Generative Adversarial Imitation Learning)**: If humans can do the task but cannot write the reward rule, humans can demonstrate, and a discriminator is then trained to tell "expert actions" from "policy actions," turning the discriminator's output into a reward.
+:::
 
-Consider a Humanoid continuous-control task. Its reward can be written as a combination of three signal types:
+There is a third common situation, called **delayed reward**. It is not completely sparse (it is not that only the last step has points), but the key feedback comes only after a long time.
+
+CartPole is a good example. On the surface, it has a reward at every step: +1 as long as the pole has not fallen. Isn't that dense? But think carefully: the wrong action that actually causes the pole to fall may have happened **dozens of steps earlier**. For example, at step 12 you pushed in the wrong direction and the pole began to tilt slightly. After that you tried hard to recover, but the tilt grew worse, and finally at step 47 the pole fell, the episode ended, and this step did not receive +1.
+
+Here is the problem: the reward at step 47 is 0 (failure), but did the mistake really happen at step 47? No. The mistake happened at step 12. Credit assignment has to trace the signal of "failure" back 35 steps, and that is hard. Game tasks are like this, and so is LLM generation: the final preference score of a response may be given only after the whole text ends, but the mistake that led to the low score may have appeared in the very first sentence.
+
+Sparse, dense, and delayed are three words that describe three different dimensions of the learning signal: how much the signal appears (sparse vs dense), how early the signal arrives (delayed vs immediate), and whether the signal can clearly point out "this very step is good or bad." They are not mutually exclusive categories. You can have a "dense but delayed" reward, for example one with points at every step whose key consequences show up only long afterward.
+
+Let us put all three back on one 50-step trajectory to get a feel for them:
+- +1 only at step 50 when the exit is reached, and 0 for the other 49 steps: this is sparse.
+- +1 or -1 at every step according to the change in distance, with an extra +1 for reaching the goal: this is dense.
+- A bad action is chosen at step 8, but its consequence does not lead to failure until step 40: this is delayed.
+
+## The Second Difficulty: A Task Has Several Requirements
+
+Up to here we have been dealing with the case of a "single objective": the maze only needs the goal, and CartPole only needs to keep the pole upright. Real tasks are often not like this. A robot must walk forward, but also keep its balance, save power, and not fall. Putting several objectives together makes things more complicated.
+
+The maze has only one requirement: reach the goal. You only need to answer "did it get there." But in robot control things immediately become complicated. For a humanoid robot walking, you want it at the same time to:
+- move forward (with high forward speed),
+- not fall (keep balance),
+- not move too violently (save energy and reduce wear),
+- not hit things (safety).
+
+Each requirement taken alone is easy to write as a reward term. The question is: when they are **put together**, who has the final say?
+
+### Adding Several Requirements Together
+
+The most direct approach is to add the reward terms up. Take the MuJoCo Humanoid task as an example. Its reward is usually written as the sum of three parts:
 
 $$
 r = r_{\text{forward}} + r_{\text{alive}} + r_{\text{ctrl}}.
 $$
 
-| Sub-reward           | Meaning              |
-| -------------------- | -------------------- |
-| $r_{\text{forward}}$ | Forward velocity     |
-| $r_{\text{alive}}$   | Alive bonus per step |
-| $r_{\text{ctrl}}$    | Joint torque penalty |
+| Sub-reward | Meaning |
+| -------------------- | ------------ |
+| $r_{\text{forward}}$ | Forward speed |
+| $r_{\text{alive}}$ | Alive bonus per step |
+| $r_{\text{ctrl}}$ | Joint torque penalty (control cost) |
 
-The terms may have very different units and numerical ranges. Without rescaling, a control cost can overwhelm the forward reward and dominate the optimization direction. Its coefficient changes the learned behavior: if it is too small, actions may become unnecessarily forceful; if it is too large, the policy may reduce movement and become conservative.
+Looks reasonable, right? Encourage moving forward, reward staying alive, penalize overly violent actions: all three are wanted. But the **numerical ranges** of the three things may be completely different. $r_{\text{forward}}$ may range from 0 to 5, and $r_{\text{ctrl}}$ from -100 to 0. If they are added directly, the absolute value of the control cost may be dozens of times that of the forward speed. The result is that the agent would rather stand still (zero control cost) than dare to move a leg (moving a leg has a high control cost, while the forward reward is only a little).
 
-This fixed-weight addition is the most common approach, but **the weights are hyperparameters**. If tuned poorly, the agent will prioritize optimizing the term with the largest numerical magnitude.
+You need to attach a weight coefficient to each term to decide which one matters more:
 
-**Ant-v4** uses four terms (Gymnasium source):
+$$
+r = w_1 r_{\text{forward}} + w_2 r_{\text{alive}} + w_3 r_{\text{ctrl}}.
+$$
 
+These coefficients **are hyperparameters**. If they are poorly tuned, the agent will give priority to optimizing the term with the largest numerical value.
+
+::: details Bonus: Reward Design Examples in Continuous-Control Environments
+Let us look at how several standard Gymnasium/MuJoCo environments design their rewards, to appreciate the complexity of weights and combinations of reward terms.
+
+**HalfCheetah-v4** (a two-legged cheetah) is the cleanest design, with only two terms:
 ```python
-forward_reward = x_velocity                # r1: forward velocity
+forward_reward = x_velocity          # r1: forward speed
+ctrl_cost = 0.1 * sum(a^2)           # r2: control cost (penalty)
+reward = forward_reward - ctrl_cost
+```
+The coefficient 0.1 decides the trade-off between "run fast" and "do not move too violently."
+
+**Ant-v4** (a four-legged ant) has four terms:
+```python
+forward_reward = x_velocity                # r1: forward speed
 healthy_reward = 1.0                        # r2: alive bonus
 ctrl_cost = 0.5 * sum(a^2)                  # r3: control cost
 contact_cost = 0.5 * 1e-3 * sum(c^2)       # r4: contact cost
 reward = forward_reward + healthy_reward - ctrl_cost - contact_cost
 ```
+Note that the contact cost coefficient is only 0.0005. It barely matters early in training, and only later, when the policy has stabilized, does this tiny penalty begin to teach the robot to avoid unnecessary body collisions. Setting the coefficient higher makes the robot too conservative, and setting it lower makes the legs hit each other.
 
-The presence of $r_4$ (contact cost) complicates the problem. Its intent is to penalize collisions between body parts, but the coefficient $0.5 \times 10^{-3}$ is so small that it is almost ignored early in training. Later, when the policy becomes strong enough, this tiny penalty begins to influence behavior: the agent learns to “avoid unnecessary self-contact.” The issue is that if we increase this coefficient, the robot may become too conservative and avoid taking actions; if we decrease it, the robot may frequently collide with itself while walking.
-
-**HalfCheetah-v4** uses a minimal two-term composition (Gymnasium source):
-
+**BipedalWalker-v3** (a biped walking over rough terrain) also mixes PBRS potential shaping with penalty terms:
 ```python
-forward_reward = x_velocity          # r1: forward velocity
-ctrl_cost = 0.1 * sum(a^2)           # r2: control cost
-reward = forward_reward - ctrl_cost
-```
-
-With only two terms, the design intent is clear: encourage forward progress while charging a cost for large actions. The coefficient $0.1$ sets the relative weight of speed and control effort. Changing this value changes the action magnitudes that the policy learns.
-
-![HalfCheetah environment illustration](../../chapter28_vla/embodied-intelligence/images/halfcheetah.gif)
-
-<div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 6: HalfCheetah-v4 (top) and Ant-v4 (bottom). HalfCheetah has only two reward terms, forward velocity and control cost, making it a standard continuous-control benchmark. Ant uses four terms (forward, alive, control, contact), which makes the composition more complex and increases the chance of reward conflicts.</em>
-</div>
-
-**BipedalWalker** has a more interesting reward design: it mixes PBRS-style shaping with penalty terms (OpenAI Gym source):
-
-```python
-shaping = 130 * pos.x / SCALE          # r1: potential based on forward distance
-shaping -= 5.0 * abs(hull_angle)       # r2: uprightness penalty
-reward = shaping - self.prev_shaping    # shaping reward in PBRS-like form
+shaping = 130 * pos.x / SCALE          # r1: forward-distance potential
+shaping -= 5.0 * abs(hull_angle)       # r2: head-upright penalty
+reward = shaping - self.prev_shaping    # potential difference (PBRS)
 reward -= 0.00035 * MOTORS_TORQUE * sum(|a|)  # r3: action penalty
 ```
+The posture penalty is written inside the potential function, which changes the trade-off between "moving forward" and "staying upright." It does not enjoy the PBRS guarantee of "does not change the optimal policy."
+:::
 
-Three reward components appear at the same time:
+### Tasks with a Sequential Order
 
-- $r_1$ places forward position in the shaping potential.
-- $r_2$ places body posture in that same shaping potential.
-- $r_3$ is subtracted from each step as a standard action cost.
+"Add up all the terms and set the weights" has a hidden assumption: all the requirements are **equally important** from the very first step. Many tasks are not like this, though. They have a clear order.
 
-Because $r_2$ is included in the potential, the full shaping reward still uses the difference between consecutive potential values. It nevertheless changes how the agent trades off forward progress and body posture. With an unsuitable coefficient, the policy may sacrifice useful forward motion to maintain posture. Such hand-designed shaping must therefore be checked against observed behavior, not only total reward.
+Take a robot grasping task. You cannot ask it at the start to "put the object at the target position." It must first learn to approach the object, then learn to grasp it, then learn to lift it, and only finally carry it to the destination.
 
-![BipedalWalker environment illustration: a biped robot walks over rough terrain](../../chapter10_ppo/images/bipedalwalker_demo.gif)
-
-<div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 7: The BipedalWalker-v3 environment. A biped robot must walk over randomly generated rough terrain. The example code puts forward position and body posture into the shaping quantity, then subtracts an action cost. Their coefficients control the trade-off among speed, posture, and effort.</em>
-</div>
-
-**RLHF also uses multi-term rewards.** In a standard implementation, the policy objective is not just the reward-model score, but:
-
-$$
-\max_\pi \mathbb{E}[r_\phi(x, y) - \beta \cdot D_{\text{KL}}(\pi(y|x) \| \pi_{\text{ref}}(y|x))].
-$$
-
-| Sub-reward                    | Meaning            | Role                                   |
-| ----------------------------- | ------------------ | -------------------------------------- |
-| $r_\phi(x, y)$                | reward model score | make responses match human preferences |
-| $- \beta \cdot D_{\text{KL}}$ | KL penalty         | prevent policy from drifting too far   |
-
-There is an inherent tension between $r_\phi$ and the KL penalty: $r_\phi$ pushes the policy toward “things humans prefer,” while the KL penalty pulls the policy back so it does not move too far. $\beta$ is the valve that controls this tension. If $\beta$ is too small, the policy may over-optimize the reward model (producing high-scoring but absurd answers); if $\beta$ is too large, the policy barely updates and the effect of RLHF disappears. In InstructGPT training, the choice of $\beta$ directly determines the balance between “helpful but not excessive” and “safe but mediocre”[^3].
-
-For example, suppose a response receives reward-model score $2.4$ and has KL divergence $0.3$ from the reference model. With $\beta=0.1$, its combined score is $2.4-0.1\times0.3=2.37$. With $\beta=2$, the score falls to $1.8$. The response itself has not changed; increasing the KL weight simply makes the policy more reluctant to depart from the reference model.
-
-**Stage-wise activation: unlocking reward terms by progress**
-
-In **robot grasping tasks**, rewards are often decomposed into stages[^9]:
+The reward of a grasping task is usually decomposed by stage:
 
 $$
 r = r_{\text{reach}} + r_{\text{grasp}} + r_{\text{lift}} + r_{\text{target}}.
 $$
 
-| Sub-reward          | Trigger condition         | Intent                   |
-| ------------------- | ------------------------- | ------------------------ |
-| $r_{\text{reach}}$  | gripper approaches object | first learn “reach”      |
-| $r_{\text{grasp}}$  | successful gripper close  | then learn “grasp”       |
-| $r_{\text{lift}}$   | object leaves the table   | then learn “lift”        |
-| $r_{\text{target}}$ | placed at target position | finally complete “place” |
+| Sub-reward | Trigger condition | Intent |
+| ------------------- | ------------ | ------------ |
+| $r_{\text{reach}}$ | The gripper approaches the object | First learn to "approach" |
+| $r_{\text{grasp}}$ | The gripper closes and grasps the object | Then learn to "grasp firmly" |
+| $r_{\text{lift}}$ | The object leaves the table | Then learn to "lift" |
+| $r_{\text{target}}$ | The object is placed at the target position | Finally complete the transport |
 
-The risk is that the agent may get stuck in its “comfort zone.” If $r_{\text{reach}}$ and $r_{\text{grasp}}$ already provide decent reward, while $r_{\text{target}}$ is difficult to obtain, the agent may settle for “reach and grasp, but never lift.”
+Here is the problem: **the agent will stay in its "comfort zone."** If $r_{\text{reach}}$ and $r_{\text{grasp}}$ are easy to get while $r_{\text{target}}$ is very hard, the agent is content with "I approached and I grasped, and that is already quite a few points." It may learn to keep the gripper holding the object but never lift it.
 
-A more systematic approach is **curriculum rewards**: activate only simple sub-rewards early, and gradually add later terms once the policy has learned the basics. This shares the same idea as curriculum learning: do not confront the agent with all objectives at once; progress in stages by difficulty.
+One idea is a **curriculum reward**: the reward also changes with training progress. At first only $r_{\text{reach}}$ is activated, and once that is learned $r_{\text{grasp}}$ is added, then $r_{\text{lift}}$, and finally $r_{\text{target}}$, like a class that teaches the easy things first and the hard things later.
 
-**Dense-to-sparse switching: a two-phase training strategy**
+Another is called **Dense2Sparse**: first train quickly with a dense reward to a level that is "not bad," and then **switch back to the sparse true objective** and continue optimizing. The core insight is that a dense reward provides gradients early in training but may lock the policy into a "good enough" local optimum in the long run, while a sparse reward is hard to learn from but represents the true objective and can correct the deviation later.
 
-Nair et al. proposed **Dense2Sparse** at CoRL 2020[^12]: train with dense rewards to quickly reach a “reasonably good” policy, then switch to the sparse true objective for further optimization. The key insight is that dense rewards provide useful gradients early, but may lock the policy into local optima in the long run; sparse rewards can correct these biases later and force the policy to truly achieve the goal.
+### Requirements That Cannot Be Traded: Safety Constraints
 
-$$
-\text{Phase 1: } r = r_{\text{dense}} \quad \xrightarrow{\text{switch}} \quad \text{Phase 2: } r = r_{\text{sparse}}.
-$$
+The "weighted sum" and "stage-by-stage activation" methods above all assume that different reward terms are **interchangeable and can compensate for each other**: a little more forward speed can offset a little collision penalty.
 
-In Sawyer robot-arm tasks, for example, Phase 1 uses “distance from gripper to object” as a dense signal so the policy quickly learns to approach. Phase 2 switches to the sparse signal “did the grasp succeed,” forcing the policy to truly grasp rather than merely “almost touching.” Experiments show that Dense2Sparse achieves higher final success rates than using purely dense or purely sparse rewards.
+But there is one kind of requirement that cannot be handled this way, and that is safety. You cannot say "it hit a person once, but its speed went up 20%, which cancels it out." Safety constraints are hard: the number of falls must not exceed a threshold, joint torque must not exceed its limit, and collisions must absolutely not happen.
 
-**Discriminator-generated rewards: learning from demonstrations**
+Such constraints are not suited to being handled by "adding a penalty term." If the coefficient is small it does not work, and if it is large the agent is frightened into not moving at all. A more suitable approach is to write them as **constraint conditions** and not as reward terms, so that the policy update mathematically guarantees the constraints are not violated.
 
-Ho and Ermon’s **GAIL (Generative Adversarial Imitation Learning)**[^13] stops hand-writing rewards and instead uses a **discriminator** to generate reward signals. The discriminator $D(s, a)$ tries to distinguish “expert demonstrations” from “current-policy actions.” The policy aims to fool the discriminator, i.e., make $D(s, a)$ as close to 1 as possible:
-
-$$
-r(s, a) = -\log(1 - D(s, a)).
-$$
-
-This reward is not written by humans; it is generated online by the discriminator. The benefit is that it reduces bias from manually specified rewards: as long as the expert demonstrations are correct, the discriminator can guide the policy toward the right behavior. The downside is that discriminator training can be unstable, and it requires high-quality demonstrations.
-
-There are many GAIL variants. AIRL rewrites the discriminator in an adversarial inverse-reinforcement-learning form to recover a reward function; DAC combines GAIL with off-policy algorithms to improve sample efficiency. Their shared theme is: **the reward comes from a model that keeps changing, not a fixed formula**.
-
-**Goal relabeling: changing rewards for past trajectories**
-
-Andrychowicz et al. introduced **HER (Hindsight Experience Replay)**[^14], a completely different idea: do not change the reward function itself; instead, **change the task goal**, so that failed trajectories can be turned into “successful experience.”
-
-In multi-goal robotics tasks (e.g., pushing a block to different target locations), suppose the policy tries to push the block to location A but fails, and the block ends up at location B. HER relabels the goal from A to B for that trajectory, turning it into a positive sample of “successfully push the block to B.”
-
-$$
-\text{Original reward: } r(s, a, g_{\text{original}}) = 0 \quad \xrightarrow{\text{HER}} \quad r(s, a, g_{\text{achieved}}) = 1.
-$$
-
-HER does not modify the reward formula; it changes reward values by relabeling goals. In effect, it adds “virtual reward compositions” to the replay buffer: the same state-action pair can have different rewards under different goals. Experiments show that in sparse-reward robotic manipulation tasks, HER can raise success rates from near 0 to above 70%.
-
-**Constraint penalties: main reward plus safety boundaries**
-
-Achiam et al.’s **CPO (Constrained Policy Optimization)**[^15] handles another kind of composition: a main objective reward plus constraint-violation costs. In robot locomotion, the main goal might be “walk fast,” while constraints include “do not fall” and “do not exceed torque limits.”
+::: details Bonus: CPO, Constrained Policy Optimization
+**CPO (Constrained Policy Optimization)** by Achiam et al. writes the optimization problem in a constrained form:
 
 $$
 \max_\pi \mathbb{E}[r_{\text{main}}] \quad \text{s.t.} \quad \mathbb{E}[c_i] \leq d_i, \quad \forall i.
 $$
 
-$\text{s.t.}$ abbreviates “subject to.” $c_i$ is the measured cost for constraint $i$, and $d_i$ is its allowed upper bound. For example, a requirement of no more than $2$ falls per $100$ steps can be written as $\mathbb{E}[c_{\text{fall}}]\leq2$.
+$\text{s.t.}$ means "subject to the following constraints." $c_i$ is the cost of the $i$-th constraint (such as the number of falls), and $d_i$ is the allowed upper bound. For example, a requirement of no more than $2$ falls per $100$ steps can be written as $\mathbb{E}[c_{\text{fall}}]\leq2$.
 
-CPO does not simply add the constraint into the reward (e.g., $r = r_{\text{main}} - \lambda c$). Instead, it ensures constraint satisfaction during policy updates. The Lagrange multiplier $\lambda$ is adjusted automatically during training: the tighter the constraint, the larger $\lambda$, and the more conservative the policy becomes. This is fundamentally different from “writing constraints as huge penalty terms,” which can cause the policy to abandon the main objective entirely just to avoid any violations.
+CPO uses Lagrange multipliers to adjust automatically during training: when the constraint is tight, the policy becomes more conservative, and when the constraint is loose, it can optimize the main objective boldly. This is fundamentally different from a "large penalty term": the latter relies on weights to threaten, while CPO limits the step size of the update.
+:::
 
-**Intrinsic plus extrinsic: filling sparse signals with curiosity**
+### Common Pitfalls of Combined Rewards
 
-In sparse-reward games (e.g., Montezuma’s Revenge), external game scores may appear only once every tens of minutes. Pathak et al.’s **ICM**[^10] adds extrinsic rewards and intrinsic curiosity rewards:
+Whichever method is used, every time you add a new term to the reward you introduce a new possibility of bias. Four kinds of problem recur in engineering:
 
-$$
-r = r_{\text{extrinsic}} + \beta \cdot r_{\text{curiosity}}.
-$$
+**Scale mismatch.** $r_{\text{forward}}$ may be in 0 to 5, and $r_{\text{ctrl}}$ in -100 to 0. The terms with large values dominate the gradient direction. This has nothing to do with the weight question of "which is more important" and is purely a matter of numerical scale. A simple remedy is to scale each sub-reward by hand to a similar range (such as [-1, 1]).
 
-- $r_{\text{extrinsic}}$: game score (extremely sparse)
-- $r_{\text{curiosity}}$: prediction error of a forward model
+**Weight sensitivity.** Changing the control penalty coefficient from 0.001 to 0.003, only a factor of three, may turn the policy from "a steady jog" into "stumbling and falling." Finding a suitable range of weights usually takes repeated trials.
 
-$\beta$ is a balance coefficient. If too small, exploration is insufficient; if too large, the “noisy TV problem” appears[^11]: a TV with random frames produces permanently high prediction error, and the extrinsic objective is completely ignored.
+**Local optimum traps.** When some sub-reward is especially easy to get, the agent will prioritize optimizing it. In the grasping task, "approach the object" is far easier than "put it at the target position," so the agent stops there and refuses to go on.
 
-Suppose one transition has extrinsic reward $0$ and curiosity reward $4$. With $\beta=0.01$, the total reward is only $0.04$; with $\beta=1$, it becomes $4$. If random television frames keep producing prediction error near $4$, an overly large $\beta$ can make watching the television more attractive than searching for actual game score.
+**Time-scale differences.** The collision penalty is **immediate**: you hit something and points are deducted at once. The task completion reward is **delayed**: it may come only hundreds of steps later. The immediate penalty often "overwhelms" the delayed reward and makes the agent too conservative.
 
-![Burda et al.: intrinsic reward comparison across Atari games with different feature representations](../../chapter03_mdp/images/intrinsic-reward-atari-comparison.png)
-
-<div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 5: Learning curves of extrinsic rewards in Atari under different feature representations. The green curve (Random CNN features) performs strongly on exploration-heavy games like Montezuma’s Revenge, indicating that intrinsic reward based on prediction error can help discover sparse extrinsic rewards. Source: Burda et al. (2018).</em>
-</div>
-
-**Within-group standardization: turning scores into relative advantages**
-
-DeepSeek’s **GRPO** computes advantages by comparing multiple answers to the same problem. Suppose we generate $8$ answers to one math question; $3$ are correct and $5$ are incorrect. A verifier first assigns the absolute rewards $1$ and $0$, and GRPO standardizes those rewards within the group:
-
-$$
-A_i = \frac{R_i - \text{mean}(R)}{\text{std}(R)}.
-$$
-
-- Correct answers rank near the top within the group and get positive advantage.
-- Incorrect answers rank near the bottom and get negative advantage.
-
-The group's mean reward is $3/8=0.375$. Using the population standard deviation, the standard deviation is about $0.484$. A correct answer therefore has standardized advantage
-
-$$
-\frac{1-0.375}{0.484}\approx1.29,
-$$
-
-while an incorrect answer has advantage $(0-0.375)/0.484\approx-0.77$. The absolute rewards $0$ and $1$ have been converted into “how far above or below this group's average” each answer lies.
-
-This construction avoids maintaining a separate value network as the Critic. The rewards may still come from a rule-based verifier or a learned reward model. If that scoring rule has a loophole, the policy can still over-optimize it. Within-group standardization explains how relative advantages are constructed; it does not guarantee alignment with the true objective.
-
-**Common pitfalls in multi-reward composition**
-
-When combining multiple reward terms, several engineering traps recur:
-
-**Scale mismatch.** $r_{\text{forward}}$ might be in $0\sim5$, while $r_{\text{ctrl}}$ might be in $-100\sim0$. Large-magnitude terms dominate gradients. PopArt[^16] uses learnable normalization statistics to adjust the scale of each reward term online and alleviate this issue.
-
-**Weight sensitivity.** In Humanoid, changing the control penalty coefficient from $0.001$ to $0.003$ can flip the policy from a “stable jog” into a “staggering fall.”
-
-**Local-optimum traps.** If a sub-reward is easy to obtain, the agent will prioritize it. In grasping, “reach the object” is much easier than “place it at the target.”
-
-**Time-scale differences.** Collision penalties are immediate, but task completion rewards may be delayed by hundreds of steps. Signals at different time scales often require different handling (e.g., advantage estimation in GAE).
-
-**Reward-model drift.** When rewards come from a discriminator or a learned model (GAIL, RLHF), the reward itself changes during training. The policy is optimizing a moving target, making stability harder.
-
-To address scale mismatch, several common solutions are used:
-
-**Manual normalization.** The simplest approach is to rescale each sub-reward into a similar range before summation, e.g., divide $r_{\text{ctrl}}$ by $100$ and then multiply by a coefficient, or normalize all rewards into $[-1, 1]$. This requires no algorithm changes, but it needs a “calibration phase” to estimate each term’s numeric range.
-
-**PopArt adaptive normalization.** PopArt[^16] maintains a running mean and standard deviation for each reward term during training and standardizes using:
+::: details Bonus: Automatic Normalization (PopArt)
+If you do not want to estimate the range of each reward term by hand, you can use **PopArt** (van Hasselt et al., 2016), which maintains the mean and standard deviation of each reward term online during training and standardizes automatically:
 
 $$
 \hat{r}_i = \frac{r_i - \mu_i}{\sigma_i}.
 $$
 
-$\mu_i$ and $\sigma_i$ are running statistics updated online. Even if raw scales differ by orders of magnitude, standardized rewards enter policy gradients at comparable magnitudes.
+$\mu_i, \sigma_i$ are running statistics that are updated as training goes on. Even if the raw scales differ by a factor of a hundred, they end up on the same order of magnitude when they enter the policy gradient.
 
-**Reward clipping.** Clamp each sub-reward into a fixed range, e.g., $[-1, 1]$. Atari DQN famously clips all rewards into $[-1, 1]$ to remove scale differences across games. The downside is loss of fine-grained gradient information: $+0.1$ and $+10$ both become $+1$.
+A more radical approach is **reward clipping**, which truncates all rewards directly to [-1, 1] (DQN does this on Atari), but it loses the gradient information of "small win vs big win."
+:::
 
-**Standardize absolute scores within a group.** GRPO subtracts the group mean from each answer's reward and divides by the group standard deviation. It still uses scores from a verifier or reward model, but converts them into “how much higher or lower than the other answers in this group.”
+## The Third Difficulty: A High Score Does Not Mean the Real Task Was Completed
 
-**Optimize separately, then combine.** Multi-objective methods (e.g., MORL) do not compress reward vectors into a single scalar in advance. Policies learn multiple objectives simultaneously, and a user later selects among trade-offs. This avoids “how to weight” altogether, at the cost of higher computation.
+Now let us return to the three maze rules at the beginning. Rule A has the "purest" objective but is the hardest to learn. Rule B uses a step cost to help the agent find the short path. Rule C provides dense feedback but makes circling more profitable than reaching the goal. All along the way, from sparse to dense and from a single objective to several, we keep running into an invisible wall: **the agent pursues only the number you wrote down, and it does not automatically understand the intention behind the number.**
 
-## Reward Misspecification
+Reward design therefore has a problem more fundamental than "how fast learning is": **does the behavior that earns a high score really complete the task you wanted it to complete?**
 
-Above we discussed signal shapes: sparse signals slow learning; dense signals can introduce bias. But the more fundamental problem is not signal shape, but whether the reward itself can represent our true intent.
+Economics has a law called Goodhart's law, which says: **"When a measure becomes a target, it ceases to be a good measure."** This law is deadlier in reinforcement learning than anywhere else, because RL is "extreme optimization." It will do everything possible to push the number you give it to the maximum.
 
-Economics has Goodhart’s law: **“When a measure becomes a target, it ceases to be a good measure.”** In reinforcement learning, this is particularly deadly. What we truly want is $R^*$ (the objective in the human mind), but in engineering we can only write or learn a proxy reward $R$. As long as $R \neq R^*$, optimization amplifies the gap between them.
+Let us formalize the problem. What you truly want in your mind, we call $R^*$. This is the "true objective," the vague but correct intention in your head, such as "make the robot walk steadily," "make the boat win the race," or "make the answer genuinely helpful." But you cannot write $R^*$ directly as code. What you can write is only a **proxy reward** $R$. As long as $R \neq R^*$, that is, as long as there is even a slight gap between your proxy reward and the true objective, optimization will magnify the gap.
 
-This is not a purely theoretical concern; it appears repeatedly in practice. A classic example is the game Coast Runners[^1]. The objective is to win a boat race, and the reward is designed as “score points by collecting green blocks.” The agent learns to drive in circles in a corner, repeatedly collecting the same block, and never finishes the race. Its score far exceeds that of a “normal racing” strategy, yet it never completes the intended task. Similarly, in a bicycle simulator where the reward measures only “closeness to target,” the agent may learn to circle near the target: always close, never arriving.
+Maze Rule C is the smallest example. Let us look at a few bigger ones.
 
-The same issue recurs in Minecraft experiments. Researchers designed dense intermediate rewards to encourage the agent to gather resources and craft tools in order to complete a complex task. The agent learned to survive safely and continuously collect resources, but almost never attempted to complete the final goal, because “survive + collect” already yields high reward. Dense rewards turned “means” into “ends”[^9].
+In the Coast Runners boat-racing game, the task is originally to "win the race," that is, to reach the finish line before the other boats. But the reward function mainly comes from the green score blocks along the course: you earn points when you hit a green block. What did the agent discover? It discovered that if it circles repeatedly in a corner with many green blocks, collecting them, its score rises especially fast, far higher than by running the whole course seriously. The policy it finally learned is to circle in the corner and eat green blocks, with a score far above the policy of racing normally, and it never finished the course, let alone won the race.
 
-Curiosity-driven methods can have similar side effects. The **Intrinsic Curiosity Module (ICM)** proposed by Pathak et al. uses forward-model prediction error as an intrinsic reward: the agent is “curious” about unexpected transitions[^10]. In sparse-reward environments, this greatly improves exploration, e.g., discovering new rooms in Montezuma’s Revenge. But it also introduces a failure mode: if the environment contains a TV that constantly plays random frames, the agent will be attracted there forever, because randomness yields permanently high prediction error. This is the famous **Noisy-TV Problem**[^11]: intrinsic reward itself can become an exploitable target.
+The same pattern repeatedly appears in Minecraft experiments. Researchers designed dense intermediate rewards to encourage the agent to complete a complex task (collect resources, craft tools, reach the final goal): a point for collecting a block of wood, a point for crafting a plank, a point for making a pickaxe. And the result? The agent learned to stay safely alive and keep collecting wood and resources, yet it almost never tried to complete the final goal, because "staying alive + collecting basic resources" was already enough to earn a high score steadily. The dense reward turned the "means" into the "end."
 
-Consider CartPole again from Chapter 1. A common reward gives $+1$ for each step the pole does not fall, formulating the task as “live as long as possible.” This direction is broadly correct, but it also encodes a design choice: we do not explicitly reward “keep the pole angle close to vertical,” nor penalize “the cart drifts too far from center.” If we change it to
+Remember the "TV problem" mentioned earlier? Prediction error is meant as a means of encouraging exploration of new things, but the agent found that "staring at a random TV" earns a steady high curiosity reward. The means of helping it find the goal once again replaced the goal itself.
+
+Let us look at CartPole again. The common reward is "+1 for every step survived," which defines the task as "the longer alive the better." This reward is in the right direction, but it is already a proxy reward: what you really want is "keep the pole steadily upright at the center." If we design the reward to be more "refined," directly rewarding a small angle and a centered position:
 
 $$
-R(s,a)=1-c_1|\theta|-c_2|x|,
+R(s,a) = 1 - c_1|\theta| - c_2|x|,
 $$
 
-where $\theta$ is the pole-angle deviation and $x$ is the cart-position deviation, learning may speed up. But the magnitudes of $c_1$ and $c_2$ change behavior: if the position penalty is too strong, the agent becomes overly conservative and would rather let the pole tilt than move away from center; if the angle penalty is too strong, it may push the cart toward the boundary just to straighten the pole.
+learning is faster, since every step tells the agent "how crooked the pole is and how far off the cart is." But the two coefficients $c_1$ and $c_2$ immediately bring us back to the weight problem. Let us plug in specific numbers: at some step $|\theta| = 0.1$ and $|x| = 0.4$.
+- If $c_1=2, c_2=0.5$: the reward is $1 - 0.2 - 0.2 = 0.6$.
+- If $c_1=2$ stays and $c_2=2$: the reward becomes $1 - 0.2 - 0.8 = 0$.
 
-For example, let $|\theta|=0.1$ and $|x|=0.4$. With $c_1=2$ and $c_2=0.5$, the reward is $1-2\times0.1-0.5\times0.4=0.6$. If only the position coefficient changes to $c_2=2$, the same state receives reward $0$. The pressure to keep the cart near the center has increased sharply even though the pole angle is unchanged.
+Changing only the position coefficient from 0.5 to 2 turns the reward of the same state from "decent" to "very poor." If the position penalty is too strong, the agent may prefer to let the pole lean as long as the cart stays at the center.
 
-These examples show different degrees of misspecification. Pan et al. categorize reward misspecification into three types[^2]:
+Pan et al. divide reward misspecification into three types:
 
-- **Wrong weights**: the direction is correct, but the relative importance across dimensions is wrong. In CartPole, choosing $c_1$ and $c_2$ is a weight issue.
-- **Wrong ontology**: the measured dimension is wrong. Coast Runners uses “collect green blocks” to measure “racing performance,” which is the wrong object of measurement.
-- **Wrong scope**: the reward covers only part of the scenarios and misses boundary cases. A reward that works in the training environment may fail completely in a new environment.
+- **Wrong weights**: the dimensions measured are right, but the proportions of importance among them are written wrongly. The choice of $c_1, c_2$ in CartPole is of this type.
+- **Wrong ontology**: the dimension measured is itself wrong. Coast Runners uses "how many green blocks are eaten" to measure "boat performance," and the dimension is fundamentally wrong.
+- **Wrong scope**: the reward is right in the training environment but does not cover new scenarios. A reward that works well in a simulator may fail in the real world.
 
-The same issues appear in LLM preference training. RLHF uses a reward model to score responses, but that reward model can learn superficial correlations such as “longer and more polite answers score higher.” After optimization, the language model starts to pile on boilerplate: the score is high, but the answer is not necessarily more accurate[^3]. More subtly, RLHF may teach the model to write in a way that “looks right but is actually wrong”: human evaluators are easier to persuade, and the error rate can increase[^4].
+In LLM preference training, none of these problems is missing. RLHF uses a reward model to score answers, but the reward model may learn surface correlations from the annotated data, such as "longer answers tend to score higher" and "answers with more polite phrases tend to score higher." After the policy is optimized, it starts to pile up boilerplate: answers get longer and more polite, the score is high, but actual accuracy does not improve and may even drop. More subtly, the model may learn expressions that "sound convincing but are actually wrong," since human evaluators are more easily misled by confident, fluent wrong answers.
 
-The essence of these phenomena is the same: **the proxy reward $R$ is an imperfect approximation of the true intent $R^*$, and optimization amplifies the imperfect parts**. The stronger the model and the more thorough the optimization, the more visible the gap between $R$ and $R^*$ becomes.
+All of these phenomena are in essence the same problem: **the proxy reward $R$ is an imperfect approximation of the true intention $R^*$, and optimization magnifies this imperfection.** The stronger the model, the more fully it is optimized, and the longer it is trained, the more clearly the gap between $R$ and $R^*$ shows.
 
 ![Three types of reward misspecification: wrong weights, wrong ontology, and wrong scope](../../chapter03_mdp/images/reward-misspecification-pan-fig1.png)
 
 <div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 1: Read this figure from left to right. The red car on the left truly wants to “reduce average commute time,” but the engineer’s proxy reward is “increase average speed,” which pushes the agent toward behaviors that look faster but actually worsen the commute. The top and bottom rows on the right represent different model sizes: the stronger the model, the more likely it is to exploit loopholes in the proxy reward. This corresponds to the three misspecification types in the text: wrong weights, wrong ontology, and wrong scope. Source: Pan et al. (2022), <a href="https://arxiv.org/abs/2201.03544" target="_blank" rel="noopener noreferrer">The Effects of Reward Misspecification</a></em>
+  <em>Figure 1: Read this figure from left to right. The red car on the left truly wants to "reduce average commute time," but the engineer's proxy reward is "increase average speed," which leads the agent toward behavior that looks faster but actually makes the commute worse. The top and bottom rows on the right represent models of different sizes: the stronger the model, the more likely it is to find loopholes in the proxy reward. Source: Pan et al. (2022)</em>
 </div>
 
-## Preference Learning and Reward Models
+## The Fourth Difficulty: The Reward Formula Simply Cannot Be Written
 
-In many tasks, reward misspecification is not because the reward was written imprecisely, but because it cannot be written at all. How should we score a response? How do we judge whether a robot motion looks “natural”? These objectives are hard to encode as $R(s,a)$, but humans can often compare which of two outcomes is better.
+Whether the maze goal was reached and whether the robot fell are easy to judge with a program. But for many tasks you simply cannot write "good" as a few simple rules. Examples are "whether the robot's movements look natural," or "whether an answer is helpful and accurate."
 
-So we can reformulate reward design as a preference-learning problem. Given the same prompt, let a model produce two answers $y_A$ and $y_B$, and ask humans which one they prefer. A reward model $r_\phi(x,y)$ learns to predict this preference, where $x$ is the input prompt, $y$ is the model output, and $\phi$ are the reward-model parameters.
+For tasks that "humans can do but cannot write rules for," if experts can give **demonstrations**, imitation learning (such as GAIL) can learn a reward from the demonstrations. Language tasks are harder, since you cannot prepare an expert answer for every possible question. But although humans cannot write "the rules of a good answer," they can do something relatively easy: **compare**. Given two answers to the same question, you can usually say which one is better.
 
-![The three-stage training pipeline of InstructGPT](../../chapter03_mdp/images/rlhf-openai-methods-diagram.webp)
+Reward design thus changes from "writing a formula" to "learning from preferences," which is the core idea of RLHF.
 
-<div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 2: RLHF reframes “we cannot write the reward” into “we can learn the reward from preferences.” Step 1 performs supervised fine-tuning on demonstration answers so the model can answer at all. Step 2 asks humans to rank multiple answers and trains a reward model from those rankings. Step 3 uses the reward model as a scorer and continues optimizing the language model with PPO. Note that the reward model is not the true human intent itself; it is a proxy learned from preference data. Source: OpenAI <a href="https://openai.com/index/instruction-following/" target="_blank" rel="noopener noreferrer">Aligning language models to follow instructions</a></em>
-</div>
-
-A common training objective encourages preferred answers to receive higher scores. For example, if humans prefer $y_A$ over $y_B$, we want
+Given the same question $x$, let the model generate two answers $y_A$ and $y_B$, and have a person annotate which one they prefer. Use this preference data to train a **reward model** $r_\phi(x,y)$, whose goal is to give the preferred answer a higher score:
 
 $$
-r_\phi(x,y_A)>r_\phi(x,y_B).
+r_\phi(x, y_w) > r_\phi(x, y_l)
 $$
 
-For example, if the reward model outputs $2.3$ for $y_A$ and $1.1$ for $y_B$, it predicts that $y_A$ better matches the preference. Here $x$ is the shared prompt, $y_A$ and $y_B$ are candidate responses, and $\phi$ denotes the trainable parameters of the reward model. The function $r_\phi(x,y)$ ultimately produces one scalar used for comparison.
+Here $y_w$ is the answer chosen by the human (win) and $y_l$ is the rejected one (lose). After training, $r_\phi$ can score any answer like an ordinary reward function, and then we use an algorithm such as PPO to optimize the language model with it as the reward signal. For example, if the reward model outputs $2.3$ for $y_A$ and $1.1$ for $y_B$, it predicts that $y_A$ better matches the preference. The function $r_\phi(x,y)$ ultimately produces one scalar used for comparison.
 
-The point is not that “humans wrote down the reward formula,” but that “humans, by comparing samples, indirectly teach the model what outputs are more reward-worthy.” Concretely, the training data consists of preference pairs $(x, y_w, y_l)$, where $y_w$ is the chosen answer (win) and $y_l$ is the rejected answer (lose). The reward model is typically trained with a Bradley-Terry objective: maximize the probability that the chosen answer’s score exceeds the rejected answer’s score. After training, $r_\phi$ can output a scalar score for any $(x, y)$, and subsequent policy optimization (often PPO) treats $r_\phi$ as the reward signal.
-
-This pipeline changes “defining rewards” from “writing formulas” into “collect preference data + train a model,” greatly increasing expressiveness. But the reward model itself is still a proxy reward, and it still faces the problem $R \neq R^*$.
-
-### Reward Model Overoptimization
-
-Gao et al. studied this problem systematically[^5]. They used a large model (6B parameters) as a “gold” reward, trained smaller models (3M to 3B parameters) as proxy reward models, and then used reinforcement learning to optimize the proxy reward. They observed a clear pattern: as optimization proceeds, the proxy reward continues to rise, but the gold reward rises only up to a peak and then declines.
-
-The intuition is not hard. A reward model is trained from limited preference data. It learns not only “what answers are truly better,” but also many statistical correlations in the dataset, such as “longer answers tend to be chosen,” or “certain polite phrases are correlated with preference.” Once optimized, the policy becomes increasingly good at exploiting these correlations: it writes longer responses and adds more polite boilerplate to obtain higher proxy reward. But the connection between those behaviors and “truly helpful” gets weaker, and can even become negatively correlated.
-
-In other words, **optimization finds loopholes in the reward model, not the true human preference**. This is Goodhart’s law manifesting directly in RLHF.
-
-![Gao et al.: reward model overoptimization curves (Best-of-N vs RL)](../../chapter03_mdp/images/reward-overoptimization-gao-bon.png)
-
-![Gao et al.: reward model overoptimization curves (RL optimization)](../../chapter03_mdp/images/reward-overoptimization-gao-rl.png)
+![The three-step training pipeline of InstructGPT](../../chapter03_mdp/images/rlhf-openai-methods-diagram.webp)
 
 <div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 3: Both plots show the same phenomenon. The x-axis represents stronger optimization; the y-axis is reward score. The colored curve is the optimized proxy reward, and the dashed gray curve is the gold reward that is closer to true preference. At first both rise, meaning optimization helps; after the peak, the proxy reward keeps rising while the gold reward declines, meaning the model is starting to exploit loopholes in the proxy rather than becoming genuinely better. The upper plot uses Best-of-N sampling; the lower plot uses RL optimization. Source: Gao et al. (2023), <a href="https://arxiv.org/abs/2210.10760" target="_blank" rel="noopener noreferrer">Scaling Laws for Reward Model Overoptimization</a></em>
+  <em>Figure 2: RLHF turns "the reward cannot be written" into "learn the reward from preferences." Step one, SFT, uses demonstration answers so the model can give basic answers. Step two trains a reward model from human rankings. Step three uses PPO to optimize the language model with the reward model as the scorer. Note that the reward model is itself a proxy reward and not the true intention. Source: OpenAI</em>
 </div>
 
-### Process Reward Models
+This pipeline greatly extends the boundary of what RL can do, but the reward model is **itself a proxy reward**: the problem of $R \neq R^*$ has not disappeared at all, it has only changed form. Because the reward model is known to be imperfect, the RLHF objective usually also includes a KL penalty term that limits how far the policy may drift from the initial reference model: "you may get better, but don't go too far." For example, suppose a response receives reward-model score $2.4$ and has KL divergence $0.3$ from the reference model. With a KL weight $\beta=0.1$, its combined score is $2.4-0.1\times0.3=2.37$. With $\beta=2$, the score falls to $1.8$. The response itself has not changed. Increasing the KL weight simply makes the policy more reluctant to depart from the reference model.
 
-Standard reward models score only the overall quality of the final answer; this is an **Outcome Reward Model (ORM)**. But in reasoning tasks, a correct final answer does not imply a correct reasoning process: the model may skip steps, guess correctly, or even use a flawed process that happens to arrive at the right result.
+### Over-Optimization of the Reward Model
 
-The idea of a **Process Reward Model (PRM)** is to score not only the final outcome, but also each step in a reasoning chain. Each step receives a score indicating whether “this step is correct” and whether it is “moving in the right direction.” This turns a sparse final reward into denser step-level rewards, providing richer learning signals and making it easier to localize where reasoning went wrong.
+That the reward model is a proxy reward is no empty remark. Gao et al. used experiments to show systematically what happens if we keep optimizing the policy to maximize the reward model's score.
 
-Suppose a three-step solution receives scores $[0.98,0.12,0.20]$. The first step is close to $1$ and appears reliable, while the second drops sharply to $0.12$. The location of the error is now visible. An outcome reward model that only sees the final wrong answer would usually assign one low score to the entire solution without showing that the problem began at step two.
+Their experimental design is clever: use a large model (6B parameters) as the "gold reward" and treat it as $R^*$ (the true preference), and use smaller models as proxy reward models for RL optimization. They found a clear pattern:
 
-The cost of process rewards is labeling effort: humans must evaluate the quality of every step in a reasoning chain, which is much more time-consuming than judging only the final answer. Some work therefore uses trained models to automatically generate step labels and reduce reliance on manual annotation.
+- Early in training: the proxy reward rises, and the gold reward rises with it. The policy is genuinely getting better.
+- Past a certain peak: the proxy reward **keeps rising**, but the gold reward **starts to fall**.
 
-![Lightman et al.: ORM vs PRM performance on mathematical reasoning](../../chapter03_mdp/images/prm-orm-lightman-fig3.png)
+Why? What a reward model learns from limited data has two parts. One part is truly related to "answer quality" (clear logic, accurate answers). The other part is **surface correlations** in the data (longer answers, more polite phrases, a summary at the end). At the start of optimization it mainly learns the first part, and the two rise together. After the first part is exhausted, the policy begins to exploit the second part, making answers longer and longer and piling up boilerplate. The proxy reward keeps climbing, but the relationship of these things to "truly helpful" gets weaker and weaker.
+
+**What optimization finds is not the true human preference but the loopholes of the reward model.** This is the direct manifestation of Goodhart's law in RLHF.
+
+![The reward model over-optimization curve found by Gao et al.](../../chapter03_mdp/images/reward-overoptimization-gao-rl.png)
 
 <div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 4: This figure compares ORM (score only the final answer) and PRM (verify each reasoning step). The x-axis selects an answer from more candidate solutions (further right means more candidates); the y-axis is the probability that the selected answer is correct. PRM curves are higher, meaning: when the model generates many reasoning chains, step-by-step verification is better at selecting genuinely reliable solutions than scoring only the final outcome. This matches the text’s conclusion: process rewards break sparse final feedback into more localizable step feedback. Source: Lightman et al. (2023), <a href="https://arxiv.org/abs/2305.20050" target="_blank" rel="noopener noreferrer">Let’s Verify Step by Step</a></em>
+  <em>Figure 3: The horizontal axis is optimization strength and the vertical axis is the reward score. The colored curve is the proxy reward, and the dashed gray line is the gold standard. Past the peak, the colored curve keeps rising while the gray one falls: the model starts to cater to the loopholes of the reward model instead of genuinely getting better. Source: Gao et al. (2023)</em>
 </div>
 
-### AI Feedback
+::: details Bonus: From ORM to PRM, RLAIF, and GRPO
+Within the RLHF framework, researchers have proposed improvements from different angles. They all try to ease $R \neq R^*$, but each introduces new problems:
 
-Collecting human preference data is one of the most expensive steps in RLHF. A natural idea is: can AI provide preferences? This is the core idea of **RLAIF (Reinforcement Learning from AI Feedback)**. Constitutional AI is a representative approach: the AI model generates two candidate answers; another AI judge, guided by a predefined “constitution” (a set of behavioral principles), decides which answer is more compliant; the resulting AI-generated preference data is then used to train a reward model.
+**PRM (Process Reward Model)**: A standard reward model gives only one total score to the final answer (ORM), and in tasks such as mathematical reasoning it cannot point out which step went wrong. A PRM scores **each step** of the reasoning chain separately, splitting the sparse final reward into dense step-level feedback, so errors are located more precisely. The cost is a large increase in annotation effort, since people must judge step by step whether each step of reasoning is correct. Suppose a three-step solution receives scores $[0.98,0.12,0.20]$. The first step is close to $1$ and appears reliable, while the second drops sharply to $0.12$. The location of the error is now visible. An outcome reward model that only sees the final wrong answer would usually assign one low score to the entire solution without showing that the problem began at step two.
 
-RLAIF substantially reduces labeling cost, but introduces a new question: are AI preferences reliable? If AI judgments diverge from true human preferences, then the problem $R \neq R^*$ is merely shifted from “human feedback” to “AI feedback.”
+**RLAIF (Reinforcement Learning from AI Feedback)**: An AI compares answers according to a predefined "constitution" (behavioral principles) and generates preference data itself, replacing human annotation. This cuts cost greatly, but only moves the problem from "is human feedback accurate" to "is AI feedback accurate."
 
-### GRPO and Within-Group Relative Rewards
+**GRPO (Group Relative Policy Optimization)**: It drops PPO's separate value network, generates a group of answers to the same problem (for example 8), and estimates advantages by standardizing the scores within the group. It works well on tasks such as mathematical reasoning where an answer checker can score directly, but it still depends on a reliable scoring signal. Concretely, suppose $3$ of the $8$ answers are correct and $5$ are incorrect, with verifier rewards $1$ and $0$. The group's mean reward is $3/8=0.375$ and the population standard deviation is about $0.484$. A correct answer therefore has standardized advantage $(1-0.375)/0.484\approx1.29$, while an incorrect answer has advantage $(0-0.375)/0.484\approx-0.77$. The absolute rewards $0$ and $1$ have been converted into "how far above or below this group's average" each answer lies.
 
-Policy-gradient methods often train a value network to estimate advantages, while rewards may come from hand-written rules or learned reward models. **GRPO (Group Relative Policy Optimization)** generates a group of answers to the same problem, for example $8$, and scores each with a correctness checker or reward model. It then standardizes the group scores and uses their relative levels to construct advantages for the policy update.
-
-The key distinction is that GRPO removes the separate value network and estimates advantages from relative group rewards. Mathematical reasoning tasks can often use an answer checker and therefore need no learned reward model; open-ended tasks may still rely on a reward model or an AI judge. Chapter 15 will describe GRPO’s mechanism and implementation in detail.
-
-### Summary
-
-These methods share the goal of mitigating the fundamental tension $R \neq R^*$, but from different angles:
-
-| Method | Core Idea                                | What It Mitigates            | New Risk Introduced                        |
-| ------ | ---------------------------------------- | ---------------------------- | ------------------------------------------ |
-| ORM    | learn an overall reward from preferences | hand-written reward is hard  | overoptimization, superficial correlations |
-| PRM    | score each step separately               | outcome reward is too sparse | high labeling cost                         |
-| RLAIF  | replace human labels with AI             | human labeling cost          | whether AI preferences are reliable        |
-| GRPO   | estimate advantages from group-relative rewards | removes the value network | still requires a reliable reward signal |
-
-No method can completely eliminate the problem $R \neq R^*$. Reward design remains one of the hardest and most important parts of reinforcement learning.
-
-A reward function is not “better” simply because it is more complex, nor because it is denser. The real question is whether it expresses the task’s key preferences clearly, without opening obvious loopholes. When designing rewards, it helps to check a few guiding questions: when the agent gets a high reward, would a human truly say the task is done well? Can the agent farm reward by repeating a local behavior? Are intermediate rewards helping learning, or have they already changed the final objective? Is the reward signal too sparse, making it hard for the algorithm to discover successful trajectories? For LLMs or complex robot tasks, are hand-written rules insufficient so we need to learn rewards from preferences? If we use a reward model, could overoptimization decouple the proxy reward from true preferences?
-
-There is no universal answer. Control tasks like CartPole can start from survival time and angle deviation; grid worlds can start from terminal reward and step cost; LLM tasks often require preference data and reward models. Scenarios differ, reward expressions differ, but the underlying logic is the same: **reward defines the direction of optimization, and that direction is almost never perfectly aligned with true intent. Good reward design is about finding a workable balance between alignment and feasibility.**
+| Method | Core idea | What it eases | New risk introduced |
+| ----- | ---------------------- | -------------- | -------------------- |
+| ORM | Learn an overall reward from preferences | Hand-written rewards are hard | Over-optimization, surface correlations |
+| PRM | Score each step separately | Outcome rewards are too sparse | High annotation cost |
+| RLAIF | Replace human annotation with AI | Cost of human annotation | Bias in the AI's own judgments |
+| GRPO | Estimate advantages from within-group relative rewards | Removes the value network | Still depends on a reliable scoring signal |
+:::
 
 ## Summary
 
-This section discussed how reward functions determine the objective in reinforcement learning.
+A reward function is not better for being more complicated, and not better for being denser. The question that really needs asking is whether it expresses the key preferences of the task clearly while leaving no obvious loophole for farming points. When designing a reward, you can check along these questions:
 
-1. Reward is a scalar signal in the MDP that defines the task objective; return is the discounted sum of future rewards. Algorithms maximize return, so the reward specification directly determines learned behavior. Reward is one-step feedback; value is an estimate of long-term return. A value function depends on the reward definition and cannot be interpreted independently.
-2. Sparse rewards are closer to the true objective but provide weak learning signals. Dense rewards can accelerate learning but often introduce the designer’s preferences and errors. Delayed rewards make credit assignment harder.
-3. **Reward shaping (PBRS)** provides a theoretical guarantee: if the shaping term has the potential form $F(s,s') = \gamma\Phi(s') - \Phi(s)$, the optimal policy is unchanged. This is an effective tool for adding dense signals without changing the objective.
-4. **Multi-objective reinforcement learning** works with reward vectors rather than scalars. Linear weighting is simple but can only find solutions in convex regions; Pareto frontiers and conditional policies cover a richer trade-off space; constrained optimization enforces safety requirements as hard boundaries.
-5. Goodhart’s law captures the fundamental difficulty of reward design: proxy reward $R$ is almost never equal to true intent $R^*$, and optimization amplifies the gap. Wrong weights, wrong ontology, and wrong scope are common misspecification types.
-6. When hand-written rewards fail, we can learn reward models from human preferences. But reward models are still proxy rewards, and overoptimization can reduce true preference. Process reward models and GRPO are newer methods that try to mitigate the issue from different directions.
+1. When the agent gets a high reward, do you, as a human, really think "the task was done well"?
+2. If the agent keeps repeating some local action, can it keep farming points without completing the task?
+3. Is the intermediate reward you added helping learning, or has it already changed the final objective?
+4. Is the reward signal so sparse that the algorithm cannot discover a successful trajectory in a reasonable time?
+5. For complex tasks (such as LLMs or robots), are hand-written rules no longer enough, so that the reward needs to be learned from preferences?
+6. If a reward model is used, could over-optimization decouple the proxy reward from the true preference?
 
-Tabular methods require states and actions that can be enumerated one by one. Once the state space becomes continuous or high-dimensional, a Q table can no longer store it. The next chapter starts from this limitation, approximates the Q function with a neural network, and moves into deep reinforcement learning.
+These questions have no uniform answer. The expression of the reward differs from scenario to scenario, but the underlying logic is the same: **the reward defines the direction of optimization, and the direction of optimization can almost never be perfectly aligned with the true intention. Good reward design is finding a good balance between "aligning with the true objective" and "making learning feasible."**
 
-← Previous: [Where Does the Data Come From?](./algorithm-taxonomy) | Next: [5.1 From Q-Learning to DQN](../chapter07_dqn/from-q-to-dqn)
+In this section we started from the simple maze that "gives 1 point only at the goal" and met four core difficulties of reward design:
+
+1. **Writing a task as a number**: $R$ gives per-step immediate feedback, $G_t$ discounts and accumulates multi-step rewards into a long-horizon objective, and $V^\pi$ is an estimate of the future return. Value exists by depending on the reward.
+2. **Too little learning signal**: A sparse reward is the cleanest but too hard to learn from, and a dense reward speeds up learning but may change the task. PBRS guarantees an unchanged optimal policy through the potential-difference form, but requires a reasonable potential function to be definable.
+3. **Multi-objective trade-offs**: A weighted sum of several reward terms is simple but sensitive to weights and prone to scale mismatch. Staged curricula suit tasks with a sequential order. Safety requirements are better written as constraints and not as penalty terms.
+4. **Imperfect proxy rewards**: Goodhart's law tells us that optimization magnifies the gap between the proxy reward $R$ and the true objective $R^*$. RLHF turns "writing the reward" into "learning the reward from preferences," which extends the boundary of capability, but over-optimization of the reward model is still a different manifestation of the same fundamental problem.
+
+Tabular methods require states and actions to be enumerable one by one. Once the states become continuous or high-dimensional, the Q table cannot hold them. The next chapter starts from this point, approximates the Q function with a neural network, and enters deep reinforcement learning.
+
+← Previous section: [Where Does the Data Come From](./algorithm-taxonomy) | Next section: [5.1 From Q-Learning to DQN](../chapter07_dqn/from-q-to-dqn)
 
 ## References
 
@@ -534,10 +505,6 @@ Tabular methods require states and actions that can be enumerated one by one. On
 [^5]: Gao, L., Schulman, J., & Hilton, J. (2022). Scaling laws for reward model overoptimization. _ICML_.
 
 [^6]: Ng, A. Y., Harada, D., & Russell, S. (1999). Policy invariance under reward transformations: Theory and application to reward shaping. _ICML_.
-
-[^7]: Xu, J., Tian, Y., Ma, P., Rus, D., Sueda, S., & Matusik, W. (2020). Prediction-guided multi-objective reinforcement learning for continuous robot control. _ICML_.
-
-[^8]: Huang, S., Ontañón, S., & Mak, H. Y. (2022). A constrained multi-objective reinforcement learning framework. _ICML Workshop_.
 
 [^9]: Amin, S., et al. (2024). Comprehensive overview of reward engineering and shaping in advancing reinforcement learning applications. _arXiv preprint arXiv:2408.10215_.
 

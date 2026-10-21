@@ -1,0 +1,59 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agents": {
+    "worker": {
+      "description": "Headless worker for delegated repo tasks: reads and edits files inside the repo, runs only allowlisted git/build/lint/check commands, no web, no destructive git, cannot edit this config.",
+      "mode": "primary",
+      "model": "opencode-go/muse-spark-1.3-contributor",
+      "steps": 150,
+      "permissions": [
+        { "action": "*", "resource": "*", "effect": "deny" },
+
+        { "action": "read", "resource": "*", "effect": "allow" },
+        { "action": "read", "resource": "*.env", "effect": "deny" },
+        { "action": "read", "resource": "*.env.*", "effect": "deny" },
+        { "action": "glob", "resource": "*", "effect": "allow" },
+        { "action": "grep", "resource": "*", "effect": "allow" },
+        { "action": "list", "resource": "*", "effect": "allow" },
+        { "action": "lsp", "resource": "*", "effect": "allow" },
+        { "action": "todowrite", "resource": "*", "effect": "allow" },
+
+        { "action": "edit", "resource": "*", "effect": "allow" },
+        { "action": "edit", "resource": "*opencode.json", "effect": "deny" },
+        { "action": "edit", "resource": "*.opencode/*", "effect": "deny" },
+        { "action": "edit", "resource": "*.git/*", "effect": "deny" },
+
+        { "action": "shell", "resource": "*", "effect": "ask" },
+        { "action": "shell", "resource": "git status*", "effect": "allow" },
+        { "action": "shell", "resource": "git diff*", "effect": "allow" },
+        { "action": "shell", "resource": "git log*", "effect": "allow" },
+        { "action": "shell", "resource": "git show*", "effect": "allow" },
+        { "action": "shell", "resource": "git ls-files*", "effect": "allow" },
+        { "action": "shell", "resource": "git grep*", "effect": "allow" },
+        { "action": "shell", "resource": "git mv *", "effect": "allow" },
+        { "action": "shell", "resource": "git rm *", "effect": "allow" },
+        { "action": "shell", "resource": "ls", "effect": "allow" },
+        { "action": "shell", "resource": "ls *", "effect": "allow" },
+        { "action": "shell", "resource": "wc *", "effect": "allow" },
+        { "action": "shell", "resource": "npm run build", "effect": "allow" },
+        { "action": "shell", "resource": "npm run lint", "effect": "allow" },
+        { "action": "shell", "resource": "npm run format:check", "effect": "allow" },
+        { "action": "shell", "resource": "npm run verify", "effect": "allow" },
+        { "action": "shell", "resource": "npm run verify:*", "effect": "allow" },
+        { "action": "shell", "resource": "npm run sitemap", "effect": "allow" },
+        { "action": "shell", "resource": "npm run fix:headings*", "effect": "allow" },
+        { "action": "shell", "resource": "npx prettier *", "effect": "allow" },
+        { "action": "shell", "resource": "npx eslint *", "effect": "allow" },
+        { "action": "shell", "resource": "npx vitepress build*", "effect": "allow" },
+        { "action": "shell", "resource": "node scripts/*", "effect": "allow" },
+        { "action": "shell", "resource": "node --test *", "effect": "allow" },
+        { "action": "shell", "resource": "bash scripts/verify.sh*", "effect": "allow" },
+        { "action": "shell", "resource": "python3 scripts/*", "effect": "allow" },
+        { "action": "shell", "resource": "python3 -m py_compile *", "effect": "allow" },
+
+        { "action": "external_directory", "resource": "*", "effect": "deny" },
+        { "action": "doom_loop", "resource": "*", "effect": "deny" }
+      ]
+    }
+  }
+}

@@ -1,154 +1,228 @@
 # 17.3 Generative PRM
 
-In Section 17.2, the classifier only returns `bad: 0.96` after seeing an incorrect equation. This score is suitable for ranking, but it does not inform the trainer whether the error stems from a missing square, a wrong premise, or a correct current step with an error in the previous step. When moving to code, physics, or new domains, fixed labels also struggle to expose which part of the knowledge the evaluator is missing.
+When the discriminative PRM from the previous section meets the step-six error that drops a square, it outputs only `bad: 0.96`. That score works fine for ranking, but for training a model it explains nothing. Was the square lost? Was a premise misused? Or was an earlier step already wrong, with the error only showing up here?
 
-Generative PRM allows the language model to first write out the reasoning process and then provide the final judgment. For example, it can explicitly point out, "From $4k^2 = 2q^2$, only $2k^2 = q^2$ can be derived, and $k^2$ cannot be changed to $k$." Natural language explanations make judgments verifiable and reuse the base model's existing knowledge.
+The problem becomes more obvious when we move to a new domain. Take a PRM trained on math and use it to judge code: it gives some line a low score, but we cannot tell whether it truly spotted a bug or whether the code style simply differs from the training data. Fixed good/bad/neutral labels do not reveal what knowledge the evaluator is missing.
 
-This section takes [ThinkPRM](https://arxiv.org/abs/2504.16828) as an example. It first compares the outputs of classification labels and generative evaluation, then examines how a small amount of seed data can train a verifier, followed by an analysis of the benefits of adding verification calculations, and finally explains when a cheaper discriminative PRM or reward-based approach should still be used.
+The **generative PRM** takes a different approach. Instead of letting the evaluator output a single score, it makes the evaluator write out its checking process first: "This step tries to divide both sides by 2, which should give $2k^2=q^2$, but it is written as $4k=q^2$, so the equation does not hold." Only then does it give an explicit verdict. The evaluator is itself a generative model: it writes a natural-language check and ends with a conclusion that can be extracted.
+
+What does this cost? Why does it need only about 1% of the process labels? Is generating an explanation too slow? Using ThinkPRM as the example, this section looks at how natural-language evaluation works, why a small number of labels is enough, how verification compute can be scaled, and when to use it and when to stay with the discriminative PRM.
 
 <img src="../../chapter20_prm_search/images/generative-prm-pipeline.svg" alt="A generative PRM writes checking evidence, locates an error, and emits an extractable final judgment">
 
-## 1. How to Generate Natural Language Evaluations
+## How to Generate Natural-Language Evaluations
 
-Generative evaluation still needs to complete the same task as discriminative PRM: reading the problem, the reasoning prefix, and the current step, and determining whether this step is valid. The difference lies in the output—classification probability is replaced by "evaluation rationale + final label."
+The task of a generative PRM is the same as that of a discriminative PRM: read the problem, read the preceding reasoning, read the current step, and decide whether the step holds. Only the output side changes: the three-class probabilities are replaced by text consisting of "checking evidence plus a final label."
 
-### 1.1 Differences Between Discriminative and Generative Outputs
+### How Discriminative and Generative Outputs Differ
 
-Discriminative PRM ([OpenAI PRM800K](./discriminative-prm)):
+Let's put the two outputs side by side.
+
+**Discriminative PRM** (for example, OpenAI's PRM800K):
 
 ```text
-Input: prompt + the i-th step of reasoning
-Output: good / bad / neutral (three-class classification)
+Input: problem + reasoning prefix up to step i
+Output: good / bad / neutral (three probabilities)
 ```
 
-Model structure: a language model that reads the full prefix + a classification or scoring head, finally outputting class probabilities.
+The model is a language model that can read long prefixes, with a classification head or scoring head added at the end to output three numbers.
 
-Generative PRM (ThinkPRM):
+**Generative PRM** (for example, ThinkPRM):
 
 ```text
-Input: prompt + the i-th step of reasoning + "Please evaluate this step"
-Output: a natural language evaluation + final judgment
+Input: problem + reasoning prefix up to step i + "Please evaluate this step"
+Output: a natural-language check + a final judgment
 ```
 
-Model structure: a standard LLM (decoder-only), with output as text.
+The model is a standard decoder-only LLM, and its output is text.
 
-### 1.2 How Generated PRM Reuses Existing Capabilities
-
-The generated PRM has two conditions that can be leveraged:
-
-**First, reuse the pre-trained knowledge of the LLM.**
-
-Discriminative PRM requires training a classification head and calibrating the boundaries of good, bad, and neutral steps. In contrast, the generated PRM uses a pre-trained language model, which may already have some knowledge of mathematics, code, and logic. Fine-tuning primarily teaches the model to check each step in a consistent format and provide a conclusion.
-
-**Second, natural language can retain the reasoning basis.**
-
-Discriminative PRM outputs good, bad, or neutral, which is suitable for fast sorting, but does not explain why a step is wrong. Generated PRM can point out the rules used, the values substituted, and the location of the error, allowing trainers to verify the reliability of the judgment.
-
-Generated PRM can output: "This step intended to use factorization, but wrote $x^2 - 1$ as $(x-1)(x-2)$, the correct form should be $(x-1)(x+1)$, therefore the current step is incorrect." Such evaluations allow trainers to directly see where the error occurs; whether to use the explanation as a training target depends on the specific method.
-
-### 1.3 How ThinkPRM Constructs Training Data
-
-[ThinkPRM](https://arxiv.org/abs/2504.16828) (2025.04) starts from the questions, problem-solving prefixes, and human step labels in the PRM800K dataset. The labels still exist, but their purpose has changed: they are no longer used to directly train a classification head, but instead to filter the language model's generated checking process.
-
-#### Generating Step-by-Step Evaluations
-
-Training samples require the model to check each step based on the reasoning and output a judgment of correct or incorrect for each step:
+Take the step-six error of the $\sqrt{2}$ proof again and compare the two outputs:
 
 ```text
-Prompt: Evaluate the third step of the following reasoning:
-Problem: Solve the equation $x^2 - 5x + 6 = 0$
+Discriminative output:
+bad: 0.96
+
+Generative output:
+This step tries to divide both sides of 4k^2 = 2q^2 by 2, which should give 2k^2 = q^2;
+writing 4k = q^2 amounts to taking a square root of only the k^2 on the left, with no
+corresponding transformation on the right, so the equation no longer holds.
+Judgment: INCORRECT
+```
+
+The former goes straight into a ranking pipeline and returns in a few milliseconds. The latter hands over both the location and the cause of the error, but we have to wait until it finishes generating the whole explanation.
+
+### How Generative Evaluation Reuses Existing Capabilities
+
+A generative PRM has two advantages, and they are also why it can be trained with fewer labels.
+
+**First, it directly reuses the LLM's pretrained knowledge.**
+
+A discriminative PRM needs a classification head trained from scratch, and it needs a large number of step labels to calibrate the boundaries between good, bad, and neutral: what counts as right, what counts as wrong, and what counts as neutral all have to be supplied by labels. A generative PRM starts from a language model that has already been pretrained. That model can already do math, read code, and follow basic logic, so fine-tuning mainly teaches it to check steps in a uniform format and to state a conclusion at the end. Most of its knowledge comes from pretraining and not from the fine-tuning data.
+
+**Second, natural language preserves the grounds for the judgment.**
+
+A discriminative PRM outputs good/bad/neutral. Ranking is fast, but it does not say why it gave that score. A generative PRM states what rule it applied, what values it substituted, and where exactly the error occurred, so the trainer can check directly whether its reasons are right.
+
+For example, it might output this evaluation: "This step tries to factor, but writes `x² - 1` as `(x-1)(x-2)`. The correct expansion is `(x-1)(x+1)`, so the current step is wrong." Reading this, one can tell whether it truly understands factoring or is producing a plausible-looking wrong explanation. The explanation itself may also be wrong. But at least it can be checked, and we do not have to guess the cause from a score of 0.96.
+
+### How ThinkPRM Builds Its Training Data
+
+[ThinkPRM](https://arxiv.org/abs/2504.16828) (April 2025) is the representative work on generative PRMs. Its starting point is still the problems, solution prefixes, and human step labels of PRM800K, but the labels now serve a different purpose. They are no longer used to train a classification head directly. They are used to filter the checking processes that a language model generates itself.
+
+#### What a Step-by-Step Evaluation Looks Like
+
+Training samples require the model to verify the grounds of each step in turn and finally give a correct/incorrect judgment that can be extracted. Here is a concrete example:
+
+```text
+Prompt: Evaluate step 3 of the following reasoning:
+Problem: Solve the equation x² - 5x + 6 = 0
 Reasoning:
-  Step 1: This is a quadratic equation, and the quadratic formula can be used.
-  Step 2: Quadratic formula: $x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$
-  Step 3: Substituting $a = 1$, $b = -5$, $c = 6$, $x = \frac{5 \pm \sqrt{25 - 24}}{2} = \frac{5 \pm 1}{2}$
-  Step 4: $x = 3$ or $x = 2$
+  Step 1: This is a quadratic equation, so we can use the quadratic formula
+  Step 2: The quadratic formula: x = (-b ± √(b²-4ac)) / 2a
+  Step 3: Substitute a=1, b=-5, c=6, x = (5 ± √(25-24)) / 2 = (5 ± 1) / 2
+  Step 4: x = 3 or x = 2
 Please evaluate Step 3.
 
-ThinkPRM Output:
+ThinkPRM output:
 Let me check Step 3:
-- $a = 1$, $b = -5$, $c = 6$ ✓ (consistent with the original equation)
-- Quadratic formula: $x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$ ✓
-- Substituting: $x = \frac{5 \pm \sqrt{(-5)^2 - 4 \cdot 1 \cdot 6}}{2 \cdot 1}$
-       = $\frac{5 \pm \sqrt{25 - 24}}{2}$
-       = $\frac{5 \pm \sqrt{1}}{2}$
-       = $\frac{5 \pm 1}{2}$ ✓
-Step 3 is correct.
+- a=1, b=-5, c=6. Checking: the original equation is indeed x²-5x+6, correct ✓
+- The quadratic formula is x = (-b ± √(b²-4ac))/2a ✓
+- Substituting the values: x = (5 ± √((-5)² - 4·1·6)) / (2·1)
+       = (5 ± √(25 - 24)) / 2
+       = (5 ± √1) / 2
+       = (5 ± 1) / 2 ✓
+The substitution and calculation in Step 3 are both correct.
 Judgment: CORRECT
 ```
 
-#### Generating, Filtering, and Fine-tuning
+Note the three-part structure of this output. It first rereads the conditions of the problem to confirm nothing was misread, then recomputes the key quantity (here the discriminant $25-24=1$), and finally gives the conclusion. The checking process in the middle is itself evidence meant for human readers, while the final line "Judgment: CORRECT" is the interface left for programs to extract, and a simple regular expression is enough to pull out the result.
 
-Data construction proceeds in three steps:
+#### The Key Technique: Generate, Then Filter, Then Fine-Tune
 
-1. Use QwQ-32B-Preview to generate multiple verification CoTs for the problem-solving prefixes in PRM800K;
-2. Retain only samples that are parseable in format, make step-by-step judgments consistent with human labels, and have lengths not exceeding the upper limit;
-3. Fine-tune reasoning models such as R1-Distill-Qwen and QwQ using the retained verification CoTs.
+ThinkPRM builds its data in three steps, and this is the core of how it saves labels:
 
-The final paper uses approximately 1,000 verification CoTs, containing about 8,000 step judgments. To obtain these samples, the system first generates approximately 5,000 candidates, which are then filtered by the PRM800K labels. Here, the scale of the labels used for fine-tuning is reduced, but high-quality step labels are not completely eliminated; when there are no human labels, rollout estimation can be used to estimate silver labels, although noise will be introduced into the filtering process.
+1. **Generate candidates**: use a strong reasoning model such as QwQ-32B-Preview to generate several verification chains for each solution prefix in PRM800K.
+2. **Filter**: keep only samples whose format can be parsed, whose step-by-step judgments agree with the human labels in PRM800K, and whose length does not exceed the limit.
+3. **Fine-tune**: use the filtered high-quality verification texts to fine-tune reasoning models such as R1-Distill-Qwen and QwQ.
 
-### 1.4 How to Choose Between Step-wise Evaluation and Full-trajectory Evaluation
+The fine-tuning objective in the third step is standard next-token prediction. Let the filtered verification text be $y=(y_1,\dots,y_m)$. The loss is
 
-During deployment, one can evaluate each step individually or hand the entire reasoning process to the model, asking it to output judgments for each step sequentially. Step-wise evaluation always focuses on a clearly defined action, making it easier to locate the first error, although it requires multiple model calls. Full-trajectory evaluation only needs to read the context once, resulting in higher throughput, but may miss minor errors in long trajectories.
+$$
+\mathcal{L} = -\sum_{t=1}^{m} \log p_\theta(y_t \mid q,\, o_{\le i},\, y_{<t}),
+$$
 
-The two approaches can also be combined: first use full-trajectory evaluation to filter out low-scoring trajectories, and then perform step-wise verification on suspected error points. When making a choice, one should simultaneously measure the first-error localization rate, the number of tokens per trajectory, and the total latency, rather than only comparing the speed of a single call.
+where $q$ is the problem and $o_{\le i}$ is the reasoning prefix being checked. The sum runs only over the tokens of the verification text, and the problem and prefix in the input are excluded from the loss. Compare this with the discriminative loss of 17.2. The discriminative model trains a probability distribution over three classes, whereas the generative model trains the generation of a whole piece of checking text. The ability to check comes from the pretrained weights, and fine-tuning only fixes the format of the check and the position of the conclusion.
 
-## 2. How Do Labels and Verification Computation Affect Performance?
+In the end the paper used only about 1,000 verification samples, containing about 8,000 step judgments. Note, however, that to get these 1,000 usable samples the system first generated about 5,000 candidates and then filtered them with the human labels of PRM800K. What is saved here is the **number of process labels used for fine-tuning**. High-quality step labels are not entirely unnecessary. Without human labels one can also estimate silver labels from rollout outcomes for the filtering, but noise comes along with them.
 
-Generative PRM reduces the number of step labels required for fine-tuning, but increases the generation cost during each evaluation. The paper examines this trade-off from three perspectives.
+So "about 1% of the labels" has to be understood correctly: it is a trade. The human labels do not disappear. Their role changes from "directly train a classification head" to "guard the quality of the generated evaluations." The number of labels used as guards is smaller, but the quality requirement is higher: if one wrong evaluation slips through the filter, it enters the fine-tuning data as a correct sample.
 
-### 2.1 Can a Small Number of Process Labels Train an Effective Verifier?
+::: details Step-by-step vs. whole-trajectory evaluation
+There are two options at deployment:
 
-ThinkPRM uses approximately 8,000 process labels, which is about 1% of the 712,000 labels used by the discriminative baseline in the paper. Under the given settings of ProcessBench, MATH-500, and AIME 2024, it outperforms the discriminative baseline and the un-tuned LLM-as-a-Judge in step validation, Best-of-N, and verifier-guided search. This conclusion relies on the base model already possessing strong reasoning capabilities, as well as the human labels filtering the generated evaluations.
+- **Step-by-step evaluation**: evaluate one step at a time, and generate the next step only after the evaluation. The advantage is that attention stays on a single well-bounded action, which makes it easy to locate the first error. The drawback is that the model is called once per step, so the number of calls is large.
+- **Whole-trajectory evaluation**: hand the model the complete reasoning at once and let it output the judgment for each step in turn. The advantage is that the context is read only once, so throughput is high. The drawback is that on a long trajectory it may miss small errors in the middle.
 
-### 2.2 Can Mathematical Training Transfer to Science and Code?
+In practice the two can be combined: first use whole-trajectory evaluation to quickly discard trajectories with clearly low scores, then run a fine-grained step-by-step review at the positions suspected of error. When choosing, do not compare only the speed of a single call. Look at first-error localization rate, average tokens per trajectory, and total latency together.
+:::
 
-The paper also tests domain transfer on subsets of GPQA-Diamond and LiveCodeBench. Compared to the discriminative verifier trained on the full PRM800K, ThinkPRM achieves improvements of 8 and 4.5 percentage points respectively. These results support the idea that "generative evaluators can reuse base knowledge," but the evaluation only covers a subset of the data. Therefore, re-calibration is still needed before applying to new codebases or scientific domains.
+## How Labels and Verification Compute Affect Results
 
-### 2.3 Verifiers Can Also Increase Reasoning Computation
+A generative PRM reduces the step labels needed for fine-tuning but increases the generation cost of every evaluation. The paper examines from three angles whether this trade is worthwhile.
 
-Generative verifiers can increase computation along two axes: either by parallel sampling multiple validation CoTs and aggregating them, or by having the same check continue to review and revise. The paper compares the two approaches under the same token budget, finding that the overall gap is not significant, with the parallel approach slightly better under some budgets. On the ProcessBench subset, ThinkPRM outperforms the un-tuned LLM-as-a-Judge by 7.2 percentage points.
+### Can a Small Number of Process Labels Train an Effective Evaluator?
 
-This aligns with the pattern in Section 16.3: more verification computation is only useful when the evaluation model can generate complementary check paths. If the model lacks domain knowledge, multiple generations may simply repeat the same misjudgment.
+ThinkPRM used only about 8,000 process labels, roughly 1% of the 712,000 labels used by the discriminative baseline in the paper. Under the given experimental settings on ProcessBench, MATH-500, and AIME 2024, it outperformed the discriminative baseline on the same base model on step verification, Best-of-N ranking, and verifier-guided search, and it also outperformed an LLM-as-a-Judge used without fine-tuning.
 
-## 3. When to Choose Discriminative or Generative PRM
+This conclusion has two preconditions, though. First, the base model must already have strong reasoning ability. Second, human labels must have been used to filter the generated evaluations to high quality. If the base model's reasoning is weak, or the filtering labels are of poor quality, 1% of the data may simply not be enough.
 
-The previous results indicate that generative evaluation can improve label efficiency, but it does not replace classifiers in all scenarios. When training requires evaluating a large number of steps per second, generating an explanation may be too slow; in research and educational settings, where the reasoning process needs to be examined, a probability alone is insufficient.
+### Does Math Training Transfer to Science and Code?
 
-| Dimension                     | Discriminative PRM                                                | Generative PRM                                                                         |
-| ----------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Output                        | Step category or probability                                      | Inspection process and extractable judgments                                           |
-| Single Evaluation             | One forward pass, high throughput                                 | Requires autoregressive generation, high latency                                       |
-| Data                          | Requires sufficient labels to calibrate classification boundaries | Still needs label filtering for generation, but can be fine-tuned with fewer samples   |
-| Domain Transfer               | Depends on training coverage and base knowledge                   | Can invoke base knowledge in text, may also generate fluent misjudgments               |
-| Adding Validation Computation | Can use ensemble or multiple models                               | Can increase generation length, review rounds, or parallel samples                     |
-| Checkability                  | Only observe scores and error samples                             | Can read the judgment basis, but the basis is not guaranteed to be faithful or correct |
+The paper also tested domain transfer on subsets of GPQA-Diamond (science problems) and LiveCodeBench (coding problems). Relative to a discriminative verifier trained on the full PRM800K, ThinkPRM scored 8 and 4.5 percentage points higher, respectively. This result supports the view that generative evaluation can reuse the base model's knowledge better, but the evaluation covers only subsets of the data. When it is applied to a new codebase or a new scientific field, recalibration is still needed.
 
-### 3.1 How Task Scale and Reasoning Cost Affect the Choice
+### The Verifier Can Also Use More Inference Compute
 
-Large-scale reinforcement learning requires evaluating a large number of steps per round. Typically, a discriminative model with higher throughput is chosen first. When debugging rewards, educational feedback, or low-frequency high-value tasks requires inspecting the reasons for errors, a generative model is more suitable. A limited data budget does not necessarily mean a limited inference budget: a generative PRM may save annotation effort, but it may use more tokens per call.
+This agrees with the pattern from Section 16.3: a generative verifier can also improve by spending more compute, mainly along two routes:
 
-### 3.2 Mixing the Two Types of PRMs
+- **Parallel**: sample several verification chains at the same time and aggregate their judgments at the end.
+- **Sequential**: let a single checking process continue to review and correct itself.
 
-When training details are not publicly available, one should not infer from product outputs whether a generative PRM is used internally. Public methods are sufficient to support three combinations:
+The paper compared the two under the same token budget. The overall gap was small, with the parallel route slightly better at some budgets. On a ProcessBench subset, ThinkPRM scored 7.2 percentage points higher than the un-fine-tuned LLM-as-a-Judge.
 
-1. **PRM and ORM Mixed**: Use PRM to evaluate the process, ORM to evaluate the result, and take a weighted sum.
-2. **Generative + Discriminative Mixed**: A generative PRM provides high-quality evaluations, which are then distilled into a discriminative PRM for large-scale training.
-3. **Self-PRM**: Let the model evaluate its own reasoning (consistent with the idea in [Self-Rewarding Language Models](https://arxiv.org/abs/2401.10020)).
+Keep in mind that more verification compute helps only when the evaluator can actually produce complementary checking paths. If the model itself lacks knowledge of some domain, generating 100 checks may repeat the same wrong judgment in different words.
 
-## 4. Is Process Reward Always Necessary?
+## When to Choose a Discriminative or Generative PRM
 
-Even if a verifier can explain step by step, the system should first ask whether it is worth training a PRM. When answers can be automatically validated and the model can sample extensively, outcome rewards may indirectly reinforce self-checking. However, when step errors are hard to locate or the sampling budget is limited, process feedback is more advantageous.
+The results above show that generative evaluation can improve label efficiency, but it cannot replace a classifier in every setting. When RL training must evaluate tens or hundreds of thousands of steps per second, having the model generate an explanation for every step may be unacceptably slow. For debugging or for teaching feedback, on the other hand, an isolated score is nowhere near enough.
 
-[DeepSeek-R1](https://arxiv.org/abs/2501.12948) provides a contrast: R1-Zero mainly uses result correctness and format rewards, yet after training, it still observes behaviors such as checking steps and modifying answers. Outcome rewards increase the probability of correct final answers; if trajectories with self-checking are more likely to be correct, such behaviors may also be indirectly reinforced. Therefore, PRMs are one method for identifying intermediate errors, but not the only way to produce self-checking behavior.
+A comparison of the two kinds of PRM:
 
-When choosing a reward method, one can judge based on whether the feedback is sufficient: when answers can be automatically validated and the sampling volume is sufficient, outcome rewards may already be effective. When intermediate errors in long trajectories are hard to locate and the training budget is limited, PRMs can more quickly identify the location of errors. When applying across domains, one must also separately evaluate whether the PRM truly understands the new domain.
+- **Output**
+  - Discriminative PRM: step class or probability
+  - Generative PRM: checking text + extractable judgment
+- **Speed of a single evaluation**
+  - Discriminative PRM: one forward pass, high throughput
+  - Generative PRM: requires autoregressive generation, high latency
+- **Data requirements**
+  - Discriminative PRM: needs enough labels to calibrate the class boundaries
+  - Generative PRM: still needs labels to filter generated evaluations, but few fine-tuning samples
+- **Domain transfer**
+  - Discriminative PRM: depends on training data coverage and the base model
+  - Generative PRM: can call on the base model's textual knowledge, but may also generate fluent wrong explanations
+- **Adding verification compute**
+  - Discriminative PRM: model ensembles, multi-model voting
+  - Generative PRM: longer generation, more review rounds, more parallel samples
+- **Inspectability**
+  - Discriminative PRM: only scores and error samples to look at
+  - Generative PRM: the grounds for the judgment can be read directly, though they are not necessarily faithful or correct
 
-Therefore, PRMs are not a necessary condition for all tasks; they can still provide feedback that outcome rewards lack when the training budget is limited or when intermediate errors need to be located.
+### How Task Scale and Inference Cost Affect the Choice
 
-## Summary
+- **Large-scale RL training**: millions of steps must be evaluated per round, so a discriminative model with higher throughput is usually preferred.
+- **Online reranking**: with up to 64 candidates, the latency of a generative PRM is usually still acceptable, depending on the specific latency budget.
+- **Debugging failure cases**: when analyzing why a model fails on some 10 problems, a discriminative PRM can only give a set of scores, while a generative PRM can explain one by one where it thinks the error is, which is clearly more valuable.
 
-ThinkPRM achieves results comparable to discriminative PRM using only about 1% of step labels in the paper's experiments, while retaining natural language justification. This advantage should be considered alongside the higher inference cost.
+An important caveat here: **a small data budget does not mean a small inference budget**. A generative PRM may save annotation fees, but every call generates hundreds or thousands of tokens, so inference cost can be an order of magnitude higher. Here is an illustrative cost comparison (the numbers are order-of-magnitude illustrations):
 
-ThinkPRM demonstrates how to reduce the need for step-by-step manual annotation using natural language evaluation, while preserving the rationale for inspection by the trainer. The reliability of generative PRM is still constrained by the capability of the evaluation model: when the evaluation model is unfamiliar with a particular domain, it may produce explanations that appear complete but are actually incorrect.
+- **RL training, a million steps per round**
+  - Discriminative (one forward pass): a million forward passes, batchable
+  - Generative (autoregressive check): a million generations, an order of magnitude more costly
+- **Online reranking with 64 candidates**
+  - Discriminative (one forward pass): entirely acceptable
+  - Generative (autoregressive check): depends on the latency budget
+- **Debugging 10 failure cases**
+  - Discriminative (one forward pass): only scores are visible
+  - Generative (autoregressive check): gives the cause of the error case by case
 
-[17.4 Formal Verifier](./formal-prm) delegates formalizable steps to external proof checkers like Lean4, replacing model-based judgment with deterministic verification.
+### Mixing the Two Kinds of PRM
+
+Without public training details, one cannot infer from a product's outputs whether it uses a generative PRM internally. From public methods, at least three combinations are feasible:
+
+1. **PRM and ORM mixed**: the PRM judges the process and the ORM judges the outcome, combined by a weighted sum, as discussed in the previous section.
+2. **Generative plus discriminative**: use a generative PRM to produce high-quality evaluations with explanations, then distill those evaluations into a small discriminative PRM. The discriminative model handles large-scale training, and the generative one is used when an explanation is needed.
+3. **Self-PRM**: let the model evaluate its own reasoning, in the same spirit as [Self-Rewarding Language Models](https://arxiv.org/abs/2401.10020).
+
+::: details Is a process reward always necessary?
+Even if a verifier can explain itself step by step, we should first ask: do we really need to train a PRM?
+
+When the answer is easy to verify automatically and the model can be sampled many times, an outcome reward may indirectly reinforce self-checking behavior as well. [DeepSeek-R1](https://arxiv.org/abs/2501.12948) is a good point of comparison. R1-Zero mainly used an outcome-correctness reward and a format reward (that is, an ORM), and after training it was still observed to show behaviors such as self-checking and revising answers. The reason is that the outcome reward raises the probability of trajectories that end in the right answer, and if trajectories with self-checks really are more likely to be right, such behavior is reinforced indirectly.
+
+When choosing a reward type, one can reason as follows:
+
+- Answers are easy to verify automatically and the sampling budget is ample: an outcome reward may be enough.
+- Intermediate errors in long trajectories are hard to locate and the training budget is limited: a PRM can point out the error location earlier.
+- Cross-domain use: evaluate separately whether the PRM really covers the new domain.
+
+A PRM is an effective way to locate intermediate errors, but it is not the only route to self-checking behavior.
+:::
+
+## Section Summary
+
+ThinkPRM shows how natural-language evaluation can reduce step-by-step human annotation while keeping the grounds of each judgment available for the trainer to inspect. It is not free, though. It only moves the cost from the annotation side to the inference side.
+
+- **Output structure**: a generative evaluation is a step-by-step natural-language check plus an extractable judgment token. The former is for humans to read and verify, and the latter is for programs to use in ranking.
+- **Data construction logic**: the role of human labels changes from "directly train a classification head" to "gatekeeper that filters generated evaluations." What "about 1% of the labels" buys is a change in what the labels are used for: fewer of them, with a higher quality requirement on the filtering.
+- **Verification compute is scalable**: sampling several verification chains in parallel and sequential review can both improve results, provided the evaluator can produce complementary checking paths. If several checks keep repeating the same error, more compute brings no gain.
+- **Selection criteria**: the discriminative PRM wins on throughput and cost and suits large-scale training; the generative PRM wins on inspectability and label efficiency and suits debugging and teaching. The two can be combined through distillation.
+
+The reliability of a generative PRM is still limited by the evaluator's own ability, however. When the evaluator is unfamiliar with a domain, it can easily write an explanation that looks complete and sensible but is actually wrong. Is there an evaluator without this problem, where right is right and wrong is wrong? The next section turns to the formal verifier: hand the steps that can be formalized to an external proof checker such as Lean4, and replace the model's probabilistic judgment with deterministic rule checking.

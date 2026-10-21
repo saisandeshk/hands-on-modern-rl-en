@@ -69,7 +69,7 @@ const { owner, repo } = parseRepository()
 const base = process.env.BASE || (isVercel ? '/' : `/${repo}/`)
 const siteUrl = process.env.SITE_URL || `https://${owner}.github.io/${repo}`
 const editLinkPattern = `https://github.com/${owner}/${repo}/edit/main/docs/:path`
-const enableLocalSearch = process.env.LOCAL_SEARCH === '1'
+const enableLocalSearch = process.env.LOCAL_SEARCH !== '0'
 const mermaidConfig = {
   securityLevel: 'loose',
   startOnLoad: false

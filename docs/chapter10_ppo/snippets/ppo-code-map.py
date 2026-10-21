@@ -18,7 +18,7 @@ class ActorCritic(nn.Module):
         self.actor_head = nn.Linear(hidden, act_dim)
         self.critic_head = nn.Linear(hidden, 1)
 
-    # [A] 策略和值函数：Actor 输出动作概率，Critic 输出状态价值
+    # [A] Policy and value function: the actor outputs action probabilities, the critic outputs state values
     def forward(self, obs):
         h = self.backbone(obs)
         logits = self.actor_head(h)
@@ -26,7 +26,7 @@ class ActorCritic(nn.Module):
         value = self.critic_head(h).squeeze(-1)
         return action_probs, value
 
-    # [B] 动作采样：根据策略分布选择动作，并记录 log_prob
+    # [B] Action sampling: pick an action from the policy distribution and record its log_prob
     def act(self, obs):
         action_probs, value = self.forward(obs)
         dist = Categorical(action_probs)
@@ -42,7 +42,7 @@ class ActorCritic(nn.Module):
         return new_logprobs, values, entropy
 
 
-# [C] 采样一批 on-policy 数据：这些数据来自"当前策略"
+# [C] Collect a batch of on-policy data: this data comes from the "current policy"
 def collect_rollout(env, model, steps=2048, device="cpu"):
     obs, _ = env.reset()
     batch = {k: [] for k in ["states", "actions", "rewards", "dones", "old_logprobs", "values"]}
@@ -74,7 +74,7 @@ def collect_rollout(env, model, steps=2048, device="cpu"):
     }
 
 
-# [D] 计算优势：GAE（Generalized Advantage Estimation）
+# [D] Compute the advantage: GAE (Generalized Advantage Estimation)
 def compute_gae(rewards, values, dones, gamma=0.99, lam=0.95):
     advantages = torch.zeros_like(rewards)
     last_advantage = 0.0
@@ -92,7 +92,7 @@ def compute_gae(rewards, values, dones, gamma=0.99, lam=0.95):
     return advantages, returns
 
 
-# [E] PPO 损失函数（DeepSpeed-Chat / VeRL / OpenRLHF 风格）
+# [E] PPO loss function (DeepSpeed-Chat / VeRL / OpenRLHF style)
 def actor_loss_fn(new_logprobs, old_logprobs, advantages, clip_eps=0.2):
     ratio = torch.exp(new_logprobs - old_logprobs)
     surr1 = ratio * advantages
@@ -137,7 +137,7 @@ def ppo_update(model, optimizer, batch, advantages, returns,
             optimizer.step()
 
 
-# [F] 训练循环：采样一批数据，再用这批数据更新多轮
+# [F] Training loop: collect a batch of data, then update on it for several epochs
 device = "cuda" if torch.cuda.is_available() else "cpu"
 env = gym.make("CartPole-v1")
 model = ActorCritic(env.observation_space.shape[0], env.action_space.n).to(device)

@@ -5,414 +5,271 @@ outline: [2, 3]
 
 # 1.2 CartPole Principles
 
-> **Code and data used in this section**: [pure PyTorch PPO](https://github.com/walkinglabs/hands-on-modern-rl/blob/main/code/chapter01_cartpole/2-pytorch_ppo.py) · [raw metrics CSV](https://github.com/walkinglabs/hands-on-modern-rl/blob/main/code/chapter01_cartpole/output/training_metrics_seed42.csv) · [plotting script](https://github.com/walkinglabs/hands-on-modern-rl/blob/main/code/chapter01_cartpole/plot_curves.py)
+> **Goal of this section**: first explain the principles of CartPole and PPO, then start from the raw records of one real training run and learn to read the episode reward and four auxiliary PPO metrics.
+
+> **Learning path**: [1.1 Run CartPole](./principles) → **1.2 CartPole Principles** → [1.3 PPO Training Visualization](./training)
+
+> **Code and data for this section**: [Pure PyTorch PPO](https://github.com/walkinglabs/hands-on-modern-rl/blob/main/code/chapter01_cartpole/2-pytorch_ppo.py) · [Raw training metrics CSV](https://github.com/walkinglabs/hands-on-modern-rl/blob/main/code/chapter01_cartpole/output/training_metrics_seed42.csv) · [Plotting script](https://github.com/walkinglabs/hands-on-modern-rl/blob/main/code/chapter01_cartpole/plot_curves.py)
 
 ::: tip Optional reading
-This section is optional. If you already have some Python, PyTorch, or deep learning background, you can read it straight through. If not, jump ahead to [1.3 Hands-on: PPO Training Visualization](./training) and come back here when you want to understand what the training loop actually does.
+This section is optional. If you already have some background in Python, PyTorch, or deep learning, you can read straight through. If not, you can skip ahead to [1.3 Hands-on: PPO Training Visualization](./training) and come back to this section when you need to understand the mechanism behind training.
 :::
 
-In the previous section we ran CartPole end to end and watched an agent improve from random actions to stable balancing. This section first unpacks the principles behind that result — what the environment tells the agent, how the agent chooses actions, and how PPO uses a batch of interaction data to improve the policy — then walks through a real training record to learn how to read episode return and four PPO diagnostic metrics.
+In the previous section we ran our first CartPole training and watched the reward curve rise from 20 to 500. This section first takes apart the principles behind it: what information the environment gives the agent, how the agent makes decisions, and how PPO uses a batch of interaction data to improve the policy. Then we return to the training records themselves and learn to read the episode reward and four auxiliary PPO metrics.
 
-Running code is not the same as understanding reinforcement learning.
+## Environment Rules: Observations, Actions, and Rewards
 
-RL as a learning paradigm has a foundation that differs from supervised and unsupervised learning. Long before the term "reinforcement learning" became standard, the core idea was already present in behavioral psychology: **trial-and-error learning**. Edward Thorndike's Law of Effect (early 20th century) captured the intuition: behaviors that lead to satisfying outcomes are reinforced; behaviors that lead to annoying outcomes are weakened. Decades later, Andrew Barto and Richard Sutton formalized these ideas into the modern RL framework with the Markov Decision Process (MDP) and four core objects: **state, action, reward, and policy** (Sutton & Barto, 1998).
+Let's first look at the rules of the environment itself. The change in the curve in the previous section happens inside the interaction at every step.
 
-This framework is extremely general. It applies not only to CartPole, but also to Go (Silver et al., 2016), robotics control (Levine et al., 2016), and post-training for large language models (Ouyang et al., 2022). Different tasks change the concrete meaning of "state/action/reward", but the underlying structure stays the same.
+The CartPole scene is simple: on a horizontal track there is a cart, and on top of the cart a pole is attached by a pivot. At every short time step, the controller has to make one choice, to push the cart left or to push it right. Besides that, it can do nothing.
 
-In this section we return to CartPole and unpack its:
+Under gravity, once the pole starts to tilt it falls faster and faster. Only by continually adjusting the direction of the push can the controller keep the pole upright for as long as possible.
 
-1. state representation
-2. action space
-3. reward mechanism
-4. decision policy
+### Observations: Four Numbers Returned at Each Step
 
-### 1.1.1 State: What Does the Agent Observe?
+To decide which way to push, the controller must first know the current situation. A person can glance at the picture and tell whether the pole is tilting, but a program does not get the picture and needs numbers. At every step CartPole returns four numbers as the state the controller can see:
 
-At every step, CartPole provides the agent with a 4-dimensional observation vector. These bounds are not manually defined; they are built into the Gymnasium environment. A few lines of code reveal them:
+$$
+s_t=[x_t,\ \dot{x}_t,\ \theta_t,\ \dot{\theta}_t].
+$$
+
+The subscript $t$ denotes the current time, and the four quantities are, in order, the cart position, the cart velocity, the pole angle, and the pole angular velocity.
+
+| Index | Observation  | Meaning                                        | Bounds in `observation_space` |
+| ----- | ------------ | ---------------------------------------------- | ----------------------------- |
+| 0     | $x$          | Position of the cart on the track              | $[-4.8,\ 4.8]$                |
+| 1     | $\dot{x}$    | Direction and speed of the cart's movement     | $(-\infty,\ +\infty)$         |
+| 2     | $\theta$     | Angle of the pole from the vertical            | About $[-24^\circ,\ 24^\circ]$ |
+| 3     | $\dot\theta$ | Direction and speed of the pole's rotation     | $(-\infty,\ +\infty)$         |
+
+The angle and the angular velocity must appear together. Knowing only that the pole leans to the right does not tell us whether it is falling quickly to the right or returning to the middle, and these two situations may call for exactly opposite actions.
+
+The following code reads the observation ranges and termination thresholds declared by the environment:
 
 ```python
 import gymnasium as gym
 import numpy as np
 
 env = gym.make("CartPole-v1")
-print(f"Observation upper bound: {env.observation_space.high}")
-print(f"Observation lower bound: {env.observation_space.low}")
+print("Observation upper bound:", env.observation_space.high)
+print("Observation lower bound:", env.observation_space.low)
+print("Cart position threshold:", env.unwrapped.x_threshold)
 print(
-    f"Termination thresholds: position ±{env.unwrapped.x_threshold}, "
-    f"angle ±{env.unwrapped.theta_threshold_radians:.4f} rad "
-    f"(≈ ±{np.degrees(env.unwrapped.theta_threshold_radians):.0f}°)"
+    "Pole angle threshold:",
+    np.degrees(env.unwrapped.theta_threshold_radians),
+    "degrees",
 )
 ```
 
-Example output:
+The infinity here means that Gymnasium declares no finite observation bound for the velocities. It does not mean that an actual run will produce infinite velocities.
 
-```
-Observation upper bound: [4.8         inf 0.41887903  inf]
-Observation lower bound: [-4.8         -inf -0.41887903 -inf]
-Termination thresholds: position ±2.4, angle ±0.2094 rad (≈ ±12°)
-```
+### Actions: Left or Right
 
-Organized into a table, this is the 4-dimensional observation vector the agent receives each frame:
+Knowing the state, the controller still has to choose an action from it. The action set of CartPole is
 
-| Index | Meaning               | `observation_space` bounds     |
-| ----- | --------------------- | ------------------------------ |
-| 0     | cart position         | -4.8 to 4.8                    |
-| 1     | cart velocity         | `-inf` to `inf`                |
-| 2     | pole angle            | -0.4189 to 0.4189 rad (≈ ±24°) |
-| 3     | pole angular velocity | `-inf` to `inf`                |
+$$
+\mathcal{A}=\{0,1\}.
+$$
 
-::: warning Why are velocities `inf`?
-Gymnasium does not declare finite observation bounds for cart velocity or pole angular velocity, so those dimensions display `inf`. To describe the empirical range of a particular run, compute the minimum and maximum from its recorded trajectories rather than assuming a typical interval.
-:::
+| Action | Meaning in the environment |
+| ------ | -------------------------- |
+| 0      | Push the cart left         |
+| 1      | Push the cart right        |
 
-These 4 numbers form a complete description of the current situation. The agent cannot access the environment's internal state-transition rules or physics parameters; all information it uses for decisions is encoded in this 4D observation.
+Note that the action set has no "do not push," and the strength of the push cannot be chosen. At every step the program must choose between left and right.
 
-In reinforcement learning, "state" is a numerical description of the environment's current situation. Different tasks have different state representations — the state in chess is the piece distribution across the board, in autonomous driving it is camera images and radar data, and in CartPole it is these 4 numbers. In fact, the choice of state representation has a profound impact on RL algorithm performance. In early research, states were typically hand-crafted features (such as robot joint angles and angular velocities). With the rise of deep learning, researchers began using high-dimensional raw observations (such as pixels) directly as states, letting neural networks learn useful feature representations on their own (Mnih et al., 2013). This is a trend we will see repeatedly throughout this book — from hand-crafted features to learned features.
+From a control point of view, an action first changes the motion of the cart and then affects the pole through the connection between cart and pole. A single action usually cannot remove the tilt immediately, and the policy has to keep adjusting according to the new observation at the next step.
 
-### 1.1.2 Action: What Can the Agent Do?
+Controlling the pole requires continuous decisions, and every choice changes the situation at the next step.
 
-CartPole's action space is as simple as it gets: two discrete actions.
+### Rewards: One Point for Each Step Survived
 
-| Action | Meaning             |
-| ------ | ------------------- |
-| 0      | push the cart left  |
-| 1      | push the cart right |
+Observations and actions define "what can be seen" and "what can be done." One more signal is needed to tell the program which behaviors are better, and this signal is the reward. The environment gives a reward of $+1$ for every step it runs. An episode ends when any of the following occurs:
 
-There is no "do nothing" and no continuous magnitude (no "push lightly vs. strongly"). This limited, discrete set of actions is the most common type of action space in RL (called a `Discrete` action space). However, not all tasks have such simple action spaces. In Chapter 11, we will encounter continuous action spaces — such as controlling a robot's joint angles — which require fundamentally different handling. In fact, the type of action space (discrete vs. continuous) largely determines the choice of algorithm. Q-learning-style algorithms are naturally suited to discrete action spaces, while policy gradient methods (like the PPO we use here) can handle both — which is one reason PPO is widely adopted in industry.
+- The cart position goes beyond $\pm 2.4$.
+- The pole angle goes beyond about $\pm 12^\circ$.
+- The episode reaches the 500-step time limit.
 
-### 1.1.3 Reward: What Is Being Optimized?
+The episode reward of CartPole-v1 is therefore equal to the number of steps survived. Holding on for 37 steps earns 37 points, and reaching the limit earns 500 points.
 
-::: tip Reward rules
+Looking closely at this reward, we see that it does not directly say "the right move now is to push left." It only records whether the task is still going after an action. The program has to compare many interactions and gradually find which states and actions more easily lead to longer episodes, which is exactly what the policy and value networks below do.
 
-- **Each surviving step → +1 point** (including the terminating step)
-- **Episode termination conditions**: pole angle exceeds ±12°, or cart position exceeds ±2.4
-- **Maximum score = 500 points** (CartPole-v1's step limit)
-  :::
+## The Policy and the Actor Network
 
-The two termination thresholds (±2.4 and ±12°) also come from the environment itself, as verified by the printout above: `env.unwrapped.x_threshold` returns 2.4, and `env.unwrapped.theta_threshold_radians` returns approximately 0.2094 rad (i.e., 12°). The 500-step limit can be confirmed via `env.spec.max_episode_steps`:
+With observations, actions, and rewards in hand, one more rule is missing: in a given state, which action should be chosen. This rule is called the **policy**, written $\pi$.
 
-```python
-print(f"Max episode steps: {env.spec.max_episode_steps}")  # Output: 500
-```
+For CartPole, the policy takes the four-dimensional observation and outputs the probabilities of the two actions:
 
-This design appears simple, but it embodies a deep insight. Richard Sutton proposed the famous "Reward Hypothesis" in his classic textbook: all goals can be described as "maximizing the expected cumulative reward signal" (Sutton & Barto, 2018). In CartPole, this reward signal is +1 per step — as long as the pole has not fallen, the agent receives a positive reward.
+$$
+\pi(a\mid s)=P(A_t=a\mid S_t=s).
+$$
 
-However, this seemingly intuitive reward design actually hides a core challenge: **the reward signal is delayed and sparse**. The agent receives +1 at each step, but it cannot directly determine which specific step's decision caused the episode to terminate early or continue. It only knows "this episode lasted 50 steps in total"; whether pushing left or pushing right at step 23 was better requires inference across many rounds of interaction.
+Let's look at a concrete state. Suppose the pole is tilting to the right, and the policy may output
 
-This property — "the reward signal only reflects overall outcome quality, without indicating which specific step's decision was better" — is one of the core features that distinguishes RL from supervised learning. In supervised learning, each training sample has a clear label as the correct answer; in RL, there is only the final total return, and the agent must infer the intermediate process through repeated interaction. Consider learning to ride a bicycle: the learner does not master it because someone precisely instructs "left foot 30%, right foot 20%" at every moment, but rather gradually perceives through repeated attempts which actions help maintain balance.
+$$
+\pi(0\mid s)=0.3,\qquad \pi(1\mid s)=0.7.
+$$
 
-### 1.1.4 Policy: The Rule for Choosing Actions
+This means that during training there is a 30% probability of pushing left and a 70% probability of pushing right. The policy computes the probabilities from the complete four-dimensional observation, and it cannot decide the action only by which side the pole leans toward, since the cart velocity, the pole angular velocity, and other information also affect the best choice.
 
-Stringing together the three elements above gives us the core concept of RL — **Policy**.
-
-A policy is "the rule for choosing action $a$ in state $s$." In CartPole, the policy answers the question: **"Given the current cart position, velocity, pole angle, and angular velocity, should I push left or right?"**
-
-Mathematically, a policy maps a state to an action probability distribution: $\pi(a|s)$. The small Actor output initialization makes both action probabilities close to `0.5` at the start. After training, the probabilities depend on the complete state; pole angle alone does not determine a fixed percentage.
+In implementation, a small neural network represents the policy. The input layer receives the four numbers, the output layer produces a score for each of the two actions, and an action is then sampled from the resulting probability distribution:
 
 ```mermaid
 flowchart LR
-    subgraph State["State"]
-        s1["Cart Position"]
-        s2["Cart Velocity"]
-        s3["Pole Angle"]
-        s4["Pole Angular Vel."]
-    end
-
-    subgraph PolicyNet["Policy Network π"]
-        h1["Hidden Layer\n64 neurons"]
-        h2["Hidden Layer\n64 neurons"]
-    end
-
-    subgraph ActionProbs["Action Probabilities"]
-        a1["π(left | s)"]
-        a2["π(right | s)"]
-    end
-
-    s1 & s2 & s3 & s4 --> h1 --> h2 --> a1 & a2
-
-    style State fill:#f8fafc,stroke:#334155,color:#0f172a
-    style PolicyNet fill:#f1f5f9,stroke:#475569,color:#0f172a
-    style ActionProbs fill:#e2e8f0,stroke:#334155,color:#0f172a
+    S["4-dimensional observation s"] --> N["Actor network<br/>4 → 64 → 64 → 2"]
+    N --> L["Probability of left"]
+    N --> R["Probability of right"]
 ```
 
-You might ask: **Does a policy have to be a neural network?**
+The output layer of the Actor uses small initial weights, so at the start of training the probabilities of the two actions are usually both close to 0.5, and the policy tries both left and right actions. As training proceeds, the policy gradually learns to give different probability distributions in different states.
 
-The answer is **no**. A policy is simply a mapping rule from states to actions; it can take any form. In fact, before deep learning became dominant, RL policies had three classic forms:
+## The Critic and State Value
 
-- **Tabular Policy**: Build a table that hard-codes the optimal action for each state. For example, in chess, one could theoretically use a table to record the optimal move for every board position. However, when the state space is large (Go has approximately $10^{170}$ possible positions), the storage requirements of a table far exceed the capacity of any physical device.
-- **Linear Policy**: Use a linear function $\pi(a|s) = \text{softmax}(W \cdot s + b)$ to map states to action probabilities. Computationally simple and convenient for theoretical analysis, but limited to learning linear decision boundaries — insufficient for nonlinear relationships like "the combination of pole angle and angular velocity determines which way to push."
-- **Neural Network Policy**: Use multiple nonlinear transformations to fit $\pi(a|s)$. This is the small 4→64→64→2 network we saw earlier in “The Policy Function.” It can be trained end-to-end with gradient descent and is guaranteed by the universal approximation theorem — as long as the network is wide enough, it can approximate any continuous function.
+The policy can output action probabilities, but from the single-step reward of $+1$ alone it is hard to tell whether an action improved the long-term outcome. In CartPole, the same "push right" action sometimes lets the pole hold on for dozens more steps and sometimes only postpones the fall. The reward of a single step cannot tell the two situations apart.
 
-For the simple CartPole task, all three policy types can work. But when the state space grows from 4 dimensions to 84×84×4 pixels (Atari games [^1]), or to tens of thousands of text tokens (large language models), tabular and linear policies are no longer viable — the state space is too large to store or learn effectively.
+PPO adds a second network for this, called the **Critic**.
 
-Notably, the evolution of policy representation methods parallels the evolution of feature extraction methods in computer vision. Before 2012, image features were mainly hand-crafted (SIFT, SURF, HOG); after AlexNet, there was a gradual shift toward automatic learning by neural networks. RL policies underwent a similar transition from hand-crafted (tabular and linear) to end-to-end learning (neural networks). The key driver of this shift was also the growth of data and compute power — when the state space is large enough and training data is sufficient, the advantages of neural network policies become undeniable.
+The Critic takes the state $s_t$ and outputs the state value $V(s_t)$. This number says how much discounted return we can still expect to earn if we continue to act under the current policy from the current state.
 
-Therefore, **neural networks have become the standard choice in modern RL not because they are the only option, but because they are the only general solution that can handle high-dimensional, complex states.** From CartPole to Atari to LLMs, all policies in this book are implemented as neural networks — but their core idea is the same: input a state, output action probabilities, and optimize via gradient descent.
-
-### 1.1.5 Summary: The RL Core Loop
-
-Combining the four elements above gives us the core loop of reinforcement learning:
-
-```mermaid
-flowchart LR
-    A["Observe State\n(4 numbers)"] --> B["Policy Decision\n(Left? Right?)"]
-    B --> C["Execute Action\n(env.step)"]
-    C --> D["Receive Reward\n(+1 alive)"]
-    D --> E["Update Policy\n(gradient descent)"]
-    E --> A
-
-    style A fill:#f8fafc,stroke:#334155,color:#0f172a
-    style B fill:#f1f5f9,stroke:#475569,color:#0f172a
-    style C fill:#f8fafc,stroke:#334155,color:#0f172a
-    style D fill:#f1f5f9,stroke:#475569,color:#0f172a
-    style E fill:#e2e8f0,stroke:#334155,color:#0f172a
-```
-
-In CartPole, this loop means:
-
-1. **Observe state**: The environment tells the agent the current 4 numbers (position, velocity, angle, angular velocity)
-2. **Policy decision**: The policy network computes the probabilities of "push left" and "push right" from these 4 numbers
-3. **Execute action**: Randomly select an action according to the probabilities and pass it to the environment
-4. **Receive reward**: If the pole hasn't fallen, receive +1 point and the next 4 numbers
-5. **Update policy**: Based on this episode's performance (total score), adjust the policy network's parameters
-
-This loop applies not only to CartPole — it applies to all RL problems. Replace "cart position" with "board layout," "push left/right" with "move position," and "+1 alive" with "win/lose," and this loop becomes the training process for a Go AI. Replace "4 numbers" with "camera pixels," "push left/right" with "steering angle," and this loop becomes the training process for autonomous driving.
-
-Different tasks only change the specific definitions of state, action, and reward; the underlying structure is always these four elements.
-
-### 1.1.6 Opening the Black Box: What Does SB3 Hide?
-
-So far, we have successfully run CartPole training, read the training curves, and identified state, action, reward, and policy — the four core elements of RL. But throughout this exploration, one component has remained a black box: the line `model.learn(total_timesteps=80000)`. It is just a few characters, yet it completes the entire learning process from random initialization to an optimal policy in seconds.
-
-SB3 encapsulates a great deal of engineering detail — this encapsulation allows us to avoid complex math and lengthy code in Chapter 1. But without understanding its internal mechanisms, the content in later chapters on policy gradients (Chapter 6) and PPO (Chapter 8) will seem to appear out of nowhere. Just as you can drive a car without understanding every engine component — but if you want to build one yourself, you need to open the hood.
-
-Therefore, before concluding this chapter, we need to understand the internal structure of this black box.
-
-The logic behind `model.learn()` can be decomposed into three components: **an Actor-Critic network for decision-making and evaluation, a Rollout loop for collecting experience data, and PPO update rules for adjusting network parameters based on return signals.** We have implemented it in its entirety using pure PyTorch; the code is in [2-pytorch_ppo.py](https://github.com/walkinglabs/hands-on-modern-rl/blob/main/code/chapter01_cartpole/2-pytorch_ppo.py). Let us examine the core logic of each component.
-
-#### 1.1.6.1 Actor-Critic Network: Both Decision-Making and Evaluation
-
-Earlier in “The Policy Function,” we saw that the policy $\pi$ is a function that "takes a state as input and outputs action probabilities." For a long time, researchers used only a single policy network for decision-making — this is how policy gradient methods worked (Williams, 1992). However, pure policy gradient methods have a significant weakness: high variance. Gradients trained on the same batch of data may point in completely different directions, leading to unstable training. To address this problem, researchers introduced a "critic" to reduce variance — this is the origin of the Actor-Critic architecture (Sutton et al., 2000; Mnih et al., 2016).
-
-The core idea of Actor-Critic is a division of labor:
-
-- **Actor**: The policy network; takes a state as input and outputs the probability of each action.
-- **Critic**: Takes a state as input and outputs a score — "the expected total future reward starting from this state."
+The code puts the two networks in the same `ActorCritic` class:
 
 ```python
 class ActorCritic(nn.Module):
     def __init__(self, obs_dim=4, act_dim=2, hidden=64):
         super().__init__()
         self.actor = nn.Sequential(
-            nn.Linear(obs_dim, hidden), nn.Tanh(),
-            nn.Linear(hidden, hidden), nn.Tanh(),
+            nn.Linear(obs_dim, hidden),
+            nn.Tanh(),
+            nn.Linear(hidden, hidden),
+            nn.Tanh(),
             nn.Linear(hidden, act_dim),
         )
         self.critic = nn.Sequential(
-            nn.Linear(obs_dim, hidden), nn.Tanh(),
-            nn.Linear(hidden, hidden), nn.Tanh(),
+            nn.Linear(obs_dim, hidden),
+            nn.Tanh(),
+            nn.Linear(hidden, hidden),
+            nn.Tanh(),
             nn.Linear(hidden, 1),
         )
-
-    def forward(self, x):
-        logits = self.actor(x)       # action scores
-        value = self.critic(x)       # state value
-        return logits, value
 ```
 
-Actor and Critic use **separate hidden layers** to avoid gradient conflicts. The Actor outputs logits (e.g., [0.3, 0.7]), which are converted to probabilities via softmax — "30% push left, 70% push right." The Critic outputs a scalar representing "how good the current situation is."
+The Actor decides how to act, and the Critic estimates the long-term value of the current situation. During training, both networks are updated from the collected trajectories. The PPO training procedure below uses the Critic's output to compute the advantage, that is, to judge how much better than expected the action at a given step was.
 
-An important detail: **orthogonal initialization**. The Actor's output layer uses a very small gain (0.01), making the initial policy close to a uniform distribution (50/50), ensuring sufficient exploration early in training. This is fully consistent with SB3's default behavior.
+## The PPO Training Procedure
 
-#### 1.1.6.2 Collecting Trajectories (Rollout): One Round of Agent-Environment Interaction
+So far we have introduced the Actor and the Critic separately, but we have not said how they work together. Now let's connect the two networks and see how one complete PPO iteration proceeds.
 
-With the network, the next step is to let it interact with the environment and collect training data. This process is called a **Rollout**:
+An iteration first uses the current policy to collect 2048 steps. At every step it saves the state, the action, the reward, the log probability of the action, and the value given by the Critic:
 
 ```python
-def collect_rollout(model, env, obs, num_steps=2048):
-    transitions = []
-
-    for _ in range(num_steps):
-        obs_tensor = torch.FloatTensor(obs)
-        with torch.no_grad():
-            action, log_prob, value = model.get_action(obs_tensor)
-
-        next_obs, reward, terminated, truncated, _ = env.step(action.item())
-        with torch.no_grad():
-            if terminated:
-                next_value = 0.0
-            else:
-                _, next_value_tensor = model(torch.FloatTensor(next_obs))
-                next_value = next_value_tensor.item()
-
-        transitions.append({
-            "obs": obs, "action": action.item(),
-            "log_prob": log_prob.item(), "value": value.item(),
-            "reward": float(reward),
-            "terminated": terminated,  # pole fell; episode ends naturally
-            "truncated": truncated,    # step limit reached (pole still up)
-            "next_value": next_value,
-        })
-
-        obs = next_obs
-        if terminated or truncated:
-            obs, _ = env.reset()
-
-    return transitions, obs
+for _ in range(num_steps):
+    action, log_prob, value = model.get_action(obs_tensor)
+    next_obs, reward, terminated, truncated, _ = env.step(action.item())
 ```
 
-This code distinguishes `terminated` (the pole fell or the cart left the region) from `truncated` (the 500-step time limit). Treating time truncation as true termination incorrectly sets the value target to zero. The script uses `next_value=0` after true termination and bootstraps from `V(s')` after time truncation or when a rollout ends mid-episode.
+This chunk of data is called a **rollout**. It can contain several complete episodes, or it may end in the middle of an episode.
 
-The observation is also carried into the next rollout. A rollout is a training-batch boundary, not a reason to reset the environment.
+After collection, the program does two things: it first judges how much better than expected the action at each step was (the advantage), and then updates the policy accordingly, but with a limit on the size of the update.
 
-Another noteworthy aspect: the sampling method in the accompanying code does not directly choose the most probable action, but **samples according to probabilities**:
+### TD Error and the GAE Advantage
+
+After sampling, the program first computes the TD error of each step:
+
+$$
+\delta_t=r_t+\gamma V(s_{t+1})-V(s_t).
+$$
+
+$V(s_t)$ is the expectation the Critic gave before the action was executed, and $r_t+\gamma V(s_{t+1})$ is the new estimate obtained after executing the action. If $\delta_t>0$, the result of this step is higher than the Critic's original expectation.
+
+Using the error of a single step is easily affected by bias in the Critic's estimates. The code uses GAE, which combines the TD errors of the current step and several following steps into the advantage $A_t$:
+
+$$
+A_t=\delta_t+\gamma\lambda\delta_{t+1}
++(\gamma\lambda)^2\delta_{t+2}+\cdots.
+$$
+
+When the advantage is positive, PPO raises the probability of this action in the same state, and when it is negative, PPO lowers that probability. This is precisely the purpose of the Critic: it provides a baseline for comparing the action at each step.
+
+### The Probability Ratio and the Clipped Objective
+
+With the advantage in hand, we still need an update rule to adjust the policy. There is a problem here: the same rollout data comes from the old policy before the update. If the new policy could deviate from the old one freely, a single update might push the policy into a very poor region.
+
+To compare the new and old policies, PPO computes the probability ratio of the sampled action:
+
+$$
+r_t(\theta)=
+\frac{\pi_\theta(a_t\mid s_t)}
+{\pi_{\theta_{\mathrm{old}}}(a_t\mid s_t)}.
+$$
+
+The code takes the clipping range $[0.8,1.2]$. When the probability ratio goes outside this range, the clipped objective limits this sample from continuing to push the policy through a large change:
 
 ```python
-dist = torch.distributions.Categorical(logits=logits)
-action = dist.sample()  # sample according to probabilities, not argmax
+ratio = torch.exp(new_log_probs - batch_old_log_probs)
+surr1 = ratio * batch_advantages
+surr2 = torch.clamp(ratio, 0.8, 1.2) * batch_advantages
+policy_loss = -torch.min(surr1, surr2).mean()
 ```
 
-Even if the network outputs a 90% probability of pushing right, there is still a 10% chance of choosing left. This randomness ensures continued exploration, corresponding to the “policy entropy” we will discuss in Section 1.2.
+Clipping does not guarantee that every update is better, but it limits how much policy change the same batch of data can produce, so that the new policy does not make an overly large single shift because of one batch of samples.
 
-#### 1.1.6.3 GAE Advantage Estimation: How Much Better Than Expected?
+## Termination, Truncation, and Rollout Boundaries
 
-After collecting data, PPO needs to answer a question: **How much better than "average" was each action?** This is the concept of "advantage."
+Earlier we mentioned that an episode ends in three situations. Gymnasium distinguishes them with two flags: `terminated` and `truncated`. Both cause the environment to run `reset`, but they mean different things in the value computation.
 
-In fact, the concept of "advantage" can be traced back to the TD error in Temporal Difference Learning (Sutton, 1988). The TD error measures "how much better the actual reward was than expected." However, single-step TD error relies more on value function estimation and typically has low variance but high bias; Monte Carlo or long multi-step returns rely more on actual sampled returns and typically have low bias but high variance. Schulman et al. proposed GAE (Generalized Advantage Estimation) in 2016, which uses a parameter $\lambda$ to smoothly trade off between bias and variance:
+`terminated=True` means the pole fell or the cart went out of bounds. The episode has ended naturally, no further reward can be obtained, and so the subsequent value is 0.
 
-```python
-def compute_gae(transitions, gamma=0.99, lam=0.95):
-    gae = 0
-    raw_advantages = []
-    for step in reversed(range(len(transitions))):
-        t = transitions[step]
-        episode_end = t["terminated"] or t["truncated"]
-        delta = t["reward"] + gamma * t["next_value"] - t["value"]
-        gae = delta + gamma * lam * (1.0 - float(episode_end)) * gae
-        raw_advantages.insert(0, gae)
+`truncated=True` means the episode reached the 500-step time limit. The pole may still be balanced at this point, so the program still uses $V(s_{t+1})$ to estimate the value after the truncation point.
 
-    raw_advantages = torch.tensor(raw_advantages, dtype=torch.float32)
-    values = torch.tensor([t["value"] for t in transitions])
-    returns = raw_advantages + values
-    advantages = (raw_advantages - raw_advantages.mean()) / (
-        raw_advantages.std(unbiased=False) + 1e-8
-    )
-    return advantages, returns
-```
+Whichever way it ends, GAE must be cut at the `reset`. The advantage of a new episode cannot be passed back to the previous episode, or the outcome of the previous game would influence the judgment of the next one.
 
-Intuitively, `delta` answers the question: "The reward received at this step + the expected value of the next step - the expected value of this step." If `delta > 0`, this step was better than expected; if `delta < 0`, it was worse than expected. GAE combines multi-step deltas through `gamma * lam * gae` to form a more stable, lower-variance advantage estimate. When $\lambda = 0$, GAE reduces to single-step TD error (low variance but high bias); when $\lambda = 1$, GAE reduces to Monte Carlo return (low bias but high variance). In practice, $\lambda = 0.95$ is commonly used to balance the two.
+The 2048-step boundary of a rollout also does not mean the episode has ended. If sampling stops in the middle of an episode, the next iteration should continue from the current state and keep accumulating that episode's reward.
 
-#### 1.1.6.4 PPO Update: Clipping for Stable Training
+## The Main Training Loop
 
-The final step is to use advantages to update the network. Before PPO, policy gradient methods faced a fundamental dilemma: too small a learning rate meant training was too slow, while too large a learning rate could cause the policy to collapse in a single step. In 2015, Schulman et al. proposed TRPO (Trust Region Policy Optimization), which constrains the KL divergence between the old and new policies to limit the magnitude of each update. TRPO has good theoretical properties but is complex to implement — requiring natural gradient and conjugate gradient computation. In 2017, Schulman et al. further proposed PPO (Proximal Policy Optimization), which replaces the KL constraint with a simple clipping trick, maintaining training stability while greatly simplifying the implementation:
-
-```python
-def ppo_update(model, optimizer, transitions, advantages, returns, clip_eps=0.2):
-    for epoch in range(10):  # train on the same data for 10 epochs
-        for batch in mini_batches:
-            logits, values = model(batch_obs)
-            new_log_probs = dist.log_prob(batch_actions)
-
-            # Ratio: probability ratio of new vs. old policy
-            ratio = exp(new_log_probs - old_log_probs)
-
-            # PPO clipped objective: limit ratio to [0.8, 1.2]
-            surr1 = ratio * advantages
-            surr2 = clamp(ratio, 1-clip_eps, 1+clip_eps) * advantages
-            policy_loss = -min(surr1, surr2).mean()
-
-            # Critic also needs to learn
-            value_loss = ((values - returns) ** 2).mean()
-
-            # Entropy bonus: encourage exploration
-            entropy = dist.entropy().mean()
-
-            loss = policy_loss + 0.5 * value_loss - 0.0 * entropy
-            loss.backward()
-            optimizer.step()
-```
-
-The meaning of clipping is straightforward: if the difference between the new and old policies already exceeds 20% (`clip_eps=0.2`), further change in that direction is no longer encouraged. It is like a driving instructor who does not let a student make large steering adjustments at once, but instead allows only small corrections each time.
-
-Each PPO update step also records two health metrics: **KL divergence** (measuring the difference between old and new policies) and **clip fraction** (the proportion of samples that were clipped). These two metrics are visible in the SwanLab dashboard — excessively large KL divergence indicates too-large single-step updates, and an excessively high clip fraction indicates overly rapid policy changes; both warrant attention.
-
-#### 1.1.6.5 The Complete Pipeline
-
-We have now seen three components: the Actor-Critic network, Rollout collection, and PPO updates. The complete runnable code is in [2-pytorch_ppo.py](https://github.com/walkinglabs/hands-on-modern-rl/blob/main/code/chapter01_cartpole/2-pytorch_ppo.py). The core skeleton is:
+Now we can connect one complete training run. The core is three steps: collect trajectories, compute advantages, update the Actor and Critic, and then repeat.
 
 ```mermaid
 flowchart LR
-    START["Random Policy\nπ(left)≈0.5 π(right)≈0.5"]
-
-    subgraph LOOP["Training Loop (repeat 40 times)"]
-        direction TB
-        A["① Collect Rollout\nRun 2048 steps with policy\nRecord (state, action, reward, value)"]
-        B["② Compute GAE Advantage\nHow much better than expected?\n+ PPO clip protection"]
-        C["③ Update Parameters\nActor + Critic\nBackprop → Adam"]
-        A --> B --> C
-    end
-
-    END["Trained Policy\nAction probabilities use the full state"]
-
-    START --> LOOP
-    C -->|"repeat"| A
-    LOOP --> END
-
-    style START fill:#f8fafc,stroke:#334155,color:#0f172a
-    style A fill:#f1f5f9,stroke:#475569,color:#0f172a
-    style B fill:#f8fafc,stroke:#334155,color:#0f172a
-    style C fill:#f1f5f9,stroke:#475569,color:#0f172a
-    style END fill:#e2e8f0,stroke:#334155,color:#0f172a
+    A["Collect 2048 steps<br/>with the current policy"] --> B["Compute TD errors<br/>and GAE advantages"]
+    B --> C["Update the Actor<br/>and the Critic"]
+    C --> A
 ```
+
+The script repeats this process 40 times:
 
 ```python
-model = ActorCritic()
-optimizer = Adam(model.parameters(), lr=3e-4)
-env = gym.make("CartPole-v1")
-obs, _ = env.reset(seed=42)
-
 for iteration in range(40):
-    # Step 1: Collect experience data (2048 steps)
     transitions, obs = collect_rollout(model, env, obs, 2048)
-
-    # Step 2: Compute GAE advantages
     advantages, returns = compute_gae(transitions)
-
-    # Step 3: PPO update (train on the same data for 10 epochs)
-    metrics = ppo_update(model, optimizer, transitions, advantages, returns)
+    metrics = ppo_update(
+        model,
+        optimizer,
+        transitions,
+        advantages,
+        returns,
+    )
 ```
 
-These three steps form the main data flow behind `model.learn(total_timesteps=80000)`. SB3 also handles batching, logging, devices, environment wrappers, and additional edge cases; the pure PyTorch version keeps the parts we need to inspect in this chapter.
+Iteration 1 collects data with a nearly random policy. The updated policy changes the data distribution of the next iteration, and the new data in turn brings the next update.
 
-Our [2-pytorch_ppo.py](https://github.com/walkinglabs/hands-on-modern-rl/blob/main/code/chapter01_cartpole/2-pytorch_ppo.py) implements this data flow in pure PyTorch: separate Actor-Critic networks, orthogonal initialization, value bootstrapping at truncation, GAE resets at episode boundaries, PPO clipping, and SwanLab metric logging. Scores depend on the random seed and runtime environment, so use the evaluation printed by the current run.
+The policy is corrected step by step through the iterations, and the reward curve likewise moves from 20 gradually toward 500.
 
-> **Hands-on experiment**: You can run both scripts and inspect each curve in SwanLab. Both log `rollout/ep_rew_mean` as a rolling mean over the last 100 completed episodes, against `total_timesteps` on the x-axis. To compare algorithms, keep seeds, budgets, and evaluation protocols identical and run multiple seeds; do not draw a conclusion from two unrelated single runs.
->
-> ```bash
-> python 1-ppo_cartpole.py      # SB3 version
-> python 2-pytorch_ppo.py       # from-scratch version
-> swanlab watch swanlog          # view comparison curves
-> ```
+## Where the Data on This Page Comes From
 
-Looking back at this section, the `model.learn()` line you wrote in Section 1.1 is powered by repeatedly executing the three-step loop above: collect data, compute advantages, and update parameters. Starting from random initialization, the policy network adjusts its decision preferences with each iteration — actions that yield higher returns are gradually reinforced, while actions that cause the pole to fall are gradually suppressed. The entire process requires no manually specified decision rules; the only drivers of learning are the reward signal and gradient descent. This is the fundamental working principle of reinforcement learning.
+Once the principles are covered, there is more worth looking at in the training records: every point on the curve and every number in the log corresponds to some stage we just discussed. This page analyzes one real run saved in the repository. The training curve, the diagnostic curves, and the console numbers all come from the same CSV, and no results from different scripts or different random seeds are stitched together.
 
-> **Key insight**: From now on, when you see `model.learn()` or `trainer.train()` in any RL library, it should no longer feel mysterious. Their core skeleton is the same three-step loop as above — the differences lie only in the details of "how to compute advantages" and "how to limit update magnitude." All subsequent chapters in this book are essentially answering these two questions.
+| Item            | Settings of this run                                                      |
+| --------------- | ------------------------------------------------------------------------- |
+| Date            | 2026-08-13                                                                |
+| Environment     | `CartPole-v1`                                                             |
+| Algorithm       | The repository's pure PyTorch PPO                                         |
+| Random seed     | `42`                                                                      |
+| Training amount | 40 iterations × 2048 steps = 81,920 environment steps                     |
+| Evaluation      | After training, 20 episodes run independently with the deterministic policy |
+| Software versions | Python 3.12.13, PyTorch 2.13.0, Gymnasium 1.3.0, NumPy 2.5.2            |
 
-## Where the data comes from
-
-This page analyzes one explicitly recorded run. It does not combine different scripts, random seeds, or old dashboard exports.
-
-| Item              | Measured-run setting                                         |
-| ----------------- | ------------------------------------------------------------ |
-| Date              | 2026-08-13                                                   |
-| Environment       | `CartPole-v1`                                                |
-| Algorithm         | the repository's pure PyTorch PPO                            |
-| Random seed       | `42`                                                         |
-| Training budget   | 40 iterations × 2,048 steps = 81,920 environment steps       |
-| Evaluation        | 20 independent episodes with a deterministic policy          |
-| Measured software | Python 3.12.13, PyTorch 2.13.0, Gymnasium 1.3.0, NumPy 2.5.2 |
-
-Use this command to reproduce the run. `--swanlab-mode disabled` disables dashboard logging only; it does not change training.
+The reproduction commands are as follows. `--swanlab-mode disabled` only turns off dashboard logging and does not change the training process.
 
 ```bash
 cd code/chapter01_cartpole
@@ -428,106 +285,132 @@ python plot_curves.py \
   --output-dir output
 ```
 
-The following lines are taken from that run. Every value can be checked against the CSV. The run predates the 100-episode rolling window, so `mean reward` here is the per-rollout mean, now logged as `mean_episode_reward_rollout`.
+Below is an excerpt of six iterations from the training log. Every number can be found in the raw CSV. This record was generated before the 100-episode rolling average was added, so the mean reward in the log is the average over the episodes that ended in that iteration, which corresponds to the current `mean_episode_reward_rollout`.
 
 ```text
-Iteration  1/40 | episodes: 91 | mean reward:  21.4 | KL: 0.0087 | clip: 14.5%
-Iteration  5/40 | episodes: 15 | mean reward: 133.4 | KL: 0.0043 | clip:  5.2%
-Iteration 10/40 | episodes:  4 | mean reward: 500.0 | KL: 0.0059 | clip:  7.4%
-Iteration 11/40 | episodes:  5 | mean reward: 460.4 | KL: 0.0077 | clip: 12.8%
-Iteration 20/40 | episodes:  4 | mean reward: 500.0 | KL: 0.0019 | clip:  1.6%
-Iteration 40/40 | episodes:  4 | mean reward: 500.0 | KL: 0.0004 | clip:  0.0%
-20-episode evaluation: 500.0 +/- 0.0
+Iteration  1/40 | episodes:  91 | mean reward:   21.4 | KL: 0.0087 | clip%: 14.5%
+Iteration  5/40 | episodes:  15 | mean reward:  133.4 | KL: 0.0043 | clip%:  5.2%
+Iteration 10/40 | episodes:   4 | mean reward:  500.0 | KL: 0.0059 | clip%:  7.4%
+Iteration 11/40 | episodes:   5 | mean reward:  460.4 | KL: 0.0077 | clip%: 12.8%
+Iteration 20/40 | episodes:   4 | mean reward:  500.0 | KL: 0.0019 | clip%:  1.6%
+Iteration 40/40 | episodes:   4 | mean reward:  500.0 | KL: 0.0004 | clip%:  0.0%
+Training complete! 20-episode evaluation: 500.0 +/- 0.0
 ```
 
-## What episode return tells us
+## First Look at the Episode Reward
 
-CartPole gives `+1` for every step survived. An episode starts at `reset` and ends when the cart leaves the allowed region, the pole angle crosses its threshold, or the 500-step time limit is reached. Episode return and episode length are therefore numerically equal in this environment.
+Once we have the records, the first thing we look at is the episode reward. The episode reward equals the number of steps survived, and the higher it is, the longer the policy keeps the pole upright.
 
-The script collects 2,048 steps per training iteration. SwanLab's `rollout/ep_rew_mean` (and the CSV's `mean_episode_reward`) averages a rolling window of the last 100 completed episodes across rollouts, matching SB3. The per-rollout mean of episodes that finished in the current segment is still logged as `rollout/ep_rew_mean_rollout` / `mean_episode_reward_rollout`. An episode that crosses a rollout boundary must continue accumulating until it actually ends. Resetting its counter at every rollout boundary would make the logged return too small.
+The training script collects 2048 steps per iteration. An episode that spans the boundary between two sampling iterations keeps accumulating until the environment actually ends it. The console, the CSV's `mean_episode_reward`, and SwanLab's `rollout/ep_rew_mean` take the rolling average over the most recent 100 complete episodes, the same statistics window as SB3's default, and the x-axis in SwanLab is the cumulative number of environment steps. The average over only the episodes that ended in the current iteration is recorded separately as `mean_episode_reward_rollout` and `rollout/ep_rew_mean_rollout`.
 
-![Measured reward curve for seed 42](../../chapter01_cartpole/images/cartpole_reward_seed42.png)
+![Measured reward curve for seed=42](../../chapter01_cartpole/images/cartpole_reward_seed42.png)
 
-<div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 1-2: raw measured data for seed 42 from the published CSV. Each point is the per-rollout mean of complete episodes ending within that 2,048-step segment (the older column layout). No smoothing or manual adjustment is applied. The dashed line marks the 500-step episode limit.</em>
-</div>
+<div class="figure-caption">Figure 1-3: The raw training reward for seed=42, with data from the CSV saved in the repository. Each point is the average reward of the complete episodes that ended in that iteration, that is, the current <code>mean_episode_reward_rollout</code>. The curve is not smoothed, and the dashed line marks the 500-step limit for a single episode.</div>
 
-This curve supports three specific observations:
+Iteration 1 ended 91 episodes, with an average reward of 21.35. The policy is close to random, so most episodes end quickly.
 
-1. The 91 complete episodes in the first rollout averaged `21.35` points.
-2. At iteration 10, or `20,480` environment steps, the four complete episodes averaged `500.0`.
-3. Iteration 11 fell back to `460.4`; a training curve need not improve monotonically. Most later rollouts returned to 500.
+Iteration 10 ended 4 episodes, with an average reward of 500.0. By then a cumulative 20,480 environment steps had been sampled.
 
-This remains a single-seed result. It shows that this implementation solved the task in this run. It does not prove that every machine, dependency version, or seed reaches 500 at 20,480 steps. Algorithm comparisons require multiple seeds and a shared evaluation protocol.
+The average reward in iteration 11 drops to 460.4. PPO training samples actions stochastically, and each iteration contains very few complete episodes, so a single point can drop temporarily. Most of the later iterations reach 500 again.
 
-## Training return versus independent evaluation
+These numbers describe only one run with seed=42. To compare the sample efficiency of two algorithms, we need to run multiple random seeds and use the same training amount and evaluation method.
 
-Training uses stochastic action sampling to preserve exploration. The per-rollout mean (`ep_rew_mean_rollout`) averages a changing number of completed episodes: dozens early in training and usually four near the 500-step limit. The primary `ep_rew_mean` curve instead uses a fixed 100-episode rolling window.
+## Training Reward vs. Independent Evaluation
 
-Independent evaluation selects the highest-probability action at every step. After training, the saved policy was evaluated for 20 episodes:
+After reading the curve, one more issue needs clarifying: the training reward on the curve is not the same thing as "is the model actually good?" During training, the program draws actions according to the probabilities the policy gives. Even if the probability of right is higher, left may still be drawn. This randomness lets the policy keep trying different actions, and it also brings fluctuation into the training reward.
+
+The independent evaluation uses the deterministic policy. At every step the program chooses the action with the highest probability, and runs 20 episodes from fresh initial states of the environment. The result of this run is:
 
 ```text
 mean = 500.0
 std  = 0.0
 ```
 
-The training curve describes how learning progressed. Independent evaluation describes how the final policy performed under a fixed protocol. We report both.
+A mean of 500.0 means all 20 episodes ran to the time limit, and a standard deviation of 0.0 means there is no difference among the 20 scores.
 
-## Four diagnostic metrics
+The independent evaluation checks what result the saved policy achieves under fixed rules. When reporting experiments, the two must be described separately.
 
-Return answers whether the policy performs the task. Diagnostic metrics help explain failed training or updates that move too far. The four curves below come from the same CSV as the reward curve.
+## Then Look at the Four Auxiliary Metrics
 
-![Four diagnostics from the same measured run](../../chapter01_cartpole/images/cartpole_diagnostics_seed42.png)
+The episode reward tells us how well the task was completed, but when training fails it cannot give the reason. The four metrics below check exactly the three stages of the principles section: whether the policy has become fixed too early, whether the Critic has learned to predict, and whether each PPO update is too large.
 
-<div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 1-3: raw Value Loss, Policy Entropy, Approximate KL, and Clip Fraction from the same run as Figure 1-2.</em>
-</div>
+The four curves below come from the same run as the reward curve.
 
-### Policy entropy
+![Four training diagnostics from the same measured run](../../chapter01_cartpole/images/cartpole_diagnostics_seed42.png)
 
-Policy entropy measures uncertainty in the action distribution. CartPole has two actions, so a policy assigning about `50%` to each starts near `ln 2 ≈ 0.693`. In this run entropy fell from `0.685` to `0.421`. The policy became more selective without choosing one fixed direction in every state.
+<div class="figure-caption">Figure 1-4: Raw values of Value Loss, Policy Entropy, Approximate KL, and Clip Fraction. The four panels share the same training record with seed=42.</div>
 
-Falling entropy does not by itself prove improvement. If return stays low, a low-entropy policy may simply have committed to a poor action pattern.
+### Policy Entropy: How Decisive the Action Choice Is
 
-### Value loss
-
-The Critic predicts discounted return from the current state. Value loss is the mean squared error between predictions and return targets:
+Start with the policy entropy. The principles section said that at the start of training the probabilities of the two actions are each close to 0.5. Policy entropy measures exactly this degree of spread, and at that point the entropy is close to
 
 $$
-L_V = \frac{1}{|B|}\sum_{i \in B}\left(V(s_i)-\hat G_i\right)^2.
+\ln 2\approx 0.693.
 $$
 
-In this run Value Loss fluctuated between `41.8` and `64.1` early on, then fell overall and ended at `0.00014`. The intermediate spikes show the Critic adapting to states generated by a changing policy. A lower value loss means better fitting of these targets; policy quality is still judged by return and evaluation.
+In this run the policy entropy falls from 0.685 to 0.421. This shows that the action probabilities gradually spread apart, but the policy still gives different results in different states.
 
-### Approximate KL
+A drop in entropy only means the policy has become more decisive. If the reward does not rise at the same time, the policy may simply be choosing a wrong action more decisively.
 
-Approximate KL measures how action probabilities change between the old and updated policies on the sampled batch. The maximum across these 40 iterations was `0.00871`; the last value was `0.00038`.
+### Value Loss: The Critic's Prediction Error
 
-These numbers are useful for comparing settings within the same implementation. This code does not implement KL-based early stopping, so this page does not invent a universal warning threshold.
-
-### Clip fraction
-
-Clip fraction reports the fraction of samples whose probability ratio lies outside the PPO clipping interval:
+Next, how well has the Critic learned? The Critic predicts the discounted return starting from state $s_i$, and the value loss compares the prediction $V(s_i)$ with the training target $\hat G_i$:
 
 $$
-\text{clipfrac}=\frac{1}{|B|}\sum_{i \in B}
+L_V=\frac{1}{|B|}\sum_{i\in B}
+\left(V(s_i)-\hat G_i\right)^2.
+$$
+
+$B$ denotes a training mini-batch. The larger the gap between prediction and target, the larger the value loss.
+
+In this run the value loss fluctuates between 41.8 and 64.1 early on and finally falls to 0.00014. The rise in the middle of training means the policy reached a new state distribution, and the Critic needed to readjust its predictions.
+
+A small value loss only shows that the Critic is closer to the current target. Whether the policy completes the task still has to be judged by the episode reward and the independent evaluation.
+
+### Approximate KL: How Far the New Policy Is from the Old
+
+The third metric corresponds to the probability ratio before the clipped objective. Approximate KL compares the action probabilities before and after the update, and the larger the value, the larger the change a PPO update made to the policy.
+
+The maximum over the 40 iterations in this run is 0.00871, and the last iteration is 0.00038. The repository code does not stop training early based on KL, so this page only reports measured values and gives no fixed threshold that applies to all tasks.
+
+### Clip Fraction: How Many Samples Hit the Limit
+
+The last metric comes directly from the clipped objective. PPO uses $\epsilon=0.2$ to limit the probability ratio to around $[0.8,1.2]$. The clip fraction counts the share of samples that fall outside this range:
+
+$$
+\operatorname{clipfrac}=\frac{1}{|B|}\sum_{i\in B}
 \mathbf 1\left[|r_i(\theta)-1|>\epsilon\right].
 $$
 
-It was `14.48%` in the first iteration, also the maximum, and `0%` in the final three iterations. The learning rate approaches zero late in training, so policy changes and clipping both become smaller. Clip fraction must be interpreted together with KL, learning rate, and return.
+In this run it is 14.48% in the first iteration and 0% in the last three. Later the learning rate gradually decays to 0, and the policy change shrinks with it.
 
-## Minimal diagnostic order
+The clip fraction must be read together with the approximate KL, the learning rate, and the reward. A single high or low value alone cannot show that training succeeded or failed.
 
-When a result looks wrong, follow the data flow:
+## The Order of Checks When Training Behaves Abnormally
 
-1. Check `terminated` and `truncated`. True termination uses `V(s')=0`; time truncation still bootstraps from `V(s')`.
-2. Check that GAE stops at every environment reset. Advantages cannot propagate into a new episode.
-3. Check that logs contain complete episodes and carry an unfinished episode across rollout boundaries.
-4. Check whether both training return and independent evaluation improve.
-5. If return is abnormal, use KL, clip fraction, entropy, and value loss to locate update-size or Critic-fitting problems.
+After linking the metrics to the principles, there is a clear troubleshooting path whenever training goes wrong. If the reward curve does not reach expectations, we can check along the order in which the data is produced:
 
-## Summary
+1. Check `terminated` and `truncated`. After natural termination the value is 0, and after a time-limit truncation $V(s')$ must still be used.
+2. Check whether GAE is cut at every `reset`. The advantage must not be passed from a new episode back to an old one.
+3. Check whether the log counts only complete episodes and keeps accumulating episodes that cross rollout boundaries.
+4. Compare the training reward with the independent evaluation, to confirm whether the problem lies in the training process or the final policy.
+5. Then use the policy entropy, value loss, approximate KL, and clip fraction to locate the specific stage.
 
-In CartPole, episode return equals the number of steps survived. The training curve shows the stochastic policy during learning, while independent evaluation tests the final deterministic policy. Diagnostic metrics explain training behavior; they do not replace task return.
+This order first checks whether the data is correct and only then interprets the optimization metrics. Wrong episode boundaries directly change the training target, and tuning the learning rate alone cannot fix that kind of problem.
 
-The next section runs this complete pipeline and captures rendered frames from the trained model.
+## Section Summary
+
+- CartPole defines the task with four observations, two actions, and a reward of $+1$ per step. The policy outputs action probabilities, the Critic estimates long-term value, GAE combines advantages, and the clipped objective limits the size of updates.
+- The episode reward equals the number of steps survived and reflects task performance directly. The training reward includes the exploration brought by stochastic sampling, whereas the independent evaluation uses deterministic actions.
+- Policy entropy, value loss, approximate KL, and clip fraction each correspond to a stage in the principles. They are used to explain the training process and cannot replace the reward.
+- The curves on this page come from one reproducible single-seed run. Comparing algorithms requires multiple random seeds.
+
+The next section, [PPO Training Visualization](./training), starts from the same reproduction commands and generates the raw CSV, the training curves, and real environment frames.
+
+## References
+
+[^1]: Schulman, J., Moritz, P., Levine, S., Jordan, M., & Abbeel, P. (2016). High-Dimensional Continuous Control Using Generalized Advantage Estimation. _ICLR 2016_.
+
+[^2]: Schulman, J., Wolski, F., Dhariwal, P., Radford, A., & Klimov, O. (2017). Proximal Policy Optimization Algorithms. _arXiv preprint_ arXiv:1707.06347. <https://arxiv.org/abs/1707.06347>
+
+[^3]: Sutton, R. S., & Barto, A. G. (2018). _Reinforcement Learning: An Introduction_ (2nd ed.). MIT Press.
