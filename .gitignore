@@ -68,3 +68,4 @@ swanlog/
 .qoder/
 docs/.vitepress/.temp/
 runs/
+.venv/
