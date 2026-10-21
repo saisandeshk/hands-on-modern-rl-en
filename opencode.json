@@ -50,6 +50,10 @@
         { "action": "shell", "resource": "bash scripts/verify.sh*", "effect": "allow" },
         { "action": "shell", "resource": "python3 scripts/*", "effect": "allow" },
         { "action": "shell", "resource": "python3 -m py_compile *", "effect": "allow" },
+        { "action": "shell", "resource": ".venv/bin/python *", "effect": "allow" },
+        { "action": "shell", "resource": ".venv/bin/pytest *", "effect": "allow" },
+        { "action": "shell", "resource": "timeout * .venv/bin/python *", "effect": "allow" },
+        { "action": "shell", "resource": "timeout * .venv/bin/pytest *", "effect": "allow" },
 
         { "action": "external_directory", "resource": "*", "effect": "deny" },
         { "action": "doom_loop", "resource": "*", "effect": "deny" }
