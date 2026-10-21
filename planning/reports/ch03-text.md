@@ -43,6 +43,20 @@ None. Paper attributions touched (Watkins & Dayan 1992; Sutton & Barto Fig. 4.1/
 - `npx prettier --write` on the four touched docs — clean.
 - `npx vitepress build docs` — first attempt failed on unquoted YAML colon in the new experiment title; after quoting, build completed successfully.
 
+## Review response
+
+- Error 1 (value-q wall-bump "matches" claim): accepted. Recomputed $V^*(0,0)=-4.68559$ and $Q^*=-5.21703$ for wall bumps; rewrote the paragraph to say the learned ordering is right/down above up/left, the two inside-grid moves match the exact optimum, and the wall-bump entries ($-4.80$/$-4.92$) are over-estimates of $-5.22$ from incomplete convergence. Also clarified review.md Exercise 6 to distinguish learned versus exact wall-bump values.
+- Error 2 (tie-break toward lower index): accepted. Rewrote to say `argmax` returns the first maximum but entries equal to $\sim 10^{-15}$ flip on floating-point noise, so the arrow pattern at tied cells is not a fixed rule.
+- Error 3 (run-output decimals / NumPy 2 repr): accepted. Replaced one-decimal values with the three-decimal `.round(3)` output (`-4.797`/`-4.686`/`-4.686`/`-4.919`) and noted NumPy 2 prints the same digits wrapped in `np.float64(...)`.
+- Error 4 (Advantage H2 orphans the $Q^\pi$ definition): accepted. Moved the whole Advantage section to after the "Mathematical definition" block, just before "The Bellman Optimality Equation".
+- Error 5 (stochastic-matrix eigenvalues "inside the unit disk"): accepted. Changed to $\rho(\boldsymbol{P}_\pi)=1$ so $\rho(\gamma\boldsymbol{P}_\pi)\le\gamma<1$ for $\gamma<1$; verified the conclusion (invertibility) is unchanged.
+- Error 6 (review.md missing from sidebar / "3.R" number): rejected as out of scope for this worker. The task spec mandates `title: 3.R Summary and Exercises` and states the coordinator will renumber/place the page, and worker rules forbid editing `docs/.vitepress/config.mjs`. Sidebar placement and renumbering are left to the coordinator (recommended: `3.4 Summary and Exercises`, link `/chapter03_value_functions/review`).
+- Doubt 1 (policy-iteration early-stopping sentence): accepted. Dropped the "which is why policy iteration can stop updating values early" clause; now says the greedy policy usually settles a few sweeps before the values do.
+- Doubt 2 ("beside the cliff"): accepted. Changed to "along the top row, one cell above the cliff".
+- Doubt 3 (3.3 sidebar text vs page H1): no page change (page H1 is the accurate description of the experiment); coordinator decision recorded: either update the sidebar entry to `3.3 Hands-on: Value Iteration and Q-Learning` to match the page, or confirm the generic sidebar wording is intentional.
+- Doubt 4 (`planning/content-review-notes.md` not updated): no change — that file is outside this task's edit scope (worker rules: only edit files in scope). Coordinator may copy the three fixed factual errors there (slot-machine `1.998698`→`1.989692`; CliffWalking 11→13 steps; stale 4x4 Q-learning run-output block).
+- Doubt 5 (Exercise 8(b) terminal-reward wording): accepted. Added "the terminal state has no successor state, so there is nothing to bootstrap" to rule out reading the reward as belonging to the terminal state.
+
 ## Open issues
 
 - Images were out of scope and left untouched. The stale-text problem is resolved in the other direction: the text grid now matches `q-learning-learned-policy.svg`.

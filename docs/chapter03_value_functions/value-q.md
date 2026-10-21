@@ -110,22 +110,6 @@ This “always pick the action with the highest score” rule is called a **gree
 
 Of course, in practice, a policy does not have to be defined this way. During training, to explore actions that have not been tried enough, we often add randomness on top of greedy choice. But from the standpoint of “how do we turn $Q$ values into action selection”, greedy choice is the clearest starting point. When several actions share the same maximal $Q$ value, any of them is greedy; implementations must break the tie somehow (for example, the lowest action index or a random choice among the maxima), and unreachable states simply keep their initialized values until experience or a model sweep reaches them.
 
-## Advantage: How Much Better Than Average?
-
-$Q^\pi(s,a)$ scores each action on an absolute scale, but for both policy improvement and later policy-gradient methods, the more useful number is the relative one. The **advantage function** subtracts the state baseline:
-
-$$
-A^\pi(s,a) = Q^\pi(s,a) - V^\pi(s).
-$$
-
-It answers: "if I insist on action $a$ here instead of letting $\pi$ choose, how much return do I gain or lose?" A positive advantage means the action beats the policy average; a negative one means it falls short. Because $V^\pi(s) = \sum_a \pi(a \mid s)\, Q^\pi(s,a)$, the advantages average to zero under $\pi$:
-
-$$
-\sum_a \pi(a \mid s)\, A^\pi(s,a) = 0.
-$$
-
-Return to the Section 3.1 example where $Q^\pi(s,\text{right}) = 10$ and $Q^\pi(s,\text{left}) = 4$ with $\pi(\text{right} \mid s) = 0.7$. There $V^\pi(s) = 8.2$, so $A^\pi(s,\text{right}) = 10 - 8.2 = 1.8$ and $A^\pi(s,\text{left}) = 4 - 8.2 = -4.2$, and indeed $0.7 \times 1.8 + 0.3 \times (-4.2) = 0$. Subtracting $V^\pi(s)$ does not change the greedy action ($\arg\max_a A^\pi = \arg\max_a Q^\pi$), but it centers the comparison around zero, which is why actor-critic methods ([Chapter 7](/chapter07_actor_critic/actor-critic)) use the advantage rather than the raw $Q$ as the policy-update signal.
-
 **Mathematical definition**
 
 To define it precisely, the action-value function under policy $\pi$ is:
@@ -141,6 +125,22 @@ The condition $S_t=s, A_t=a$ means: we fix the starting state and the first acti
 $$
 R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \cdots .
 $$
+
+## Advantage: How Much Better Than Average?
+
+$Q^\pi(s,a)$ scores each action on an absolute scale, but for both policy improvement and later policy-gradient methods, the more useful number is the relative one. The **advantage function** subtracts the state baseline:
+
+$$
+A^\pi(s,a) = Q^\pi(s,a) - V^\pi(s).
+$$
+
+It answers: "if I insist on action $a$ here instead of letting $\pi$ choose, how much return do I gain or lose?" A positive advantage means the action beats the policy average; a negative one means it falls short. Because $V^\pi(s) = \sum_a \pi(a \mid s)\, Q^\pi(s,a)$, the advantages average to zero under $\pi$:
+
+$$
+\sum_a \pi(a \mid s)\, A^\pi(s,a) = 0.
+$$
+
+Return to the Section 3.1 example where $Q^\pi(s,\text{right}) = 10$ and $Q^\pi(s,\text{left}) = 4$ with $\pi(\text{right} \mid s) = 0.7$. There $V^\pi(s) = 8.2$, so $A^\pi(s,\text{right}) = 10 - 8.2 = 1.8$ and $A^\pi(s,\text{left}) = 4 - 8.2 = -4.2$, and indeed $0.7 \times 1.8 + 0.3 \times (-4.2) = 0$. Subtracting $V^\pi(s)$ does not change the greedy action ($\arg\max_a A^\pi = \arg\max_a Q^\pi$), but it centers the comparison around zero, which is why actor-critic methods ([Chapter 7](/chapter07_actor_critic/actor-critic)) use the advantage rather than the raw $Q$ as the policy-update signal.
 
 <span id="bellman-optimal"></span>
 
@@ -335,11 +335,11 @@ for row in range(N):
     print(" ".join(cells))
 ```
 
-Run output (exact decimals vary slightly with the NumPy version; the ordering and the arrow pattern are what matter):
+Run output (values shown with NumPy 1.x formatting; NumPy 2 prints each value as `np.float64(...)` with the same digits — the ordering and the arrow pattern are what matter):
 
 ```text
 Q-values of the four actions at the start state:
-{'↑': -4.8, '→': -4.7, '↓': -4.7, '←': -4.9}
+{'↑': -4.797, '→': -4.686, '↓': -4.686, '←': -4.919}
 
 One greedy policy learned:
 → ↓ → ↓
@@ -350,7 +350,7 @@ One greedy policy learned:
 
 ![Greedy policy learned by Q-Learning](./images/q-learning-learned-policy.svg)
 
-For example, at the start state, the learned $Q$ values are about: up $-4.8$, right $-4.7$, down $-4.7$, left $-4.9$. This indicates that, in terms of long-run return, "right" and "down" are both better than "up" and "left", which matches the optimal values ($-4.69$ for the two good moves that stay inside the grid, about $-5.22$ for the two moves that bump into the wall). When several actions tie for the maximum, `argmax` picks one of them; the figure above breaks ties toward the lower action index, so other optimal arrow patterns with the same 6-step return are equally valid.
+For example, at the start state, the learned $Q$ values are about: up $-4.80$, right $-4.69$, down $-4.69$, left $-4.92$. The learned ordering is right/down above up/left. The two moves that stay inside the grid match the exact optimum ($-4.686 \approx -4.69$ for a 6-step shortest path), while the two rarely-updated wall-bump entries are still over-estimates ($-4.80$/$-4.92$ versus the exact $-5.22$) because the run has not converged on them. When several actions tie for the maximum, `argmax` returns the first maximum, but entries equal to within about $10^{-15}$ can flip on floating-point noise, so the exact arrow choice at tied cells is not a fixed rule and other optimal arrow patterns with the same 6-step return are equally valid.
 
 <span id="off-policy"></span>
 
@@ -387,7 +387,7 @@ $$
 Q(s,a) \leftarrow Q(s,a) + \alpha\left[r + \gamma\max_{a'}Q(s',a') - Q(s,a)\right].
 $$
 
-Its target is $r+\gamma\max_{a'}Q(s',a')$. Regardless of which next action the behavior policy actually executes, Q-Learning uses the largest Q-value in $s'$. It therefore assumes that the next step will execute the optimal action perfectly. The resulting policy follows the shortest path beside the cliff without accounting for the risk that exploration may move the agent downward.
+Its target is $r+\gamma\max_{a'}Q(s',a')$. Regardless of which next action the behavior policy actually executes, Q-Learning uses the largest Q-value in $s'$. It therefore assumes that the next step will execute the optimal action perfectly. The resulting policy follows the shortest path along the top row, one cell above the cliff, without accounting for the risk that exploration may move the agent downward.
 
 **SARSA** uses
 

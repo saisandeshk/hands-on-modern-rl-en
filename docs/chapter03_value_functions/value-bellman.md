@@ -557,7 +557,7 @@ $$
 \end{aligned}
 $$
 
-(Here $\boldsymbol{I}$ is the identity matrix. When $\gamma < 1$, the matrix $(\boldsymbol{I} - \gamma \boldsymbol{P}_\pi)$ is always invertible because $\boldsymbol{P}_\pi$ is a stochastic matrix whose eigenvalues lie inside the unit disk, so $\gamma \boldsymbol{P}_\pi$ has spectral radius below $1$.)
+(Here $\boldsymbol{I}$ is the identity matrix. When $\gamma < 1$, the matrix $(\boldsymbol{I} - \gamma \boldsymbol{P}_\pi)$ is always invertible because $\rho(\boldsymbol{P}_\pi) = 1$ for a stochastic matrix, so $\rho(\gamma \boldsymbol{P}_\pi) \le \gamma < 1$.)
 
 At this point, we have obtained the **analytic solution** of the Bellman equation under fixed policy $\pi$. This means that as long as the environment rules (rewards and transition probabilities) and policy $\pi$ are fully transparent, we can in theory directly compute the exact value of every state under that policy.
 
@@ -585,7 +585,7 @@ $$
 
 The proof is one line: averaging (or maximizing) over next-state values cannot spread two value vectors apart by more than the largest per-state gap, and the extra factor $\gamma$ shrinks it. By the Banach fixed-point theorem, each operator therefore has exactly one fixed point, and repeatedly applying it from any initial table converges to that point. That is why iterative policy evaluation ($\boldsymbol{v}_{k+1} = T^\pi \boldsymbol{v}_k$) converges to $\boldsymbol{v}_\pi$, and value iteration ($\boldsymbol{v}_{k+1} = T^* \boldsymbol{v}_k$) converges to $\boldsymbol{v}^*$.
 
-In practice this gives a residual-aware stopping rule: stop when the Bellman residual $\lVert \boldsymbol{v}_{k+1} - \boldsymbol{v}_k \rVert_\infty$ falls below a small threshold $\theta$, since the distance to the true fixed point is then bounded by $\theta / (1 - \gamma)$. Note the distinction the residual hides: value convergence (the table stops changing) implies policy convergence (the greedy policy stops changing), but the greedy policy often stabilizes several sweeps before the values have fully converged, which is why policy iteration can stop updating values early. Terminal states are treated as absorbing with value $0$ (no future return after termination), so their rows never need updating.
+In practice this gives a residual-aware stopping rule: stop when the Bellman residual $\lVert \boldsymbol{v}_{k+1} - \boldsymbol{v}_k \rVert_\infty$ falls below a small threshold $\theta$, since the distance to the true fixed point is then bounded by $\theta / (1 - \gamma)$. Note the distinction the residual hides: value convergence (the table stops changing) implies policy convergence (the greedy policy stops changing), but the greedy policy usually settles a few sweeps before the values do, so in practice you often already know the policy while the values are still moving. Terminal states are treated as absorbing with value $0$ (no future return after termination), so their rows never need updating.
 
 **If we have a formula, why learn other algorithms?**
 

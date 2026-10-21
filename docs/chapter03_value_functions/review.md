@@ -215,7 +215,7 @@ $$
 -(1 + 0.9 + 0.9^2 + 0.9^3 + 0.9^4 + 0.9^5) = -\frac{1 - 0.9^6}{1 - 0.9} \approx -4.686.
 $$
 
-Since $0.9^6 = 0.531441$, the sum is $(1 - 0.531441)/0.1 = 4.68559$. Learned values around $-4.7$ for the two moves that stay inside the grid are within a few percent of the optimal $-4.69$, while wall-bumping moves are worse (about $-4.8$ to $-4.9$), so the greedy choice "right or down" recovers a shortest path.
+Since $0.9^6 = 0.531441$, the sum is $(1 - 0.531441)/0.1 = 4.68559$. Learned values around $-4.69$ for the two moves that stay inside the grid match the optimal $-4.69$, while the learned wall-bumping values ($-4.80$ for up, $-4.92$ for left) are over-estimates of the exact wall-bump optimum $-5.22$ because those entries are rarely updated and the run has not converged on them — but the ordering is still correct, so the greedy choice "right or down" recovers a shortest path.
 :::
 
 ### 7. Coding: reproduce the value-iteration experiment
@@ -251,5 +251,5 @@ Using the same `code/chapter03_value_functions/` directory: (a) run the regressi
 ::: details Solution
 (a) All $5$ tests ($8$ subtests) pass.
 
-(b) The terminal reward is already collected on entry (goal $+1$, trap $-1$), and terminal states are absorbing with value $0$. If `action_value` added $\gamma V(\text{terminal})$ with a nonzero terminal entry, the same reward would be counted twice: once as $r$ and once inside the bootstrap. The test sets $V(\text{GOAL}) = 999$ and still requires `action_value` to return exactly $1.0$. For ties: many grid states have two equally optimal moves (for example, "right" and "down" from the start state). Always taking action $0$ would hide this, bias exploration, and make the printed policy look falsely unique; sampling or `argmax`-with-ties preserves all shortest paths and matches the multi-arrow optimal policy in the figures.
+(b) The terminal reward is already collected on entry (goal $+1$, trap $-1$), and terminal states are absorbing with value $0$ because the terminal state has no successor state, so there is nothing to bootstrap. If `action_value` added $\gamma V(\text{terminal})$ with a nonzero terminal entry, the same reward would be counted twice: once as $r$ and once inside the bootstrap. The test sets $V(\text{GOAL}) = 999$ and still requires `action_value` to return exactly $1.0$. For ties: many grid states have two equally optimal moves (for example, "right" and "down" from the start state). Always taking action $0$ would hide this, bias exploration, and make the printed policy look falsely unique; sampling or `argmax`-with-ties preserves all shortest paths and matches the multi-arrow optimal policy in the figures.
 :::
