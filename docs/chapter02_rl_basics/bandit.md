@@ -571,11 +571,11 @@ Here $\mu^* = \max_a \mu_a$. Regret is the expected gap of "how much more could 
 
 The **regret bound** is the fundamental metric for evaluating an algorithm. A good policy should have regret that grows **sublinearly** in $T$, that is, $\text{Regret}(T) = o(T)$. This means that as $T \to \infty$ the agent gets closer and closer to optimal, and the average loss per round tends to 0.
 
-| Growth rate        | Meaning     | Assessment                                    |
-| ------------------ | ----------- | --------------------------------------------- |
-| $\Theta(T)$        | Linear      | The agent learned nothing, pure random        |
-| $\Theta(\sqrt{T})$ | Sublinear   | A standard good policy (UCB, Thompson)        |
-| $\Theta(\log T)$   | Logarithmic | The theoretical lower bound (Lai-Robins 1985) |
+| Growth rate        | Meaning     | Assessment                                         |
+| ------------------ | ----------- | -------------------------------------------------- |
+| $\Theta(T)$        | Linear      | The agent learned nothing, pure random             |
+| $\Theta(\sqrt{T})$ | Sublinear   | A standard good policy (UCB, Thompson)             |
+| $\Theta(\log T)$   | Logarithmic | The theoretical lower bound (Lai and Robbins 1985) |
 
 ### $\epsilon$-Greedy and Decay Schedules
 

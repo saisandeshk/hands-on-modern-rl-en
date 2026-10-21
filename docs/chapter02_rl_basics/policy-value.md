@@ -1,3 +1,7 @@
+---
+title: 2.3 Policies, Values, and Returns
+---
+
 # 2.3 Policies, Values, and Returns
 
 The previous section used the MDP tuple to describe a sequential decision problem. $\mathcal{S}$ and $\mathcal{A}$ specify what the agent can encounter and do; $P$ and $R$ specify how the environment changes and what immediate reward it provides; $\gamma$ specifies the weight of future rewards.
@@ -145,6 +149,8 @@ $$
 $$
 
 $\tau$ is the Greek letter tau and denotes the whole trajectory. The subscripts $0,1,2$ on states and actions mark decision times; $r_1$ is the feedback received after the action at time $0$. One complete run from the initial state to a terminal state is usually called an episode.
+
+This page writes the reward after step $t$ as $R_{t+1}$ (the convention of Sutton and Barto), while Section 2.2 wrote it as $r_t$. The two notations describe the same sequence of rewards; only the index shifts by one, so $G_t = R_{t+1} + \gamma R_{t+2} + \cdots$ here is the same object as $G_t = r_t + \gamma r_{t+1} + \cdots$ there.
 
 A trajectory contains several one-step rewards. To evaluate the entire future from a particular time, we combine those rewards into a **return**:
 
