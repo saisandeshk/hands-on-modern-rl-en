@@ -1,5 +1,5 @@
 """
-Chapter 8: RLHF PPO Alignment Training
+Chapter 13: RLHF PPO Alignment Training
 ==========================
 
 This script demonstrates stage three of the RLHF pipeline — PPO alignment training.
@@ -31,8 +31,8 @@ import matplotlib.pyplot as plt
 # Create output directory
 os.makedirs("output", exist_ok=True)
 
-# Set Chinese font
-plt.rcParams["font.sans-serif"] = ["SimHei", "Arial Unicode MS", "DejaVu Sans"]
+# Use a plain sans-serif font stack (English-only labels)
+plt.rcParams["font.sans-serif"] = ["DejaVu Sans", "Arial"]
 plt.rcParams["axes.unicode_minus"] = False
 
 # ==========================================
@@ -204,27 +204,33 @@ class SimpleRewardModel:
             score -= 0.5  # Too long, possibly redundant
 
         # ---- Structured content score ----
-        if any(marker in response for marker in ["1.", "2.", "3.", "（1）", "（2）"]):
+        if any(marker in response for marker in ["1.", "2.", "3.", "(1)", "(2)"]):
             score += 1.0  # Has a numbered list, well structured
         if "```" in response:
             score += 1.0  # Contains a code block
-        if any(marker in response for marker in ["：\n", "：\r\n", "步骤", "方法"]):
+        if any(marker in response for marker in [":\n", ":\r\n", "Step", "Method", "First", "How to"]):
             score += 0.5  # Has structured explanation
 
         # ---- Tone score ----
-        positive_words = ["请", "建议", "可以帮助", "以下", "当然", "好的"]
-        negative_words = ["不关我事", "自己搜", "随便", "不想", "懒得"]
+        positive_words = ["please", "suggest", "can help", "here is", "of course", "great", "happy to"]
+        negative_words = ["not my problem", "search it yourself", "whatever", "do not care", "too lazy"]
+        response_lower = response.lower()
         for word in positive_words:
-            if word in response:
+            if word in response_lower:
                 score += 0.3
         for word in negative_words:
-            if word in response:
+            if word in response_lower:
                 score -= 1.0
 
         # ---- Relevance score ----
         # Check whether the response is relevant to the prompt (simple keyword matching)
-        prompt_keywords = set(prompt.replace("？", "").replace("？", "").replace("，", "").split())
-        response_words = set(response.replace("，", "").replace("。", "").split())
+        import re as _re
+
+        def _words(text):
+            return set(_re.findall(r"[a-zA-Z]+", text.lower()))
+
+        prompt_keywords = _words(prompt)
+        response_words = _words(response)
         overlap = len(prompt_keywords & response_words)
         if overlap > 0:
             score += min(overlap * 0.2, 1.0)
@@ -500,7 +506,7 @@ def plot_training_stats(stats, save_path="output/ppo_training_stats.png"):
 
 def main():
     print("=" * 60)
-    print("Chapter 8: RLHF PPO Alignment Training")
+    print("Chapter 13: RLHF PPO Alignment Training")
     print("=" * 60)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -568,10 +574,10 @@ def main():
     # ---- 5.4 Test before alignment ----
     print("\n[Step 4] Testing model output before PPO alignment...")
     test_prompts = [
-        "用 Python 写一个求列表最大值的函数。",
-        "解释什么是机器学习。",
-        "给我讲一个有趣的故事。",
-        "如何提高英语水平？",
+        "Write a Python function that finds the maximum of a list.",
+        "Explain what machine learning is.",
+        "Tell me an interesting story.",
+        "How can I improve my English?",
     ]
 
     print("  --- Output before PPO alignment ---")
@@ -610,14 +616,14 @@ def main():
 
     # Prompt pool used for training
     train_prompts_pool = [
-        "请解释什么是深度学习。",
-        "用 Python 写一个冒泡排序。",
-        "如何学习编程？",
-        "什么是人工智能？",
-        "请推荐几本技术书籍。",
-        "如何准备技术面试？",
-        "解释什么是 RESTful API。",
-        "写一段鼓励正在学习的人的话。",
+        "Please explain what deep learning is.",
+        "Write a bubble sort in Python.",
+        "How do I learn programming?",
+        "What is artificial intelligence?",
+        "Recommend a few technical books.",
+        "How do I prepare for a technical interview?",
+        "Explain what a RESTful API is.",
+        "Write an encouraging note for someone who is learning.",
     ]
 
     # ---- 5.6 Run the PPO training loop ----

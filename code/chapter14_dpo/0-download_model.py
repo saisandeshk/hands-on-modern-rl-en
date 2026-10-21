@@ -1,5 +1,5 @@
 """
-Chapter 2, Step 0: Download the model from ModelScope
+Chapter 14, Step 0: Download the model from ModelScope
 ====================================
 
 Before running any experiments, download Qwen2.5-0.5B-Instruct to the local machine.

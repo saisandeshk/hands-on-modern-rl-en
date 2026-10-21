@@ -1,6 +1,6 @@
-# 16.8 Hands-On: veRL Code Generation RL Experiment
+# 15.8 Hands-On: veRL Code Generation RL Experiment
 
-This directory holds the companion code for _Hands-On Modern Reinforcement Learning_, [Section 16.8](../../../docs/chapter15_grpo/verl-code-sandbox.md): **running PPO training on a code generation task with veRL**.
+This directory holds the companion code for _Hands-On Modern Reinforcement Learning_, [Section 15.8](../../../docs/chapter15_grpo/verl-code-sandbox.md): **running PPO training on a code generation task with veRL**.
 
 Code problems share a key advantage with math problems: the answer isn't graded by a human, it **can be verified by running tests**. Passing the tests earns positive reward, failing earns low reward — this is "hard feedback." This section is about getting a model to write programs that actually run.
 

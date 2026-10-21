@@ -1,123 +1,148 @@
 """
-Chapter 9: Simplified Group-Relative RLVR — GSM8K Style
-==========================================================
+Chapter 15: GRPO Math Reasoning — RLVR on GSM8K-Style Problems
+===============================================================
 
-This script trains a small language model (Qwen2.5-0.5B-Instruct) with a
-simplified group-relative REINFORCE objective. It demonstrates the RLVR data
-flow, but it is not the full DeepSeekMath GRPO objective: there is no old-policy
-ratio, PPO clipping, or reference-policy KL term here.
+This script trains a small language model (Qwen2.5-0.5B-Instruct) with the
+GRPO (Group Relative Policy Optimization) objective from DeepSeekMath.
 
-Core pipeline:
-  1. Build a GSM8K-style arithmetic word problem dataset (20 problems)
-  2. Load the Qwen2.5-0.5B-Instruct model
-  3. Generate group_size=4 responses per problem
-  4. Compute a reward for each response with a rule-based reward function
-  5. GRPO group-relative normalization to obtain advantages
-  6. Update the policy using the advantages (policy gradient)
-  7. Train for 3 epochs, tracking accuracy, average reward, and response length
+Full GRPO pipeline per prompt:
+  1. Sample a group of G completions from the old (sampling) policy at
+     temperature 1.0 with no top-p filtering, so the sampling distribution
+     equals the old-policy distribution used in the importance ratio.
+  2. Score each completion with a verifiable, rule-based reward (answer checker).
+  3. Group-normalize rewards into advantages:
+         A_hat_i = (r_i - mean(r)) / (std(r) + eps),
+     broadcast to every completion token of response i.
+  4. Per-token importance ratio against the old policy with PPO-style clipping:
+         ratio = exp(log pi_theta - log pi_old),
+         clipped = clamp(ratio, 1 - eps_clip, 1 + eps_clip).
+  5. KL penalty to a frozen reference policy with the k3 estimator:
+         KL_k3 = exp(log pi_ref - log pi_theta) - (log pi_ref - log pi_theta) - 1.
+  6. Completion-only masks: prompt tokens and padding are excluded from the loss.
+  7. Documented loss aggregation: sequence-mean (default) vs token-mean (see
+     LOSS_AGGREGATION below).
 
-How to run:
+How to run (full mode needs a GPU; default full fine-tune holds fp32/bf16
+weights plus a frozen reference copy plus gradients/optimizer states, so allow
+~5 GB+ of VRAM before activations — use --lora on 6 GB cards):
   pip install -r requirements.txt
   python grpo_math_reasoning.py
+  python grpo_math_reasoning.py --group-size 8 --epochs 1   # quick run
+  python grpo_math_reasoning.py --smoke                     # no network: tiny random model
 
-Notes:
-  - This script can run on CPU, but it will be slow
-  - A GPU is recommended (roughly 2~4 GB of VRAM needed)
-  - Without a GPU, consider using a smaller model or less data
+Model download: the default model "Qwen/Qwen2.5-0.5B-Instruct" (~1 GB) is
+downloaded automatically from Hugging Face on first use and cached. To use less
+VRAM, pass --lora (requires the `peft` package) or pick a smaller model with
+--model. Smoke mode builds a tiny random GPT-2 locally and downloads nothing.
 """
 
-import re
+import argparse
 import copy
-import torch
+import re
+
 import numpy as np
-from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
+import torch.nn.functional as F
+
+# ==========================================
+# Loss aggregation choice (documented)
+# ==========================================
+# "sequence-mean" (default): average the per-token loss within each completion
+#   first (so long and short completions count equally), then average over the
+#   group. This avoids biasing the update toward long completions.
+# "token-mean": pool all completion tokens across the group and take one mean.
+#   This gives long completions proportionally more weight.
+# Pass --aggregation token-mean to switch. Unit tests cover both.
+LOSS_AGGREGATION = "sequence-mean"
+
+EPS = 1e-8
 
 
 # ==========================================
-# Part 1: GSM8K-style math dataset
+# Part 1: GSM8K-style math dataset (English)
 # ==========================================
 # 20 elementary-school arithmetic word problems covering +, -, *, /
 # Each problem contains a question and a standard answer
 
 math_dataset = [
     {
-        "question": "小明有 15 个苹果，小红给了他 27 个，小明现在有多少个苹果？",
+        "question": "Ming has 15 apples. Hong gives him 27 more. How many apples does Ming have now?",
         "answer": "42",
     },
     {
-        "question": "一个班级有 36 个学生，平均分成 6 组，每组有多少个学生？",
+        "question": "A class has 36 students split evenly into 6 groups. How many students are in each group?",
         "answer": "6",
     },
     {
-        "question": "张三每天跑步 5 公里，他一周（7天）一共跑了多少公里？",
+        "question": "Zhang runs 5 km every day. How many km does he run in a week (7 days)?",
         "answer": "35",
     },
     {
-        "question": "一本书有 240 页，李四已经读了 85 页，还剩多少页没读？",
+        "question": "A book has 240 pages. Li has read 85 pages. How many pages are left unread?",
         "answer": "155",
     },
     {
-        "question": "水果店有苹果 48 个，橘子 36 个，香蕉 25 个，一共有多少个水果？",
+        "question": "A fruit shop has 48 apples, 36 oranges, and 25 bananas. How many fruits are there in total?",
         "answer": "109",
     },
     {
-        "question": "一箱饮料有 24 瓶，8 箱饮料一共有多少瓶？",
+        "question": "A crate holds 24 bottles. How many bottles do 8 crates hold?",
         "answer": "192",
     },
     {
-        "question": "小红有 100 元钱，买了一本书花了 32 元，买了一支笔花了 8 元，还剩多少钱？",
+        "question": "Hong has 100 dollars. She spends 32 on a book and 8 on a pen. How much money is left?",
         "answer": "60",
     },
     {
-        "question": "一个长方形的长是 12 厘米，宽是 8 厘米，它的面积是多少平方厘米？",
+        "question": "A rectangle is 12 cm long and 8 cm wide. What is its area in square cm?",
         "answer": "96",
     },
     {
-        "question": "学校买了 5 盒铅笔，每盒 12 支，一共有多少支铅笔？",
+        "question": "A school buys 5 boxes of pencils with 12 pencils per box. How many pencils is that?",
         "answer": "60",
     },
     {
-        "question": "王师傅每小时加工 15 个零件，工作了 8 小时，一共加工了多少个零件？",
+        "question": "A worker makes 15 parts per hour and works 8 hours. How many parts does he make?",
         "answer": "120",
     },
     {
-        "question": "一列火车每小时行驶 120 公里，行驶了 3 小时，一共行驶了多少公里？",
+        "question": "A train travels 120 km per hour for 3 hours. How far does it travel?",
         "answer": "360",
     },
     {
-        "question": "农场里有鸡 45 只，鸭比鸡多 18 只，鸭有多少只？",
+        "question": "A farm has 45 chickens. There are 18 more ducks than chickens. How many ducks are there?",
         "answer": "63",
     },
     {
-        "question": "一个三角形的底边长 10 厘米，高 6 厘米，面积是多少平方厘米？",
+        "question": "A triangle has base 10 cm and height 6 cm. What is its area in square cm?",
         "answer": "30",
     },
     {
-        "question": "妈妈买了 3 千克苹果，每千克 8 元，又买了 2 千克橘子，每千克 5 元，一共花了多少钱？",
+        "question": "A mother buys 3 kg of apples at $8 per kg and 2 kg of oranges at $5 per kg. How much does she spend?",
         "answer": "34",
     },
     {
-        "question": "学校图书馆有故事书 280 本，科技书比故事书少 95 本，科技书有多少本？",
+        "question": "A library has 280 story books. There are 95 fewer science books than story books. How many science books are there?",
         "answer": "185",
     },
     {
-        "question": "小明从家到学校走了 15 分钟，每分钟走 60 米，家到学校有多远？",
+        "question": "Ming walks 15 minutes to school at 60 meters per minute. How far is school from home?",
         "answer": "900",
     },
     {
-        "question": "一个游泳池长 50 米，宽 25 米，它的周长是多少米？",
+        "question": "A swimming pool is 50 m long and 25 m wide. What is its perimeter in meters?",
         "answer": "150",
     },
     {
-        "question": "有 4 个小朋友分 72 颗糖，平均每人分到多少颗？",
+        "question": "Four children share 72 candies equally. How many does each child get?",
         "answer": "18",
     },
     {
-        "question": "工厂生产了 500 个零件，合格的有 468 个，不合格的有多少个？",
+        "question": "A factory makes 500 parts, of which 468 pass inspection. How many fail?",
         "answer": "32",
     },
     {
-        "question": "一桶油重 18 千克，用掉了三分之一，还剩多少千克？",
+        "question": "A bucket holds 18 kg of oil. One third is used. How many kg remain?",
         "answer": "12",
     },
 ]
@@ -128,11 +153,11 @@ math_dataset = [
 # ==========================================
 def extract_answer_from_response(response):
     """
-    Extract the final answer from the model's response
+    Extract the final answer from the model's response.
 
     Priority order:
       1. \\boxed{...} format
-      2. The number following a Chinese answer marker ("答案是/为：")
+      2. An English answer marker ("The answer is ..." / "Answer: ...")
       3. The last number in the response (fallback)
 
     Args:
@@ -145,17 +170,15 @@ def extract_answer_from_response(response):
     if boxed_match:
         return boxed_match.group(1).strip()
 
-    # Method 2: Chinese answer marker
-    cn_match = re.search(r'答案[是为：:]\s*([+-]?\d+\.?\d*)', response)
-    if cn_match:
-        return cn_match.group(1).strip()
-
-    # Method 3: English answer marker
-    en_match = re.search(r'[Tt]he answer is\s*([+-]?\d+\.?\d*)', response)
+    # Method 2: English answer marker
+    en_match = re.search(
+        r'(?:[Tt]he answer is|[Aa]nswer\s*:|[Ff]inal answer is)\s*([+-]?\d+\.?\d*)',
+        response,
+    )
     if en_match:
         return en_match.group(1).strip()
 
-    # Method 4: last number in the response (fallback)
+    # Method 3: last number in the response (fallback)
     numbers = re.findall(r'([+-]?\d+\.?\d*)', response)
     if numbers:
         return numbers[-1]
@@ -165,21 +188,20 @@ def extract_answer_from_response(response):
 
 def compute_reward(response, ground_truth):
     """
-    Compute the reward value for a response
+    Compute the reward value for a response.
 
-    This is a simplified reward function focused mainly on answer correctness:
+    A simplified verifiable reward focused on answer correctness:
       - Correct answer: reward = 1.0
       - Incorrect answer: reward = 0.0
-      - Format bonus: +0.1 if step-by-step reasoning format is used
-      - Well-formed response (has step markers), up to +0.1
 
-    The final reward is capped at 1.0
+    (There is intentionally no format bonus: the reward is binary 0/1, so the
+    accuracy statistic `mean(1.0 if r >= 1.0 else 0.0)` counts correct answers.)
 
     Args:
         response: text generated by the model
         ground_truth: the standard answer string
     Returns:
-        float: reward value in [0.0, 1.0]
+        float: reward value, either 0.0 or 1.0
     """
     reward = 0.0
 
@@ -193,46 +215,254 @@ def compute_reward(response, ground_truth):
             if str(extracted).strip() == str(ground_truth).strip():
                 reward = 1.0
 
-    # Format bonus (only considered when the answer is correct, to avoid rewarding well-formatted wrong answers)
-    if reward > 0:
-        has_steps = bool(re.search(r'步骤|第\d+步|Step|首先|然后|接着|最后', response))
-        if has_steps:
-            reward = min(1.0, reward + 0.1)
-
     return reward
 
 
 # ==========================================
-# Part 3: GRPO group-relative normalization
+# Part 3: GRPO core math (pure functions, unit-tested)
 # ==========================================
-def compute_grpo_advantages(rewards):
+def compute_group_advantages(rewards, eps=EPS):
     """
-    Core of GRPO: normalize a group of rewards within the group
+    GRPO group-relative normalization.
 
     Formula:
-        advantage_i = (reward_i - mean) / (std + eps)
+        A_hat_i = (r_i - mean(r)) / (std(r) + eps)
+
+    The population std (unbiased=False) is used here; the DeepSeekMath paper
+    does not specify whether the denominator is G or G-1, so this is a
+    convention choice (it scales advantages by sqrt(G/(G-1)) relative to the
+    unbiased estimator). When all rewards in the group are equal, std is 0
+    and every advantage is 0 (no learning signal — nothing to prefer within
+    the group).
 
     Args:
-        rewards: list[float], reward values for a group of responses
+        rewards: Tensor of shape (G,) with one scalar reward per completion
+        eps: small constant guarding against division by zero
     Returns:
-        numpy array: normalized advantage values
+        Tensor of shape (G,) with the group-normalized advantages
     """
-    rewards_arr = np.array(rewards, dtype=np.float64)
-    mean_r = rewards_arr.mean()
-    std_r = rewards_arr.std() + 1e-8
-    advantages = (rewards_arr - mean_r) / std_r
-    return advantages
+    rewards = torch.as_tensor(rewards, dtype=torch.float32)
+    mean_r = rewards.mean()
+    std_r = rewards.std(unbiased=False)
+    return (rewards - mean_r) / (std_r + eps)
+
+
+def compute_grpo_advantages(rewards):
+    """
+    Numpy-compat wrapper around compute_group_advantages (kept for the
+    mechanism demo style: pass a list of floats, get a numpy array back).
+    """
+    adv = compute_group_advantages(torch.as_tensor(list(rewards), dtype=torch.float32))
+    return adv.detach().cpu().numpy()
+
+
+def k3_kl_estimate(new_logp, ref_logp):
+    """
+    The k3 KL estimator (Schulman 2020), always non-negative:
+
+        KL_k3 = exp(d) - d - 1,  where d = log pi_ref - log pi_theta.
+
+    It is zero exactly when the policies match (d = 0) and penalizes large
+    deviations more steeply than the naive k1 estimator (-d), while
+    remaining unbiased in expectation under pi_theta.
+
+    Args:
+        new_logp: per-token log-probs under the current policy
+        ref_logp: per-token log-probs under the frozen reference policy
+    Returns:
+        per-token KL estimate, same shape as the inputs
+    """
+    diff = ref_logp - new_logp
+    return torch.exp(diff) - diff - 1.0
+
+
+def build_completion_mask(prompt_lens, completion_ids, pad_id=None):
+    """
+    Build a completion-only mask: 1 for completion tokens, 0 for prompt and
+    padding tokens.
+
+    Args:
+        prompt_lens: list/array of prompt lengths, one per sequence (batch G)
+        completion_ids: LongTensor (G, L) of completion token ids
+        pad_id: optional padding id; positions holding it are masked out
+    Returns:
+        FloatTensor (G, L) mask
+    """
+    g, seq_len = completion_ids.shape
+    positions = torch.arange(seq_len).unsqueeze(0).expand(g, seq_len)
+    prompt_lens_t = torch.as_tensor(list(prompt_lens)).unsqueeze(1)
+    mask = (positions >= prompt_lens_t).float()
+    if pad_id is not None:
+        mask = mask * (completion_ids != pad_id).float()
+    return mask
+
+
+def grpo_loss(
+    new_logp,
+    old_logp,
+    ref_logp,
+    advantages,
+    mask,
+    clip_eps=0.2,
+    kl_coef=0.01,
+    aggregation=LOSS_AGGREGATION,
+):
+    """
+    Full GRPO per-token loss with PPO-style clipping and a k3 KL penalty.
+
+    Per-token terms (A_i is the group advantage of completion i, broadcast to
+    all its completion tokens):
+        ratio   = exp(new_logp - old_logp)
+        policy  = -min(ratio * A_i, clamp(ratio, 1-eps, 1+eps) * A_i)
+        kl      = k3(new_logp, ref_logp)
+        token_loss = policy + kl_coef * kl
+
+    For positive A_i the min() keeps the update from growing the ratio past
+    1+eps; for negative A_i it keeps the update from shrinking the ratio below
+    1-eps — the standard PPO trust region in both directions.
+
+    Aggregation (documented choice):
+      - "sequence-mean": mean within each completion first (long and short
+        completions count equally), then mean over the group. Default.
+      - "token-mean": one mean over all unmasked completion tokens (long
+        completions weigh more).
+
+    All inputs except advantages/mask are per-token log-probs of shape (G, L).
+    advantages has shape (G,) and is broadcast across tokens. mask has shape
+    (G, L); masked positions contribute nothing.
+
+    Returns:
+        scalar loss tensor
+    """
+    ratio = torch.exp(new_logp - old_logp)
+    clipped_ratio = torch.clamp(ratio, 1.0 - clip_eps, 1.0 + clip_eps)
+    adv = advantages.unsqueeze(1)
+    policy_loss = -torch.min(ratio * adv, clipped_ratio * adv)
+    kl = k3_kl_estimate(new_logp, ref_logp)
+    token_loss = (policy_loss + kl_coef * kl) * mask
+
+    if aggregation == "token-mean":
+        denom = mask.sum().clamp_min(1.0)
+        return token_loss.sum() / denom
+    if aggregation == "sequence-mean":
+        per_seq = token_loss.sum(dim=1) / mask.sum(dim=1).clamp_min(1.0)
+        return per_seq.mean()
+    raise ValueError(f"unknown aggregation: {aggregation!r}")
 
 
 # ==========================================
-# Part 4: Generate model responses
+# Part 4: Tokenizer/model helpers (incl. smoke mode)
+# ==========================================
+class CharTokenizer:
+    """Minimal character-level tokenizer for --smoke mode (no downloads).
+
+    Maps each distinct character to an id; reserves 0 for padding and 1 for EOS.
+    Implements just enough of the HF tokenizer API for this script.
+    """
+
+    def __init__(self, texts=None):
+        chars = set()
+        for t in texts or []:
+            chars.update(t)
+        # Reserve 0 = pad, 1 = eos/bos.
+        self.pad_token_id = 0
+        self.eos_token_id = 1
+        self.bos_token_id = 1
+        self.pad_token = "<pad>"
+        self.eos_token = "<eos>"
+        self._stoi = {"<pad>": 0, "<eos>": 1}
+        for i, ch in enumerate(sorted(chars), start=2):
+            self._stoi[ch] = i
+        self._itos = {i: ch for ch, i in self._stoi.items()}
+
+    @property
+    def vocab_size(self):
+        return len(self._stoi)
+
+    def encode(self, text, return_tensors=None):
+        ids = [self._stoi.get(ch, 1) for ch in text]
+        if return_tensors == "pt":
+            return torch.tensor([ids], dtype=torch.long)
+        return ids
+
+    def decode(self, ids, skip_special_tokens=True):
+        if torch.is_tensor(ids):
+            ids = ids.tolist()
+        out = []
+        for i in ids:
+            if skip_special_tokens and i in (self.pad_token_id, self.eos_token_id):
+                continue
+            out.append(self._itos.get(i, "?"))
+        return "".join(out)
+
+    def apply_chat_template(self, messages, tokenize=False, add_generation_prompt=True):
+        text = ""
+        for m in messages:
+            text += f"{m['role']}: {m['content']}\n"
+        if add_generation_prompt:
+            text += "assistant: "
+        return text
+
+    def __call__(self, texts, return_tensors="pt", padding=False, **kwargs):
+        if isinstance(texts, str):
+            texts = [texts]
+        ids = [self.encode(t) for t in texts]
+        max_len = max(len(s) for s in ids)
+        padded = [s + [self.pad_token_id] * (max_len - len(s)) for s in ids]
+        return {
+            "input_ids": torch.tensor(padded, dtype=torch.long),
+            "attention_mask": torch.tensor(
+                [[1] * len(s) + [0] * (max_len - len(s)) for s in ids],
+                dtype=torch.long,
+            ),
+        }
+
+
+def build_smoke_model_and_tokenizer(device="cpu"):
+    """Build a tiny random GPT-2 plus a char tokenizer (no network needed)."""
+    from transformers import GPT2Config, GPT2LMHeadModel
+
+    texts = [p["question"] for p in math_dataset[:4]]
+    tokenizer = CharTokenizer(texts)
+    config = GPT2Config(
+        vocab_size=max(tokenizer.vocab_size, 32),
+        n_positions=128,
+        n_ctx=128,
+        n_embd=64,
+        n_layer=2,
+        n_head=2,
+    )
+    model = GPT2LMHeadModel(config).to(device)
+    return model, tokenizer
+
+
+def _model_device(model):
+    return getattr(model, "device", next(model.parameters()).device)
+
+
+def _token_log_probs(model, input_ids):
+    """Per-token log-probs of each position predicting the next token.
+
+    Returns Tensor (batch, seq_len - 1): log pi(input_ids[t+1] | prefix .. t).
+    """
+    outputs = model(input_ids)
+    logits = outputs.logits[:, :-1, :]
+    log_probs = F.log_softmax(logits, dim=-1)
+    labels = input_ids[:, 1:]
+    return log_probs.gather(2, labels.unsqueeze(-1)).squeeze(-1)
+
+
+# ==========================================
+# Part 5: Generate model responses
 # ==========================================
 def generate_responses(model, tokenizer, prompt, num_responses=4, max_new_tokens=200):
     """
-    Have the model generate several different responses to the same question
+    Have the model generate several different responses to the same question.
 
-    Uses do_sample=True + temperature > 0 to produce diversity.
-    Each response uses a different random draw to ensure variety.
+    Uses do_sample=True at temperature 1.0 with no top-p filtering, so the
+    sampling distribution equals the old-policy distribution used in the
+    importance ratio (sampling at a lower temperature would make the ratio
+    differ from 1 even before any update and break the PPO trust region).
 
     Args:
         model: the language model
@@ -247,7 +477,12 @@ def generate_responses(model, tokenizer, prompt, num_responses=4, max_new_tokens
     text = tokenizer.apply_chat_template(
         messages, tokenize=False, add_generation_prompt=True
     )
-    inputs = tokenizer([text], return_tensors="pt").to(model.device)
+    enc = tokenizer([text], return_tensors="pt")
+    device = _model_device(model)
+    inputs = {
+        k: (v.to(device) if torch.is_tensor(v) else v) for k, v in enc.items()
+    }
+    input_ids = inputs["input_ids"]
 
     responses = []
     for _ in range(num_responses):
@@ -256,12 +491,14 @@ def generate_responses(model, tokenizer, prompt, num_responses=4, max_new_tokens
                 **inputs,
                 max_new_tokens=max_new_tokens,
                 do_sample=True,
-                temperature=0.7,
-                top_p=0.9,
+                temperature=1.0,
+                top_p=1.0,
+                pad_token_id=getattr(tokenizer, "pad_token_id", None)
+                or getattr(tokenizer, "eos_token_id", None),
             )
         # Decode: keep only the generated part (skip the input prompt)
         response = tokenizer.decode(
-            outputs[0][inputs.input_ids.shape[-1]:],
+            outputs[0][input_ids.shape[-1]:],
             skip_special_tokens=True,
         )
         responses.append(response)
@@ -270,112 +507,133 @@ def generate_responses(model, tokenizer, prompt, num_responses=4, max_new_tokens
 
 
 # ==========================================
-# Part 5: simplified group-relative policy-gradient update
+# Part 6: Full GRPO policy update
 # ==========================================
-def grpo_policy_update(model, tokenizer, optimizer, prompt, responses, advantages):
+def grpo_policy_update(
+    model,
+    ref_model,
+    tokenizer,
+    optimizer,
+    prompt,
+    responses,
+    advantages,
+    clip_eps=0.2,
+    kl_coef=0.01,
+    aggregation=LOSS_AGGREGATION,
+    update_epochs=1,
+):
     """
-    Update the model with group-normalized advantages and REINFORCE
+    Update the model with one GRPO step over a group of completions.
 
-    Core formula:
-        loss = -mean(advantage_i * log_prob_i)
+    For each completion, the old (sampling) policy log-probs and the frozen
+    reference log-probs are computed under no_grad; then the current policy is
+    optimized with grpo_loss() (ratio + clipping + k3 KL, completion-masked).
 
-    where log_prob_i is the mean token log probability of the i-th response.
-    This deliberately omits the old-policy ratio, clipping, and reference KL
-    from the original GRPO objective.
-    Both positive and negative advantages contribute: positive raises the response's probability, negative lowers it.
+    Note: prompt and completion are tokenized separately and concatenated, so
+    the BPE boundary between prompt and completion differs slightly from the
+    true sampling-time tokenization; the old log-probs are therefore an
+    approximation of the exact sampled-trajectory log-probs (standard
+    simplification in teaching code).
 
     Args:
-        model: the language model
+        model: the policy being trained
+        ref_model: frozen reference policy (may be None to skip the KL term)
         tokenizer: the tokenizer
         optimizer: optimizer
         prompt: the original question
-        responses: list of generated responses
-        advantages: GRPO-normalized advantage values
+        responses: list of sampled completion strings (group of size G)
+        advantages: group-normalized advantages, shape (G,)
+        clip_eps: PPO clip range
+        kl_coef: weight of the k3 KL penalty
+        aggregation: "sequence-mean" (default) or "token-mean"
+        update_epochs: PPO-style epochs over the same sampled group
     Returns:
-        float: the loss for this round
+        float: the final loss value
     """
     model.train()
+    device = _model_device(model)
 
-    # Build token ids for the prompt
     messages = [{"role": "user", "content": prompt}]
     prompt_text = tokenizer.apply_chat_template(
         messages, tokenize=False, add_generation_prompt=True
     )
-    prompt_ids = tokenizer.encode(prompt_text, return_tensors="pt").to(model.device)
+    prompt_ids = tokenizer.encode(prompt_text, return_tensors="pt").to(device)
     prompt_len = prompt_ids.shape[-1]
 
-    total_loss = 0.0
-    num_valid = 0
+    # Tokenize prompt + each completion; pad completions to a batch.
+    comp_id_list = []
+    for resp in responses:
+        ids = tokenizer.encode(resp, return_tensors="pt").to(device)
+        bos = getattr(tokenizer, "bos_token_id", None)
+        if bos is not None and ids.shape[-1] > 0 and ids[0, 0] == bos:
+            ids = ids[:, 1:]
+        comp_id_list.append(ids[0])
+    max_len = max(t.shape[0] for t in comp_id_list)
+    pad_id = getattr(tokenizer, "pad_token_id", 0) or 0
+    full_ids = []
+    for t in comp_id_list:
+        pad_needed = max_len - t.shape[0]
+        comp_padded = (
+            torch.cat([t, torch.full((pad_needed,), pad_id, dtype=torch.long, device=device)])
+            if pad_needed > 0
+            else t
+        )
+        full_ids.append(torch.cat([prompt_ids[0], comp_padded]))
+    batch_ids = torch.stack(full_ids)
 
-    for response, advantage in zip(responses, advantages):
-        # Concatenate prompt + response
-        response_ids = tokenizer.encode(response, return_tensors="pt").to(model.device)
-        # Strip a possible leading BOS token from response_ids
-        if response_ids[0, 0] == tokenizer.bos_token_id:
-            response_ids = response_ids[:, 1:]
-
-        full_ids = torch.cat([prompt_ids, response_ids], dim=-1)
-
-        # Forward pass to get logits
-        outputs = model(full_ids)
-        logits = outputs.logits
-
-        # Compute the log_prob of the generated part (response tokens only)
-        # logits[:, :-1, :] are the predictions at position t; full_ids[:, 1:] are the true tokens at position t+1
-        response_logits = logits[0, prompt_len - 1:-1, :]  # logits for the response part
-        response_tokens = full_ids[0, prompt_len:]          # token ids for the response part
-
-        if response_tokens.shape[0] == 0:
-            continue
-
-        # Compute the log-probability of each token
-        log_probs = torch.nn.functional.log_softmax(response_logits, dim=-1)
-        token_log_probs = log_probs.gather(1, response_tokens.unsqueeze(1)).squeeze(1)
-
-        # Average log-probability (normalized by token count, to avoid bias toward long responses)
-        avg_log_prob = token_log_probs.mean()
-
-        # Policy gradient loss: -advantage * log_prob
-        loss = -advantage * avg_log_prob
-        total_loss += loss
-        num_valid += 1
-
-    if num_valid == 0:
+    # Completion mask: exclude prompt tokens (and padding).
+    batch_size, total_len = batch_ids.shape
+    positions = torch.arange(total_len, device=device).unsqueeze(0).expand(batch_size, total_len)
+    mask_full = (positions >= prompt_len).float()
+    mask_full = mask_full * (batch_ids != pad_id).float()
+    # Shift for next-token prediction: token t predicts t+1, so drop column 0.
+    token_mask = mask_full[:, 1:]
+    if token_mask.sum() == 0:
         return 0.0
 
-    # Average loss
-    avg_loss = total_loss / num_valid
+    with torch.no_grad():
+        old_logp_full = _token_log_probs(model, batch_ids)
+        if ref_model is not None:
+            ref_logp_full = _token_log_probs(ref_model, batch_ids)
+        else:
+            ref_logp_full = old_logp_full.detach()
+    old_logp = old_logp_full * 0 + old_logp_full.detach()  # frozen sampling log-probs
+    advantages_t = torch.as_tensor(list(advantages), dtype=torch.float32, device=device)
 
-    # Backward pass and parameter update
-    optimizer.zero_grad()
-    avg_loss.backward()
-    # Gradient clipping to prevent exploding gradients
-    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-    optimizer.step()
+    final_loss = 0.0
+    for _ in range(update_epochs):
+        new_logp_full = _token_log_probs(model, batch_ids)
+        loss = grpo_loss(
+            new_logp_full,
+            old_logp,
+            ref_logp_full,
+            advantages_t,
+            token_mask,
+            clip_eps=clip_eps,
+            kl_coef=kl_coef,
+            aggregation=aggregation,
+        )
+        optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        optimizer.step()
+        final_loss = loss.item()
 
-    return avg_loss.item()
+    return final_loss
 
 
 # ==========================================
-# Part 6: Full training pipeline
+# Part 7: Full training pipeline
 # ==========================================
-def train():
+def train(args):
     """
-    Full pipeline for GRPO math reasoning training
-
-    Hyperparameters:
-        - model_name = "Qwen/Qwen2.5-0.5B-Instruct"
-        - group_size = 4: generate 4 responses per question
-        - num_epochs = 3: number of training epochs
-        - learning_rate = 1e-5: learning rate
-        - max_new_tokens = 200: max number of generated tokens
+    Full GRPO math-reasoning training pipeline.
     """
-    # ---------- Hyperparameters ----------
-    model_name = "Qwen/Qwen2.5-0.5B-Instruct"
-    group_size = 4       # number of samples per question (the GRPO "group")
-    num_epochs = 3       # number of training epochs
-    learning_rate = 1e-5 # learning rate
-    max_new_tokens = 200 # max generation length
+    model_name = args.model
+    group_size = args.group_size
+    num_epochs = args.epochs
+    learning_rate = args.lr
+    max_new_tokens = args.max_new_tokens
 
     print("=" * 70)
     print("  GRPO Math Reasoning Training (GSM8K style)")
@@ -386,40 +644,69 @@ def train():
     print(f"  Epochs: {num_epochs}")
     print(f"  Learning rate: {learning_rate}")
     print(f"  Max generation length: {max_new_tokens}")
+    print(f"  Clip eps: {args.clip_eps} | KL coef: {args.kl_coef} | Aggregation: {args.aggregation}")
     print("=" * 70)
 
-    # ---------- Load the model ----------
-    print("\nLoading model...")
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    tokenizer.pad_token = tokenizer.eos_token
-
-    # Determine the device
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"  Using device: {device}")
+    print(f"\nUsing device: {device}")
 
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        torch_dtype=torch.float32,
-        device_map=device,
-    )
-    model.eval()  # Start in eval mode
+    if args.smoke:
+        # Smoke mode always runs on CPU (shared-GPU friendly) with a tiny model.
+        device = "cpu"
+        print("Smoke mode: building a tiny local model (no download).")
+        model, tokenizer = build_smoke_model_and_tokenizer(device=device)
+        ref_model = None
+        dataset = math_dataset[:2]
+        num_epochs = 1
+        group_size = min(group_size, 2)
+    else:
+        from transformers import AutoModelForCausalLM, AutoTokenizer
 
-    # Create the optimizer
+        print("\nLoading model...")
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+
+        use_lora = args.lora
+        if use_lora:
+            from peft import LoraConfig, get_peft_model
+
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            torch_dtype=torch.bfloat16 if device == "cuda" else torch.float32,
+        ).to(device)
+        if use_lora:
+            lora_cfg = LoraConfig(r=8, lora_alpha=16, lora_dropout=0.05,
+                                  task_type="CAUSAL_LM")
+            model = get_peft_model(model, lora_cfg)
+            print("  LoRA enabled (r=8): only adapter weights are trained.")
+        # Frozen reference copy for the KL term.
+        ref_model = copy.deepcopy(model)
+        ref_model.eval()
+        for param in ref_model.parameters():
+            param.requires_grad = False
+        dataset = math_dataset
+
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
-    # ---------- Pre-training test ----------
-    print("\n" + "=" * 70)
-    print("  Model performance before training (test on 3 sampled problems)")
-    print("=" * 70)
-    test_indices = [0, 7, 14]  # Test on problems 1, 8, and 15
-    pre_train_results = evaluate_on_samples(model, tokenizer, math_dataset, test_indices)
+    # ---------- Pre-training test (in-sample demo: same training problems) ----------
+    if not args.smoke:
+        print("\n" + "=" * 70)
+        print("  Model performance before training (in-sample demo on 3 training problems;")
+        print("  not a held-out generalization test)")
+        print("=" * 70)
+        # NOTE: indices [0, 7, 14] are training problems, so this before/after
+        # comparison shows in-sample improvement only, not generalization.
+        test_indices = [0, 7, 14]
+        pre_train_results = evaluate_on_samples(model, tokenizer, math_dataset, test_indices)
+    else:
+        pre_train_results, test_indices = [], []
 
     # ---------- Training loop ----------
     print("\n" + "=" * 70)
-    print("  Starting simplified group-relative RLVR training")
+    print("  Starting GRPO + RLVR training")
     print("=" * 70)
 
-    # Record training metrics
     epoch_metrics = []
 
     for epoch in range(num_epochs):
@@ -432,60 +719,60 @@ def train():
         epoch_lengths = []
         epoch_losses = []
 
-        for idx, problem in enumerate(math_dataset):
+        for idx, problem in enumerate(dataset):
             question = problem["question"]
             ground_truth = problem["answer"]
 
-            # Step 1: generate a group of responses for the current question
+            # Step 1: sample a group of completions from the current policy
             responses = generate_responses(
                 model, tokenizer, question,
                 num_responses=group_size,
                 max_new_tokens=max_new_tokens,
             )
 
-            # Step 2: compute the reward for each response
-            rewards = []
-            for resp in responses:
-                r = compute_reward(resp, ground_truth)
-                rewards.append(r)
+            # Step 2: verifiable reward for each completion
+            rewards = [compute_reward(resp, ground_truth) for resp in responses]
 
-            # Step 3: GRPO group-relative normalization
-            advantages = compute_grpo_advantages(rewards)
+            # Step 3: group-relative normalization -> advantages
+            advantages = compute_group_advantages(
+                torch.tensor(rewards, dtype=torch.float32)
+            )
 
-            # Step 4: policy gradient update
+            # Step 4: GRPO update (ratio + clipping + reference KL)
             loss = grpo_policy_update(
-                model, tokenizer, optimizer,
+                model, ref_model, tokenizer, optimizer,
                 question, responses, advantages,
+                clip_eps=args.clip_eps, kl_coef=args.kl_coef,
+                aggregation=args.aggregation,
+                update_epochs=args.update_epochs,
             )
 
             # Record metrics
-            avg_reward = np.mean(rewards)
-            accuracy = np.mean([1.0 if r >= 1.0 else 0.0 for r in rewards])
-            avg_length = np.mean([len(r) for r in responses])
+            avg_reward = float(np.mean(rewards))
+            accuracy = float(np.mean([1.0 if r >= 1.0 else 0.0 for r in rewards]))
+            avg_length = float(np.mean([len(r) for r in responses]))
 
             epoch_total_rewards.append(avg_reward)
             epoch_accuracies.append(accuracy)
             epoch_lengths.append(avg_length)
             epoch_losses.append(loss)
 
-            # Print progress every 5 problems
             if (idx + 1) % 5 == 0:
-                recent_acc = np.mean(epoch_accuracies[-5:])
-                recent_reward = np.mean(epoch_total_rewards[-5:])
+                recent_acc = float(np.mean(epoch_accuracies[-5:]))
+                recent_reward = float(np.mean(epoch_total_rewards[-5:]))
                 print(
-                    f"  Problem {idx + 1:2d}/{len(math_dataset)} | "
+                    f"  Problem {idx + 1:2d}/{len(dataset)} | "
                     f"last-5 accuracy: {recent_acc:.1%} | "
                     f"avg reward: {recent_reward:.3f} | "
                     f"loss: {loss:.4f}"
                 )
 
-        # End of epoch, aggregate metrics
         epoch_metrics.append({
             "epoch": epoch + 1,
-            "avg_reward": np.mean(epoch_total_rewards),
-            "accuracy": np.mean(epoch_accuracies),
-            "avg_length": np.mean(epoch_lengths),
-            "avg_loss": np.mean([l for l in epoch_losses if l != 0.0]),
+            "avg_reward": float(np.mean(epoch_total_rewards)),
+            "accuracy": float(np.mean(epoch_accuracies)),
+            "avg_length": float(np.mean(epoch_lengths)),
+            "avg_loss": float(np.mean([l for l in epoch_losses if l != 0.0] or [0.0])),
         })
 
         print(f"\n  Epoch {epoch + 1} summary:")
@@ -494,9 +781,13 @@ def train():
         print(f"    Avg response length: {epoch_metrics[-1]['avg_length']:.0f} chars")
         print(f"    Avg loss:   {epoch_metrics[-1]['avg_loss']:.4f}")
 
+    if args.smoke:
+        print("\nSmoke run complete (no download, tiny local model).")
+        return
+
     # ---------- Post-training test ----------
     print("\n" + "=" * 70)
-    print("  Model performance after training (same 3 test problems)")
+    print("  Model performance after training (same 3 in-sample training problems)")
     print("=" * 70)
     post_train_results = evaluate_on_samples(model, tokenizer, math_dataset, test_indices)
 
@@ -513,35 +804,23 @@ def train():
         print(f"  Before training: {pre['response'][:60]}... -> reward: {pre['reward']:.2f}")
         print(f"  After training: {post['response'][:60]}... -> reward: {post['reward']:.2f}")
 
-    # ---------- Training metrics summary ----------
-    print("\n" + "=" * 70)
-    print("  Training metrics summary")
-    print("=" * 70)
-    print()
-    print(f"  {'Epoch':>5s}  {'AvgReward':>10s}  {'Accuracy':>10s}  {'RespLen':>10s}  {'Loss':>10s}")
-    print(f"  {'─────':>5s}  {'──────────':>10s}  {'──────────':>10s}  {'──────────':>10s}  {'──────────':>10s}")
-    for m in epoch_metrics:
-        print(f"  {m['epoch']:>5d}  {m['avg_reward']:>10.4f}  "
-              f"{m['accuracy']:>10.2%}  {m['avg_length']:>10.0f}  "
-              f"{m['avg_loss']:>10.4f}")
-
     # ---------- Final summary ----------
     print("\n" + "=" * 70)
-    print("  Simplified Group-Relative RLVR Training Summary")
+    print("  GRPO + RLVR Training Summary")
     print("=" * 70)
     print(f"""
-  This experiment demonstrated a simplified group-relative RLVR pipeline.
-  It does not implement the full DeepSeekMath GRPO ratio, clipping, or KL terms.
+  This experiment ran the full GRPO objective (ratio + clipping + reference KL).
 
   1. Data preparation:
      - {len(math_dataset)} GSM8K-style arithmetic word problems
      - Each problem has a clear standard answer, enabling rule-based verification
 
-  2. Group-relative policy-gradient training:
+  2. GRPO training:
      - {group_size} responses sampled per problem
      - A rule-based reward function verifies answer correctness
      - Group-relative normalization computes advantages, with no Critic network needed
-     - Policy gradient updates the model's parameters
+     - PPO-style clipping keeps the new policy near the sampling policy
+     - The k3 KL term keeps the policy near the frozen reference model
 
   3. Key observations:
      - Before training: the model's outputs may be near-random, with low accuracy
@@ -556,17 +835,17 @@ def train():
   5. Directions for extension:
      - Increase the amount of training data (the full GSM8K dataset)
      - Use a larger model (Qwen2.5-1.5B / 7B)
-     - Increase group_size (8~16) for a more stable advantage estimate
+     - Increase group_size (8-16) for a more stable advantage estimate
      - Use a DeepSeek-R1-style multi-stage training approach
     """)
 
 
 # ==========================================
-# Part 7: Evaluation function
+# Part 8: Evaluation function
 # ==========================================
 def evaluate_on_samples(model, tokenizer, dataset, indices):
     """
-    Evaluate the model's performance on the given samples (greedy decoding)
+    Evaluate the model's performance on the given samples (greedy decoding).
 
     Args:
         model: the language model
@@ -578,25 +857,31 @@ def evaluate_on_samples(model, tokenizer, dataset, indices):
     """
     model.eval()
     results = []
+    device = _model_device(model)
 
     for idx in indices:
         problem = dataset[idx]
-        # Use greedy decoding to generate the response (deterministic output)
         messages = [{"role": "user", "content": problem["question"]}]
         text = tokenizer.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True
         )
-        inputs = tokenizer([text], return_tensors="pt").to(model.device)
+        enc = tokenizer([text], return_tensors="pt")
+        inputs = {
+            k: (v.to(device) if torch.is_tensor(v) else v) for k, v in enc.items()
+        }
+        input_ids = inputs["input_ids"]
 
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
                 max_new_tokens=200,
                 do_sample=False,
+                pad_token_id=getattr(tokenizer, "pad_token_id", None)
+                or getattr(tokenizer, "eos_token_id", None),
             )
 
         response = tokenizer.decode(
-            outputs[0][inputs.input_ids.shape[-1]:],
+            outputs[0][input_ids.shape[-1]:],
             skip_special_tokens=True,
         )
 
@@ -613,7 +898,6 @@ def evaluate_on_samples(model, tokenizer, dataset, indices):
         }
         results.append(result)
 
-        # Print detailed info
         print(f"\n  Problem: {problem['question'][:50]}...")
         print(f"  Ground truth: {problem['answer']}")
         print(f"  Model response: {response[:80]}{'...' if len(response) > 80 else ''}")
@@ -626,5 +910,27 @@ def evaluate_on_samples(model, tokenizer, dataset, indices):
 # ==========================================
 # Entry point
 # ==========================================
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(description="GRPO math reasoning (DeepSeekMath-style)")
+    parser.add_argument("--model", type=str, default="Qwen/Qwen2.5-0.5B-Instruct",
+                        help="HF model id (0.5B; full fine-tune needs ~5 GB+ VRAM before "
+                             "activations — use --lora on 6 GB cards)")
+    parser.add_argument("--group-size", type=int, default=4)
+    parser.add_argument("--epochs", type=int, default=3)
+    parser.add_argument("--lr", type=float, default=1e-5)
+    parser.add_argument("--max-new-tokens", type=int, default=200)
+    parser.add_argument("--clip-eps", type=float, default=0.2)
+    parser.add_argument("--kl-coef", type=float, default=0.01,
+                        help="KL coefficient (DeepSeekMath used 0.04; 0.01 is gentler for this tiny demo)")
+    parser.add_argument("--aggregation", type=str, default="sequence-mean",
+                        choices=["sequence-mean", "token-mean"])
+    parser.add_argument("--update-epochs", type=int, default=1)
+    parser.add_argument("--lora", action="store_true",
+                        help="Train LoRA adapters instead of full weights (needs peft)")
+    parser.add_argument("--smoke", action="store_true",
+                        help="Offline smoke run: tiny random model, 2 prompts, no download")
+    return parser.parse_args(argv)
+
+
 if __name__ == "__main__":
-    train()
+    train(parse_args())

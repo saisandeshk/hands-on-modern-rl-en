@@ -7,7 +7,7 @@ open, then optimizes that small policy with REINFORCE. The same environment and
 reward can later be reused around a small LLM with LoRA/GRPO.
 
 Run:
-    python docs/chapter10_agentic_rl/code/deep_research_rl_benchmark.py
+    python code/chapter19_agentic/agentic_system/deep_research_rl_benchmark.py
 """
 
 from __future__ import annotations

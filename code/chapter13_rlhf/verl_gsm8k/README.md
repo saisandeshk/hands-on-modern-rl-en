@@ -1,6 +1,6 @@
-# 8.7 veRL + GSM8K Adaptation Code
+# 13.8 veRL + GSM8K Adaptation Code
 
-This directory corresponds to the tutorial [8.7 Hands-on: Running PPO Training on GSM8K with veRL](../../../docs/chapter13_rlhf/verl-ppo-gsm8k.md).
+This directory corresponds to the tutorial [13.8 Hands-on: Running PPO Training on GSM8K with veRL](../../../docs/chapter13_rlhf/verl-ppo-gsm8k.md).
 
 This repository does not copy the veRL source code. It only provides the GSM8K reward functions and launch scripts used in the course; the actual training entry point still comes from the external veRL repository.
 

@@ -1,4 +1,4 @@
-# Chapter 8: dependencies for the full RLHF pipeline experiments
+# Chapter 13: dependencies for the full RLHF pipeline experiments
 transformers==4.57.3
 trl==0.24.0
 torch>=2.0.0

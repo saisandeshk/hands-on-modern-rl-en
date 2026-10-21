@@ -1,5 +1,5 @@
 """
-Chapter 12: Reinforcement Learning Training for a Tool-Calling Agent
+Chapter 19: Reinforcement Learning Training for a Tool-Calling Agent
 ==========================================================
 
 This script simulates a tool-calling Agent that uses the REINFORCE algorithm to learn
@@ -30,8 +30,8 @@ import matplotlib.pyplot as plt
 # Create the output directory
 os.makedirs("output", exist_ok=True)
 
-# Configure a CJK-capable font so chart titles and labels render correctly
-plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'SimHei']
+# Configure a plain sans-serif font stack (English-only labels)
+plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial']
 plt.rcParams['axes.unicode_minus'] = False
 
 
@@ -51,32 +51,32 @@ TOOL_DESCRIPTIONS = {
 # Design rationale: question types are evenly distributed (roughly 1/3 each) for diversity
 TRAINING_QUERIES = [
     # ---- search type ----
-    {"query": "中国的首都是哪里？",                     "correct_tool": "search"},
-    {"query": "Python 是什么时候发明的？",               "correct_tool": "search"},
-    {"query": "光速是多少？",                           "correct_tool": "search"},
-    {"query": "法国的人口有多少？",                      "correct_tool": "search"},
-    {"query": "什么是量子计算？",                        "correct_tool": "search"},
-    {"query": "第二次世界大战什么时候结束？",             "correct_tool": "search"},
-    {"query": "地球到月球的距离是多少？",                "correct_tool": "search"},
-    {"query": "谁发明了电话？",                          "correct_tool": "search"},
+    {"query": "What is the capital of China?",                     "correct_tool": "search"},
+    {"query": "When was Python invented?",                         "correct_tool": "search"},
+    {"query": "What is the speed of light?",                       "correct_tool": "search"},
+    {"query": "What is the population of France?",                 "correct_tool": "search"},
+    {"query": "What is quantum computing?",                        "correct_tool": "search"},
+    {"query": "When did World War II end?",                        "correct_tool": "search"},
+    {"query": "How far is the Moon from Earth?",                    "correct_tool": "search"},
+    {"query": "Who invented the telephone?",                       "correct_tool": "search"},
     # ---- calculate type ----
-    {"query": "请计算 123 + 456",                       "correct_tool": "calculate"},
-    {"query": "25 乘以 37 等于多少？",                   "correct_tool": "calculate"},
-    {"query": "1024 除以 8 是多少？",                   "correct_tool": "calculate"},
-    {"query": "求 17 的平方根",                          "correct_tool": "calculate"},
-    {"query": "计算圆的面积，半径为 5",                  "correct_tool": "calculate"},
-    {"query": "3 的 10 次方是多少？",                    "correct_tool": "calculate"},
-    {"query": "99 乘法表中 7×8 是多少？",               "correct_tool": "calculate"},
-    {"query": "把 1024 转换成二进制",                    "correct_tool": "calculate"},
+    {"query": "Please compute 123 + 456",                          "correct_tool": "calculate"},
+    {"query": "How much is 25 times 37?",                          "correct_tool": "calculate"},
+    {"query": "How much is 1024 divided by 8?",                    "correct_tool": "calculate"},
+    {"query": "Find the square root of 17",                        "correct_tool": "calculate"},
+    {"query": "Compute the area of a circle with radius 5",        "correct_tool": "calculate"},
+    {"query": "How much is 3 to the power of 10?",                 "correct_tool": "calculate"},
+    {"query": "In the times table, how much is 7x8?",              "correct_tool": "calculate"},
+    {"query": "Convert 1024 to binary",                            "correct_tool": "calculate"},
     # ---- run_code type ----
-    {"query": "帮我写一个冒泡排序",                      "correct_tool": "run_code"},
-    {"query": "写一个 Python 函数判断回文",              "correct_tool": "run_code"},
-    {"query": "执行这段排序代码并输出结果",              "correct_tool": "run_code"},
-    {"query": "帮我调试这段代码的语法错误",              "correct_tool": "run_code"},
-    {"query": "写一个爬虫抓取网页标题",                  "correct_tool": "run_code"},
-    {"query": "实现一个简单的 REST API",                 "correct_tool": "run_code"},
-    {"query": "运行这段数据分析脚本",                    "correct_tool": "run_code"},
-    {"query": "帮我写一个单元测试",                      "correct_tool": "run_code"},
+    {"query": "Help me write a bubble sort",                       "correct_tool": "run_code"},
+    {"query": "Write a Python function to check palindromes",      "correct_tool": "run_code"},
+    {"query": "Execute this sorting snippet and show the result",  "correct_tool": "run_code"},
+    {"query": "Help me debug the syntax error in this code",       "correct_tool": "run_code"},
+    {"query": "Write a crawler that scrapes a page title",         "correct_tool": "run_code"},
+    {"query": "Implement a simple REST API",                       "correct_tool": "run_code"},
+    {"query": "Run this data-analysis script",                     "correct_tool": "run_code"},
+    {"query": "Help me write a unit test",                         "correct_tool": "run_code"},
 ]
 
 
@@ -142,18 +142,25 @@ class ToolPolicy:
           - contains a math keyword -> calculate
           - contains a programming keyword -> run_code
           - otherwise -> search
-        """
-        calc_keywords = ["计算", "乘", "除", "平方", "面积", "次方", "等于多少",
-                         "加", "减", "根", "乘法", "进制"]
-        code_keywords = ["写", "执行", "代码", "函数", "调试", "爬虫", "API",
-                         "排序", "运行", "测试", "编程", "脚本"]
 
-        for kw in calc_keywords:
-            if kw in query:
-                return "calculate"
-        for kw in code_keywords:
-            if kw in query:
-                return "run_code"
+        Matching is done on whole word tokens (not substrings), so that e.g.
+        "capital" does not trigger the "api" code keyword.
+        """
+        import re as _re
+
+        calc_single = {"compute", "multiply", "times", "divide", "divided",
+                       "square", "area", "power", "plus", "minus", "root",
+                       "binary", "add", "subtract"}
+        calc_phrases = ["how much", "times table", "to the power"]
+        code_single = {"write", "execute", "code", "function", "debug", "crawler",
+                       "api", "sort", "sorting", "run", "test", "program", "script"}
+
+        query_lower = query.lower()
+        tokens = set(_re.findall(r"[a-z]+", query_lower))
+        if tokens & calc_single or any(p in query_lower for p in calc_phrases):
+            return "calculate"
+        if tokens & code_single:
+            return "run_code"
         return "search"
 
     def get_probabilities(self, query_type):
@@ -296,163 +303,163 @@ def train(policy, n_episodes=50, queries_per_episode=8):
 # ==========================================
 # Part 4: Run training
 # ==========================================
-print("=" * 70)
-print("  Chapter 12: Reinforcement Learning Training for a Tool-Calling Agent")
-print("=" * 70)
 
-np.random.seed(42)  # Fix the random seed
+def main():
+    print("=" * 70)
+    print("  Chapter 19: Reinforcement Learning Training for a Tool-Calling Agent")
+    print("=" * 70)
 
-# Initialize the policy
-policy = ToolPolicy(n_tools=3, learning_rate=0.05)
+    np.random.seed(42)  # Fix the random seed
 
-# ---- Pre-training test ----
-print("\n[Before training] tool-selection probabilities (random init, uniform distribution):")
-print(f"  {'Query type':<12} {'search':<12} {'calculate':<12} {'run_code':<12}")
-print(f"  {'─' * 48}")
-for qt in ["search", "calculate", "run_code"]:
-    probs = policy.get_probabilities(qt)
-    print(f"  {qt:<12} {probs[0]:<12.4f} {probs[1]:<12.4f} {probs[2]:<12.4f}")
+    # Initialize the policy
+    policy = ToolPolicy(n_tools=3, learning_rate=0.05)
 
-# Quickly test the pre-training accuracy
-correct_before = 0
-total_before = len(TRAINING_QUERIES)
-for qd in TRAINING_QUERIES:
-    qt = policy.get_query_type(qd["query"])
-    action, _ = policy.sample_action(qt)
-    if TOOL_NAMES[action] == qd["correct_tool"]:
-        correct_before += 1
-accuracy_before = correct_before / total_before
-print(f"\n  Pre-training accuracy: {correct_before}/{total_before} = {accuracy_before:.1%}")
+    # ---- Pre-training test ----
+    print("\n[Before training] tool-selection probabilities (random init, uniform distribution):")
+    print(f"  {'Query type':<12} {'search':<12} {'calculate':<12} {'run_code':<12}")
+    print(f"  {'─' * 48}")
+    for qt in ["search", "calculate", "run_code"]:
+        probs = policy.get_probabilities(qt)
+        print(f"  {qt:<12} {probs[0]:<12.4f} {probs[1]:<12.4f} {probs[2]:<12.4f}")
 
-# ---- Start training ----
-print("\n" + "─" * 70)
-print("  Starting REINFORCE training (50 episodes)")
-print("─" * 70)
+    # Quickly test the pre-training accuracy
+    correct_before = 0
+    total_before = len(TRAINING_QUERIES)
+    for qd in TRAINING_QUERIES:
+        qt = policy.get_query_type(qd["query"])
+        action, _ = policy.sample_action(qt)
+        if TOOL_NAMES[action] == qd["correct_tool"]:
+            correct_before += 1
+    accuracy_before = correct_before / total_before
+    print(f"\n  Pre-training accuracy: {correct_before}/{total_before} = {accuracy_before:.1%}")
 
-history = train(policy, n_episodes=50, queries_per_episode=8)
+    # ---- Start training ----
+    print("\n" + "─" * 70)
+    print("  Starting REINFORCE training (50 episodes)")
+    print("─" * 70)
 
-# ---- Post-training test ----
-print("\n" + "─" * 70)
-print("  Training complete!")
-print("─" * 70)
+    history = train(policy, n_episodes=50, queries_per_episode=8)
 
-print("\n[After training] tool-selection probabilities (should converge to the correct assignment):")
-print(f"  {'Query type':<12} {'search':<12} {'calculate':<12} {'run_code':<12}  {'Optimal tool'}")
-print(f"  {'─' * 64}")
-for qt, optimal in [("search", "search"), ("calculate", "calculate"), ("run_code", "run_code")]:
-    probs = policy.get_probabilities(qt)
-    print(f"  {qt:<12} {probs[0]:<12.4f} {probs[1]:<12.4f} {probs[2]:<12.4f}  {optimal}")
+    # ---- Post-training test ----
+    print("\n" + "─" * 70)
+    print("  Training complete!")
+    print("─" * 70)
 
-# Test post-training accuracy (deterministic policy: pick the highest-probability tool)
-correct_after = 0
-for qd in TRAINING_QUERIES:
-    qt = policy.get_query_type(qd["query"])
-    probs = policy.get_probabilities(qt)
-    best_action = np.argmax(probs)
-    if TOOL_NAMES[best_action] == qd["correct_tool"]:
-        correct_after += 1
-accuracy_after = correct_after / total_before
-print(f"\n  Post-training accuracy (deterministic policy): {correct_after}/{total_before} = {accuracy_after:.1%}")
-print(f"  Accuracy improvement: {accuracy_after - accuracy_before:+.1%}")
+    print("\n[After training] tool-selection probabilities (should converge to the correct assignment):")
+    print(f"  {'Query type':<12} {'search':<12} {'calculate':<12} {'run_code':<12}  {'Optimal tool'}")
+    print(f"  {'─' * 64}")
+    for qt, optimal in [("search", "search"), ("calculate", "calculate"), ("run_code", "run_code")]:
+        probs = policy.get_probabilities(qt)
+        print(f"  {qt:<12} {probs[0]:<12.4f} {probs[1]:<12.4f} {probs[2]:<12.4f}  {optimal}")
 
-# ---- Show predictions per query ----
-print("\n[Per-query prediction breakdown]:")
-print(f"  {'Question':<30} {'Correct tool':<10} {'Predicted tool':<10} {'Result'}")
-print(f"  {'─' * 65}")
-for qd in TRAINING_QUERIES:
-    qt = policy.get_query_type(qd["query"])
-    probs = policy.get_probabilities(qt)
-    best_action = np.argmax(probs)
-    predicted_tool = TOOL_NAMES[best_action]
-    correct = predicted_tool == qd["correct_tool"]
-    mark = "correct" if correct else "incorrect"
-    query_short = qd["query"][:28] + ".." if len(qd["query"]) > 28 else qd["query"]
-    print(f"  {query_short:<30} {qd['correct_tool']:<10} {predicted_tool:<10} {mark}")
+    # Test post-training accuracy (deterministic policy: pick the highest-probability tool)
+    correct_after = 0
+    for qd in TRAINING_QUERIES:
+        qt = policy.get_query_type(qd["query"])
+        probs = policy.get_probabilities(qt)
+        best_action = np.argmax(probs)
+        if TOOL_NAMES[best_action] == qd["correct_tool"]:
+            correct_after += 1
+    accuracy_after = correct_after / total_before
+    print(f"\n  Post-training accuracy (deterministic policy): {correct_after}/{total_before} = {accuracy_after:.1%}")
+    print(f"  Accuracy improvement: {accuracy_after - accuracy_before:+.1%}")
 
+    # ---- Show predictions per query ----
+    print("\n[Per-query prediction breakdown]:")
+    print(f"  {'Question':<30} {'Correct tool':<10} {'Predicted tool':<10} {'Result'}")
+    print(f"  {'─' * 65}")
+    for qd in TRAINING_QUERIES:
+        qt = policy.get_query_type(qd["query"])
+        probs = policy.get_probabilities(qt)
+        best_action = np.argmax(probs)
+        predicted_tool = TOOL_NAMES[best_action]
+        correct = predicted_tool == qd["correct_tool"]
+        mark = "correct" if correct else "incorrect"
+        query_short = qd["query"][:28] + ".." if len(qd["query"]) > 28 else qd["query"]
+        print(f"  {query_short:<30} {qd['correct_tool']:<10} {predicted_tool:<10} {mark}")
 
-# ==========================================
-# Part 5: Visualization
-# ==========================================
-print("\nGenerating visualization charts...")
+    # ==========================================
+    # Part 5: Visualization
+    # ==========================================
+    print("\nGenerating visualization charts...")
 
-fig, axes = plt.subplots(1, 2, figsize=(18, 7))
-fig.suptitle("Tool-Calling Agent -- REINFORCE Training Process", fontsize=18, fontweight="bold")
+    fig, axes = plt.subplots(1, 2, figsize=(18, 7))
+    fig.suptitle("Tool-Calling Agent -- REINFORCE Training Process", fontsize=18, fontweight="bold")
 
-# ---- Subplot 1: evolution of tool-selection probability ----
-ax1 = axes[0]
+    # ---- Subplot 1: evolution of tool-selection probability ----
+    ax1 = axes[0]
 
-episodes = np.arange(1, len(history["episode_accuracy"]) + 1)
+    episodes = np.arange(1, len(history["episode_accuracy"]) + 1)
 
-# Extract the tool-selection probability trajectory for each query type
-for qt_idx, (qt, color, marker) in enumerate([
-    ("search",    "#2196F3", "o"),
-    ("calculate", "#FF9800", "s"),
-    ("run_code",  "#4CAF50", "^"),
-]):
-    probs_history = np.array(history["tool_probs_history"][qt])
-    # Plot the probability that the correct tool is chosen for this query type
-    ax1.plot(episodes, probs_history[:, qt_idx],
-             marker=marker, linewidth=2.5, markersize=6,
-             color=color, label=f"{qt} queries -> chooses {TOOL_NAMES[qt_idx]}")
+    # Extract the tool-selection probability trajectory for each query type
+    for qt_idx, (qt, color, marker) in enumerate([
+        ("search",    "#2196F3", "o"),
+        ("calculate", "#FF9800", "s"),
+        ("run_code",  "#4CAF50", "^"),
+    ]):
+        probs_history = np.array(history["tool_probs_history"][qt])
+        # Plot the probability that the correct tool is chosen for this query type
+        ax1.plot(episodes, probs_history[:, qt_idx],
+                 marker=marker, linewidth=2.5, markersize=6,
+                 color=color, label=f"{qt} queries -> chooses {TOOL_NAMES[qt_idx]}")
 
-ax1.axhline(y=1/3, color="gray", linestyle="--", alpha=0.5, label="Random baseline (1/3)")
-ax1.set_title("Evolution of Tool-Selection Probability", fontsize=14, fontweight="bold")
-ax1.set_xlabel("Training episode", fontsize=12)
-ax1.set_ylabel("Probability of choosing the correct tool", fontsize=12)
-ax1.legend(fontsize=10, loc="center right")
-ax1.grid(True, alpha=0.3)
-ax1.set_ylim(0, 1.05)
+    ax1.axhline(y=1/3, color="gray", linestyle="--", alpha=0.5, label="Random baseline (1/3)")
+    ax1.set_title("Evolution of Tool-Selection Probability", fontsize=14, fontweight="bold")
+    ax1.set_xlabel("Training episode", fontsize=12)
+    ax1.set_ylabel("Probability of choosing the correct tool", fontsize=12)
+    ax1.legend(fontsize=10, loc="center right")
+    ax1.grid(True, alpha=0.3)
+    ax1.set_ylim(0, 1.05)
 
-# Add annotations
-ax1.annotate("Before training: uniform distribution (~33%)",
-             xy=(1, 1/3), xytext=(8, 0.15),
-             fontsize=10, color="gray",
-             arrowprops=dict(arrowstyle="->", color="gray", lw=1.5))
-ax1.annotate("After training: converges to the correct assignment",
-             xy=(50, 0.9), xytext=(30, 0.95),
-             fontsize=10, color="green", fontweight="bold",
-             arrowprops=dict(arrowstyle="->", color="green", lw=1.5))
+    # Add annotations
+    ax1.annotate("Before training: uniform distribution (~33%)",
+                 xy=(1, 1/3), xytext=(8, 0.15),
+                 fontsize=10, color="gray",
+                 arrowprops=dict(arrowstyle="->", color="gray", lw=1.5))
+    ax1.annotate("After training: converges to the correct assignment",
+                 xy=(50, 0.9), xytext=(30, 0.95),
+                 fontsize=10, color="green", fontweight="bold",
+                 arrowprops=dict(arrowstyle="->", color="green", lw=1.5))
 
-# ---- Subplot 2: accuracy curve ----
-ax2 = axes[1]
+    # ---- Subplot 2: accuracy curve ----
+    ax2 = axes[1]
 
-ax2.plot(episodes, history["episode_accuracy"],
-         linewidth=1.5, alpha=0.4, color="steelblue", label="Episode accuracy (raw)")
+    ax2.plot(episodes, history["episode_accuracy"],
+             linewidth=1.5, alpha=0.4, color="steelblue", label="Episode accuracy (raw)")
 
-# Moving average
-window = 5
-if len(history["episode_accuracy"]) >= window:
-    moving_avg = []
-    for i in range(len(history["episode_accuracy"])):
-        start = max(0, i - window + 1)
-        moving_avg.append(np.mean(history["episode_accuracy"][start:i+1]))
-    ax2.plot(episodes, moving_avg, color="crimson", linewidth=2.5,
-             label=f"Moving average (window={window})")
+    # Moving average
+    window = 5
+    if len(history["episode_accuracy"]) >= window:
+        moving_avg = []
+        for i in range(len(history["episode_accuracy"])):
+            start = max(0, i - window + 1)
+            moving_avg.append(np.mean(history["episode_accuracy"][start:i+1]))
+        ax2.plot(episodes, moving_avg, color="crimson", linewidth=2.5,
+                 label=f"Moving average (window={window})")
 
-ax2.axhline(y=1/3, color="gray", linestyle="--", alpha=0.5, label="Random baseline (33.3%)")
-ax2.axhline(y=accuracy_after, color="green", linestyle=":", alpha=0.7,
-            label=f"Final accuracy ({accuracy_after:.1%})")
+    ax2.axhline(y=1/3, color="gray", linestyle="--", alpha=0.5, label="Random baseline (33.3%)")
+    ax2.axhline(y=accuracy_after, color="green", linestyle=":", alpha=0.7,
+                label=f"Final accuracy ({accuracy_after:.1%})")
 
-ax2.set_title("Tool-Selection Accuracy Over Training", fontsize=14, fontweight="bold")
-ax2.set_xlabel("Training episode", fontsize=12)
-ax2.set_ylabel("Accuracy", fontsize=12)
-ax2.legend(fontsize=10, loc="lower right")
-ax2.grid(True, alpha=0.3)
-ax2.set_ylim(0, 1.05)
+    ax2.set_title("Tool-Selection Accuracy Over Training", fontsize=14, fontweight="bold")
+    ax2.set_xlabel("Training episode", fontsize=12)
+    ax2.set_ylabel("Accuracy", fontsize=12)
+    ax2.legend(fontsize=10, loc="lower right")
+    ax2.grid(True, alpha=0.3)
+    ax2.set_ylim(0, 1.05)
 
-plt.tight_layout()
-plt.savefig("output/tool_use_agent_training.png", dpi=150, bbox_inches="tight")
-print("Chart saved to: output/tool_use_agent_training.png")
-plt.show()
+    plt.tight_layout()
+    plt.savefig("output/tool_use_agent_training.png", dpi=150, bbox_inches="tight")
+    print("Chart saved to: output/tool_use_agent_training.png")
+    plt.show()
 
-
-# ==========================================
-# Part 6: Summary
-# ==========================================
-print("\n" + "=" * 70)
-print("  Key Takeaways")
-print("=" * 70)
-print(f"""
+    # ==========================================
+    # Part 6: Summary
+    # ==========================================
+    print("\n" + "=" * 70)
+    print("  Key Takeaways")
+    print("=" * 70)
+    print(f"""
   1. Tool calling is a core capability of Agentic RL
      - The Agent must learn to choose the right tool based on user intent
      - This is the key leap from "passively answering" to "actively acting"
@@ -473,4 +480,8 @@ print(f"""
      - Next step: the Agent needs to plan a multi-step sequence of tool calls
      - This is the multi-turn credit assignment problem discussed in multi_turn_rl.py
 """)
-print("=" * 70)
+    print("=" * 70)
+
+
+if __name__ == "__main__":
+    main()

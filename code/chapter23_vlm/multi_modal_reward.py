@@ -1,5 +1,5 @@
 """
-Chapter 11: Multi-Modal Reward Function Design
+Chapter 23: Multi-Modal Reward Function Design
 ==========================================================
 
 This script demonstrates designing a multi-modal reward function for VLM
@@ -28,8 +28,8 @@ import matplotlib.pyplot as plt
 # Create output directory
 os.makedirs("output", exist_ok=True)
 
-# Set a CJK-capable font to ensure chart titles and labels render correctly
-plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'SimHei']
+# Use a plain sans-serif font stack (English-only labels)
+plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial']
 plt.rcParams['axes.unicode_minus'] = False
 
 
@@ -48,21 +48,25 @@ def reward_correctness(response, ground_truth):
 
     Args:
         response: the model's text response
-        ground_truth: dict, {'三角形': int, '圆形': int, '正方形': int}
+        ground_truth: dict, {'triangle': int, 'circle': int, 'square': int}
     Returns:
         float: 0.0 (incorrect) or 1.0 (correct)
     """
     # Try to extract the number corresponding to each shape from the response
     extracted = {}
+    response_lower = response.lower()
 
-    for shape_name in ['三角形', '圆形', '正方形']:
-        # Pattern 1: shape name + number, e.g. "三角形3个" or "三角形：3" or "三角形有3个"
+    for shape_name in ['triangle', 'circle', 'square']:
+        # Pattern 1: shape name + number, e.g. "triangles: 3" or "3 triangles" or "triangle count is 3"
+        plural = shape_name + 's'
         patterns = [
-            rf'{shape_name}[^0-9]*?(\d+)',
-            rf'(\d+)\s*个\s*{shape_name}',
+            rf'{plural}\s*:?\s*(?:is\s*)?(\d+)',
+            rf'{shape_name}\s*:?\s*(?:is\s*)?(\d+)',
+            rf'(\d+)\s+{plural}',
+            rf'(\d+)\s+{shape_name}',
         ]
         for pattern in patterns:
-            matches = re.findall(pattern, response)
+            matches = re.findall(pattern, response_lower)
             if matches:
                 # Take the last match (usually the final conclusion)
                 extracted[shape_name] = int(matches[-1])
@@ -92,8 +96,8 @@ def reward_reasoning_quality(response):
       - 0.5: complete step-by-step reasoning with analysis
 
     Judged by:
-      - Whether it contains step markers ("第一步", "Step 1", "1.", etc.)
-      - Whether it contains reasoning keywords ("因为", "所以", "因此", "分析", "计算")
+      - Whether it contains step markers ("Step 1", "1.", "First", etc.)
+      - Whether it contains reasoning keywords ("because", "so", "therefore", "analyze", "calculate")
       - Whether the response is long enough to contain reasoning
 
     Args:
@@ -105,12 +109,12 @@ def reward_reasoning_quality(response):
 
     # Check for step markers (0.2 points)
     step_markers = [
-        r'第[一二三四五六七八九十\d]+步',
         r'[Ss]tep\s*\d+',
-        r'首先',
-        r'然后',
-        r'接着',
-        r'最后',
+        r'[Ff]irst',
+        r'[Tt]hen',
+        r'[Nn]ext',
+        r'[Ff]inally',
+        r'[Ll]ast',
     ]
     step_count = sum(1 for m in step_markers if re.search(m, response))
     if step_count >= 3:
@@ -120,10 +124,14 @@ def reward_reasoning_quality(response):
 
     # Check for reasoning keywords (0.2 points)
     reasoning_keywords = [
-        '因为', '所以', '因此', '分析', '计算',
-        '可以', '发现', '观察', '总共', '合计',
+        'because', 'so', 'therefore', 'analyz', 'analis', 'calculat',
+        'can see', 'found', 'observ', 'total', 'altogether',
     ]
-    keyword_count = sum(1 for kw in reasoning_keywords if kw in response)
+    response_lower = response.lower()
+    keyword_count = sum(
+        1 for kw in reasoning_keywords
+        if re.search(r'\b' + re.escape(kw) + r'\b', response_lower)
+    )
     if keyword_count >= 3:
         score += 0.2
     elif keyword_count >= 1:
@@ -148,7 +156,7 @@ def reward_format(response):
       - 0.2: perfect formatting (summary conclusion + all three shape counts present)
 
     Expected format example:
-      "图片中有 X 个三角形、Y 个圆形和 Z 个正方形，总共 N 个形状。"
+      "The image has X triangles, Y circles, and Z squares, N shapes in total."
 
     Args:
         response: the model's text response
@@ -156,27 +164,30 @@ def reward_format(response):
         float: 0.0~0.2
     """
     score = 0.0
+    response_lower = response.lower()
 
     # Check whether all three shapes are mentioned (0.1 points)
-    shapes_mentioned = sum(1 for s in ['三角形', '圆形', '正方形'] if s in response)
+    shapes_mentioned = sum(1 for s in ['triangle', 'circle', 'square'] if s in response_lower)
     if shapes_mentioned == 3:
         score += 0.1
     elif shapes_mentioned >= 2:
         score += 0.05
 
-    # Check for a summary statement (0.05 points)
+    # Check for a summary statement (0.05 points). Patterns require an explicit
+    # summary cue ("in total", a total followed by a number) so a bare word
+    # like "not total" does not earn the bonus.
     summary_patterns = [
-        r'总共\s*\d+',
-        r'合计\s*\d+',
-        r'一共\s*\d+',
-        r'总计\s*\d+',
-        r'答[：:]',
+        r'in total',
+        r'total\s*\d+',
+        r'altogether',
+        r'in all',
+        r'answer\s*:',
     ]
-    if any(re.search(p, response) for p in summary_patterns):
+    if any(re.search(p, response_lower) for p in summary_patterns):
         score += 0.05
 
     # Check for a number-shape pairing (0.05 points)
-    has_number_shape_pair = bool(re.search(r'\d+\s*个', response))
+    has_number_shape_pair = bool(re.search(r'\d+\s+(triangles?|circles?|squares?)', response_lower))
     if has_number_shape_pair:
         score += 0.05
 
@@ -195,8 +206,8 @@ def reward_visual_grounding(response, image_info):
 
     image_info example:
       {
-        'present_shapes': ['三角形', '圆形'],  # shapes actually present in the image
-        'absent_shapes': ['正方形'],             # shapes not present in the image
+        'present_shapes': ['triangle', 'circle'],  # shapes actually present in the image
+        'absent_shapes': ['square'],               # shapes not present in the image
       }
 
     Args:
@@ -206,38 +217,43 @@ def reward_visual_grounding(response, image_info):
         float: 0.0~0.3
     """
     score = 0.0
+    response_lower = response.lower()
 
     present_shapes = image_info.get('present_shapes', [])
     absent_shapes = image_info.get('absent_shapes', [])
 
     # Check whether the present shapes are mentioned (0.15 points)
-    mentioned_present = sum(1 for s in present_shapes if s in response)
+    mentioned_present = sum(1 for s in present_shapes if s.lower() in response_lower)
     if len(present_shapes) > 0:
         ratio = mentioned_present / len(present_shapes)
         score += 0.15 * ratio
 
     # Check whether absent shapes are correctly reported as absent (0.1 points)
-    # If a shape is absent and the model says "0 个" or "没有", that is correct visual grounding
+    # If a shape is absent and the model says "0 triangles" or "no squares", that is correct visual grounding
     for shape in absent_shapes:
-        if shape in response:
-            # Check whether it's correctly labeled as 0
-            zero_patterns = [
-                rf'{shape}[^0-9]*?0',
-                rf'0\s*个\s*{shape}',
-                rf'没有\s*{shape}',
-            ]
-            if any(re.search(p, response) for p in zero_patterns):
-                score += 0.05
-                break  # cap the bonus at 0.05
+        plural = shape.lower() + 's'
+        zero_patterns = [
+            rf'{plural}\s*:?\s*(?:is\s*)?0',
+            rf'{shape.lower()}\s*:?\s*(?:is\s*)?0',
+            rf'0\s+{plural}',
+            rf'no\s+{plural}',
+        ]
+        if any(re.search(p, response_lower) for p in zero_patterns):
+            score += 0.05
+            break  # cap the bonus at 0.05
 
-    # Check for visually descriptive language (0.05 points)
+    # Check for visually descriptive language (0.05 points). Word-boundary
+    # matching avoids substring false positives (e.g. "top" in "topic").
     visual_keywords = [
-        '颜色', '红色', '蓝色', '绿色', '橙色', '紫色',
-        '位置', '左边', '右边', '上方', '下方',
-        '大小', '大', '小',
-        '可以看到', '图中', '图片中', '画布上',
+        'color', 'red', 'blue', 'green', 'orange', 'purple',
+        'position', 'left', 'right', 'above', 'below', 'top', 'bottom',
+        'size', 'big', 'small', 'large',
+        'can see', 'in the image', 'in the picture', 'on the canvas',
     ]
-    visual_count = sum(1 for kw in visual_keywords if kw in response)
+    visual_count = sum(
+        1 for kw in visual_keywords
+        if re.search(r'\b' + re.escape(kw) + r'\b', response_lower)
+    )
     if visual_count >= 2:
         score += 0.05
 
@@ -249,10 +265,10 @@ def compute_total_reward(response, ground_truth, image_info):
     Compute the weighted total reward
 
     Weight distribution:
-      - Correctness:        × 1.0  → max 1.0
-      - Reasoning quality:   × 1.0  → max 0.5
-      - Format compliance:   × 1.0  → max 0.2
-      - Visual grounding:    × 1.0  → max 0.3
+      - Correctness:        x 1.0  -> max 1.0
+      - Reasoning quality:  x 1.0  -> max 0.5
+      - Format compliance:  x 1.0  -> max 0.2
+      - Visual grounding:   x 1.0  -> max 0.3
       ---------------------------------------------
       Theoretical max total score: 2.0
 
@@ -290,105 +306,105 @@ test_cases = [
     {
         'name': 'Perfect response (correct + reasoning + format + visual grounding)',
         'response': (
-            '我仔细观察了图片。\n'
-            '首先，分析图中的三角形：我数到了 3 个三角形，分别在左上方和右侧。\n'
-            '然后，分析圆形：图片中有 1 个圆形，颜色是蓝色，位于中间偏左。\n'
-            '接着，分析正方形：图片中有 2 个正方形，一个红色一个绿色。\n'
-            '所以，图片中总共有 3 个三角形、1 个圆形和 2 个正方形，合计 6 个形状。\n'
-            '答：三角形3个，圆形1个，正方形2个，总共6个。'
+            'I looked at the image carefully.\n'
+            'First, the triangles: I count 3 triangles, one at the top left and two on the right.\n'
+            'Then, the circles: there is 1 circle, blue, slightly left of center.\n'
+            'Next, the squares: there are 2 squares, one red and one green.\n'
+            'So the image has 3 triangles, 1 circle, and 2 squares, 6 shapes in total.\n'
+            'Answer: triangles 3, circles 1, squares 2, total 6.'
         ),
-        'ground_truth': {'三角形': 3, '圆形': 1, '正方形': 2},
+        'ground_truth': {'triangle': 3, 'circle': 1, 'square': 2},
         'image_info': {
-            'present_shapes': ['三角形', '圆形', '正方形'],
+            'present_shapes': ['triangle', 'circle', 'square'],
             'absent_shapes': [],
         },
     },
     {
         'name': 'Correct but short (no reasoning process)',
-        'response': '三角形3个，圆形1个，正方形2个。',
-        'ground_truth': {'三角形': 3, '圆形': 1, '正方形': 2},
+        'response': 'Triangles 3, circles 1, squares 2.',
+        'ground_truth': {'triangle': 3, 'circle': 1, 'square': 2},
         'image_info': {
-            'present_shapes': ['三角形', '圆形', '正方形'],
+            'present_shapes': ['triangle', 'circle', 'square'],
             'absent_shapes': [],
         },
     },
     {
         'name': 'Wrong but with reasoning process',
         'response': (
-            '让我一步步来分析。\n'
-            '首先，观察图片中的三角形。可以看到有 2 个三角形。\n'
-            '然后，观察圆形。图片中有 1 个圆形。\n'
-            '最后，观察正方形。有 2 个正方形。\n'
-            '所以，总共是 2+1+2=5 个形状。\n'
-            '答：三角形2个，圆形1个，正方形2个。'
+            'Let me analyze this step by step.\n'
+            'First, look at the triangles. I can see 2 triangles.\n'
+            'Then, look at the circles. There is 1 circle.\n'
+            'Finally, look at the squares. There are 2 squares.\n'
+            'So that is 2+1+2=5 shapes in total.\n'
+            'Answer: triangles 2, circles 1, squares 2.'
         ),
-        'ground_truth': {'三角形': 3, '圆形': 1, '正方形': 2},
+        'ground_truth': {'triangle': 3, 'circle': 1, 'square': 2},
         'image_info': {
-            'present_shapes': ['三角形', '圆形', '正方形'],
+            'present_shapes': ['triangle', 'circle', 'square'],
             'absent_shapes': [],
         },
     },
     {
         'name': 'Wrong and confused',
-        'response': '图里有好多形状，大概是三角形2个圆形3个正方形5个吧。',
-        'ground_truth': {'三角形': 3, '圆形': 1, '正方形': 2},
+        'response': 'There are lots of shapes, maybe 2 triangles 3 circles and 5 squares.',
+        'ground_truth': {'triangle': 3, 'circle': 1, 'square': 2},
         'image_info': {
-            'present_shapes': ['三角形', '圆形', '正方形'],
+            'present_shapes': ['triangle', 'circle', 'square'],
             'absent_shapes': [],
         },
     },
     {
         'name': 'Partially correct (only one shape counted correctly)',
         'response': (
-            '我来看一下图片中的形状。\n'
-            '三角形有 3 个，这个我数对了。\n'
-            '圆形有 2 个，正方形有 1 个。\n'
-            '总共 6 个形状。'
+            'Let me look at the shapes in the image.\n'
+            'There are 3 triangles, I got that one right.\n'
+            'There are 2 circles and 1 square.\n'
+            '6 shapes in total.'
         ),
-        'ground_truth': {'三角形': 3, '圆形': 1, '正方形': 2},
+        'ground_truth': {'triangle': 3, 'circle': 1, 'square': 2},
         'image_info': {
-            'present_shapes': ['三角形', '圆形', '正方形'],
+            'present_shapes': ['triangle', 'circle', 'square'],
             'absent_shapes': [],
         },
     },
     {
         'name': 'Well-formatted but wrong content',
         'response': (
-            '答：经过分析，图片中包含以下形状：\n'
-            '三角形0个，圆形5个，正方形5个，总共10个。'
+            'Answer: after analysis, the image contains:\n'
+            'triangles 0, circles 5, squares 5, 10 in total.'
         ),
-        'ground_truth': {'三角形': 0, '圆形': 2, '正方形': 3},
+        'ground_truth': {'triangle': 0, 'circle': 2, 'square': 3},
         'image_info': {
-            'present_shapes': ['圆形', '正方形'],
-            'absent_shapes': ['三角形'],
+            'present_shapes': ['circle', 'square'],
+            'absent_shapes': ['triangle'],
         },
     },
     {
         'name': 'Has visual description but the answer is wrong',
         'response': (
-            '观察图片，可以看到图片中左侧有一个蓝色的圆形，'
-            '右边有一个红色的三角形，下方有两个绿色的正方形。\n'
-            '三角形1个，圆形2个，正方形2个，合计5个形状。'
+            'Looking at the image, I can see a blue circle on the left, '
+            'a red triangle on the right, and two green squares below.\n'
+            'Triangles 1, circles 2, squares 2, 5 shapes altogether.'
         ),
-        'ground_truth': {'三角形': 2, '圆形': 1, '正方形': 3},
+        'ground_truth': {'triangle': 2, 'circle': 1, 'square': 3},
         'image_info': {
-            'present_shapes': ['三角形', '圆形', '正方形'],
+            'present_shapes': ['triangle', 'circle', 'square'],
             'absent_shapes': [],
         },
     },
     {
         'name': 'Case where some shapes are absent (handled correctly)',
         'response': (
-            '首先，分析图中的三角形：有 2 个三角形。\n'
-            '然后，分析圆形：有 3 个圆形。\n'
-            '接着，分析正方形：图片中没有正方形，0个。\n'
-            '所以，三角形2个，圆形3个，正方形0个，总共5个形状。\n'
-            '答：三角形2个，圆形3个，正方形0个。'
+            'First, the triangles: there are 2 triangles.\n'
+            'Then, the circles: there are 3 circles.\n'
+            'Next, the squares: there are no squares, 0 squares.\n'
+            'So triangles 2, circles 3, squares 0, 5 shapes in total.\n'
+            'Answer: triangles 2, circles 3, squares 0.'
         ),
-        'ground_truth': {'三角形': 2, '圆形': 3, '正方形': 0},
+        'ground_truth': {'triangle': 2, 'circle': 3, 'square': 0},
         'image_info': {
-            'present_shapes': ['三角形', '圆形'],
-            'absent_shapes': ['正方形'],
+            'present_shapes': ['triangle', 'circle'],
+            'absent_shapes': ['square'],
         },
     },
 ]
@@ -466,7 +482,7 @@ def run_reward_tests():
     for i, (tc, rewards) in enumerate(zip(test_cases, all_rewards)):
         gt = tc['ground_truth']
         print(f"\n--- Test case {i+1}: {tc['name']} ---")
-        print(f"  Annotation: triangles={gt['三角形']}, circles={gt['圆形']}, squares={gt['正方形']}")
+        print(f"  Annotation: triangles={gt['triangle']}, circles={gt['circle']}, squares={gt['square']}")
         print(f"  Response: {tc['response'][:80]}...")
         print(f"  Reward breakdown:")
         print(f"    Correctness:       {rewards['correctness']:.2f}  {'[max]' if rewards['correctness'] == 1.0 else '[no score]'}")
