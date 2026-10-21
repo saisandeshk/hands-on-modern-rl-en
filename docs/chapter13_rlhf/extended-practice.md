@@ -112,8 +112,10 @@ A rough calculation using `flawed_reward`:
 
 | Answer | Length score | Format score | Politeness score | Total | Human impression     |
 | ------ | ------------ | ------------ | ---------------- | ----- | -------------------- |
-| A      | ~0.32        | 0.0          | 0.0              | 0.32  | Concise and accurate |
-| B      | ~0.75        | 1.0          | 0.6              | 2.35  | Verbose and empty    |
+| A      | ~1.23        | 0.0          | 0.0              | 1.23  | Concise and accurate |
+| B      | ~1.65        | 1.0          | 0.9              | 3.55  | Verbose and empty    |
+
+Character counts drive the length term (`len(response) / 100.0`): answer A is 123 characters (1.23) and answer B is 165 characters (1.65). Answer B additionally matches three politeness phrases ("I'm happy to help", "Here are some", "Hope this helps") for $3 \times 0.3 = 0.9$ plus both format bonuses for $1.0$.
 
 The bad reward strongly prefers B. As long as PPO keeps optimizing, the model will produce more answers like B.
 

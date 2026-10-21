@@ -1,5 +1,5 @@
 ---
-title: 13.2 SFT Instruction Tuning
+title: 13.2 Supervised Fine-Tuning
 ---
 
 # 13.2 Supervised Fine-Tuning
@@ -280,6 +280,8 @@ def build_labels(input_ids, assistant_mask, ignore_index=-100):
 
 This function is short, but it determines whether the model learns to "answer questions" or to "parrot the entire chat history."
 
+The same mask governs three boundaries that silently corrupt training when handled inconsistently. **Padding** tokens pad a batch to equal length and must always be masked on both the input and the label side. **EOS** ends the response: tokens after EOS are not model decisions and must be masked, while a missing EOS (the model never stopped) is itself a training signal worth tracking. **Truncation** cuts sequences longer than the context window; truncated assistant tokens are unseen rather than wrong, so mask them instead of teaching the model to predict a cut-off fragment. A fixed-sequence log-probability oracle is just this rule applied deterministically: given stored tokens plus the stored mask, recompute $\sum_t m_t \log \pi(y_t \mid \cdot)$ under any checkpoint without regenerating. That recomputability is what makes SFT losses, KL terms, and importance ratios auditable later.
+
 #### 3) Packing and length strategy: the triangle of throughput, quality, and stability
 
 In long-context training, the sample length distribution strongly affects throughput and stability. Two common strategies in practice:
@@ -317,6 +319,8 @@ A common beginner mistake is watching only SFT loss. SFT loss decreasing only me
 
 Preference data is the core fuel for DPO and the second stage of RLHF (RM training). Each data point is a triplet $(x, y_w, y_l)$: given the same prompt $x$, the model generates two responses, and a human (or AI) annotator labels $y_w$ (chosen) as better than $y_l$ (rejected).
 
+Keep the feedback types distinct: a **demonstration** shows one good answer, a **comparison** picks the better of two, a **ranking** orders several, a **rating** assigns an absolute number, and a **critique** explains what is wrong in words. This chapter standardizes everything after collection into pairwise triplets, because comparisons transfer across annotators better than ratings and plug directly into both the RM loss below and DPO in Chapter 14. Prompts should be sampled to cover the deployment distribution, and later rounds should include responses from the current policy itself -- otherwise the RM only ever judges yesterday's distribution.
+
 ### How Preference Data Trains a Reward Model
 
 Preference data tells us only that response A is better than response B, while PPO needs a numeric reward it can optimize. RLHF therefore introduces a reward model $r_\phi(x,y)$ between preference annotation and PPO. Given a prompt $x$ and response $y$, it outputs a scalar score.
@@ -336,6 +340,8 @@ $$
 
 This way of modeling pairwise preferences from score differences is commonly called the **Bradley–Terry model**. [^bt] The mechanism—score difference to preference probability—is what matters for the rest of the chapter.
 
+Two limits of this model shape everything downstream. First, **only differences are identified**: adding the same constant to $r_\phi(x, y_w)$ and $r_\phi(x, y_l)$ leaves every preference probability unchanged, so the absolute reward scale is arbitrary and must be calibrated before PPO (see Section 13.4). Second, **only the ordering is constrained**: a pair with $\Delta r = 5$ and a pair with $\Delta r = 0.5$ can both be "correct," yet PPO treats their magnitudes very differently. High held-out accuracy with tiny margins is therefore a weak reward signal, and high accuracy with huge margins on a narrow domain often means overfitting rather than a robust scorer.
+
 The corresponding negative log-likelihood loss is:
 
 $$
@@ -352,7 +358,7 @@ $$
 \mathcal{L}_{RM}=-\log 0.818\approx 0.201
 $$
 
-The reward model judged this pair correctly and with reasonable confidence. If it reversed the order -- $0.5$ for chosen and $2.0$ for rejected -- then $\Delta r=-1.5$, $\sigma(-1.5)\approx 0.182$, and the loss becomes $-\log 0.182\approx 1.704$. The gradient pushes the chosen score up and the rejected score down until the order is restored and the gap reopens.
+The reward model judged this pair correctly and with reasonable confidence. If it reversed the order -- $0.5$ for chosen and $2.0$ for rejected -- then $\Delta r=-1.5$, $\sigma(-1.5)\approx 0.182$, and the loss becomes $-\log 0.182\approx 1.701$. The gradient pushes the chosen score up and the rejected score down until the order is restored and the gap reopens.
 
 Pairwise annotation also matches how humans judge reliably: annotators generally agree more consistently on which of two responses is better than on absolute numeric grades -- one person's "7" is another person's "8". The three annotation styles trade off as follows:
 

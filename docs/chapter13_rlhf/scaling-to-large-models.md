@@ -2,7 +2,7 @@
 title: '13.5 Large-Scale Training Engineering'
 ---
 
-# 13.5 Large-Scale Training Engineering: Scaling the Same RLHF Pipeline
+# 13.5 Large-Scale Training Engineering
 
 ## Reading Guide
 
@@ -90,6 +90,8 @@ Frameworks like OpenRLHF package several system solutions:
 | Monitoring             | Local logs                      | Experiment platforms, checkpoints, failure recovery |
 
 Algorithmically you are still doing SFT, RM, PPO; each step has just been decomposed into a distributed system.
+
+Account for compute the way you account for data: budget **rollout tokens** (generated per PPO step), **verifier calls** (rule checks and judge invocations per response), and **latency** (time from prompt batch to usable gradient step) separately from training FLOPs. Rollout usually dominates wall-clock time in on-policy RL, so doubling the rollout batch without extra inference capacity slows iteration even though the gradient statistics improve. Log all three per experiment alongside GPU-hours so a "better" curve can be priced honestly.
 
 A mid-scale PPO-RLHF system typically includes:
 
@@ -240,7 +242,7 @@ The structure of classical RLHF is consistent across small and large models: bas
 
 At this point, Chapter 13 has completed the main thread of classical RLHF. Chapter 14 moves into [DPO](../chapter14_dpo/dpo-objective-derivation), which updates the model directly from preference pairs. Chapters 15–17 then cover GRPO/RLVR, reasoning models, and process rewards; Chapter 18 brings these methods together in an industrial training system.
 
-If you want an additional hands-on exercise before moving to Chapter 9, see the extended practice: deliberately write a bad reward function, observe how reward hacking happens, and then fix it with data and evaluation — [Extended Practice: Reward Hacking and Data Flywheels](./extended-practice).
+If you want an additional hands-on exercise before moving to Chapter 14, see the extended practice: deliberately write a bad reward function, observe how reward hacking happens, and then fix it with data and evaluation — [Extended Practice: Reward Hacking and Data Flywheels](./extended-practice).
 
 ## Exercises
 

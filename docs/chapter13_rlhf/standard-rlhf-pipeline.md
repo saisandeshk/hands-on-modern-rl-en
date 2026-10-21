@@ -1,5 +1,5 @@
 ---
-title: 13.4 The RLHF Pipeline
+title: 13.4 Reinforcement Learning Fine-Tuning
 ---
 
 # 13.4 Reinforcement Learning Fine-Tuning
@@ -206,7 +206,7 @@ flowchart LR
     style R3 fill:#e3f2fd,stroke:#1565c0
 ```
 
-**Pure rule rewards** suit tasks with objective ground truth: whether the final answer of a math problem is correct, whether code runs, whether the output format is valid. Such rewards are fully deterministic and cannot be "hacked", but they only check surface form and cannot assess semantic quality.
+**Pure rule rewards** suit tasks with objective ground truth: whether the final answer of a math problem is correct, whether code runs, whether the output format is valid. Such rewards are fully deterministic and cannot be "hacked", but they only check surface form and cannot assess semantic quality. Judge a rule verifier by **soundness** (it never accepts a wrong answer) and **completeness** (it accepts every legitimate formatting of a right answer), and test both directions explicitly: feed it correct answers in unusual formats (false negatives) and wrong answers in perfect formats (false positives). Parser boundaries -- what counts as the "final answer" -- are part of the verifier and must be versioned with it.
 
 **Pure model rewards** are the reward model (RM) trained in this section: given $(prompt, response)$, it outputs a scalar score. An RM understands semantics -- it knows which of "helpful but blunt" and "polite but empty" is better. But an RM carries a fundamental risk: it is itself a model, and models can be exploited adversarially. This is the reward hacking problem covered later (Sections 13.6 and 13.7).
 
@@ -401,6 +401,7 @@ Collect the checks into one practical checklist to walk through when designing y
 ::: details Advanced: a minimal PyTorch reward model
 
 ```python
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -418,8 +419,10 @@ class RewardModel(nn.Module):
             input_ids=input_ids,
             attention_mask=attention_mask,
         )
-        # Production code should locate the last valid token from attention_mask.
-        last_hidden = outputs.last_hidden_state[:, -1, :]
+        # Score the last non-padded token of each sequence.
+        last_idx = attention_mask.sum(dim=1) - 1
+        batch_idx = torch.arange(input_ids.shape[0], device=input_ids.device)
+        last_hidden = outputs.last_hidden_state[batch_idx, last_idx, :]
         return self.reward_head(last_hidden).squeeze(-1)
 
 
@@ -581,6 +584,8 @@ This is not bureaucracy. When debugging RLHF you will often ask:
 - From which checkpoint did the model start getting verbose?
 
 If artifacts are unclear, these questions become hard to answer later.
+
+Treat every rollout as an immutable record: store the prompt, the response tokens, the decoding settings (temperature, top-$p$, top-$k$, seed), the acting checkpoint id, and the log-probabilities under the policy that generated them. Later PPO updates read those stored log-probabilities as the denominator of the importance ratio; regenerating or silently editing them breaks the on/off-policy bookkeeping. Bind versions jointly -- policy, tokenizer and chat template, reward model, verifier, and evaluation prompt set -- so a claimed win rate names the exact tuple that produced it. Training, sampling, and evaluation prompts must be disjoint by prompt id (Section 13.2), and any rollout that is refused, timed-out, invalid, or truncated gets its own outcome tag rather than being scored as an ordinary completion.
 
 ## Common Failure Mode Map
 

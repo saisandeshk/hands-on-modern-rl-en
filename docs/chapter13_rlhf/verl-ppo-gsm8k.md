@@ -1,3 +1,7 @@
+---
+title: '13.8 Hands-on: veRL PPO on GSM8K'
+---
+
 # 13.8 Hands-on: veRL PPO on GSM8K
 
 > **Section goal**: Run PPO on GSM8K with veRL, trace the data flow across rollout, rule rewards, advantage estimation, and model updates, then compare math accuracy before and after training.
@@ -768,4 +772,4 @@ This section depends on external veRL and does not copy veRL source code. This r
 
 ## Section Summary
 
-This lab connects the runnable experiment to the main idea of the section. Use the reported metrics together with replay or task-level evaluation, and keep conclusions within the conditions that were actually tested.
+PPO on GSM8K replaces the learned reward model with a verifiable correctness check but keeps the surrounding machinery: sample with the current policy, score each trajectory, estimate advantages, and update under KL and clipping constraints. The reported 42.08% to 54.89% gain holds only for the stated setup (model, data split, reward definition, and decoding settings); change any of them and re-measure rather than quoting the delta as a general PPO effect.
