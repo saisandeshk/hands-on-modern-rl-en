@@ -1,8 +1,8 @@
 ---
-title: 15.R Summary and Exercises
+title: 15.9 Summary and Exercises
 ---
 
-# 15.R Summary and Exercises
+# 15.9 Summary and Exercises
 
 This chapter replaced the two learned models of RLHF — the Critic and the reward model — with two cheaper substitutes: within-group comparison and verifiable rewards. GRPO (Sections 15.1–15.2, 15.4) samples several answers per prompt and turns "better than the group average" into an advantage; RLVR (Sections 15.3, 15.5–15.6, 15.8) scores those answers with rules, tests, and sandboxes instead of a reward model; on-policy distillation (Section 15.7) fills the remaining gap with dense token-level teacher feedback on the student's own trajectories.
 

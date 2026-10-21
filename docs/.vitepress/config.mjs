@@ -1095,6 +1095,10 @@ const sidebar = {
             {
               text: '15.8 Hands-on: Code Generation with veRL',
               link: '/chapter15_grpo/verl-code-sandbox'
+            },
+            {
+              text: '15.9 Summary and Exercises',
+              link: '/chapter15_grpo/review'
             }
           ]
         },
