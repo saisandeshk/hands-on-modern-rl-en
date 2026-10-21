@@ -24,7 +24,7 @@ Status legend: **confirmed** = checked by arithmetic or against the cited paper 
 - [ ] `chapter11_imitation_meta_rl/irl-gail.md` — Wasserstein GAIL "gradient clipping" wording is garbled; the optimal-transport box heading contradicts its body (which talks about Jensen-Shannon divergence). **suspected**
 - [ ] `chapter11_imitation_meta_rl/meta-rl.md` — §3.2 says Algorithm Distillation in-context RL and GPT-3 in-context learning are "almost the same thing", then hedges; reads as contradictory. **suspected**
 - [ ] `chapter12_exploration_marl_hierarchical/intrinsic-motivation-exploration.md` — the 10⁻¹⁸ probability (ε=0.1, 6 actions, 50 steps) cannot be derived from the stated numbers; ICM on Mario is described as continuous control, but Mario has discrete actions. **suspected**
-- [ ] `chapter12_exploration_marl_hierarchical/hierarchical.md` — HIRO's off-policy correction is described as g' = s_{t+c} − s_t; HIRO actually picks g' (among candidates) to maximize the low-level policy's action log-likelihood. Latent actions are credited to Genie 3; they come from Genie (2024). **suspected (likely correct critique)**
+- [ ] `chapter12_exploration_marl_hierarchical/hierarchical.md` — HIRO's off-policy correction is described as g' = s\_{t+c} − s_t; HIRO actually picks g' (among candidates) to maximize the low-level policy's action log-likelihood. Latent actions are credited to Genie 3; they come from Genie (2024). **suspected (likely correct critique)**
 
 ## Part IV · LLM post-training
 
@@ -44,4 +44,5 @@ Status legend: **confirmed** = checked by arithmetic or against the cited paper 
 
 ## Cross-references and numbering
 
+- [x] `chapter05_dqn/visual-game-projects.md` — seven runnable commands/paths used the pre-rename directory `chapter07_dqn/` (requirements installs, `dqn_gym_sb3.py`, `dqn_atari_sb3.py`, `dqn_pokemon_red_pyboy.py` invocations and a GIF output path), but the code lives in `code/chapter05_dqn/`. Fixed to `chapter05_dqn/` (code-classic review follow-up).
 - [ ] Several pages cite chapter numbers from older outlines, e.g. `preface/introduction.md` ("Chapters 8–9" for DPO, "Chapter 8" for Agentic RL), `chapter12_exploration_marl_hierarchical/marl.md` ("PPO since Chapter 7"), `chapter08_ppo/trust-region-clipping.md` ("Chapter 6" for REINFORCE is correct), `chapter08_ppo/gae-reward-model.md` (Chapters 4, 7.1, 14, 15). Check each against the sidebar numbering.

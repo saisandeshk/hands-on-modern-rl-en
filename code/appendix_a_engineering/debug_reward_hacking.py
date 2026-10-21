@@ -290,13 +290,17 @@ def train_agent(env, label, num_episodes=300, batch_size=64, seed=0, device="cpu
             original reward)
         loss_history: history of loss values
     """
-    state_dim = env.observation_space.shape[0]
-    action_dim = env.action_space.n
-    agent = DQNAgent(state_dim, action_dim, lr=1e-3, gamma=0.99, device=device)
-
+    # Seed first so that --seed controls the initial Q-network weights too
+    # (torch draws the Linear init from the global RNG at construction time).
+    # All scenarios are called with the same seed so that only the reward
+    # function differs between them.
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
+
+    state_dim = env.observation_space.shape[0]
+    action_dim = env.action_space.n
+    agent = DQNAgent(state_dim, action_dim, lr=1e-3, gamma=0.99, device=device)
 
     EPSILON_START = 1.0
     EPSILON_END = 0.01
@@ -486,7 +490,7 @@ def run_all_experiments(num_episodes=300, batch_size=64, seed=0, device="cpu"):
     )
     shaping_rewards, shaping_task_scores, shaping_losses = train_agent(
         bad_shaping_env, "Bad shaping", num_episodes=num_episodes, batch_size=batch_size,
-        seed=seed + 1, device=device,
+        seed=seed, device=device,
     )
     diagnose_reward_hacking(shaping_rewards, shaping_task_scores, "Scenario 2 - Bad shaping")
 
@@ -500,7 +504,7 @@ def run_all_experiments(num_episodes=300, batch_size=64, seed=0, device="cpu"):
     correct_env = gym.make("CartPole-v1")
     correct_rewards, correct_task_scores, correct_losses = train_agent(
         correct_env, "Correct reward", num_episodes=num_episodes, batch_size=batch_size,
-        seed=seed + 2, device=device,
+        seed=seed, device=device,
     )
     diagnose_reward_hacking(correct_rewards, correct_task_scores, "Scenario 3 - Correct design")
 

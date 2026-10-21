@@ -69,7 +69,9 @@ class TrainingMonitorCallback(BaseCallback):
             if hasattr(logger, "name_to_value"):
                 name_to_value = logger.name_to_value
 
-                entropy = name_to_value.get("train/entropy_loss", 0)
+                # SB3 records `train/entropy_loss = -mean(entropy)`, so negate
+                # it back to the actual policy entropy (higher = more exploration).
+                entropy = -name_to_value.get("train/entropy_loss", 0)
                 clip_frac = name_to_value.get("train/clip_fraction", 0)
                 approx_kl = name_to_value.get("train/approx_kl", 0)
 

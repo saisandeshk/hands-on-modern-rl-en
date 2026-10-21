@@ -515,7 +515,15 @@ def main(args=None):
     print_value_iteration_steps(n_steps=20)
 
     # Hard assertions so `pytest` and `--smoke` both catch regressions.
-    manual_v = manual_bellman_expectation()
+    # (verify_results() already printed the manual solution once; solve the
+    # linear system quietly here instead of printing it a second time.)
+    A = np.array([
+        [1.0, -0.45, -0.45],
+        [-0.225, 0.64, -0.315],
+        [0.0, -0.45, 0.55],
+    ])
+    b = np.array([1.5, -0.5, 2.0])
+    manual_v = np.linalg.solve(A, b)
     iter_v, _ = policy_evaluation(np.ones((N_STATES, N_ACTIONS)) / N_ACTIONS)
     assert np.allclose(manual_v, iter_v, atol=1e-6), "Bellman expectation mismatch"
 

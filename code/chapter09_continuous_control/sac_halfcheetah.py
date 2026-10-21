@@ -55,9 +55,10 @@ class SACTrainingCallback(BaseCallback):
 
     SAC's core monitoring metrics:
         - episode_reward: cumulative episode reward, measures policy performance
-        - entropy/alpha: entropy coefficient (temperature parameter), measures exploration strength
+        - ent_coef: entropy coefficient (temperature parameter), measures exploration strength
         - critic_loss: critic network loss, measures value estimation quality
         - actor_loss: actor network loss, measures the direction of policy optimization
+        - ent_coef_loss: temperature-tuning loss (SB3 logs no policy entropy for SAC)
 
     Differences from the PPO callback:
         - SAC is off-policy, so data can be reused; there is no clip_fraction
@@ -73,7 +74,7 @@ class SACTrainingCallback(BaseCallback):
         self.alpha_list = []          # Entropy coefficient (temperature parameter)
         self.critic_loss_list = []    # Critic loss
         self.actor_loss_list = []     # Actor loss
-        self.entropy_list = []        # Policy entropy
+        self.ent_coef_loss_list = []  # Temperature (ent_coef) loss; SB3 logs no policy entropy for SAC
         self.timesteps_list = []      # Corresponding timesteps
 
     def _on_step(self):
@@ -88,24 +89,30 @@ class SACTrainingCallback(BaseCallback):
             if hasattr(logger, "name_to_value"):
                 name_to_value = logger.name_to_value
 
-                # alpha: SAC's temperature parameter
-                # In automatic tuning mode, alpha is adaptively adjusted based on the target entropy
-                # Larger alpha → encourages more exploration
-                # Smaller alpha → favors exploitation
-                alpha = name_to_value.get("train/entropy_coef", 0)
+                # alpha: SAC's temperature parameter (SB3 logs it as
+                # `train/ent_coef`; in automatic-tuning mode alpha is adapted
+                # to hold the target entropy `-dim(A)`).
+                # Larger alpha → encourages more exploration.
+                # Smaller alpha → favors exploitation.
+                # NOTE: SB3 logs no policy entropy for SAC, so instead of a
+                # flat-zero "entropy" series we track `train/ent_coef_loss`
+                # (the temperature-tuning loss, which SB3 does log).
+                if "train/ent_coef" not in name_to_value:
+                    return True
+                alpha = name_to_value.get("train/ent_coef", 0)
                 # critic_loss: total loss of the two Q-networks
                 # Measures how well the Q-values fit the actual returns
                 critic_loss = name_to_value.get("train/critic_loss", 0)
                 # actor_loss: loss of the policy network
                 # Includes both the Q-value term and the entropy term
                 actor_loss = name_to_value.get("train/actor_loss", 0)
-                # entropy: average entropy of the current policy
-                entropy = name_to_value.get("train/entropy", 0)
+                # ent_coef_loss: loss used to auto-tune the temperature alpha
+                ent_coef_loss = name_to_value.get("train/ent_coef_loss", 0)
 
                 self.alpha_list.append(alpha)
                 self.critic_loss_list.append(critic_loss)
                 self.actor_loss_list.append(actor_loss)
-                self.entropy_list.append(entropy)
+                self.ent_coef_loss_list.append(ent_coef_loss)
                 self.timesteps_list.append(self.num_timesteps)
 
         return True
@@ -238,7 +245,7 @@ def main(args=None):
     print("-" * 50)
 
     # Create the training monitoring callback
-    callback = SACTrainingCallback(check_freq=1000)
+    callback = SACTrainingCallback(check_freq=64 if args.smoke else 1000)
 
     # Train for the configured budget (for demonstration; real training usually needs 1M+)
     total_timesteps = args.total_timesteps
@@ -292,14 +299,14 @@ def main(args=None):
     ax2.set_ylabel("alpha")
     ax2.grid(True, alpha=0.3)
 
-    # Subplot 3: policy entropy
+    # Subplot 3: temperature-tuning loss (SB3 logs no policy entropy for SAC)
     ax3 = axes[0, 2]
-    if callback.entropy_list:
-        ax3.plot(callback.timesteps_list, callback.entropy_list,
+    if callback.ent_coef_loss_list:
+        ax3.plot(callback.timesteps_list, callback.ent_coef_loss_list,
                  color="#4CAF50", alpha=0.8, linewidth=1.5)
-    ax3.set_title("Policy Entropy (exploration level)", fontsize=13)
+    ax3.set_title("Temperature loss (ent_coef_loss)", fontsize=13)
     ax3.set_xlabel("Timestep")
-    ax3.set_ylabel("Entropy")
+    ax3.set_ylabel("Loss")
     ax3.grid(True, alpha=0.3)
 
     # Subplot 4: critic loss

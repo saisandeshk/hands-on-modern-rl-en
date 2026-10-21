@@ -36,10 +36,20 @@ Every training script follows the same CLI conventions (the code stays
 readable — this is a textbook):
 
 - `--seed`: seeds Python, NumPy, torch and the environment.
-- `--device {auto,cpu,cuda}`: torch device (SB3 scripts take the same flag).
+- `--device`: torch device. Most scripts take `{auto,cpu,cuda}`; the two
+  Chapter 1 scripts (`1-ppo_cartpole.py`, `2-pytorch_ppo.py`) also accept
+  `mps` (Apple Silicon) and default to `auto`, and `dqn_atari_sb3.py` takes
+  an unrestricted `--device` string defaulting to `auto`. Pure
+  NumPy/matplotlib scripts (e.g. `two_armed_bandit.py`,
+  `bellman_equation_verify.py`, `export_dqn_curves.py`,
+  `gae_visualization.py`) accept `--device` for CLI consistency but ignore
+  it.
 - `--smoke`: a tiny configuration (few steps, small nets) that finishes in well
   under ~60 s on CPU, needs no network, opens no windows (never
-  `render_mode="human"`), and writes any files under `runs/` (gitignored).
+  `render_mode="human"`), and writes its figures under `runs/` (gitignored).
+  (Some scripts still create an empty `output/` directory at import time via
+  a module-level `os.makedirs`; that directory is gitignored and holds no
+  smoke outputs.)
 
 Matplotlib always uses the non-interactive `Agg` backend when saving figures.
 
@@ -66,7 +76,8 @@ that cannot run here (Atari ROMs, `pyboy`) are skipped with an explicit reason.
 
 Docs pages are root-relative links without the `.md` extension, e.g.
 `/chapter05_dqn/from-q-to-dqn`. The “Docs page” column names the page that
-links the script; scripts marked “(unreferenced — suggested)” are not linked
+covers or runs the script (via a runnable command or an explicit
+reference); scripts marked “(unreferenced — suggested)” are not covered
 from any docs page yet, with a suggestion of where each belongs.
 
 | Ch. | Directory                                  | Scripts                         | What each does                                                                                                                                              | Docs page                                                                                        |
@@ -74,7 +85,7 @@ from any docs page yet, with a suggestion of where each belongs.
 | 1   | `chapter01_cartpole/`                      | `1-ppo_cartpole.py`             | SB3 PPO trains CartPole, logs SwanLab curves (skipped if `swanlab` is missing)                                                                              | `/chapter01_cartpole/principles`                                                                 |
 |     |                                            | `2-pytorch_ppo.py`              | Pure PyTorch PPO: Actor-Critic, GAE, clipping                                                                                                               | `/chapter01_cartpole/principles`, `/chapter01_cartpole/metrics`, `/chapter01_cartpole/training`  |
 |     |                                            | `plot_curves.py`                | Plots reviewable metric curves from the exported CSV                                                                                                        | `/chapter01_cartpole/metrics`, `/chapter01_cartpole/training`                                    |
-|     |                                            | `capture_frames.py`             | Captures real Gymnasium rendered frames (uses the trained model, else a random policy in `--smoke`)                                                         | `/chapter01_cartpole/training`                                                                   |
+|     |                                            | `capture_frames.py`             | Captures real Gymnasium rendered frames (trained model; `--smoke` uses a random policy)                                                                     | `/chapter01_cartpole/training`                                                                   |
 | 2   | `chapter02_rl_basics/`                     | `two_armed_bandit.py`           | Two-armed bandit: random vs greedy vs ε-greedy vs UCB (unreferenced — suggested: `/chapter02_rl_basics/bandit`)                                             | —                                                                                                |
 | 3   | `chapter03_value_functions/`               | `bellman_equation_verify.py`    | Numerical check of the Bellman expectation/optimality equations (unreferenced — suggested: `/chapter03_value_functions/value-bellman`)                      | —                                                                                                |
 |     |                                            | `gridworld_q_learning.py`       | 4×4 GridWorld value iteration + Q-learning, exports SVGs/CSV/JSON                                                                                           | `/chapter03_value_functions/value-experiment`                                                    |
@@ -139,5 +150,17 @@ their own runtimes and are not part of the pytest smoke suite.
 - Smoke runs write under `<chapter>/runs/` (gitignored). Full training runs
   write under `<chapter>/output/`; `code/chapter01_cartpole/output/` keeps the
   checked-in reference CSV used by the Chapter 1 pages.
-- Sw
-  ...[truncated 911 chars]
+- `capture_frames.py` without `--smoke` requires a trained checkpoint and
+  exits with a message if it is missing; it never silently substitutes a
+  random policy for a trained one.
+- SB3 logger keys read by the custom callbacks were verified against the
+  installed SB3 source: PPO `train/entropy_loss` is the _negative_ policy
+  entropy (negated before plotting), and SAC temperature uses
+  `train/ent_coef` / `train/ent_coef_loss` (SB3 logs no policy entropy
+  for SAC).
+- Seeding in the Appendix A diagnosis scripts is seed-matched across
+  scenarios: the same `--seed` is used for every scenario so that only the
+  reward function or training configuration differs.
+- Atari DQN behavior/figures need `ale-py`/ROMs (unavailable offline);
+  those tests skip with a reason. Pokémon Red paths/addresses are carried
+  over untouched and are unverifiable without a legal ROM.

@@ -27,6 +27,8 @@ SCRIPTS = [
 TIMEOUT = 300
 
 
+ATARI_SCRIPTS = {"dqn_atari_sb3.py", "render_atari.py"}
+
 @pytest.mark.parametrize("script", SCRIPTS)
 def test_smoke(script):
     here = Path(__file__).resolve().parent
@@ -38,7 +40,10 @@ def test_smoke(script):
         timeout=TIMEOUT,
     )
     combined = proc.stdout + proc.stderr
-    if proc.returncode != 0 and (
+    # Only the two scripts that need Atari ROMs may skip, and only for a
+    # missing-ROM reason — any other failure (even one mentioning "Atari")
+    # must fail the suite.
+    if proc.returncode != 0 and script in ATARI_SCRIPTS and (
         "ROM" in combined
         or "Atari" in combined
         or "ale-py" in combined

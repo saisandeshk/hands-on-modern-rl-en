@@ -233,6 +233,13 @@ def train_scenario(agent, env, label, num_episodes=300, batch_size=64,
     Returns:
         results: a dict containing all diagnostic data
     """
+    # Re-seed here (same seed for every scenario) so the comparison is
+    # controlled: weight init, episode starts and the epsilon-greedy action
+    # stream are identical and only the training configuration differs.
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
     # Diagnostic data collection
     reward_history = []
     loss_history = []
@@ -475,6 +482,11 @@ def run_all_scenarios(num_episodes=300, batch_size=64, seed=0, device="cpu"):
     state_dim = env1.observation_space.shape[0]
     action_dim = env1.action_space.n
 
+    # Re-seed before each agent build so all four scenarios start from
+    # identical weights; train_scenario() re-seeds again for the rollout loop.
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
     agent_lr_high = ConfigurableDQNAgent(
         state_dim, action_dim,
         lr=1.0,               # Learning rate too high! Normally 1e-3
@@ -496,6 +508,9 @@ def run_all_scenarios(num_episodes=300, batch_size=64, seed=0, device="cpu"):
     print("=" * 60)
 
     env2 = gym.make("CartPole-v1")
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
     agent_no_clip = ConfigurableDQNAgent(
         state_dim, action_dim,
         lr=1e-3,              # Normal learning rate
@@ -506,7 +521,7 @@ def run_all_scenarios(num_episodes=300, batch_size=64, seed=0, device="cpu"):
         device=device,
     )
     results_no_clip = train_scenario(agent_no_clip, env2, "No gradient clipping",
-                                     num_episodes=num_episodes, batch_size=batch_size, seed=seed + 1)
+                                     num_episodes=num_episodes, batch_size=batch_size, seed=seed)
 
     # -- Scenario 3: epsilon not decaying --
     print("\n" + "=" * 60)
@@ -516,6 +531,9 @@ def run_all_scenarios(num_episodes=300, batch_size=64, seed=0, device="cpu"):
     print("=" * 60)
 
     env3 = gym.make("CartPole-v1")
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
     agent_no_decay = ConfigurableDQNAgent(
         state_dim, action_dim,
         lr=1e-3,
@@ -527,7 +545,7 @@ def run_all_scenarios(num_episodes=300, batch_size=64, seed=0, device="cpu"):
         device=device,
     )
     results_no_decay = train_scenario(agent_no_decay, env3, "epsilon=1.0 (no decay)",
-                                      num_episodes=num_episodes, batch_size=batch_size, seed=seed + 2)
+                                      num_episodes=num_episodes, batch_size=batch_size, seed=seed)
 
     # -- Scenario 4: correct training after the fixes --
     print("\n" + "=" * 60)
@@ -537,6 +555,9 @@ def run_all_scenarios(num_episodes=300, batch_size=64, seed=0, device="cpu"):
     print("=" * 60)
 
     env4 = gym.make("CartPole-v1")
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
     agent_correct = ConfigurableDQNAgent(
         state_dim, action_dim,
         lr=1e-3,              # Appropriate learning rate
@@ -548,7 +569,7 @@ def run_all_scenarios(num_episodes=300, batch_size=64, seed=0, device="cpu"):
         device=device,
     )
     results_correct = train_scenario(agent_correct, env4, "Correct configuration",
-                                     num_episodes=num_episodes, batch_size=batch_size, seed=seed + 3)
+                                     num_episodes=num_episodes, batch_size=batch_size, seed=seed)
 
     return [results_lr_high, results_no_clip, results_no_decay, results_correct]
 

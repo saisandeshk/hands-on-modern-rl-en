@@ -257,7 +257,7 @@ To render GIFs, use the same script with different checkpoints and output paths:
 python code/chapter05_dqn/render_atari.py \
   --env-id PongNoFrameskip-v4 \
   --model output/dqn_atari_long/PongNoFrameskip-v4_dqn_seed0_10m_zoo_aligned/checkpoints/dqn_atari_500000_steps.zip \
-  --output docs/chapter07_dqn/images/dqn-atari-pong-500k.gif \
+  --output docs/chapter05_dqn/images/dqn-atari-pong-500k.gif \
   --max-steps 1800 \
   --render-every 6 \
   --fps 20 \
@@ -361,14 +361,14 @@ MountainCar's state is even shorter — only position and velocity — but rewar
 
 ```bash
 cd code
-pip install -r chapter07_dqn/requirements.txt
+pip install -r chapter05_dqn/requirements.txt
 
-python chapter07_dqn/dqn_gym_sb3.py \
+python chapter05_dqn/dqn_gym_sb3.py \
   --env-id CartPole-v1 \
   --total-timesteps 100000 \
   --learning-starts 1000
 
-python chapter07_dqn/dqn_gym_sb3.py \
+python chapter05_dqn/dqn_gym_sb3.py \
   --env-id MountainCar-v0 \
   --total-timesteps 300000 \
   --learning-starts 5000
@@ -389,7 +389,7 @@ Training settings affect results more than network architecture itself. 84×84 g
 ::: details Experiment Entry: Atari Pong
 
 ```bash
-python chapter07_dqn/dqn_atari_sb3.py \
+python chapter05_dqn/dqn_atari_sb3.py \
   --env-id PongNoFrameskip-v4 \
   --total-timesteps 10000000 \
   --buffer-size 10000 \
@@ -506,13 +506,13 @@ If using DQN, the network structure itself does not change: given screen state $
 
 ```bash
 cd code
-pip install -r chapter07_dqn/requirements.txt
+pip install -r chapter05_dqn/requirements.txt
 ```
 
 Prepare a legally obtained `PokemonRed.gb`; recommend starting from an existing save `start.state` (to avoid spending steps on the title menu):
 
 ```bash
-python chapter07_dqn/dqn_pokemon_red_pyboy.py \
+python chapter05_dqn/dqn_pokemon_red_pyboy.py \
   --rom /path/to/PokemonRed.gb \
   --state /path/to/start.state \
   --total-timesteps 500000 \

@@ -50,7 +50,15 @@ def main():
         args.output = "runs/smoke_capture_frames/cartpole_frames_smoke.png"
         args.device = "cpu"
     here = os.path.dirname(os.path.abspath(__file__))
-    use_model = os.path.exists(args.model) and not args.smoke
+    use_model = os.path.exists(args.model)
+    if args.smoke:
+        use_model = False
+    elif not use_model:
+        raise SystemExit(
+            f"Model checkpoint not found: {args.model}\n"
+            "Train it first with 2-pytorch_ppo.py, pass --model <path>, "
+            "or re-run with --smoke for a random-policy capture."
+        )
     actor_critic = None
     model = None
     if use_model:
@@ -93,7 +101,8 @@ def main():
         ax.set_title(f"step {step}\nangle={np.degrees(state[2]):+.2f}°")
         ax.axis("off")
     fig.suptitle(
-        f"Deterministic evaluation in Gymnasium CartPole-v1 — score {score}",
+        f"{'Random-policy' if args.smoke else 'Deterministic'} evaluation "
+        f"in Gymnasium CartPole-v1 — score {score}",
         fontsize=14,
     )
     fig.tight_layout()

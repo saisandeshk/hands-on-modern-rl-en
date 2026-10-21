@@ -94,7 +94,7 @@ def main():
     )
     ax.set_ylim(0, 525)
     ax.legend()
-    save(fig, args.output_dir, "cartpole_reward_seed42.png")
+    save(fig, args.output_dir, f"cartpole_reward_seed{seed}.png")
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 8), sharex=True)
     panels = [
@@ -121,7 +121,7 @@ def main():
         fontsize=15,
     )
     fig.tight_layout()
-    save(fig, args.output_dir, "cartpole_diagnostics_seed42.png")
+    save(fig, args.output_dir, f"cartpole_diagnostics_seed{seed}.png")
 
 
 if __name__ == "__main__":
