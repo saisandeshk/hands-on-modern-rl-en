@@ -1,5 +1,5 @@
 ---
-title: 10.4 Lab: Offline RL from Fixed Datasets
+title: '10.4 Lab: Offline RL from Fixed Datasets'
 ---
 
 # 10.4 Lab: Offline RL from Fixed Datasets
