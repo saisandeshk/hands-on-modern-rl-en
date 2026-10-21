@@ -39,7 +39,7 @@
 
 ## Sidebar additions
 
-- `17.R Summary and Exercises` → `docs/chapter17_prm_search/review.md` (front matter `title: 17.R Summary and Exercises`, H1 `# 17.R Summary and Exercises`). Coordinator to add to sidebar and renumber as needed.
+- `17.7 Summary and Exercises` → `docs/chapter17_prm_search/review.md` (front matter `title: 17.7 Summary and Exercises`, H1 `# 17.7 Summary and Exercises`). Coordinator to add `{ text: '17.7 Summary and Exercises', link: '/chapter17_prm_search/review' }` to the Chapter 17 sidebar block.
 
 ## Commands run and results
 
@@ -47,6 +47,22 @@
 - `.venv/bin/python -c` importing `code/chapter17_prm_search/tree_of_thought.py` (`ThoughtNode`, `evaluate_node`, `generate_children`, `apply_op` division-by-zero guard): import succeeds; 4-number node scores 0.38, yields 48 children, `1/0` returns None. Grounds the two coding exercises.
 - `npx prettier --write` on all seven chapter files: success (two files reformatted, rest unchanged).
 - `npx vitepress build docs`: success (build complete, no dead links).
+
+## Review response
+
+- Error 1 (PRM800K labour: 24,000 h / 12 person-years) — accepted and fixed in `discriminative-prm.md` (both the callout and the Section Summary): 800,000 × 30 s = 24,000,000 s = 6,667 h ≈ 3.3 person-years (verified with `.venv/bin/python`).
+- Error 2 (majority-vote tally "−3 appears 4 times") — accepted and fixed in `parallel-reasoning-and-summary.md`: the five answers normalize to −3 ×3, −2 ×1, +3 ×1, so "3 times" is correct; conclusion unchanged.
+- Error 3 (stale garbled √2 retelling in `outcome-vs-process.md:242`) — accepted and fixed with the standardized wording used in 17.3 ("Substituting $p=2k$ gives $4k^2=2q^2$, i.e. $2k^2=q^2$, but the step writes $4k=q^2$").
+- Error 4 (review page not in sidebar; `17.R` numbering) — partially accepted: renamed front matter and H1 to `17.7 Summary and Exercises` to match the book's plain-number convention (cf. 2.4, 5.6, 7.8 review pages); the sidebar entry itself is out of scope (`docs/.vitepress/config.mjs` is coordinator-owned), so "Sidebar additions" below now requests `{ text: '17.7 Summary and Exercises', link: '/chapter17_prm_search/review' }`.
+- Error 5 (Exercise 7 tie-break "either key may be returned") — accepted and fixed in `review.md`: `max` over insertion-ordered `cands` deterministically returns `A` (verified by running the snippet; floating-point products are `0.12960000000000002` vs `0.1296`, so `A` wins outright).
+- Error 6 (Exercise 8 rounding 0.791/1.391) — accepted and fixed in `review.md`: recomputation gives bonus ≈ 0.79166 → 0.792 and UCB ≈ 1.39166 → 1.392.
+- Doubt 1 (ThinkPRM +8/+4.5/+7.2 pp, 712K labels precision) — partially accepted: kept the paper's numbers (already listed under Needs external verification) but added explicit "reported / tied to those subsets and splits" attribution at each use so readers do not mistake them for general guarantees.
+- Doubt 2 (PutnamBench 47/658 vs 654) — rejected (no change): unverifiable offline; the figure stays attributed as "the paper reports" and listed under Needs external verification for the coordinator.
+- Doubt 3 (autoformalization arXiv link 2205.12615 vs 2205.12628) — rejected (no change): 2205.12615 is the identifier for Wu et al., "Autoformalization with Large Language Models" (May 2022) to my confident knowledge; the reviewer's alternative looks like a nearby-paper mix-up, and there is no offline way to re-check.
+- Doubt 4 (completeness terminology) — partially accepted: reworded in `formal-prm.md` so completeness is a property of the checking pipeline/automation (timeouts, tactic inventories) while the kernel itself only checks handed-in proof terms; soundness wording unchanged.
+- Doubt 5 (on-policy distillation wording) — partially accepted: reworded in `parallel-reasoning-and-summary.md` to "often called on-policy distillation" with the teacher supplying token-level targets/corrections on the student's own prefixes.
+- Doubt 6 (`tree_of_thought.py` Chapter-13 label, requirements) — rejected (no change, out of scope): `code/` is owned by another worker per the task rules; flagged here for the coordinator instead.
+- Doubt 7 (PaCoRe attribution per use) — accepted in substance: the numbers were already introduced as "The PaCoRe paper reports ..."; no further edit needed beyond the existing attribution, and the figures remain under Needs external verification.
 
 ## Open issues
 

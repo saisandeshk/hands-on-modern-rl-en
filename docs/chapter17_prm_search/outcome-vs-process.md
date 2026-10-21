@@ -239,7 +239,7 @@ Treat the PRM as a classifier: the input is the problem plus the reasoning prefi
 
 ### Generative PRM
 
-Let a large model first generate a natural-language check ("This step tries to divide both sides by 2, which should give $2k^2=q^2$, but it is written as $k$"), and give a judgment at the end. The representative work is ThinkPRM. Its advantages are that it can say where the error is and needs less human annotation (it reuses the base model's knowledge). Its drawbacks are that the evaluation itself must generate tokens and is slower, and that the evaluation can also be wrong.
+Let a large model first generate a natural-language check ("Substituting $p=2k$ gives $4k^2=2q^2$, i.e. $2k^2=q^2$, but the step writes $4k=q^2$, dropping the square and skipping the division"), and give a judgment at the end. The representative work is ThinkPRM. Its advantages are that it can say where the error is and needs less human annotation (it reuses the base model's knowledge). Its drawbacks are that the evaluation itself must generate tokens and is slower, and that the evaluation can also be wrong.
 
 ### Formal Verifier
 

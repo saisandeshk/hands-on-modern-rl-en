@@ -132,13 +132,13 @@ A generative PRM reduces the step labels needed for fine-tuning but increases th
 
 ### Can a Small Number of Process Labels Train an Effective Evaluator?
 
-ThinkPRM used only about 8,000 process labels, roughly 1% of the 712,000 labels used by the discriminative baseline in the paper. Under the given experimental settings on ProcessBench, MATH-500, and AIME 2024, it outperformed the discriminative baseline on the same base model on step verification, Best-of-N ranking, and verifier-guided search, and it also outperformed an LLM-as-a-Judge used without fine-tuning.
+ThinkPRM used only about 8,000 process labels, roughly 1% of the 712,000 labels the paper reports for the discriminative baseline in its comparison. Under the given experimental settings on ProcessBench, MATH-500, and AIME 2024, it outperformed the discriminative baseline on the same base model on step verification, Best-of-N ranking, and verifier-guided search, and it also outperformed an LLM-as-a-Judge used without fine-tuning.
 
 This conclusion has two preconditions, though. First, the base model must already have strong reasoning ability. Second, human labels must have been used to filter the generated evaluations to high quality. If the base model's reasoning is weak, or the filtering labels are of poor quality, 1% of the data may simply not be enough.
 
 ### Does Math Training Transfer to Science and Code?
 
-The paper also tested domain transfer on subsets of GPQA-Diamond (science problems) and LiveCodeBench (coding problems). Relative to a discriminative verifier trained on the full PRM800K, ThinkPRM scored 8 and 4.5 percentage points higher, respectively. This result supports the view that generative evaluation can reuse the base model's knowledge better, but the evaluation covers only subsets of the data. When it is applied to a new codebase or a new scientific field, recalibration is still needed.
+The paper also tested domain transfer on subsets of GPQA-Diamond (science problems) and LiveCodeBench (coding problems). Relative to a discriminative verifier trained on the full PRM800K, ThinkPRM scored a reported 8 and 4.5 percentage points higher, respectively. This result supports the view that generative evaluation can reuse the base model's knowledge better, but the evaluation covers only the reported subsets of the data, so the exact gaps should be read as tied to those splits. When it is applied to a new codebase or a new scientific field, recalibration is still needed.
 
 ### The Verifier Can Also Use More Inference Compute
 
@@ -147,7 +147,7 @@ This agrees with the pattern from Section 16.3: a generative verifier can also i
 - **Parallel**: sample several verification chains at the same time and aggregate their judgments at the end.
 - **Sequential**: let a single checking process continue to review and correct itself.
 
-The paper compared the two under the same token budget. The overall gap was small, with the parallel route slightly better at some budgets. On a ProcessBench subset, ThinkPRM scored 7.2 percentage points higher than the un-fine-tuned LLM-as-a-Judge.
+The paper compared the two under the same token budget. The overall gap was small, with the parallel route slightly better at some budgets. On a ProcessBench subset, ThinkPRM scored a reported 7.2 percentage points higher than the un-fine-tuned LLM-as-a-Judge (a figure tied to that subset and split).
 
 Keep in mind that more verification compute helps only when the evaluator can actually produce complementary checking paths. If the model itself lacks knowledge of some domain, generating 100 checks may repeat the same wrong judgment in different words.
 

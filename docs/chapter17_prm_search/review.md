@@ -1,8 +1,8 @@
 ---
-title: 17.R Summary and Exercises
+title: 17.7 Summary and Exercises
 ---
 
-# 17.R Summary and Exercises
+# 17.7 Summary and Exercises
 
 ## What you should now be able to do
 
@@ -140,7 +140,7 @@ for rule in ("mean", "min", "product"):
     print(rule, select(cands, rule))
 ```
 
-Expected output (verified): `mean` picks A with `{'A': 0.7, 'B': 0.6}`; `min` picks B with `{'A': 0.2, 'B': 0.6}`; `product` ties with `{'A': 0.1296, 'B': 0.1296}` (either key may be returned on the tie). For the second part, score any `ThoughtNode` path with `evaluate_node` from `tree_of_thought.py`, collect one score per depth level, and confirm that `min` rejects paths containing a near-zero step while `mean` can still select them.
+Expected output (verified): `mean` picks A with `{'A': 0.7, 'B': 0.6}`; `min` picks B with `{'A': 0.2, 'B': 0.6}`; `product` is effectively a tie (`A ≈ 0.1296`, `B = 0.1296`; in floating point `math.prod` gives `0.12960000000000002` vs `0.1296`, so the `max` call returns `A`). For the second part, score any `ThoughtNode` path with `evaluate_node` from `tree_of_thought.py`, collect one score per depth level, and confirm that `min` rejects paths containing a near-zero step while `mean` can still select them.
 :::
 
 ### Exercise 8 (coding): UCB picker and running-average update
@@ -171,5 +171,5 @@ print("after 10 more visits: Q =", round(q, 3), "N =", n,
       "UCB =", round(ucb(q, n, 100 + 10), 3))
 ```
 
-Expected output (verified): `A 1.229, B 1.254, C 1.957`. After 10 further visits with reward $0.6$ each, $Q$ stays $0.6$ and $N = 15$; with the parent at 110 visits ($\ln 110 \approx 4.700$), the bonus falls to about $1.414\sqrt{4.700/15} \approx 0.791$ and UCB to about $1.391$ — still competitive here, but every additional visit without improvement shrinks the bonus until A and B retake the lead. This is the exploration term being "used up."
+Expected output (verified): `A 1.229, B 1.254, C 1.957`. After 10 further visits with reward $0.6$ each, $Q$ stays $0.6$ and $N = 15$; with the parent at 110 visits ($\ln 110 \approx 4.700$), the bonus falls to about $1.414\sqrt{4.700/15} \approx 0.792$ and UCB to about $1.392$ — still competitive here, but every additional visit without improvement shrinks the bonus until A and B retake the lead. This is the exploration term being "used up."
 :::
