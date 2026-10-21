@@ -119,11 +119,11 @@ Configuring this constraint requires balancing "allowing the policy to explore" 
 
 To encourage the model to finish a task in fewer steps, one can introduce a reward mechanism that decays with the number of steps.
 
-> **Moonshot** proposed the **Gamma-decay Reward**. When the model completes the task correctly, the reward decays exponentially with the number of steps used:
+> A length-penalty scheme used in the Kimi-Researcher line of work (sometimes called the Gamma-decay Reward) works as follows. When the model completes the task correctly, the trajectory reward decays exponentially with the number of steps used:
 >
 > $$R = r \times \gamma^{T}, \quad \gamma < 1$$
 >
-> Here $r$ is the binary task reward (1 on success) and $T$ is the number of steps the trajectory used. A successful trajectory that finishes in fewer steps keeps more of the reward (for example, with $\gamma = 0.95$, $T = 5$ gives $0.77$ while $T = 20$ gives $0.36$), which guides the model to execute tasks more efficiently [\[Reference\]](https://moonshotai.github.io/Kimi-Researcher/). Credit for individual turns then follows the standard discounted-return decomposition $G_t = \sum_{k \geq t} \gamma^{k-t} r_k$ from [19.3 Trajectory Credit Assignment](./credit-assignment).
+> Here $r$ is the binary task reward (1 on success) and $T$ is the number of steps the trajectory used. A successful trajectory that finishes in fewer steps keeps more of the reward (for example, with $\gamma = 0.95$, $T = 5$ gives $0.77$ while $T = 20$ gives $0.36$), which guides the model to execute tasks more efficiently [\[Reference\]](https://moonshotai.github.io/Kimi-Researcher/). This $R$ is used directly as the trajectory-level reward (e.g., compared across a GRPO group); do not apply the per-turn discounted-return decomposition of [19.3 Trajectory Credit Assignment](./credit-assignment) on top of it, since that would discount the length penalty a second time.
 
 ---
 
@@ -760,7 +760,7 @@ Layers 3 and 5 need further discussion. We begin with the problem in layer 3.
 
 Layer 3 has the LLM look at a screenshot and score it directly, which has clear limitations. An LLM's judgment of visual details is unstable: the same page may receive different scores in two runs. More seriously, an LLM can be misled by surface features. A page whose functionality is entirely wrong can still score high as long as its colors look good and its alignment is neat.
 
-This concern is not hypothetical. Tests on the Omni-I2C benchmark show [^omni-i2c] that pure pixel metrics (SSIM, LPIPS) correlate with human judgment only at 0.11-0.44 (Kendall's Tau), while an LMM judge can reach 0.83. Even so, 0.83 means that nearly 2 out of every 10 judgments still disagree with humans. The web-perception question answering in the FullFront benchmark confirms this as well [^fullfront]: the strongest model, Claude 3.7 Sonnet, still has an average accuracy below 55%, while humans exceed 95%. Models' visual judgment of page details is still far from the human level.
+This concern is not hypothetical. Tests on the Omni-I2C benchmark show [^omni-i2c] that similarity metrics (SSIM, CLIP Score) correlate with human judgment only at 0.12–0.44 (Kendall's Tau), while an LMM judge can reach 0.83. A rank correlation of $\tau = 0.83$ still leaves room for substantial item-level disagreement, but that disagreement rate cannot be read off $\tau$ directly; it requires the item-level agreement statistics. The web-perception question answering in the FullFront benchmark confirms this as well [^fullfront]: the strongest model, Claude 3.7 Sonnet, still has an average accuracy below 55%, while humans exceed 95%. Models' visual judgment of page details is still far from the human level.
 
 The problem is real, but a combination of strategies can mitigate it.
 

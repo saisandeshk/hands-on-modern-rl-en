@@ -36,7 +36,7 @@ The most critical difference lies in **heterogeneity** and **explicit communicat
     └── 6. Aggregate → Submit PR
 ```
 
-Anthropic's internal research published in 2025 measured that the **Orchestrator-Worker pattern achieves a 90.2% speedup and an 18–32% increase in success rate on SWE-bench Verified** compared to a single agent. The key reason is not "two agents are stronger than one," but rather **task decomposition prevents the context window from being overwhelmed** — a single agent handling the entire PR process must focus on "finding the file / writing code / running tests / writing documentation" all at once; decomposition allows each worker to focus on a single task.
+Unpublished internal figures reported in secondary summaries claim that an **Orchestrator-Worker pattern achieves large speedups and success-rate gains on SWE-bench Verified** compared to a single agent (one widely cited but unverified summary gives a 90.2% speedup and an 18–32% increase). The key reason is not "two agents are stronger than one," but rather **task decomposition prevents the context window from being overwhelmed** — a single agent handling the entire PR process must focus on "finding the file / writing code / running tests / writing documentation" all at once; decomposition allows each worker to focus on a single task.
 
 The policy of the Orchestrator can be formalized as a hierarchical MDP:
 
@@ -73,7 +73,7 @@ $$\pi_\theta^{\text{swarm}}(a_t \mid q, \text{pool}, h_{1:t})$$
 where $a_t = (\text{select-agent}, \text{message}, \text{route-to})$.
 
 ::: warning Cost Explosion in Swarm Mode
-Swarm mode consumes 10–50 times more tokens than a single agent. Kimi K2.5 paper reports: processing a SWE-bench task on average consumes 280K tokens (single agent baseline is 18K). This is why industrial deployment in 2026 still primarily uses Orchestrator-Worker—cost-controlled, with performance close to Swarm.
+Swarm mode consumes an order of magnitude more tokens than a single agent (roughly 10–30× in reported cases). The Kimi K2.5 paper reports: processing a SWE-bench task on average consumes 280K tokens (single agent baseline is 18K, i.e. about 15.6×). This is why industrial deployment in 2026 still primarily uses Orchestrator-Worker—cost-controlled, with performance close to Swarm.
 :::
 
 ## Reinforcement Learning for Multi-Agent Systems
@@ -100,7 +100,7 @@ $$
 \left[v(S\cup\{i\})-v(S)\right]
 $$
 
-Here, $ v(S) $ is the success probability of the subset $ S $ completing the task. The term $ N! $ requires **counterfactual evaluation** — removing agent $ i $ from the team and checking whether the task can still be completed. Although this method is the fairest, it is computationally expensive.
+Here, $ v(S) $ is the success probability of the subset $ S $ completing the task. The weight $\frac{|S|!(N-|S|-1)!}{N!}$ is purely combinatorial and costs nothing to evaluate; the cost lies in evaluating the marginal contribution $v(S\cup\{i\})-v(S)$, which requires re-running the task for each of the $2^N-1$ coalitions. Here $N$ (the number of agents) is the $K$ of Approach 1. Although this method is the fairest, it is computationally expensive.
 
 **Approach 3: Heuristic Attribution via Orchestrator**
 
@@ -219,7 +219,7 @@ Orchestrator assigns Worker-C to test, discovers the new bug
 ...and so on in an infinite loop...
 ```
 
-Internal data from Anthropic: the "chain of errors" rate in multi-agent systems is 2.7 times that of single-agent systems.
+Unverified reports of Anthropic internal data describe the "chain of errors" rate in multi-agent systems as roughly 2.7 times that of single-agent systems; treat this as an anecdotal figure pending a citable source.
 
 **Countermeasure**: Each agent should output with an associated **confidence score**; low-confidence outputs trigger the Orchestrator to perform a secondary verification.
 
@@ -227,7 +227,7 @@ Internal data from Anthropic: the "chain of errors" rate in multi-agent systems 
 
 After multiple agents influence each other, the system may converge to a wrong consensus — especially in Debate mode. If one agent uses an incorrect premise, other agents may accept it based on "politeness" or "conformity."
 
-**Countermeasure**: Introduce a "devil's advocate" agent — an agent specifically tasked with challenging the mainstream view. Anthropic's Debate system enforces that at least one agent must hold a dissenting position.
+**Countermeasure**: Introduce a "devil's advocate" agent — an agent specifically tasked with challenging the mainstream view. Some debate-system designs enforce that at least one agent must hold a dissenting position.
 
 ### Free Rider
 

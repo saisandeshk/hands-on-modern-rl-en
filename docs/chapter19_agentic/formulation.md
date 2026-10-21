@@ -133,7 +133,7 @@ class Step:
     is_terminal: bool          # Whether this is the last step
 ```
 
-This approach offers three benefits: precise step boundaries, no retokenization drift, and flexible context management strategies (append-only, sliding-window, LLM summarization, selective retention). Experiments with Agent-R1 show that **sliding-window performs better on GSM8K than append-only**—"less is more," as the model does not need to see all history to make good decisions.
+This approach offers three benefits: precise step boundaries, no retokenization drift, and flexible context management strategies (append-only, sliding-window, LLM summarization, selective retention). Experiments with Agent-R1 report that **sliding-window context management performs better than append-only on their multi-turn tool-use evaluations** — "less is more," as the model does not need to see all history to make good decisions.
 
 ## Comparison with Single-turn RL
 

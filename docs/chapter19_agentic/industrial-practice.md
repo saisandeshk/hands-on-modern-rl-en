@@ -115,11 +115,11 @@ This constraint must balance "allowing the policy to explore" and "maintaining s
 
 To encourage the model to complete tasks in fewer steps, we can introduce a reward mechanism that decays with the number of steps used.
 
-> **Moonshot** proposed **Gamma-decay Reward**. When the model completes a task correctly, the reward value decays exponentially with the number of steps used:
+> A length-penalty scheme used in the Kimi-Researcher line of work (sometimes called Gamma-decay Reward) works as follows. When the model completes a task correctly, the trajectory reward value decays exponentially with the number of steps used:
 >
 > $$R = r \times \gamma^{T}, \quad \gamma < 1$$
 >
-> Here, $r$ is the binary task reward (1 on success) and $T$ is the number of steps the trajectory used. A successful trajectory that finishes in fewer steps keeps more of the reward (for example, with $\gamma = 0.95$, $T = 5$ gives $0.77$ while $T = 20$ gives $0.36$), which guides the model to execute tasks more efficiently [\[Reference\]](https://moonshotai.github.io/Kimi-Researcher/). Credit for individual turns then follows the standard discounted-return decomposition $G_t = \sum_{k \geq t} \gamma^{k-t} r_k$ from [19.3 Trajectory Credit Assignment](./credit-assignment).
+> Here, $r$ is the binary task reward (1 on success) and $T$ is the number of steps the trajectory used. A successful trajectory that finishes in fewer steps keeps more of the reward (for example, with $\gamma = 0.95$, $T = 5$ gives $0.77$ while $T = 20$ gives $0.36$), which guides the model to execute tasks more efficiently [\[Reference\]](https://moonshotai.github.io/Kimi-Researcher/). This $R$ is used directly as the trajectory-level reward (e.g., compared across a GRPO group); do not apply the per-turn discounted-return decomposition of [19.3 Trajectory Credit Assignment](./credit-assignment) on top of it, since that would discount the length penalty a second time.
 
 ---
 

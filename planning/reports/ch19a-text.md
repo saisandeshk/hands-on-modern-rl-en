@@ -68,39 +68,39 @@ None (no pages added).
 
 ## Coverage against the curriculum checklist (RL-12, scope-relevant)
 
-| Item | Verdict | Where |
-| --- | --- | --- |
-| RL with verifiable rewards | covered | swe-smith RLVR loop; `code_reward`; ORM/RLVR discussion |
-| Math, code, structured-output envs | covered | code tasks; BFCL/ACEBench; sympy/SWE-smith |
-| Verifier isolation, adversarial hidden tests | partial → improved | sandbox + Docker rows; F2P/P2F; new hidden-tests paragraph (adversarial mutation still thin) |
-| Outcome rewards, sparse terminal credit | covered | ORM section; lab |
-| Process rewards, step-level credit | covered | PRM + GiGPO/HGPO/SPA/AgentPRM/IGPO/StepPO/Turn-PPO |
-| Reasoning traces / hidden reasoning / observable answers | covered | Search-R1 four-tag scheme; action mask |
-| Inference-time search, self-consistency, aggregation | partial → improved | Best-of-N; new test-time-vs-train-time box (self-consistency voting not detailed) |
-| Train-time vs test-time compute | covered (added) | new tip box in 19.3 |
-| Rejection fine-tuning, rollout distillation | partial | rejection sampling lives in 19.4 (other worker's scope); RFT term unused in scope files |
-| On-policy teacher-student distillation vocabulary | partial | distillation idea appears only in 19.4 LoopTool (out of scope) |
-| Reasoning length, budget control, invalid traces | covered | gamma-decay (fixed); truncation filtering; `max_turns` |
-| Multi-turn state, observations, tool-call actions | covered | formulation (POMDP, action mask) |
-| Env transitions, tool results, terminal conditions | covered | formulation + `SandboxEnv` done/observation |
-| Trajectory-level rewards, delayed credit | covered | credit assignment; turn discounting (fixed) |
-| Sandbox, reset, deterministic replay, side-effect boundaries | covered (added) | new sandbox subsection (live-env replay inherently partial) |
-| Tool-error, timeout, retry, duplicate-action semantics | covered (added) | new sandbox subsection |
-| Actor, rollout worker, reward/verifier, learner roles | covered | four-component build (Policy/Env/Worker/Trainer) |
-| Sync vs async rollout-update loops | covered | overview + build system + rLLM |
-| Policy broadcast, version, staleness | covered (added) | new versions/staleness paragraph |
-| Colocated vs dislocated generation/training | partial | framework tables + async discussion; no dedicated cost analysis |
-| Generation batching, backpressure, learner starvation | covered (added) | new backpressure paragraph + gaps table |
-| Checkpoint, rollout, optimizer, sampler recovery | covered (added) | new recovery paragraph |
-| Retry dedup, failed-rollout accounting | covered (added) | failure-class logging + dedup paragraph |
-| Prompt curriculum, filtering, evolving distributions | covered (added) | trainer bullet (+ HardGen/LoopTool in 19.4) |
-| Rollout tok/s, verifier throughput, update utilization | covered (added) | new accounting paragraph |
-| Sample/inference/training/total compute accounting | covered (added) | same paragraph |
-| Independent reasoning/capability/safety/agent eval | partial | capability eval thorough; safety eval only via hallucination penalties |
-| Reward hacking, spec gaming, held-out shifts | covered (added) | hacking sections + benchmark-exploit + new held-out paragraph |
-| Clean reproduction, prespecified objective/reward/extension | partial | deterministic envs, decontamination, versioned rubrics; no explicit prespecification protocol |
-| Multi-agent self-play, auto curriculum (Depth) | covered | swarm + Ch26 pointer; AgentFounder |
-| Multimodal, embodied, production agents (Later) | partial | extended-readings index only, as expected |
+| Item                                                         | Verdict            | Where                                                                                         |
+| ------------------------------------------------------------ | ------------------ | --------------------------------------------------------------------------------------------- |
+| RL with verifiable rewards                                   | covered            | swe-smith RLVR loop; `code_reward`; ORM/RLVR discussion                                       |
+| Math, code, structured-output envs                           | covered            | code tasks; BFCL/ACEBench; sympy/SWE-smith                                                    |
+| Verifier isolation, adversarial hidden tests                 | partial → improved | sandbox + Docker rows; F2P/P2F; new hidden-tests paragraph (adversarial mutation still thin)  |
+| Outcome rewards, sparse terminal credit                      | covered            | ORM section; lab                                                                              |
+| Process rewards, step-level credit                           | covered            | PRM + GiGPO/HGPO/SPA/AgentPRM/IGPO/StepPO/Turn-PPO                                            |
+| Reasoning traces / hidden reasoning / observable answers     | covered            | Search-R1 four-tag scheme; action mask                                                        |
+| Inference-time search, self-consistency, aggregation         | partial → improved | Best-of-N; new test-time-vs-train-time box (self-consistency voting not detailed)             |
+| Train-time vs test-time compute                              | covered (added)    | new tip box in 19.3                                                                           |
+| Rejection fine-tuning, rollout distillation                  | partial            | rejection sampling lives in 19.4 (other worker's scope); RFT term unused in scope files       |
+| On-policy teacher-student distillation vocabulary            | partial            | distillation idea appears only in 19.4 LoopTool (out of scope)                                |
+| Reasoning length, budget control, invalid traces             | covered            | gamma-decay (fixed); truncation filtering; `max_turns`                                        |
+| Multi-turn state, observations, tool-call actions            | covered            | formulation (POMDP, action mask)                                                              |
+| Env transitions, tool results, terminal conditions           | covered            | formulation + `SandboxEnv` done/observation                                                   |
+| Trajectory-level rewards, delayed credit                     | covered            | credit assignment; turn discounting (fixed)                                                   |
+| Sandbox, reset, deterministic replay, side-effect boundaries | covered (added)    | new sandbox subsection (live-env replay inherently partial)                                   |
+| Tool-error, timeout, retry, duplicate-action semantics       | covered (added)    | new sandbox subsection                                                                        |
+| Actor, rollout worker, reward/verifier, learner roles        | covered            | four-component build (Policy/Env/Worker/Trainer)                                              |
+| Sync vs async rollout-update loops                           | covered            | overview + build system + rLLM                                                                |
+| Policy broadcast, version, staleness                         | covered (added)    | new versions/staleness paragraph                                                              |
+| Colocated vs dislocated generation/training                  | partial            | framework tables + async discussion; no dedicated cost analysis                               |
+| Generation batching, backpressure, learner starvation        | covered (added)    | new backpressure paragraph + gaps table                                                       |
+| Checkpoint, rollout, optimizer, sampler recovery             | covered (added)    | new recovery paragraph                                                                        |
+| Retry dedup, failed-rollout accounting                       | covered (added)    | failure-class logging + dedup paragraph                                                       |
+| Prompt curriculum, filtering, evolving distributions         | covered (added)    | trainer bullet (+ HardGen/LoopTool in 19.4)                                                   |
+| Rollout tok/s, verifier throughput, update utilization       | covered (added)    | new accounting paragraph                                                                      |
+| Sample/inference/training/total compute accounting           | covered (added)    | same paragraph                                                                                |
+| Independent reasoning/capability/safety/agent eval           | partial            | capability eval thorough; safety eval only via hallucination penalties                        |
+| Reward hacking, spec gaming, held-out shifts                 | covered (added)    | hacking sections + benchmark-exploit + new held-out paragraph                                 |
+| Clean reproduction, prespecified objective/reward/extension  | partial            | deterministic envs, decontamination, versioned rubrics; no explicit prespecification protocol |
+| Multi-agent self-play, auto curriculum (Depth)               | covered            | swarm + Ch26 pointer; AgentFounder                                                            |
+| Multimodal, embodied, production agents (Later)              | partial            | extended-readings index only, as expected                                                     |
 
 ## Commands run and results
 
@@ -114,3 +114,24 @@ None (no pages added).
 1. `industrial-practice.md` (19.6) and `industrial-evaluation.md` (Supplement) overlap heavily — the latter states it merged the former plus benchmarks, so most scenario content now exists twice. Recommend the coordinator pick one canonical home (or an explicit "read this, not that" pointer). I fixed the shared Gamma-decay bug in both but did not deduplicate.
 2. `rllm-deepcoder-lab.md:863` (out of scope) links "Section 19.3" to `./multi-turn-rl`; the ORM-vs-PRM discussion is in `./credit-assignment`. Flagged for the owning worker.
 3. The 2026-dated paper ecosystem in `credit-assignment.md` and `extended-readings.md` needs an online reference sweep (listed above) — I corrected only what arithmetic and first-principles reasoning could settle.
+
+## Review response
+
+Reviewer report `planning/reviews/ch19a-text.md` (4 Errors + 12 Doubts). One line per finding:
+
+- E1 (ground_truth comment mixes truncated/exact π): accepted — comment now reads `2 * 3.14159 * 6371 ≈ 40030.14 (exact 2πR ≈ 40030.17)`.
+- E2 (Gamma-decay $R=r\gamma^T$ double-discounts when combined with $G_t$ decomposition; quoted 0.77/0.36 match neither $G_1$ convention): accepted — kept $R=r\gamma^T$ (numbers verified: $0.95^5\approx0.77$, $0.95^{20}\approx0.36$) and deleted the cross-reference sentence in both `industrial-evaluation.md` and `industrial-practice.md`, adding an explicit do-not-double-discount note.
+- E3 (τ=0.83 read as "2 out of 10 disagree"): accepted — replaced with rank-correlation wording noting item-level disagreement is not readable off τ; body metrics aligned to footnote (SSIM 0.12, CLIP Score 0.44).
+- E4 (Shapley $N!$ attribution + $K$/$N$ switch): accepted — weight described as combinatorial, cost moved to marginal-value evaluation over $2^N-1$ coalitions, $N$=$K$ stated.
+- D1 (turn-discounting heading promises "earlier mistakes carry greater responsibility" but $G_t$ decays forward): accepted — retitled to "Propagating Future Rewards Backward" and rewrote lead to state earlier turns get the geometrically decayed share; compounding, not $\gamma$, is what makes early errors costly.
+- D2 (Anthropic 90.2%/18–32%, 2.7× chain-of-errors, Debate dissent enforcement uncited): accepted — softened all three to reported/unverified secondary-summary wording; numbers retained only as attributed anecdotes pending a citable source.
+- D3 (Swarm cost 10–50× vs 15.6× vs 15–30×): accepted — harmonized warning to "roughly 10–30× in reported cases (280K vs 18K ≈ 15.6×)", consistent with the summary table.
+- D4 ("Moonshot proposed Gamma-decay" unattributed): accepted — reframed as "scheme used in the Kimi-Researcher line of work (sometimes called Gamma-decay Reward)" in both files; blog link kept, proposer claim dropped.
+- D5 (KL estimator allegedly reversed vs DeepSeekMath): rejected — re-derived from `code/chapter19_agentic/agentic_system/policy.py`: `delta = ref − new`, `exp(delta) − delta − 1` with samples from $\pi_\theta$ is the k3 estimator of KL($\pi_\theta\|\pi_{\text{ref}}$), i.e. the DeepSeekMath direction; no text change.
+- D6 (bare "TSR" in 19.3 defined only in 19.4): accepted — spelled out as "trajectory-search rollouts (beam search/Best-of-N in rollout generation)" with a link to `./tool-use-and-trajectory`.
+- D7 ("Round 1" vs code's "Turn 1"): accepted — transcript block changed to `Turn 1..4` to match `print(f"Turn {i+1}...")`.
+- D8 ("Checkpoint four things" lists three): accepted — now "four items: model weights, optimizer state, sampler cursor, rollout log".
+- D9 ("uniform negative penalty" vs graded ORM-negative list): accepted — reworded to "a single shared terminal penalty that then discounts geometrically".
+- D10 (GiGPO "other actions" vs group mean incl. self; "the implementation divides" with no in-book code): accepted — changed to "average of the group" and "a typical implementation further divides…".
+- D11 (Agent-R1 sliding-window "on GSM8K", a single-turn benchmark): accepted — dropped the GSM8K pairing; now "their multi-turn tool-use evaluations".
+- D12 (body "SSIM, LPIPS at 0.11–0.44" vs footnote SSIM 0.12 / CLIP 0.44): accepted — body now reads "similarity metrics (SSIM, CLIP Score) … at 0.12–0.44", matching the footnote.
