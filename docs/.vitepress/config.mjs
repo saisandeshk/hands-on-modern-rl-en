@@ -1061,6 +1061,10 @@ const sidebar = {
             {
               text: '14.4 Hands-on: A DPO Alignment Experiment',
               link: '/chapter14_dpo/dpo-hands-on'
+            },
+            {
+              text: '14.5 Summary and Exercises',
+              link: '/chapter14_dpo/review'
             }
           ]
         },
