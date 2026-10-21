@@ -1,0 +1,5 @@
+# Chapter 26 lab (self-play dynamics) dependencies
+numpy>=1.24.0
+matplotlib>=3.7.0
+torch>=2.0.0
+pytest>=7.0.0
