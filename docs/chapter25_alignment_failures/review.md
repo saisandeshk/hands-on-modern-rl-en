@@ -129,6 +129,7 @@ You have per-task scores for two models on the same 60 easy and 20 hard tasks. S
 import numpy as np
 
 def stratified_bootstrap_diff(easy_a, easy_b, hard_a, hard_b, B=10000, seed=0):
+    easy_a, easy_b, hard_a, hard_b = map(np.asarray, (easy_a, easy_b, hard_a, hard_b))
     rng = np.random.default_rng(seed)
     diffs = []
     for _ in range(B):

@@ -37,6 +37,27 @@ Read all five chapter pages in full, checked derivations, recomputed every numer
 - `npx prettier --write` on all five chapter files plus `review.md`: chapter files unchanged, `review.md` formatted.
 - `npx vitepress build docs`: success (client + SSR bundles built, all pages rendered, ~18 s).
 
+## Review response (2026-10-21)
+
+1. IQM closed form wrong for M not divisible by 4 — accepted: divisor corrected to `M - 2k` with `k = floor(M/4)`, kept M=8 worked example; added note that `rliable` uses interpolated quantiles.
+2. Saturated-task domination mechanism wrong — accepted: rewrote as high-variance runs/lucky seeds moving the mean, IQM trimming both tails.
+3. Stratification justification (majority domination) and 80/20 vs 60/20 inconsistency — accepted: rewrote as mixture-fluctuation variance with fixed 60/20 composition matching Exercise 9.
+4. Empty-group guard returning 0.0 and single-band stub — accepted: empty bands now return `(None, count)` and the stub cycles through all three bands.
+5. Review page not in sidebar config — accepted but no change made: editing `docs/.vitepress/config.mjs` is outside this task's scope; entry `25.R Summary and Exercises → /chapter25_alignment_failures/review` remains listed under Sidebar additions for the coordinator.
+6. `25.R` numbering vs `25.6` and heading-tool regex — rejected: the original task explicitly requires front matter/H1 `25.R Summary and Exercises` with coordinator renumbering, so the label was kept.
+7. Exercise 9 `easy_a[ie]` fails on Python lists — accepted: added `map(np.asarray, ...)` conversion; verified with list inputs.
+8. Section 25.5.7 high-precision system-card figures with "around" hedges — accepted: removed the unverifiable `34x / 20.96 / 65.83% / 0.612` figures, kept per-task attribution (speedup vs locomotion vs pass rate) with an instruction to check the current card.
+9. Section 25.4.6 debate-paper title mismatching arXiv 2407.04622 — accepted: relinked text to "Debating with More Persuasive LLMs Leads to More Truthful Answers".
+10. Section 25.2.1 RLVR link pointing at DeepSeek-R1 (2501.12948) — accepted: replaced with the internal book link to `/chapter15_grpo/rlvr`; DeepSeek-R1 keeps its existing citation in Section 25.4.4.
+
+- Doubt 1 (non-canonical truncated IQM) — accepted as a clarification: added one sentence noting the `rliable` interpolated-quantile implementation differs slightly at the boundaries.
+- Doubt 2 (empty reasoning must score 0 contradicts outcome RLVR) — accepted: qualified so only hard-coded answers and deleted/skipped tests must score 0, with empty-reasoning penalties described as task policy, not outcome-soundness.
+- Doubt 3 (unverifiable system-card claims) — accepted: handled via finding 8; figures removed and flagged under Needs external verification.
+- Doubt 4 (sixth subsection under "Five Standards", missing Agarwal Further Reading) — accepted: demoted the seeds/IQM block to `####` under Statistical Rigor and added Agarwal et al. 2021 to Further Reading.
+- Doubt 5 (whitespace word-grams vs token 13-grams) — accepted: added a code comment stating the sketch is a word-gram approximation.
+
+Review-round commands: `npx prettier --write` on the four touched chapter files plus the report; bootstrap list-input snippet executed successfully via `.venv/bin/python`; `npx vitepress build docs` — success (see below).
+
 ## Open issues
 
 - No front matter on the five existing chapter pages (they start directly with `# 25.k`); left as-is since the build passes and front matter is outside this task's scope — flagging in case the coordinator wants a uniform pass.
@@ -45,19 +66,19 @@ Read all five chapter pages in full, checked derivations, recomputed every numer
 
 ### Coverage table (in-scope checklist items)
 
-| Item | Status | Where |
-|---|---|---|
-| Reward distribution shift as policy changes | covered | 25.1 Goodhart, 25.4.2 overoptimization |
-| Reward overoptimization and proxy regression | covered | 25.4.2 (Gao et al. proxy/gold, KL) |
-| Judge position/identity/self-preference/correlated-error bias | covered (added) | 25.5.5 Judge Biases |
-| Multiple reward components and scalarization policy | covered | 25.4.3–25.4.4 templates + 25.4.8 lineage note |
-| Verifier completeness, soundness, parser boundaries | covered (added) | 25.2.3 new subsection |
-| False-positive / false-negative verifier tests | covered (added) | 25.2.3 adversarial + known-good tests |
-| Format/verbosity/style/length shortcuts | covered (extended) | 25.2.3 + 25.4.8 stop rules |
-| Train reward vs independent task/human/safety eval | covered | 25.2.7 record, 25.4.2 four gauges, 25.5 |
-| Adversarial completions and hidden verifier tests | covered (added) | 25.2.3–25.2.4, 25.4.3 gate set |
-| Reward governance, rollback, collection stop rules | covered (added) | 25.4.8 new subsection |
-| Preference/reward/verifier version lineage | covered (added) | 25.4.8 new subsection |
-| Multiple seeds, CIs, IQM / stratified bootstrap (working depth) | covered (added) | 25.5.1 new subsection |
-| Held-out shifts (transfer/one-shot gate sets) | covered | 25.2.3, 25.4.3, 25.5 |
+| Item                                                                                                                 | Status              | Where                                                                                                                                             |
+| -------------------------------------------------------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reward distribution shift as policy changes                                                                          | covered             | 25.1 Goodhart, 25.4.2 overoptimization                                                                                                            |
+| Reward overoptimization and proxy regression                                                                         | covered             | 25.4.2 (Gao et al. proxy/gold, KL)                                                                                                                |
+| Judge position/identity/self-preference/correlated-error bias                                                        | covered (added)     | 25.5.5 Judge Biases                                                                                                                               |
+| Multiple reward components and scalarization policy                                                                  | covered             | 25.4.3–25.4.4 templates + 25.4.8 lineage note                                                                                                     |
+| Verifier completeness, soundness, parser boundaries                                                                  | covered (added)     | 25.2.3 new subsection                                                                                                                             |
+| False-positive / false-negative verifier tests                                                                       | covered (added)     | 25.2.3 adversarial + known-good tests                                                                                                             |
+| Format/verbosity/style/length shortcuts                                                                              | covered (extended)  | 25.2.3 + 25.4.8 stop rules                                                                                                                        |
+| Train reward vs independent task/human/safety eval                                                                   | covered             | 25.2.7 record, 25.4.2 four gauges, 25.5                                                                                                           |
+| Adversarial completions and hidden verifier tests                                                                    | covered (added)     | 25.2.3–25.2.4, 25.4.3 gate set                                                                                                                    |
+| Reward governance, rollback, collection stop rules                                                                   | covered (added)     | 25.4.8 new subsection                                                                                                                             |
+| Preference/reward/verifier version lineage                                                                           | covered (added)     | 25.4.8 new subsection                                                                                                                             |
+| Multiple seeds, CIs, IQM / stratified bootstrap (working depth)                                                      | covered (added)     | 25.5.1 new subsection                                                                                                                             |
+| Held-out shifts (transfer/one-shot gate sets)                                                                        | covered             | 25.2.3, 25.4.3, 25.5                                                                                                                              |
 | Demonstrations/comparisons/rankings/ratings/critiques; BT likelihood; PRM step boundaries; AI feedback/constitutions | partial (by design) | primary coverage in Ch. 13/14/17; Ch. 25 touches constitutions (25.4.7), AI prefs, and process-vs-outcome scoring without duplicating derivations |

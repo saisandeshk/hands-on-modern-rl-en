@@ -403,7 +403,7 @@ This result shows that assisted oversight deserves study, but the tasks are stil
 
 ### Debate and Weak Judges
 
-[On scalable oversight with weak LLMs judging strong LLMs](https://arxiv.org/abs/2407.04622) compared three protocols: two models debating each other, one model being questioned by a judge, and the judge answering directly.
+[Debating with More Persuasive LLMs Leads to More Truthful Answers](https://arxiv.org/abs/2407.04622) compared three protocols: two models debating each other, one model being questioned by a judge, and the judge answering directly.
 
 When a single consultant is randomly assigned to the correct or incorrect stance, debate outperforms the single-consultant protocol on the tasks the paper tested. Compared with the judge answering directly, the result depends on the task type: debate is better in information-asymmetric extractive question answering, while the results on math, code, logic, and multimodal tasks are more mixed.
 

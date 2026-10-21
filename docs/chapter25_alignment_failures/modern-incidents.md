@@ -22,7 +22,7 @@ The model can submit a program that actually computes $x^2$, or it can simply wr
 
 Now let's write this in general form. Let the problem be $x$ and the model's answer be $y$. Denote the reward given by the verifier as $V(x,y)$ and the real task utility as $U(x,y)$. In the example just given, $V$ checks only three public inputs, while $U$ requires the program to handle the entire input range the task specifies.
 
-To separate the training metric from the real task, we use a teaching notation for the objective below. It summarizes the basic object of [RLVR](https://arxiv.org/abs/2501.12948), "sample answers, verify by rules, raise the verifiable reward," but it is not the one objective function prescribed by any particular paper. What RLVR optimizes is
+To separate the training metric from the real task, we use a teaching notation for the objective below. It summarizes the basic object of [RLVR](/chapter15_grpo/rlvr) ("sample answers, verify by rules, raise the verifiable reward"), but it is not the one objective function prescribed by any particular paper. What RLVR optimizes is
 
 $$
 J_V(\theta)=\mathbb{E}_{x,\,y\sim\pi_\theta(\cdot|x)}[V(x,y)],
@@ -133,7 +133,7 @@ The four sets play different roles. Using the same hidden tests for early stoppi
 
 Borrow two words from program verification to grade any verifier $V$ against the real task $U$:
 
-- **Soundness**: a high verifier score implies real success. Violations are false positives — the lookup-table program above is the canonical example ($V = 1$, $U = 0$). Test soundness with **adversarial completions**: hand-written shortcuts (hard-coded answers, empty reasoning with a correct final number, deleted or skipped tests) that must score 0. Any adversarial completion that scores above 0 is a verifier bug, not a model achievement.
+- **Soundness**: a high verifier score implies real success. Violations are false positives — the lookup-table program above is the canonical example ($V = 1$, $U = 0$). Test soundness with **adversarial completions**: hand-written shortcuts (hard-coded answers, deleted or skipped tests) that must score 0. Any adversarial completion that scores above 0 is a verifier bug, not a model achievement. (A bare correct final number with no reasoning still earns full marks under a pure outcome verifier; penalizing empty reasoning is a task policy — for example when a derivation is explicitly required or a process reward is used — not a soundness property of the outcome check itself.)
 - **Completeness**: real success implies a high verifier score. Violations are false negatives — the correct program with an extra space ($V = 0$, $U = 1$) fails only because the extractor is too strict. Test completeness with **known-good variants**: reformat, rename variables, and paraphrase correct solutions; every one of them must still pass.
 
 Common shortcut channels sit on the soundness side and deserve their own regression checks: response length (longer answers scored higher without being more correct), sycophantic or confident tone, markdown headings and formatting, and keyword stuffing aimed at the extractor. Log output length alongside accuracy on every checkpoint; if length rises while hidden-set accuracy is flat, the policy is likely exploiting a verbosity shortcut rather than learning the task. Parser boundaries belong here too: the extractor version, the accepted answer format, and the parse-failure rate must be versioned and reported separately, as Section 25.5 requires for every harness.
