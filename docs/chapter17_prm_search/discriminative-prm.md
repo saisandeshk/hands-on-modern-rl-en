@@ -228,6 +228,18 @@ A discriminative PRM needs to split a response into "steps," and how to split is
 
 If steps are too short, the classifier cannot see a complete operation; if they are too long, one label covers several judgments and we cannot tell where exactly the error is. The splitting rule should correspond to verifiable actions in the task, and once fixed it should be treated as part of the data specification and not changed midway through training.
 
+### Calibration, Shortcuts, Shift, and Active Collection
+
+A PRM that ranks well on its training distribution can still mislead training. Four checks belong in the evaluation loop.
+
+**Calibration, margins, and disagreement slices.** Held-out ranking accuracy (does the higher-scored candidate actually succeed more often?) is the headline metric, but it hides miscalibration: a model can rank correctly while its probabilities are overconfident. Measure calibration on held-out steps, and slice results by margin $|p_{\text{good}} - p_{\text{bad}}|$ and by annotator disagreement. Small-margin and high-disagreement slices are where the next annotation budget should go, and where aggregation (mean vs. min) is most fragile.
+
+**Format, verbosity, and length shortcuts.** Step classifiers learn the easiest correlates of "looks correct": longer derivations, confident formatting, familiar notation. A fluent wrong step then outscores a terse right one. Mitigations are procedural, not architectural: length-controlled evaluation splits, style-normalized candidate sets, and adversarial completions that are verbose but wrong. If min-aggregation suddenly rejects everything after a formatting change, suspect the shortcut before suspecting the policy.
+
+**Distribution shift and overoptimization.** As the policy improves, its prefixes drift off the PRM's training distribution, and optimizing the proxy eventually regresses true task success (Goodhart's law). Track the train reward against an independent task metric and periodic human checks on samples, not just against the PRM score. Keep version lineage for the preference data, the reward model, and the verifier, with a rollback rule: if independent success falls while the proxy rises, revert the reward version and refresh labels before continuing.
+
+**Active collection and stop rules.** Because step labels are the bottleneck, collect them where the model is most uncertain: small margins, high ensemble disagreement, and steps that flip the aggregate verdict. Stop or pause collection when held-out ranking accuracy plateaus and the disagreement slice stops shrinking; more labels on already-decided regions buy little.
+
 ### How to Combine Process Scores and Outcome Scores
 
 The more reliable practices in the public literature fall into three groups:

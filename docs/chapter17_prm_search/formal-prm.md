@@ -196,8 +196,8 @@ $$\text{Pass}@k = 1-(1-p)^k$$
 
 This is exactly the coverage formula from Section 16.3. Working backward, here are the single-attempt success rates implied by these numbers:
 
-- Pass@32 = 82.4%: the single-attempt success rate is about $p=5.3\%$ (since $(1-0.053)^{32}\approx0.176$)
-- Pass@8192 = 88.9%: the single-attempt success rate needs to be only about $p=0.03\%$ (since $(1-0.0003)^{8192}\approx0.111$)
+- Pass@32 = 82.4%: the single-attempt success rate is about $p=5.3\%$ (since $(1-0.053)^{32}\approx0.175$, so $1-0.175\approx0.825$)
+- Pass@8192 = 88.9%: the single-attempt success rate needs to be only about $p=0.027\%$ (since $(1-0.000268)^{8192}\approx0.111$, so $1-0.111=0.889$)
 
 The two settings differ by more than 100 times. When reporting formal proving results, the candidate budget must be stated, or the number has no meaning. These numbers also show that increasing the search budget for formal proofs does cover more problems, but the compute cost grows linearly with the number of candidates.
 
@@ -226,6 +226,16 @@ Formal feedback requires translating the task into Lean4. This is no small amoun
 ### Training Cost
 
 During proof search, tactics are generated repeatedly and the Lean checker is called again and again. When the branching factor and the proof depth grow, the number of checks grows quickly. The actual cost depends on caching strategy, parallelism, theorem library size, and search budget, and the public material is not enough to summarize all systems with a fixed multiplier.
+
+### Soundness, Completeness, and Verifier Tests
+
+"Deterministic" needs a precise reading. For a fixed formal system, statement, library version, and timeout, a kernel check is deterministic. Two further properties decide whether that determinism is useful.
+
+**Soundness** means the checker accepts only genuinely valid proofs: no false positives. **Completeness** means it accepts every valid proof in its fragment: no false negatives. Proof kernels are designed for soundness; completeness is always bounded in practice by timeouts, tactic inventories, and automation strength. A failure therefore has three possible readings: the proof is wrong, the proof is right but beyond the automation budget, or the input did not parse into the intended statement. Treating all three as "the model was wrong" corrupts the reward.
+
+**Parser and elaboration boundaries** are where most silent errors enter. Implicit coercions, overloaded notation, universe levels, and missing side conditions can turn the checked statement into a different claim from the English original. Keep the natural-language problem, the formal statement, and the elaborated kernel term as three separately versioned artifacts, and re-check the correspondence whenever the library or the formalizer changes.
+
+**False-positive and false-negative tests** should run in CI around the verifier. Mutate known-good proofs (drop a hypothesis, weaken an inequality, swap a tactic) and require the checker to reject them; replay a corpus of known-good proofs and require acceptance within the timeout. Add **hidden verifier tests**: held-out statements and mutated edge cases the policy never sees during training, so that a policy that games the visible test set still fails the hidden one. Execute all of this in an **isolated sandbox** with reset and deterministic replay: fixed library versions, no network, no persistent state between checks, and logged seeds, so a pass today reproduces tomorrow.
 
 ### How to Expand the Coverage of Formal Checking
 

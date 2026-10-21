@@ -4,7 +4,7 @@ When the discriminative PRM from the previous section meets the step-six error t
 
 The problem becomes more obvious when we move to a new domain. Take a PRM trained on math and use it to judge code: it gives some line a low score, but we cannot tell whether it truly spotted a bug or whether the code style simply differs from the training data. Fixed good/bad/neutral labels do not reveal what knowledge the evaluator is missing.
 
-The **generative PRM** takes a different approach. Instead of letting the evaluator output a single score, it makes the evaluator write out its checking process first: "This step tries to divide both sides by 2, which should give $2k^2=q^2$, but it is written as $4k=q^2$, so the equation does not hold." Only then does it give an explicit verdict. The evaluator is itself a generative model: it writes a natural-language check and ends with a conclusion that can be extracted.
+The **generative PRM** takes a different approach. Instead of letting the evaluator output a single score, it makes the evaluator write out its checking process first: "Substituting $p=2k$ gives $4k^2=2q^2$, i.e. $2k^2=q^2$, but the step writes $4k=q^2$: the square on $k$ was dropped and the division by $2$ was skipped, so the equation does not hold." Only then does it give an explicit verdict. The evaluator is itself a generative model: it writes a natural-language check and ends with a conclusion that can be extracted.
 
 What does this cost? Why does it need only about 1% of the process labels? Is generating an explanation too slow? Using ThinkPRM as the example, this section looks at how natural-language evaluation works, why a small number of labels is enough, how verification compute can be scaled, and when to use it and when to stay with the discriminative PRM.
 
@@ -43,9 +43,9 @@ Discriminative output:
 bad: 0.96
 
 Generative output:
-This step tries to divide both sides of 4k^2 = 2q^2 by 2, which should give 2k^2 = q^2;
-writing 4k = q^2 amounts to taking a square root of only the k^2 on the left, with no
-corresponding transformation on the right, so the equation no longer holds.
+This step substitutes p = 2k into p^2 = 2q^2. The correct substitution gives 4k^2 = 2q^2,
+i.e. 2k^2 = q^2 after dividing by 2; writing 4k = q^2 drops the square on k and skips
+the division, so the equation no longer holds.
 Judgment: INCORRECT
 ```
 
