@@ -74,7 +74,7 @@ $$
 
 You see, $R$ takes three concrete things, "the original state, the action, and the next state," and outputs one number. The number output here is -0.01.
 
-But, you may ask, reinforcement learning does not maximize the reward of a single step. In Section 3.1 we defined that what the agent really maximizes is the **discounted return** starting from the current time:
+But, you may ask, reinforcement learning does not maximize the reward of a single step. In Section 2.2 (Chapter 2) we defined that what the agent really maximizes is the **discounted return** starting from the current time:
 
 $$
 G_t = R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \cdots.
@@ -255,7 +255,7 @@ $$
 | $r_{\text{alive}}$   | Alive bonus per step                |
 | $r_{\text{ctrl}}$    | Joint torque penalty (control cost) |
 
-Looks reasonable, right? Encourage moving forward, reward staying alive, penalize overly violent actions: all three are wanted. But the **numerical ranges** of the three things may be completely different. $r_{\text{forward}}$ may range from 0 to 5, and $r_{\text{ctrl}}$ from -100 to 0. If they are added directly, the absolute value of the control cost may be dozens of times that of the forward speed. The result is that the agent would rather stand still (zero control cost) than dare to move a leg (moving a leg has a high control cost, while the forward reward is only a little).
+Looks reasonable, right? Encourage moving forward, reward staying alive, penalize overly violent actions: all three are wanted. But the **numerical ranges** of the three things may be completely different. As a schematic illustration (not the exact gym coefficients), suppose $r_{\text{forward}}$ ranges from 0 to 5 while $r_{\text{ctrl}}$ ranges from -100 to 0. If they are added directly, the absolute value of the control cost may be dozens of times that of the forward speed. The result is that the agent would rather stand still (zero control cost) than dare to move a leg (moving a leg has a high control cost, while the forward reward is only a little).
 
 You need to attach a weight coefficient to each term to decide which one matters more:
 
@@ -351,7 +351,7 @@ CPO uses Lagrange multipliers to adjust automatically during training: when the 
 
 Whichever method is used, every time you add a new term to the reward you introduce a new possibility of bias. Four kinds of problem recur in engineering:
 
-**Scale mismatch.** $r_{\text{forward}}$ may be in 0 to 5, and $r_{\text{ctrl}}$ in -100 to 0. The terms with large values dominate the gradient direction. This has nothing to do with the weight question of "which is more important" and is purely a matter of numerical scale. A simple remedy is to scale each sub-reward by hand to a similar range (such as [-1, 1]).
+**Scale mismatch.** Schematically, $r_{\text{forward}}$ may be in 0 to 5, and $r_{\text{ctrl}}$ in -100 to 0. The terms with large values dominate the gradient direction. This has nothing to do with the weight question of "which is more important" and is purely a matter of numerical scale. A simple remedy is to scale each sub-reward by hand to a similar range (such as [-1, 1]).
 
 **Weight sensitivity.** Changing the control penalty coefficient from 0.001 to 0.003, only a factor of three, may turn the policy from "a steady jog" into "stumbling and falling." Finding a suitable range of weights usually takes repeated trials.
 
@@ -402,7 +402,7 @@ learning is faster, since every step tells the agent "how crooked the pole is an
 
 Changing only the position coefficient from 0.5 to 2 turns the reward of the same state from "decent" to "very poor." If the position penalty is too strong, the agent may prefer to let the pole lean as long as the cart stays at the center.
 
-Pan et al. divide reward misspecification into three types:
+Pan et al. describe reward misspecification patterns including three common ones:
 
 - **Wrong weights**: the dimensions measured are right, but the proportions of importance among them are written wrongly. The choice of $c_1, c_2$ in CartPole is of this type.
 - **Wrong ontology**: the dimension measured is itself wrong. Coast Runners uses "how many green blocks are eaten" to measure "boat performance," and the dimension is fundamentally wrong.
@@ -501,7 +501,7 @@ In this section we started from the simple maze that "gives 1 point only at the 
 
 Tabular methods require states and actions to be enumerable one by one. Once the states become continuous or high-dimensional, the Q table cannot hold them. The next chapter starts from this point, approximates the Q function with a neural network, and enters deep reinforcement learning.
 
-← Previous section: [Where Does the Data Come From](./algorithm-taxonomy) | Next section: [5.1 From Q-Learning to DQN](../chapter05_dqn/from-q-to-dqn)
+← Previous section: [Policy Sampling and Data Sources](./algorithm-taxonomy) | Next section: [5.1 From Q-Learning to DQN](../chapter05_dqn/from-q-to-dqn)
 
 ## References
 
@@ -513,7 +513,7 @@ Tabular methods require states and actions to be enumerable one by one. Once the
 
 [^4]: Wen, J., Zhong, R., Khan, A., Jørgensen, E., Wu, J., Tran, D., Peng, Z., Peng, B., & He, H. (2024). Language models learn to mislead humans via RLHF. _arXiv preprint arXiv:2409.12822_.
 
-[^5]: Gao, L., Schulman, J., & Hilton, J. (2022). Scaling laws for reward model overoptimization. _ICML_.
+[^5]: Gao, L., Schulman, J., & Hilton, J. (2023). Scaling laws for reward model overoptimization. _ICML_.
 
 [^6]: Ng, A. Y., Harada, D., & Russell, S. (1999). Policy invariance under reward transformations: Theory and application to reward shaping. _ICML_.
 
@@ -527,8 +527,8 @@ Tabular methods require states and actions to be enumerable one by one. Once the
 
 [^13]: Ho, J., & Ermon, S. (2016). Generative adversarial imitation learning. _NeurIPS_.
 
-[^14]: Andrychowicz, M., Wolski, F., Ray, A., Schneider, J., Fong, R., Welinder, P., McGrew, B., Tobin, J., Pieter Abbeel, O., & Zaremba, W. (2017). Hindsight experience replay. _NeurIPS_.
+[^14]: Andrychowicz, M., Wolski, F., Ray, A., Schneider, J., Fong, R., Welinder, P., McGrew, B., Tobin, J., Abbeel, P., & Zaremba, W. (2017). Hindsight experience replay. _NeurIPS_.
 
 [^15]: Achiam, J., Held, D., Tamar, A., & Abbeel, P. (2017). Constrained policy optimization. _ICML_.
 
-[^16]: van Hasselt, H., Hessel, M., & Aslanides, J. (2016). When using function approximation, a simpler target often yields better results. _Deep Reinforcement Learning Workshop, NeurIPS_.
+[^16]: van Hasselt, H., et al. (2016). Learning values across many orders of magnitude (PopArt). _NeurIPS_.

@@ -1,5 +1,5 @@
 ---
-title: 4.1 DP, MC, and TD
+title: 4.1 Dynamic Programming, Monte Carlo and TD
 ---
 
 # 4.1 Dynamic Programming, Monte Carlo and TD
@@ -443,7 +443,7 @@ The state transitions for each step are:
 | 4    | **$S\xrightarrow{-1}M$** | <img src="./images/three-state-corridor-highlight-s-right.svg" alt="Sampled trajectory, step 4: S go right to M" style="max-width: 260px;" />    |
 | 5    | **$M\xrightarrow{-1}G$** | <img src="./images/three-state-corridor-highlight-m-right.svg" alt="Sampled trajectory, step 5: M go right to G" style="max-width: 260px;" />    |
 
-MC updates only after the episode ends. It traverses the trajectory backward, accumulating returns from each visited position to the terminal state. With $\gamma=1$, the targets for each visit in this trajectory are:
+MC updates only after the episode ends. The returns are accumulated backward from the terminal state (each visit's target is the sum of all rewards after it), and the table below applies one update per visit in the order the visits occurred. Because the constant step size $\alpha=0.5$ does not average commutatively (unlike $\alpha=1/N$), the final values depend on this update order. With $\gamma=1$, the targets for each visit in this trajectory are:
 
 | Visit position | State | Rewards actually obtained afterward | MC target $G_t$ |
 | -------------- | ----- | ----------------------------------- | --------------- |
@@ -474,6 +474,24 @@ $G_t$ is the full return from that visit position to the terminal state. For the
 | 1st $M$       | $-4$      | 0         | $0+0.5(-4-0)=-2$               |
 | 3rd $S$       | $-2$      | -4.25     | $-4.25+0.5[-2-(-4.25)]=-3.125$ |
 | 2nd $M$       | $-1$      | -2        | $-2+0.5[-1-(-2)]=-1.5$         |
+
+### First-Visit, Every-Visit, and Incremental Averages
+
+The example above updates on every visit to a state within the episode, which is every-visit MC. First-visit MC instead uses only the return following the first visit to each state in each episode and ignores later revisits. Both converge to $V^\pi(s)$ as the number of visits grows, but they average over different sample sets: every-visit averages one return per visit, first-visit one return per episode in which the state appears.
+
+Neither variant needs to store all past returns. The sample mean after $n$ returns $G_1,\dots,G_n$,
+
+$$
+\bar{G}_n=\frac{1}{n}\sum_{i=1}^{n}G_i,
+$$
+
+has the incremental form
+
+$$
+\bar{G}_n=\bar{G}_{n-1}+\frac{1}{n}\left[G_n-\bar{G}_{n-1}\right],
+$$
+
+which is exactly the update $V(s)\leftarrow V(s)+\alpha[G_t-V(s)]$ with $\alpha=1/N(s)$, as used in the code at the end of this section. The $1/N(s)$ step size satisfies the standard stochastic-approximation conditions ($\sum\alpha=\infty$, $\sum\alpha^2<\infty$) and converges for stationary prediction. When the target drifts during learning, for example when the policy is also improving, a constant step size $\alpha$ is preferred: it never decays to zero, so it keeps tracking, at the price of never fully averaging out noise.
 
 The MC target $G_t$ covers all rewards from the current visit to the terminal state. Before an episode ends, the full return from an intermediate state is not yet determined, so we cannot compute $G_t$ and therefore cannot update the value estimate for that state. Only after the episode ends, when all rewards along the trajectory are known, can we compute $G_t$ backward from the end and then update each visit.
 
@@ -558,6 +576,120 @@ The TD error will reappear many times in later chapters. Critic training, advant
 
 The TD error is the difference between a value estimate and the one-step Bellman target.
 
+## From Evaluation to Control: Policy Iteration, Value Iteration, and GPI
+
+So far DP has only answered "how good is this fixed policy." Control asks the next question: how do we find a better policy? Two ideas combine into every planning method in this chapter: evaluate the current policy, then make it greedy with respect to the values just computed.
+
+Policy evaluation iterates the Bellman expectation backup until the table stops moving. In code the loop ends when the largest change over a sweep falls below a small threshold $\theta$ (a common choice is $10^{-4}$ to $10^{-6}$):
+
+$$
+\max_s\left|V_{k+1}(s)-V_k(s)\right|<\theta.
+$$
+
+For $\gamma<1$ this residual rule is backed by a contraction argument: the Bellman expectation and optimality operators are $\gamma$-contractions in the max norm, so each sweep shrinks the distance to the fixed point by a factor of roughly $\gamma$ and a small residual means the table is close to $V^\pi$. The corridor in this chapter uses $\gamma=1$, so the strict contraction theorem does not apply here; the sweep still converges because the induced chain is absorbing (a finite expected hitting time to $G$), with an observed error decay of about $0.51$ per sweep. A useful practical fact is that the greedy policy usually stops changing before the values have fully converged, so policy iteration can terminate early once no state changes its greedy action.
+
+Policy improvement then builds the greedy policy from the evaluated values. For the corridor, insert the converged values $V(S)=-3.375$ and $V(M)=-1.875$ with $\gamma=1$:
+
+$$
+Q(S,\text{R})=-1+V(M)=-2.875,\qquad Q(S,\text{L})=-2+V(S)=-5.375,
+$$
+
+$$
+Q(M,\text{R})=-1+V(G)=-1,\qquad Q(M,\text{L})=-2+V(S)=-5.375.
+$$
+
+Going right wins in both states, so the improved policy walks right everywhere. Its values ($V(S)=-2$, $V(M)=-1$) are strictly better, which illustrates the policy improvement theorem: acting greedily with respect to $V^\pi$ yields a policy at least as good as $\pi$, and strictly better unless $\pi$ is already optimal. Alternating full evaluation with greedy improvement is policy iteration.
+
+Value iteration short-circuits the alternation by folding a one-step greedy choice into every sweep:
+
+$$
+V_{k+1}(s)=\max_a\left[R(s,a)+\gamma\sum_{s'}P(s'\mid s,a)V_k(s')\right].
+$$
+
+From zeros in the corridor, the first sweep gives $V_1(S)=\max(-1,-2)=-1$ and $V_1(M)=\max(-1,-2)=-1$; the second gives $V_2(S)=\max(-1-1,-2-1)=-2$ and $V_2(M)=\max(-1,-2-1)=-1$, after which the table is already optimal. Value iteration is policy iteration with a single evaluation sweep per improvement step. For $\gamma<1$ it converges to $V^*$ because the Bellman optimality operator is a $\gamma$-contraction with the optimal value function as its unique fixed point; with the corridor's $\gamma=1$ the guarantee comes instead from the absorbing episodic structure, as above.
+
+Both are instances of generalized policy iteration (GPI): any interleaving of partial evaluation and partial improvement steps in which both processes keep pulling toward consistency. Almost every control method later in this book, including SARSA and Q-learning below, is GPI with sampled updates instead of model sweeps.
+
+Three implementation conventions decide whether planning code is correct. First, update order: synchronous sweeps read the whole old table and write a new one, which is easy to reason about, while asynchronous (in-place) updates reuse fresh numbers within the same sweep and usually converge faster; both converge for these backups. Second, tie handling: when several actions tie for the greedy maximum, break ties deterministically (for example, lowest action index) so results are reproducible, and document the rule. Third, terminals and unreachable states: pin $V(G)=0$ and never update terminal states, and either skip states the policy can never reach or leave them at initialization rather than letting arbitrary values leak into updates through bootstrapping.
+
+## n-Step Returns and TD($\lambda$)
+
+TD(0) looks one step ahead and MC looks all the way to termination. The $n$-step return fills the continuum between them:
+
+$$
+G_{t:t+n}=R_{t+1}+\gamma R_{t+2}+\cdots+\gamma^{n-1}R_{t+n}+\gamma^{n}V(S_{t+n}),
+$$
+
+with the convention that if the episode terminates within the $n$ steps, the tail value is replaced by zero and the return becomes exact. The update is the familiar template with a deeper target:
+
+$$
+V(S_t)\leftarrow V(S_t)+\alpha\left[G_{t:t+n}-V(S_t)\right].
+$$
+
+The integer $n$ is a bias-variance knob. Small $n$ bootstraps sooner, so it has lower variance but inherits more bias from the current table; large $n$ waits for more real rewards, so it is less biased but noisier and slower to update. TD(0) and MC are the endpoints $n=1$ and $n\to\infty$.
+
+TD($\lambda$) avoids committing to one $n$ by averaging all of them with exponentially decaying weights. With $\lambda\in[0,1]$, the $\lambda$-return is
+
+$$
+G_t^\lambda=(1-\lambda)\sum_{n=1}^{\infty}\lambda^{n-1}G_{t:t+n},
+$$
+
+so $\lambda=0$ recovers TD(0) and $\lambda=1$ recovers the full return. This is the forward view: it defines the target but still needs future rewards, so it cannot be computed online directly.
+
+The backward view makes the same idea online with eligibility traces. Each state keeps a trace $z(s)$ that marks how recently and how often it was visited. On each step the traces decay by $\gamma\lambda$ and the current state gains one unit (accumulating traces),
+
+$$
+z(s)\leftarrow\gamma\lambda z(s)+\mathbf{1}\{s=S_t\},
+$$
+
+and then every state is nudged in proportion to its trace and the one-step TD error $\delta_t=R_{t+1}+\gamma V(S_{t+1})-V(S_t)$:
+
+$$
+V(s)\leftarrow V(s)+\alpha\,\delta_t\,z(s)\quad\text{for all }s.
+$$
+
+A state visited several steps ago still has a nonzero trace, so today's surprise flows backward along the recent path with geometrically shrinking credit. The forward and backward views coincide in expectation for accumulating traces, which is why traces are described as an efficient online implementation of the $\lambda$-return: recent states absorb most of the correction, distant ones almost none.
+
+## Tabular Control: SARSA, Expected SARSA, and Q-Learning
+
+Prediction estimates values for a fixed policy. Control must also choose actions, so it estimates action values $Q(s,a)$ and derives behavior from them. Three tabular updates differ only in which next action their target assumes.
+
+SARSA is on-policy. It executes the quintuple $(S_t,A_t,R_{t+1},S_{t+1},A_{t+1})$, where $A_{t+1}$ is the action the current behavior policy actually takes next, and updates
+
+$$
+Q(S_t,A_t)\leftarrow Q(S_t,A_t)+\alpha\left[R_{t+1}+\gamma Q(S_{t+1},A_{t+1})-Q(S_t,A_t)\right].
+$$
+
+Because the target contains the action that will really be taken, SARSA evaluates the policy it follows, exploration included. That makes it risk-aware: in the classic cliff-walk task it learns the safer inland path, since its own occasional exploratory steps near the cliff edge show up in its targets.
+
+Q-learning is off-policy. It replaces the next action with the greedy best:
+
+$$
+Q(S_t,A_t)\leftarrow Q(S_t,A_t)+\alpha\left[R_{t+1}+\gamma\max_{a'}Q(S_{t+1},a')-Q(S_t,A_t)\right].
+$$
+
+The behavior policy can explore freely (for instance $\epsilon$-greedy), while the target pretends all future actions are greedy. Q-learning therefore learns the value of the optimal policy directly and takes the shorter cliff-edge route in cliff-walk, but it pays in two ways during learning: the max over estimated values is upward biased (maximization bias), and because the target never charges for the exploratory step actually taken, the risky optimal path looks better than the policy that must walk it.
+
+Expected SARSA sits between them. It averages over the next-action distribution instead of sampling or maximizing:
+
+$$
+Q(S_t,A_t)\leftarrow Q(S_t,A_t)+\alpha\left[R_{t+1}+\gamma\sum_{a'}\pi(a'\mid S_{t+1})Q(S_{t+1},a')-Q(S_t,A_t)\right].
+$$
+
+When $\pi$ is the current $\epsilon$-greedy policy the update is on-policy like SARSA, but with lower variance because the expectation replaces a single sampled $A_{t+1}$; when $\pi$ is the greedy policy the expectation is over a point mass, so the update is exactly Q-learning and no smoothing remains. Smoothing exists only for a stochastic $\pi$.
+
+All three need two schedules to converge in the tabular setting. Exploration typically uses $\epsilon$-greedy behavior with $\epsilon$ decayed toward zero (GLIE: greedy in the limit with infinite exploration), so every state-action pair keeps being visited early on but behavior becomes greedy asymptotically. Step sizes must satisfy the Robbins-Monro conditions ($\sum_t\alpha_t=\infty$, $\sum_t\alpha_t^2<\infty$, for instance $\alpha_t=1/t$) in theory, while constant small $\alpha$ values are common in practice for tracking nonstationary targets.
+
+One bookkeeping distinction prevents silent bugs: terminal versus truncated bootstrapping. If $S_{t+1}$ is a true terminal state (goal reached, pole fell), the bootstrap value is zero because there is no future. If the episode was truncated by a time limit, the state is not terminal and the correct target keeps $\gamma Q(S_{t+1},\cdot)$ (or $\gamma V(S_{t+1})$). Modern environments separate these cases with `terminated` and `truncated` flags; treating a time limit as termination systematically undervalues states near the cutoff.
+
+```python
+if terminated:      # true terminal state: no future value
+    target = reward
+else:               # including truncation: keep bootstrapping
+    target = reward + gamma * Q[next_state][next_action_or_max]
+Q[s][a] += alpha * (target - Q[s][a])
+```
+
 ## The Relationship Among the Three Methods
 
 DP, MC, and TD are not three unrelated algorithms. They are three ways to solve the same problem under different information constraints.
@@ -583,6 +715,7 @@ $$
 \underbrace{\pi(a\mid s)}_{\text{policy: action probability}}
 \left[
 \underbrace{R(s,a)}_{\text{reward model}}
++
 \gamma
 \sum_{s'}
 \underbrace{P(s'\mid s,a)}_{\text{transition model}}
@@ -799,8 +932,11 @@ This section discussed three methods of value estimation.
 3. MC does not require a model. It updates values using the full-trajectory return $G_t$. Its target is unbiased, but it must wait for episode termination and typically has higher variance.
 4. TD also does not require a model, and it can update after every step. It uses $r+\gamma V(s')$ as its target, providing more timely learning and lower variance, but because the target includes an estimate, it introduces bias.
 5. The shared core of DP, MC, and TD is the Bellman idea: the current value can be characterized by immediate reward and future value. Their differences lie in whether future value is computed exactly by the model, revealed by complete experience, or approximated by the next-state estimate.
+6. Planning becomes control by alternating evaluation with greedy improvement. Policy iteration evaluates fully then improves, value iteration improves on every sweep, and GPI is any interleaving of the two. For $\gamma<1$ the Bellman operators behind these sweeps are $\gamma$-contractions, so iterates converge geometrically to a unique fixed point (with the corridor's $\gamma=1$, convergence comes from the absorbing episodic structure instead); stop when the largest sweep change falls below $\theta$, and pin terminal values at zero.
+7. One-step TD and full MC are endpoints of a continuum. The $n$-step return mixes $n$ real rewards with a bootstrap, trading bias against variance, and TD($\lambda$) averages over all $n$ with weights $(1-\lambda)\lambda^{n-1}$. Eligibility traces implement the same average online by letting each TD error flow backward with decay $\gamma\lambda$.
+8. Tabular control estimates $Q(s,a)$ instead of $V(s)$. SARSA bootstraps from the action actually taken next (on-policy, risk-aware), Q-learning from the greedy best action (off-policy, optimal but optimistic), and Expected SARSA from the average under $\pi$ (lower variance, matching Q-learning when $\pi$ is greedy). Converge with decaying $\epsilon$-greedy exploration plus Robbins-Monro step sizes, and bootstrap through time limits (truncation) while using zero future value only at true termination.
 
-In the next section we move from state value $V(s)$ to action value $Q(s,a)$. $V(s)$ only tells you how good a state is overall, whereas $Q(s,a)$ directly compares "how good it is to take action $a$ first in state $s$", enabling the agent to make action choices.
+This section moved from state value $V(s)$ to action value $Q(s,a)$: $V(s)$ tells you how good a state is overall, whereas $Q(s,a)$ directly compares candidate actions and therefore supports control.
 
 Next section: [4.2 Policy Sampling and Data Sources](./algorithm-taxonomy)
 

@@ -1,5 +1,5 @@
 ---
-title: '4.2 Data Sources: On-Policy, Off-Policy, Online, and Offline'
+title: 4.2 Policy Sampling and Data Sources
 ---
 
 # 4.2 Policy Sampling and Data Sources
@@ -101,6 +101,34 @@ In deep RL, **DQN** makes off-policy practical via a replay buffer: it stores ol
 
 - **Pros**: much more sample-efficient. Old data can be reused; expert data can be leveraged.
 - **Cons**: distribution shift. If the target policy wants to take actions that never appear in the dataset, the algorithm must extrapolate, which can be wildly wrong. [^sutton-barto]
+
+### Correcting the Mismatch: Importance Sampling
+
+Off-policy data follows $\mu$, but we want expectations under $\pi$. Importance sampling (IS) reweights each sample by how much more (or less) likely it is under the target policy. For a one-step reward,
+
+$$
+\mathbb{E}_\pi[R]=\mathbb{E}_\mu\left[\rho\,R\right],\qquad \rho(s,a)=\frac{\pi(a\mid s)}{\mu(a\mid s)}.
+$$
+
+A concrete check: suppose at some state $\mu$ picks right with probability $0.5$ while $\pi$ picks right with probability $0.8$. A sampled transition $(s,\text{right},r=-1)$ gets weight $\rho=0.8/0.5=1.6$, contributing $1.6\times(-1)=-1.6$ to the corrected estimate; a left action gets $\rho=0.2/0.5=0.4$. Actions the target favors count extra, actions it dislikes count less, and the ordinary, ratio-weighted average $\frac1n\sum_i\rho_iG_i$ is unbiased for the target expectation.
+
+For a full trajectory the ratio multiplies per step, $\rho_{0:T}=\prod_{t}\pi(a_t\mid s_t)/\mu(a_t\mid s_t)$, which is unbiased but its variance explodes with horizon length. Per-decision IS softens this by giving each reward only the product of ratios up to its own time step, since later action choices cannot affect an earlier reward.
+
+Two estimators use these weights differently. With $n$ sampled returns $G_i$ and ratios $\rho_i$, the ordinary estimator averages the weighted returns,
+
+$$
+\hat{V}_{\text{ord}}=\frac{1}{n}\sum_{i=1}^{n}\rho_i G_i,
+$$
+
+which is unbiased but can swing wildly when a few ratios are huge. The weighted (self-normalized) estimator divides by the sum of the weights,
+
+$$
+\hat{V}_{\text{w}}=\frac{\sum_i\rho_i G_i}{\sum_i\rho_i},
+$$
+
+which is biased (the denominator is random) but usually has far lower variance, and the bias shrinks as $n$ grows. Off-policy MC prediction in practice uses the weighted form for exactly this reason.
+
+Three conditions decide whether either estimator can be trusted. First, support (coverage): wherever $\pi(a\mid s)>0$ we need $\mu(a\mid s)>0$, otherwise the ratio divides by zero and no reweighting can invent unseen actions. Second, effective sample size: when weights are lopsided, $n$ nominal samples may carry the information of far fewer, conventionally estimated as $(\sum_i\rho_i)^2/\sum_i\rho_i^2$; a value near $1$ means one trajectory dominates and the estimate is unreliable. Third, behavior design: $\epsilon$-greedy and other exploratory $\mu$ exist precisely to keep coverage nonzero while staying close enough to $\pi$ that the ratios stay tame.
 
 ## Online vs. Offline
 
@@ -229,16 +257,16 @@ To use an analogy: PPO's clipping ensures you **do not go too far from the old p
 
 This explains why LLM-RL training can still be unstable even with PPO clipping. Fixes for training-inference mismatch generally follow several lines:
 
-- **Precision fixes**: Use FP16/BF16 instead of FP8 for rollout to reduce the numerical discrepancy between $\pi_{\text{rollout}}$ and $\pi_{\text{old}}$; some work goes the other direction and compresses training-side precision -- FP8-RL in the veRL framework achieves W8A8 full-stack low-precision training, combined with importance sampling correction, improving rollout throughput by 44% while matching the BF16 baseline.
-- **Importance sampling (IS) correction**: Since $\pi_{\text{rollout}} \neq \pi_{\text{old}}$, explicitly introduce importance weights to correct distribution shift. Truncated IS (TIS) is the most direct approach, clipping extreme IS ratios to prevent gradient explosion; more recent work includes MinPRO, which replaces the cumulative product with the minimum token-level ratio within a prefix, providing more stability under large off-policy drift.
+- **Precision fixes**: Use higher rollout precision (for example FP16/BF16 instead of FP8) to reduce the numerical discrepancy between $\pi_{\text{rollout}}$ and $\pi_{\text{old}}$; some work instead compresses training-side precision and adds an importance-sampling correction, reporting higher rollout throughput while staying close to the higher-precision baseline.
+- **Importance sampling (IS) correction**: Since $\pi_{\text{rollout}} \neq \pi_{\text{old}}$, explicitly introduce importance weights to correct distribution shift. The standard approach is truncated IS, which clips extreme ratios to prevent gradient explosion; reported variants also replace the cumulative product with per-prefix statistics for stability under large off-policy drift.
 - **Pruning long-tail tokens**: Training-inference mismatch concentrates in low-probability regions; directly removing extreme long-tail tokens can eliminate the largest source of deviation at its origin.
-- **MoE routing replay**: Inference-time expert routing is inherently different from training; R3 (Rollout Routing Replay) replays the inference routing distribution during training, solving the MoE-RL-specific amplification of training-inference mismatch.
+- **Routing consistency**: In mixture-of-experts models, inference-time expert routing can differ from training; replaying the inference routing distribution during training addresses this MoE-specific amplification of the mismatch.
 - **Optimization perspective**: Treat training-inference mismatch as a dynamic optimization problem, triggering learning rate scheduling through signals like response length surges.
 - **Engineering-side rollout correction**: Before training, use the current training engine to recompute the rollout policy's log-probability, forcibly aligning $\pi_{\text{rollout}}$ and $\pi_{\text{old}}$ -- expensive but most reliable.
 
 ### Making Peace with Reality
 
-These papers collectively point to one conclusion: in LLM-RL engineering practice, there is no such thing as "purely" on-policy. What we can do is **keep the gap between $\mu$ and $\pi_\theta$ within an acceptable range** -- PPO's clipping is one form of control, FP16 is another, and R3 routing replay is yet another. The on/off-policy theory in the first half of the main text is a clean binary classification, while engineering reality is a **continuous spectrum** -- theoretically on-policy, but in practice always carrying a hint of off-policy flavor.
+These papers collectively point to one conclusion: in LLM-RL engineering practice, there is no such thing as "purely" on-policy. What we can do is **keep the gap between $\mu$ and $\pi_\theta$ within an acceptable range** -- PPO's clipping is one form of control, low-precision training is another, and routing replay is yet another. The on/off-policy theory in the first half of the main text is a clean binary classification, while engineering reality is a **continuous spectrum** -- theoretically on-policy, but in practice always carrying a hint of off-policy flavor.
 
 ## Summary
 
