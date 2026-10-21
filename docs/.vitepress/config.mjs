@@ -755,6 +755,10 @@ const sidebar = {
             {
               text: '4.3 Reward Design',
               link: '/chapter04_classical_methods/reward-design'
+            },
+            {
+              text: '4.4 Summary and Exercises',
+              link: '/chapter04_classical_methods/review'
             }
           ]
         }
