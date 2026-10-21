@@ -1,3 +1,7 @@
+---
+title: '14.4 Hands-on: A DPO Alignment Experiment'
+---
+
 # 14.4 Hands-on: A DPO Alignment Experiment
 
 > **Section goal**: Train a small language model on paired preferences: first to stop blindly agreeing with the user, then to reduce sarcastic responses. Use training metrics and before-and-after generations to check the learned preference.
@@ -52,11 +56,11 @@ python code/chapter14_dpo/1-generate_data.py
 Expected output:
 
 ```
-Successfully generated 100 preference data items, saved to: output/preference_data.json
-Try modifying this script to change the preference direction, e.g., make the model more direct instead of politely disagreeing!
+Successfully generated 100 preference examples, saved to: output/preference_data.json
+Try modifying this script to change the preference direction, e.g. making the model more direct instead of gently pushing back!
 ```
 
-Each data item looks like this:
+Each data item looks like this (English translation; the script's built-in templates are Chinese with a ` (场景 i+1)` suffix -- the schema is what matters):
 
 ```json
 {
@@ -194,14 +198,18 @@ Step  Training Loss  Rewards/Margins  Rewards/Chosen  Rewards/Rejected  Rewards/
  15       0.5987          0.3421           0.2314          -0.1107              0.72
  ...
  45       0.2103          1.5632           0.9201          -0.6431              0.92
+```
+
+(Illustrative values averaged over a logging window: a single batch at `per_device_train_batch_size=2` can only give accuracies of 0.0, 0.5, or 1.0.)
 
 Done! Saved to ./output/dpo_results/final_model.
-```
+
+````
 
 How to read the key signals:
 
 - **Training Loss** drops from $\ln 2 \approx 0.69$ to about $0.21$, indicating the model gradually learned to distinguish "correction" from "agreement."
-- **Rewards/Accuracies** rises from $0.52$ (near random guessing) to $0.92$, indicating the model's preference judgment on the training set is becoming increasingly accurate.
+- **Rewards/Accuracies** rises from ~0.5 (near chance, window-averaged) toward ~0.9, indicating the model's preference judgment on the training set is becoming increasingly accurate.
 - **Rewards/Margins** grows steadily, indicating the gap between the model's preference for chosen and its rejection of rejected is widening.
 
 ### Step 3: Test the Aligned Model
@@ -233,7 +241,7 @@ print("=" * 40)
 print("[Preference-aligned response]")
 print(tokenizer.decode(outputs[0][inputs.input_ids.shape[-1]:], skip_special_tokens=True))
 print("=" * 40)
-```
+````
 
 Expected output (illustrative):
 
@@ -306,10 +314,7 @@ dataset = Dataset.from_dict({
 print(f"Preference dataset size: {len(dataset)}")
 ```
 
-Notes on the code block above:
-
-1. The strings inside `prompt/chosen/rejected` are part of the dataset content. In practice you can keep them in Chinese or English; what matters is that the "chosen" completion is consistently preferable under the criterion you want to align to.
-2. We translate the surrounding explanation, and only translate clearly-explanatory print strings. We do not change the training semantics.
+Notes on the code block above: the strings inside `prompt/chosen/rejected` are the dataset content; what matters is that the "chosen" completion is consistently preferable under the criterion you want to align to.
 
 ### Running DPO Training
 
@@ -499,6 +504,14 @@ Another possibility is a subtle form of **reward hacking**. The model might latc
 </details>
 
 Training metrics are only the surface. The real mechanism sits inside DPO's math: why can "changing the loss" remove the entire PPO loop? Why can we train without a separate reward model? For that, see the derivation in [14.1 DPO Objective and Derivation](./dpo-objective-derivation) and the analysis in [DPO Theory and Variants](./dpo-theory-and-family).
+
+## 14.4.5 Controls, Held-Out Slices, and What Counts as Evidence
+
+A rising margin on the training set is necessary but not sufficient. Three controls separate real alignment from memorization:
+
+1. **Held-out prompts and slices.** The sycophancy test above already uses a prompt absent from training; extend this into a held-out set covering new topics, and slice results by prompt type (and by annotator, if several people labeled the data). A model that wins on one annotator's slice but collapses on another's has fit labeling style, not preference.
+2. **Compute-matched baselines.** Before crediting DPO, train SFT on the chosen completions only for the same token budget, and try a rejection-sampling baseline: sample $n$ completions from the current policy, keep the best by an _independent_ scorer (a reference model, a reward model, or a rule-based verifier -- not DPO's own implicit reward, which would be circular), and fine-tune on the winners. If SFT-on-chosen matches DPO on downstream behavior, the contrastive term added nothing; the preference pairs were effectively demonstrations.
+3. **External task, safety, and style checks.** Preference accuracy is not downstream quality. Re-run a small external battery after training: a task benchmark the pairs never mention, a safety probe set, and a style/length audit. The classic overoptimization signature is accuracy and margin still climbing with more epochs or data reuse while these external scores plateau and then fall -- that divergence, not the training loss, is the early-stopping signal.
 
 ## Section Summary
 

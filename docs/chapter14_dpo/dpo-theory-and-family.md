@@ -1,5 +1,5 @@
 ---
-title: 14.3 DPO Theory, Math, and Method Selection
+title: 14.3 DPO Improvements
 ---
 
 # 14.3 DPO Improvements
@@ -545,6 +545,24 @@ The code mapping is also direct:
 - `dpo_logits = beta * (chosen_logratio - rejected_logratio)` corresponds to the full reward difference inside the sigmoid.
 - `loss = -F.logsigmoid(dpo_logits).mean()` corresponds to $\mathcal{L}_{\text{DPO}}$.
 
+### DPO Gradient: Easy, Hard, and Mislabeled Pairs Get Different Weights
+
+Differentiate the per-sample loss $\ell = -\log \sigma(u)$ with $u = \beta(\Delta_w - \Delta_l)$ (the implicit-reward margin). Since $\frac{d}{du}[-\log\sigma(u)] = -\sigma(-u)$, the gradient is:
+
+$$\nabla_\theta \ell = -\underbrace{\sigma(-u)}_{w} \cdot \beta \nabla_\theta(\Delta_w - \Delta_l), \qquad \Delta_w = \log\frac{\pi_\theta(y_w\mid x)}{\pi_{\text{ref}}(y_w\mid x)}.$$
+
+The scalar $w = \sigma(-u)$ is the entire weighting story. Work it out numerically: if the margin is $u = 2$ (an easy, already-separated pair), $w = \sigma(-2) \approx 0.12$ and the pair barely pushes the parameters. If $u = 0$ (a hard, tied pair), $w = 0.5$. If $u = -2$ (the model currently ranks the pair backwards), $w = \sigma(2) \approx 0.88$ and the update is large. This is desirable on clean data: effort concentrates on undecided pairs. It is also the failure mode: a mislabeled pair (the "rejected" answer is actually better) sits at a large negative margin forever, so it keeps a large weight and drags the model toward the wrong ranking. That is why label noise hurts DPO disproportionately, and why the conservative variant below floors every pair's loss instead of letting any single pair saturate.
+
+The direction of the push is equally readable: $+\beta w\,\nabla_\theta \log \pi_\theta(y_w\mid x)$ raises the chosen likelihood while $-\beta w\,\nabla_\theta \log \pi_\theta(y_l\mid x)$ lowers the rejected one, each step scaled by the same weight $w$. A caveat on the failure mode: cDPO does not selectively down-weight mislabeled pairs -- its per-sample weight $w_{\text{cDPO}}(u) = (1-\varepsilon)\sigma(-u) - \varepsilon\sigma(u)$ shrinks every pair's update (e.g. at $u=-2$ from $0.88$ to $0.78$, but at $u=+2$ from $0.12$ to $0.02$), so the wrong-pair-to-right-pair weight ratio actually rises. Its real effect is to floor every pair's loss (linear growth in $|u|$) so no pair is ever treated as fully satisfied and a non-vanishing gradient $\varepsilon$ remains on already-separated pairs.
+
+### Masks, Lengths, and Label Conventions
+
+Three bookkeeping choices decide whether the margin measures preference or plumbing:
+
+- **Completion-only masks and prompt cancellation.** The sequence log-probability sums only over response tokens; prompt tokens carry label $-100$ and contribute zero (see `sequence_logprob` above). Because both $\log \pi_\theta(y\mid x)$ terms condition on the same prompt $x$, prompt difficulty cancels in the ratio: only the completion's relative likelihood survives.
+- **Summed versus length-normalized log-probabilities.** DPO sums token log-probs, so a longer completion accumulates a more negative total. When chosen responses are systematically longer (or shorter) than rejected ones, part of the margin is a length effect, not a quality effect. SimPO's fix is to divide by length, $r_{\text{SimPO}} = \frac{\beta}{|y|}\sum_t \log \pi_\theta(y_t\mid x, y_{<t})$, and to add an explicit target margin $\gamma$ in the loss, $\mathcal{L} = -\log\sigma(\beta(\bar\ell_w - \bar\ell_l) - \gamma)$; check length statistics before deciding which convention your data needs.
+- **Order, sign, and label invariants.** Swapping $y_w$ and $y_l$ flips the margin sign, $u \mapsto -u$, mapping loss $-\log\sigma(u)$ to $-\log\sigma(-u)$ and accuracy $a \mapsto 1 - a$. A fixed-batch test (recompute the same batch; swap the two sides) must reproduce exactly these transformations, or the loader has a column swap. A simultaneous constant shift of both implicit rewards leaves the loss unchanged: only the gap matters.
+
 At this point, the landing point of DPO is clear:
 
 1. The input is preference data $(x,y_w,y_l)$.
@@ -611,9 +629,9 @@ This point is very direct in the training step: after `loss.backward()`, only th
 
 From the derivation in Step 2, we obtained a very important relationship:
 
-$$r(x,y) = \beta \log \frac{\pi_\theta(y|x)}{\pi_{\text{ref}}(y|x)}$$
+$$r(x,y) = \beta \log \frac{\pi_\theta(y\mid x)}{\pi_{\text{ref}}(y\mid x)} + \mathrm{const}(x)$$
 
-This means the model after DPO training **actually contains a reward model internally**. You can use it to score any answer:
+This means the model after DPO training **actually contains a reward model internally** (the constant depends only on the prompt and cancels in every same-prompt comparison, so it is dropped whenever only gaps matter). You can use it to score any answer:
 
 ```python
 # ==========================================
@@ -621,28 +639,34 @@ This means the model after DPO training **actually contains a reward model inter
 # ==========================================
 import torch
 
+def sequence_logprob_sum(model, tokenizer, prompt, response):
+    """ completion-only summed log-probability: prompt tokens are masked out.
+    Toy helper: tokenizes prompt and prompt+response separately, so BPE merges
+    across the boundary can shift the mask by a token; for chat models use the
+    trainer's jointly-templated input and its -100 labels instead. """
+    full = tokenizer(prompt + response, return_tensors="pt")
+    prompt_len = len(tokenizer(prompt)["input_ids"])
+    input_ids = full["input_ids"]
+    with torch.no_grad():
+        log_probs = model(**full).logits.log_softmax(dim=-1)
+    # gather the log-prob of each actual next token
+    gathered = log_probs[0, :-1, :].gather(-1, input_ids[0, 1:].unsqueeze(-1)).squeeze(-1)
+    # mask: keep only tokens belonging to the response (completion)
+    mask = torch.zeros_like(gathered)
+    mask[max(0, prompt_len - 1):] = 1.0
+    return (gathered * mask).sum()
+
 def implicit_reward(policy_model, ref_model, tokenizer, prompt, response, beta=0.1):
     """
     Compute DPO's implicit reward:
-    r(x,y) = beta * log(pi_theta(y|x) / pi_ref(y|x))
+    r(x,y) = beta * (log pi_theta(y|x) - log pi_ref(y|x)) + const(x),
+    where each log-prob is summed over completion tokens only.
+    The prompt-only const(x) cancels in same-prompt comparisons.
     """
-    # Concatenate prompt and response
-    text = prompt + response
-    inputs = tokenizer(text, return_tensors="pt")
-
-    # Compute log probabilities from the policy model and reference model
     with torch.no_grad():
-        policy_outputs = policy_model(**inputs)
-        ref_outputs = ref_model(**inputs)
-
-        # Get each token's log probability
-        policy_log_probs = policy_outputs.logits.log_softmax(dim=-1)
-        ref_log_probs = ref_outputs.logits.log_softmax(dim=-1)
-
-    # Simplification: use average log probability as a sequence-level score.
-    # Real implementations sum token-level log probabilities.
-    reward = beta * (policy_log_probs.mean() - ref_log_probs.mean())
-    return reward.item()
+        logp = sequence_logprob_sum(policy_model, tokenizer, prompt, response)
+        logp_ref = sequence_logprob_sum(ref_model, tokenizer, prompt, response)
+    return (beta * (logp - logp_ref)).item()
 
 # Example: compare two answers by implicit reward
 prompt = "Explain quantum mechanics to me."
@@ -660,7 +684,7 @@ print(f"Reward gap: {r_good - r_bad:.4f}")
 The meaning of implicit reward is this: **DPO does not lack a reward model; it hides the reward model inside the policy model**. You do not need to train and maintain a separate RM. The policy model itself can score its own answers. This is what "Direct" means in DPO: it learns the policy **directly** from preference data and **skips** the intermediate step of explicitly training an RM.
 
 <details>
-<summary>Question: What is the relationship between DPO's implicit reward $r(x,y) = \beta \log(\pi_\theta / \pi_{\text{ref}})$ and the KL penalty in [Chapter 8 PPO](../chapter08_ppo/trust-region-clipping)?</summary>
+<summary>Question: What is the relationship between DPO's implicit reward $r(x,y) = \beta \log(\pi_\theta / \pi_{\text{ref}})$ (up to a prompt-only constant) and the KL penalty in [Chapter 8 PPO](../chapter08_ppo/trust-region-clipping)?</summary>
 
 They are two sides of the same object. PPO's objective includes the term $-\beta \cdot D_{\text{KL}}(\pi_\theta \| \pi_{\text{ref}})$, which prevents the policy from moving too far away from the reference model. DPO's implicit reward $\beta \log(\pi_\theta / \pi_{\text{ref}})$ is exactly the logarithmic term inside the KL divergence. It is the "pointwise version" of the KL divergence.
 
@@ -689,7 +713,7 @@ The core tension behind these limitations can be summarized with an analogy: DPO
 | **Training complexity**      | Low (standard supervised learning)      | High (multi-model coordination, sensitive hyperparameters) |
 | **Ceiling**                  | Limited by data quality                 | Theoretically higher (can explore online)                  |
 
-DPO clearly wins over PPO in engineering complexity, but PPO has a higher theoretical ceiling. This trade-off gave rise to a class of DPO-style offline preference optimization methods. They all answer the same question: **which component can be safely removed?**
+DPO clearly wins over PPO in engineering complexity, but PPO has a higher theoretical ceiling. The gap is a support-mismatch problem: the offline dataset fixes which $(x, y_w, y_l)$ regions the loss ever sees, while the deployed policy visits new regions where the learned ranking is unconstrained. The standard follow-up is iterative (online) DPO: sample fresh response pairs from the current policy, have them labeled by humans or a reward model, and retrain -- moving the offline objective back toward the online RL loop at the price of rebuilding the labeling loop. This trade-off gave rise to a class of DPO-style offline preference optimization methods. They all answer the same question: **which component can be safely removed?**
 
 ## The DPO-Style Offline Preference Optimization Family
 
@@ -705,7 +729,7 @@ You can first understand their differences by asking "what was removed?":
 
 ### KTO
 
-DPO needs pairwise preference data $(y_w, y_l)$, but collecting pairwise comparison data is expensive in practice. KTO (Kahneman-Tversky Optimization) proposes a more practical alternative: **each answer only needs a "thumbs up" or "thumbs down"; no pairwise comparison is required**.
+DPO needs pairwise preference data $(y_w, y_l)$, but collecting pairwise comparison data is expensive in practice. KTO (Kahneman-Tversky Optimization; Ethayarajh et al., 2024) proposes a more practical alternative: **each answer only needs a "thumbs up" or "thumbs down"; no pairwise comparison is required**.
 
 KTO's name comes from prospect theory in behavioral economics, where humans are more sensitive to "losses" than to "gains". KTO incorporates this idea into its loss function: negative feedback receives a stronger penalty than positive feedback receives reward.
 
@@ -713,43 +737,53 @@ From the perspective of data collection, KTO's advantage is even clearer. Suppos
 
 ### SimPO
 
-DPO needs a frozen Reference Model $\pi_{\text{ref}}$ as a baseline. SimPO (Simple Preference Optimization) replaces comparison with the reference model by the answer's own average log probability:
+DPO needs a frozen Reference Model $\pi_{\text{ref}}$ as a baseline. SimPO (Simple Preference Optimization; Meng et al., 2024) replaces comparison with the reference model by the answer's own average log probability:
 
 $$r_{\text{SimPO}}(x,y) = \beta \cdot \frac{1}{|y|} \sum_{t=1}^{|y|} \log \pi_\theta(y_t | x, y_{<t})$$
 
-There is no longer a $\pi_{\text{ref}}$. The implicit reward is measured directly by the policy model's own average log probability. This saves memory because one full model is no longer maintained, speeds up training because no Reference Model forward pass is needed, and simplifies implementation. But without $\pi_{\text{ref}}$ as a safety rope, the model may change its behavior too aggressively. SimPO's paper finds empirically that this risk can be acceptable when data quality is high, but when data quality is poor, the Reference Model's constraint remains valuable.
+There is no longer a $\pi_{\text{ref}}$. The implicit reward is measured directly by the policy model's own average log probability. This saves memory because one full model is no longer maintained, speeds up training because no Reference Model forward pass is needed, and simplifies implementation. In full, SimPO trains $\mathcal{L} = -\log\sigma(\beta(\bar\ell_w - \bar\ell_l) - \gamma)$, where $\bar\ell$ is the length-normalized log-probability and $\gamma > 0$ is a target margin: the normalized gap must exceed $\gamma$, not merely exceed zero. But without $\pi_{\text{ref}}$ as a safety rope, the model may change its behavior too aggressively. SimPO's paper finds empirically that this risk can be acceptable when data quality is high, but when data quality is poor, the Reference Model's constraint remains valuable.
 
 ### IPO
 
-DPO may overfit when data is scarce or the preference signal is weak. IPO (Identity Preference Optimization) replaces DPO's log-ratio form with a KL-regularized squared-error objective:
+DPO may overfit when data is scarce or the preference signal is weak. IPO (Identity Preference Optimization; Azar et al., 2024) replaces DPO's log-sigmoid with a squared-error objective that stops pushing once the gap is large enough:
 
 $$\mathcal{L}_{\text{IPO}} = \mathbb{E} \left[ \left( \log \frac{\pi_\theta(y_w|x)}{\pi_{\text{ref}}(y_w|x)} - \log \frac{\pi_\theta(y_l|x)}{\pi_{\text{ref}}(y_l|x)} - \frac{1}{2\beta} \right)^2 \right]$$
 
-IPO replaces log-sigmoid with mean squared error and therefore has a natural "target value" ($1/2\beta$). The model only needs to reach this target; it does not need to widen the gap without limit. As an analogy, DPO asks that "the good essay's score must be much higher than the bad essay's score", where a larger gap is always better. IPO asks that "the good essay only needs to be higher than the bad essay by $1/2\beta$". This "enough is enough" property is especially important in small-data settings. When data is scarce, you are less certain whether the learned preference is accurate, so overly aggressive optimization is more likely to overfit. Empirically, when preference data has fewer than 1,000 examples, IPO is noticeably more stable than DPO; when the data exceeds 10,000 examples, the gap between them narrows.
+Note the units: unlike the DPO margin, which multiplies the log-ratio difference by $\beta$, the IPO target $1/(2\beta)$ applies to the raw (unscaled) log-ratio difference.
+
+Why a fixed target helps can be read off the Bradley-Terry assumption behind DPO. Bradley-Terry says the choice probability is $\sigma(r_w - r_l)$; a deterministic label ("humans always pick $y_w$") therefore implies an infinite reward gap, and DPO's loss keeps rewarding ever-larger margins without bound. That is preference-model misspecification turned into overconfidence: weak or deterministic signals get extrapolated to extreme probability ratios. IPO instead asks that "the good essay only needs to be higher than the bad essay by $1/2\beta$" -- an "enough is enough" property that caps the extrapolation. As an analogy, DPO asks that "the good essay's score must be much higher than the bad essay's score", where a larger gap is always better. This capped behavior matters most when data is scarce, where certainty about the learned preference is lowest; with abundant clean data, the practical gap between DPO and IPO narrows.
+
+### Label Noise, Unpaired Feedback, and No-Reference Losses
+
+The gradient analysis above showed DPO's weak point: a mislabeled pair keeps a large weight forever. Three extensions each remove one assumption behind that failure:
+
+- **Conservative DPO and label smoothing.** Conservative DPO (cDPO) assumes each label is flipped with probability $\varepsilon$ and replaces the target with a soft one: $\mathcal{L}_{\text{cDPO}} = -(1-\varepsilon)\log\sigma(u) - \varepsilon\log\sigma(-u)$, where $u$ is the usual $\beta$-scaled margin. At $u = 0$ the loss is $\ln 2$ for any $\varepsilon$, and the loss never collapses to zero: it grows linearly in $|u|$ (like $\varepsilon u$ for confidently-correct margins, $(1-\varepsilon)|u|$ for confidently-wrong ones), so no single pair is ever treated as fully satisfied. Plain label smoothing on the Bradley-Terry target behaves the same way; use it whenever annotator agreement is well below 100%.
+- **KTO's loss in one line (simplified).** KTO (Ethayarajh et al., 2024) keeps a reference model but drops the pairing requirement: each example is a single $(x, y)$ with a desirable/undesirable bit. Its value function applies prospect-theory asymmetry (losses loom larger than gains) around a reference point $z_0$ derived from the KL term: roughly, desirable examples push $r$ up while undesirable ones push $r$ down, with a larger loss-aversion coefficient $\lambda > 1$ on the undesirable side (the paper writes $v_{\text{KTO}} = \lambda_D\sigma(r - z)$ / $\lambda_U\sigma(r - z)$ with $\lambda_U > \lambda_D$; TRL's `KTOTrainer` implements the undesirable term so that it decreases the reward). The vocabulary to remember is unpaired feedback: desirable versus undesirable, not chosen versus rejected.
+- **ORPO without any reference.** Odds-Ratio Preference Optimization (ORPO; Hong et al., 2024) folds preference learning into a single SFT-like pass with no $\pi_{\text{ref}}$ at all: $\mathcal{L}_{\text{ORPO}} = \mathcal{L}_{\text{SFT}} + \lambda \cdot (-\log\sigma(\log\text{odds}_w - \log\text{odds}_l))$, where $\text{odds}(y\mid x) = \pi_\theta(y\mid x)/(1 - \pi_\theta(y\mid x))$ and $\mathcal{L}_{\text{SFT}} = -\log \pi_\theta(y_w\mid x)$ is preferred fine-tuning on the chosen completion only. The SFT term teaches the good answer; the odds-ratio term adds the contrast. Treat SFT-on-chosen as the cheapest baseline every preference method must beat at matched compute before claiming the contrastive term earned its keep.
 
 ### Family Differences in One Table
 
-| Dimension           | DPO                                              | KTO                                         | SimPO                                 | IPO                                    |
-| ------------------- | ------------------------------------------------ | ------------------------------------------- | ------------------------------------- | -------------------------------------- |
-| **Data format**     | Preference pair $(y_w, y_l)$                     | Single label $(y, \text{thumbs up/down})$   | Preference pair $(y_w, y_l)$          | Preference pair $(y_w, y_l)$           |
-| **Data collection** | High cost (needs comparison between two answers) | Low cost (only one answer needs evaluation) | High cost (same as DPO)               | High cost (same as DPO)                |
-| **Needs Ref?**      | Yes                                              | Yes                                         | **No**                                | Yes                                    |
-| **Math basis**      | Bradley-Terry + log-sigmoid                      | Prospect-theory value function              | Average log probability               | Mean squared error + KL regularization |
-| **Core strength**   | Classic, stable, best ecosystem                  | Flexible data format, low collection cost   | Saves memory (one fewer full model)   | More stable with small data            |
-| **Best fit**        | General first choice                             | User feedback, review annotations           | Single-card training for large models | Fewer than 1,000 data examples         |
+| Dimension           | DPO                                              | KTO                                         | SimPO                                 | IPO                                                                                            |
+| ------------------- | ------------------------------------------------ | ------------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Data format**     | Preference pair $(y_w, y_l)$                     | Single label $(y, \text{thumbs up/down})$   | Preference pair $(y_w, y_l)$          | Preference pair $(y_w, y_l)$                                                                   |
+| **Data collection** | High cost (needs comparison between two answers) | Low cost (only one answer needs evaluation) | High cost (same as DPO)               | High cost (same as DPO)                                                                        |
+| **Needs Ref?**      | Yes                                              | Yes                                         | **No**                                | Yes                                                                                            |
+| **Math basis**      | Bradley-Terry + log-sigmoid                      | Prospect-theory value function              | Average log probability               | Mean squared error + KL regularization                                                         |
+| **Core strength**   | Classic, stable, best ecosystem                  | Flexible data format, low collection cost   | Saves memory (one fewer full model)   | More stable with small data                                                                    |
+| **Best fit**        | General first choice                             | User feedback, review annotations           | Single-card training for large models | Small or noisy datasets -- the fixed target helps most when the preference signal is uncertain |
 
 ## Method Selection Guide
 
 Putting all methods together, here is a practical decision table:
 
-| Scenario                                              | Recommendation | Reason                                                                      |
-| ----------------------------------------------------- | -------------- | --------------------------------------------------------------------------- |
-| Large amount of preference-pair data                  | **DPO**        | Classic, stable, best ecosystem, broad community support                    |
-| Only thumbs up/down feedback                          | **KTO**        | Data format is a natural match; no pairwise comparison needed               |
-| Tight memory budget, such as single-card 70B training | **SimPO**      | No Reference Model, saving one full model                                   |
-| Very small data, within a few hundred examples        | **IPO**        | Regularization helps prevent overfitting and is more stable with small data |
-| Chasing the theoretical ceiling                       | **PPO / GRPO** | Online methods can explore new policies and have a higher ceiling           |
-| Quickly validating an alignment pipeline              | **DPO**        | Simplest implementation and fastest path to results                         |
+| Scenario                                              | Recommendation | Reason                                                                               |
+| ----------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------ |
+| Large amount of preference-pair data                  | **DPO**        | Classic, stable, best ecosystem, broad community support                             |
+| Only thumbs up/down feedback                          | **KTO**        | Data format is a natural match; no pairwise comparison needed                        |
+| Tight memory budget, such as single-card 70B training | **SimPO**      | No Reference Model, saving one full model                                            |
+| Small or noisy preference data, weak signal           | **IPO**        | Fixed target caps extrapolation; more stable when the preference signal is uncertain |
+| Chasing the theoretical ceiling                       | **PPO / GRPO** | Online methods can explore new policies and have a higher ceiling                    |
+| Quickly validating an alignment pipeline              | **DPO**        | Simplest implementation and fastest path to results                                  |
 
 ```mermaid
 flowchart TD
@@ -758,7 +792,7 @@ flowchart TD
     DPO --> SimPO["SimPO (2024)\n1 model\nremove Reference"]
     DPO --> IPO["IPO (2024)\nKL regularization\nmore robust"]
 
-    DPO --> GRPO["GRPO (2025)\nno Critic\ncovered in Section 14.1"]
+    DPO --> GRPO["GRPO (2024)\nno Critic\ncovered in Chapter 15"]
 
     style PPO fill:#fce4ec,stroke:#c62828
     style DPO fill:#fff3e0,stroke:#f57c00

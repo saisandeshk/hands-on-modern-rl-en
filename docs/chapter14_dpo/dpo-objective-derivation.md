@@ -196,9 +196,9 @@ To understand why this is possible, recall the implicit constraint during PPO tr
 Rafailov et al. (2023) found that solving for the optimal policy under this KL constraint yields a concise relationship:
 
 <!-- prettier-ignore -->
-$$r(x,y)\propto\log\frac{\pi_\theta(y\mid x)}{\pi_{\mathrm{ref}}(y\mid x)}$$
+$$r(x,y) = \beta \ln\frac{\pi_\theta(y\mid x)}{\pi_{\mathrm{ref}}(y\mid x)} + \mathrm{const}(x)$$
 
-That is, a response's reward score $r(x,y)$ is proportional to the log of the ratio between "the current model's probability of generating that response" and "the original model's probability of generating that response." This relationship is not approximate; it is mathematically exact. It means the reward score can be computed directly from the probability ratio of two models, and training a separate reward model is no longer necessary -- just keep the original model $\pi_{ref}$ as a reference and compare the probability changes of the training model $\pi_\theta$.
+That is, a response's reward score $r(x,y)$ equals $\beta$ times the log-ratio of "the current model's probability of generating that response" to "the original model's probability of generating that response", up to a constant that depends only on the prompt $x$ (it cancels when two responses to the same prompt are compared). This relationship is not approximate; it is the exact closed-form solution of the KL-regularized objective derived in Exercise 4 below. It means the reward difference can be computed directly from the probability ratios of two models, and training a separate reward model is no longer necessary -- just keep the original model $\pi_{ref}$ as a reference and compare the probability changes of the training model $\pi_\theta$.
 
 Based on this insight, DPO takes preference data (a good and a bad response to the same question) and directly adjusts model parameters to increase the probability of the good response and decrease the probability of the bad one. The entire process requires only one language model plus a static copy of the reference model, skipping the reward model training and PPO's reinforcement learning loop, reducing the problem to optimizing a contrastive loss function.
 
