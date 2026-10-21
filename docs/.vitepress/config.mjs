@@ -863,6 +863,10 @@ const sidebar = {
             {
               text: '7.7 Hands-on: Actor-Critic Frontier Applications',
               link: '/chapter07_actor_critic/ac-frontier'
+            },
+            {
+              text: '7.8 Summary and Exercises',
+              link: '/chapter07_actor_critic/review'
             }
           ]
         },

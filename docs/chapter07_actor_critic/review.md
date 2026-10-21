@@ -1,8 +1,8 @@
 ---
-title: 7.R Summary and Exercises
+title: 7.8 Summary and Exercises
 ---
 
-# 7.R Summary and Exercises
+# 7.8 Summary and Exercises
 
 This chapter built the Actor-Critic architecture: a Critic that learns state values and an Actor that climbs the policy gradient scaled by the advantage. The chapter then stress-tested the idea from CartPole through Pendulum and BipedalWalker up to AlphaStar-scale systems.
 
