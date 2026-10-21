@@ -410,6 +410,10 @@ class MCTS:
 Pay attention to `-value` in `backpropagate`. This is the key to zero-sum games:
 what benefits Black harms White by the same amount. So as the perspective alternates each ply, the value must flip sign.
 
+::: warning A simplification in the demo above
+The listing evaluates the value network even at terminal positions (no legal moves) and backpropagates that estimate. A production implementation would instead backpropagate the actual game outcome at terminal nodes and only call the value network at non-terminal leaves. On 6x6 the simplification keeps the code short, but expect slightly noisier training targets because of it.
+:::
+
 ## 7.5.5 Self-Play Training
 
 AlphaGo's most revolutionary idea is **self-play**: let the AI play against itself, and use the game outcomes to train itself.
@@ -604,8 +608,7 @@ def env_to_string(board):
     return "\n".join(lines)
 ```
 
-For the interactive portion above, the prompts are kept in Chinese to match the original minimal demo.
-When integrating it into your own project, it is straightforward to translate the CLI messages.
+The prompts above use plain `print`/`input` calls so the game loop runs as-is from a terminal.
 
 ## 7.5.7 AlphaGo and the Concepts in This Chapter
 
@@ -673,4 +676,4 @@ then switch to self-play for reinforcement. This matches the first stage describ
 
 ## Section Summary
 
-This lab connects the runnable experiment to the main idea of the section. Use the reported metrics together with replay or task-level evaluation, and keep conclusions within the conditions that were actually tested.
+On 6x6 Go, the same Actor-Critic pattern from this chapter carries the whole pipeline: the policy network (Actor) proposes moves, the value network (Critic) scores positions, and MCTS combines the two into a stronger move decision than either network alone. Self-play closes the loop by turning those MCTS decisions into fresh training targets for both heads. The next section returns to continuous control and scales the same Actor-Critic idea up to a walking robot: [Hands-on: BipedalWalker](./bipedalwalker).

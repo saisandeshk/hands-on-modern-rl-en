@@ -136,7 +136,7 @@ In real-world problems, however, it is almost never feasible to know the complet
 
 Monte Carlo (MC) updates wait until a complete episode finishes, then use the [actual return $G_t$](../chapter02_rl_basics/mdp) to train the Critic. The Critic loss is a mean squared error:
 
-$$L_{\text{Critic}} = \left( G_t - V_\phi(s) \right)^2 \tag{6.3}$$
+$$L_{\text{Critic}} = \left( G_t - V_\phi(s) \right)^2 \tag{7.3}$$
 
 Each symbol in this equation:
 
@@ -207,7 +207,7 @@ In a neural-network implementation, the MC method is equivalent to: run one full
 
 Temporal Difference (TD) learning updates the Critic using the [TD Error](../chapter04_classical_methods/dp-mc-td). The Critic loss is:
 
-$$L_{\text{Critic}} = \left( r + \gamma V_\phi(s') - V_\phi(s) \right)^2 = \delta^2 \tag{6.4}$$
+$$L_{\text{Critic}} = \left( r + \gamma V_\phi(s') - V_\phi(s) \right)^2 = \delta^2 \tag{7.4}$$
 
 Each symbol in this equation:
 
@@ -321,6 +321,41 @@ The advantages of TD methods (recall the [TD(0) update](../chapter04_classical_m
 3. **Matches the Actor's update cadence** -- both update once per environment step.
 
 The price is introducing **bias**: $V_\phi(s')$ is itself an estimate, not the true value. This is called [bootstrapping](../chapter04_classical_methods/dp-mc-td) -- using your own estimates to update your own estimates. In practice, however, this bias is far smaller than the benefit gained from reducing variance.
+
+## From One Step to $n$ Steps: Preview of GAE
+
+One-step TD and full-episode MC are two ends of a spectrum. The $n$-step return fills in everything between: look $n$ real rewards ahead, then bootstrap from the Critic after that:
+
+$$G_{t:t+n} = r_{t+1} + \gamma r_{t+2} + \cdots + \gamma^{n-1} r_{t+n} + \gamma^n V(s_{t+n})$$
+
+so that $n = 1$ recovers the TD target $r_{t+1} + \gamma V(s_{t+1})$ and $n \to \infty$ (run to termination, where $V = 0$) recovers the MC return $G_t$. Subtracting the baseline gives the $n$-step advantage:
+
+$$A^{(n)}_t = G_{t:t+n} - V(s_t) = \sum_{k=0}^{n-1} \gamma^k \delta_{t+k} \tag{7.5}$$
+
+where $\delta_{t+k} = r_{t+k+1} + \gamma V(s_{t+k+1}) - V(s_{t+k})$ is the one-step TD error at each step. In words, the $n$-step advantage is the discounted sum of the next $n$ TD errors: each $\delta$ reports the one-step surprise, and adding more of them extends how far ahead the estimate looks.
+
+A concrete check, reusing the 3-step episode from Section 7.1 ($\gamma = 0.9$; rewards $+3, +1, +2$; values $2.0, 4.0, 1.0, 0.0$; TD errors $+4.6, -2.1, +1.0$):
+
+- $A^{(1)}_0 = \delta_0 = +4.6$ (pure TD: low variance, but trusts $V(s_1)$ completely).
+- $A^{(2)}_0 = \delta_0 + \gamma \delta_1 = 4.6 + 0.9 \times (-2.1) = 4.6 - 1.89 = 2.71$.
+- $A^{(3)}_0 = \delta_0 + \gamma \delta_1 + \gamma^2 \delta_2 = 4.6 - 1.89 + 0.81 \times 1.0 = 3.52$, which exactly matches the MC advantage $G_0 - V(s_0) = 5.52 - 2.0 = 3.52$ computed in Section 7.1.
+
+Larger $n$ sees further (less bias from wrong $V$ values) but accumulates more randomness (more variance). **Generalized Advantage Estimation (GAE)** makes this tradeoff smooth instead of forcing a single choice of $n$: it takes an exponentially weighted average over all $n$-step advantages, controlled by a second parameter $\lambda \in [0, 1]$:
+
+$$A^{\text{GAE}}_t = \sum_{l=0}^{\infty} (\gamma \lambda)^l \, \delta_{t+l} \tag{7.6}$$
+
+Setting $\lambda = 0$ keeps only the $l = 0$ term, i.e. pure one-step TD; setting $\lambda = 1$ recovers the discounted sum of all TD errors, which telescopes to $G_t - V(s_t)$ (pure MC). Values in between blend the two ends. On the same numbers with $\lambda = 0.95$:
+
+$$A^{\text{GAE}}_0 = 4.6 + (0.9 \times 0.95)(-2.1) + (0.9 \times 0.95)^2 (1.0) = 4.6 - 1.7955 + 0.7310 \approx 3.54,$$
+
+close to the MC end because $\lambda$ is near 1, yet still down-weighting the far future relative to pure MC.
+
+Two practical rules follow:
+
+1. **$\gamma$ sets the horizon.** The effective horizon is about $1/(1-\gamma)$ steps ($\approx 10$ for $\gamma = 0.9$, $\approx 100$ for $\gamma = 0.99$). Too small a $\gamma$ makes the agent short-sighted -- in the corridor above it would underweight ever reaching $G$; too close to 1 propagates noisy far-future rewards into every update.
+2. **$\lambda$ sets the bias-variance position.** $\lambda \to 0$ means low variance but high bias (the Critic's errors dominate); $\lambda \to 1$ means low bias but high variance (whole-trajectory noise returns). The near-universal starting point, also used in this chapter's Pendulum and BipedalWalker scripts (`gamma=0.99, gae_lambda=0.95`), is $\gamma = 0.99$ with $\lambda = 0.95$.
+
+Chapter 8 develops GAE at full working depth, including the sparse-reward LLM setting where only the final token is scored (see [GAE Advantage Estimation](../chapter08_ppo/gae-reward-model)).
 
 ## Comparing the Three Methods
 

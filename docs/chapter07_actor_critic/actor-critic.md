@@ -1,5 +1,5 @@
 ---
-title: 7.2 Actor-Critic Architecture
+title: 7.2 Actor-Critic Updates
 ---
 
 # 7.2 Actor-Critic Updates

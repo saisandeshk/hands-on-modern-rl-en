@@ -143,7 +143,15 @@ loss = actor_loss + 0.5 * critic_loss - 0.001 * entropy
 
 The `actor_loss` has a negative sign because the optimizer performs gradient descent by default. We want: when advantage is positive, increase `log_prob`; when advantage is negative, decrease `log_prob`. Turned into a loss, this becomes minimizing `-(log_prob * advantage)`.
 
-The `critic_loss` pushes the Critic's estimate toward the TD target. The final `entropy` term encourages the policy to retain some exploration and prevents the standard deviation from collapsing too early.
+The `critic_loss` pushes the Critic's estimate toward the TD target. The final `entropy` term encourages the policy to retain some exploration and prevents the standard deviation from collapsing too early. The `0.5` and `0.001` above are illustrative loss coefficients: the Stable-Baselines3 script used in Section 7.4.5 sets the same value-function coefficient (`vf_coef=0.5`) but leaves the entropy bonus off (`ent_coef=0.0`), relying on the Gaussian's own sampling noise for exploration on this task.
+
+::: tip Tanh squashing and the log-probability correction
+A Gaussian can sample any real number, but Pendulum only accepts $[-2, 2]$. The code squashes samples with $a = 2\tanh(u)$, $u \sim \mathcal{N}(\mu, \sigma^2)$. Squashing changes the density, so the log-probability of the executed (squashed) action needs the change-of-variables correction:
+
+$$\log \pi(a|s) = \log \mathcal{N}(u; \mu, \sigma) - \sum_i \log(1 - \tanh^2(u_i) + \epsilon),$$
+
+i.e. subtract the log-determinant of the $\tanh$ Jacobian (plus the constant $\log 2$ scaling). Skipping this correction biases the Actor gradient near the bounds, where $\tanh$ compresses hard. Libraries such as Stable-Baselines3 handle the squashed density internally; if you hand-roll the Gaussian head above, apply the correction before forming `actor_loss`.
+:::
 
 ## 7.4.5 Running the Training
 
@@ -180,7 +188,7 @@ The training script generates a model, normalization statistics, and three curve
 To copy the plots into the course site:
 
 ```bash
-cp output/actor_critic_pendulum_*.png docs/chapter09_actor_critic/images/
+cp output/actor_critic_pendulum_*.png docs/chapter07_actor_critic/images/
 ```
 
 After training, you can render a replay GIF:
@@ -198,13 +206,13 @@ Here are the results from a 300k-step training run. Since A2C is still an on-pol
 ![A2C Pendulum-v1 replay: the policy can swing the rod near the top, but stability is still limited](./images/pendulum_actor_critic.gif)
 
 <div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 6.4-1: Pendulum replay after A2C training. This episode scored roughly -761; it reaches near-upright but is not yet near-optimal stable control.</em>
+  <em>Figure 7.4-1: Pendulum replay after A2C training. This episode scored roughly -761; it reaches near-upright but is not yet near-optimal stable control.</em>
 </div>
 
 ![Actor-Critic Pendulum-v1 episode reward curve](./images/actor_critic_pendulum_reward.png)
 
 <div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 6.4-2: Episode reward curve. Light blue shows raw returns, dark blue is a 20-episode moving average, and the green dashed line marks the A2C baseline of -800.</em>
+  <em>Figure 7.4-2: Episode reward curve. Light blue shows raw returns, dark blue is a 20-episode moving average, and the green dashed line marks the A2C baseline of -800.</em>
 </div>
 
 The deterministic evaluation for this run is approximately **-780 ± 39** (over 20 episodes), with the best single episode around **-750**. It is more stable than a random or early policy, but it is not yet near-optimal pendulum control. That is intentional: the goal of this section is not to push Pendulum to the best possible score, but to use a small enough continuous-control task to clearly walk through the "Gaussian Actor + value Critic + advantage update" pipeline.
@@ -224,7 +232,7 @@ One advantage of a Gaussian policy is that we can directly observe exploration i
 ![Actor-Critic Pendulum-v1 policy entropy curve](./images/actor_critic_pendulum_entropy.png)
 
 <div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 6.4-3: Policy entropy loss. SB3 records entropy_loss, i.e., negative entropy. As the curve climbs toward 0, the true entropy is declining.</em>
+  <em>Figure 7.4-3: Policy entropy loss. SB3 records entropy_loss, i.e., negative entropy. As the curve climbs toward 0, the true entropy is declining.</em>
 </div>
 
 Looking at the learning process, the policy initially needs substantial randomness. It does not yet know which direction to push, nor how to decelerate when approaching the upright position. As the Critic's advantage signals become more reliable, the Actor gradually concentrates probability mass around effective actions, and the true policy entropy slowly drops.
@@ -240,7 +248,7 @@ The reward curve tells us whether performance is improving; the loss curves help
 ![Actor-Critic Pendulum-v1 Actor/Critic loss curves](./images/actor_critic_pendulum_loss.png)
 
 <div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 6.4-4: Actor/Critic loss curves. Online Actor-Critic losses are typically noisier than supervised learning losses. Focus on whether they diverge over the long run.</em>
+  <em>Figure 7.4-4: Actor/Critic loss curves. Online Actor-Critic losses are typically noisier than supervised learning losses. Focus on whether they diverge over the long run.</em>
 </div>
 
 The Critic loss comes from the squared TD error:
@@ -267,13 +275,14 @@ Fourth, check whether the actions are frequently stuck at the boundaries. If the
 
 Common hyperparameter reference:
 
-| Parameter       | This section's setting | What happens if it is off                                           |
-| --------------- | ---------------------- | ------------------------------------------------------------------- |
-| `learning_rate` | `7e-4`                 | too high causes oscillation; too low learns too slowly              |
-| `n_steps`       | `32`                   | too short gives noisy advantages; too long reduces update frequency |
-| `gamma`         | `0.99`                 | too low focuses on near-term swing, ignoring staying upright        |
-| `num_envs`      | `8`                    | too few collects samples slowly; too many adds overhead             |
-| `VecNormalize`  | enabled                | without it the Critic has a harder time fitting raw returns         |
+| Parameter       | This section's setting | What happens if it is off                                                                                                               |
+| --------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `learning_rate` | `7e-4`                 | too high causes oscillation; too low learns too slowly                                                                                  |
+| `n_steps`       | `32`                   | too short gives noisy advantages; too long reduces update frequency                                                                     |
+| `gamma`         | `0.99`                 | too low focuses on near-term swing, ignoring staying upright                                                                            |
+| `gae_lambda`    | `0.95`                 | `0` trusts the Critic fully (biased); `1` trusts full returns (noisy); see the $n$-step/GAE preview in [Section 7.3](./critic-training) |
+| `num_envs`      | `8`                    | too few collects samples slowly; too many adds overhead                                                                                 |
+| `VecNormalize`  | enabled                | without it the Critic has a harder time fitting raw returns                                                                             |
 
 ## Section Summary
 
