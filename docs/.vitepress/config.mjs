@@ -1175,6 +1175,10 @@ const sidebar = {
             {
               text: '17.6 Parallel Reasoning and Answer Aggregation',
               link: '/chapter17_prm_search/parallel-reasoning-and-summary'
+            },
+            {
+              text: '17.7 Summary and Exercises',
+              link: '/chapter17_prm_search/review'
             }
           ]
         },
