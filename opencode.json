@@ -58,6 +58,31 @@
         { "action": "external_directory", "resource": "*", "effect": "deny" },
         { "action": "doom_loop", "resource": "*", "effect": "deny" }
       ]
+    },
+    "reviewer": {
+      "description": "Headless reviewer: reads the repo and git history, may only write review files under planning/reviews/.",
+      "mode": "primary",
+      "model": "opencode-go/minimax-m3.1-flash-free",
+      "steps": 250,
+      "permissions": [
+        { "action": "*", "resource": "*", "effect": "deny" },
+        { "action": "read", "resource": "*", "effect": "allow" },
+        { "action": "read", "resource": "*.env", "effect": "deny" },
+        { "action": "read", "resource": "*.env.*", "effect": "deny" },
+        { "action": "glob", "resource": "*", "effect": "allow" },
+        { "action": "grep", "resource": "*", "effect": "allow" },
+        { "action": "list", "resource": "*", "effect": "allow" },
+        { "action": "todowrite", "resource": "*", "effect": "allow" },
+        { "action": "edit", "resource": "*planning/reviews/*", "effect": "allow" },
+        { "action": "shell", "resource": "*", "effect": "ask" },
+        { "action": "shell", "resource": "git diff*", "effect": "allow" },
+        { "action": "shell", "resource": "git show*", "effect": "allow" },
+        { "action": "shell", "resource": "git log*", "effect": "allow" },
+        { "action": "shell", "resource": "git ls-tree*", "effect": "allow" },
+        { "action": "shell", "resource": ".venv/bin/python -c *", "effect": "allow" },
+        { "action": "external_directory", "resource": "*", "effect": "deny" },
+        { "action": "doom_loop", "resource": "*", "effect": "deny" }
+      ]
     }
   }
 }
