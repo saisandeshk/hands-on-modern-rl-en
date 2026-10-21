@@ -697,6 +697,10 @@ const sidebar = {
             {
               text: '1.3 Hands-on: PPO Training Visualization',
               link: '/chapter01_cartpole/training'
+            },
+            {
+              text: '1.4 Summary and Exercises',
+              link: '/chapter01_cartpole/review'
             }
           ]
         },

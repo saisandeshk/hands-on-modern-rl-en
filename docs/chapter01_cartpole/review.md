@@ -1,9 +1,9 @@
 ---
-title: 1.R Summary and Exercises
+title: 1.4 Summary and Exercises
 outline: [2, 3]
 ---
 
-# 1.R Summary and Exercises
+# 1.4 Summary and Exercises
 
 > **Learning path**: [1.1 Run CartPole](./principles) → [1.2 CartPole Principles](./metrics) → [1.3 PPO Training Visualization](./training) → **1.R Summary and Exercises**
 
