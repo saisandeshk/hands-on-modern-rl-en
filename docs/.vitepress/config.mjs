@@ -737,6 +737,10 @@ const sidebar = {
             {
               text: '3.3 Hands-on: Value Function Experiments',
               link: '/chapter03_value_functions/value-experiment'
+            },
+            {
+              text: '3.4 Summary and Exercises',
+              link: '/chapter03_value_functions/review'
             }
           ]
         },

@@ -1,8 +1,8 @@
 ---
-title: 3.R Summary and Exercises
+title: 3.4 Summary and Exercises
 ---
 
-# 3.R Summary and Exercises
+# 3.4 Summary and Exercises
 
 ## What You Should Now Be Able to Do
 
