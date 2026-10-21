@@ -159,7 +159,9 @@ import torch
 def kl_penalty(log_probs, ref_log_probs, mode="k3"):
     """
     log_probs:     [B, seq_len]  current policy p
-    ref_log_probs: [B, seq_len]  reference policy q
+    ref_log_probs: [B, seq_len]  reference policy q (compute under torch.no_grad())
+    Averages over all positions; exclude padding positions beforehand
+    (e.g. mean only over the loss mask) when sequences are padded.
     """
     if mode == "k1":
         return (log_probs - ref_log_probs).mean()

@@ -51,7 +51,7 @@ $$
 ```python
 def sample_with_temperature(logits, temperature=1.0):
     if temperature < 1e-8:
-        return logits.argmax(dim=-1)  # T=0 degenerates to greedy
+        return logits.argmax(dim=-1, keepdim=True)  # T=0 degenerates to greedy
     probs = torch.softmax(logits / temperature, dim=-1)
     return torch.multinomial(probs, num_samples=1)
 ```
@@ -107,6 +107,8 @@ def top_k_filtering(logits, k):
     return logits.masked_fill(logits < threshold, float('-inf'))
 
 def top_k_sample(logits, k, temperature=1.0):
+    if temperature < 1e-8:
+        return logits.argmax(dim=-1, keepdim=True)  # T=0 degenerates to greedy
     logits = top_k_filtering(logits / temperature, k)
     probs = torch.softmax(logits, dim=-1)
     return torch.multinomial(probs, num_samples=1)
@@ -155,7 +157,7 @@ probs = softmax(logits); sample
 import numpy as np
 
 def top_p_filtering(logits, p):
-    """logits: [vocab_size] -> positions outside nucleus set to -inf"""
+    """logits: float array [vocab_size] -> positions outside nucleus set to -inf"""
     sorted_indices = np.argsort(logits)[::-1]           # descending order
     sorted_logits = logits[sorted_indices]
     sorted_probs = np.exp(sorted_logits - sorted_logits.max())
@@ -177,7 +179,7 @@ def top_p_filtering(logits, p):
 import torch
 
 def top_p_filtering(logits, p):
-    """logits: [B, vocab_size] -> positions outside nucleus set to -inf"""
+    """logits: [B, vocab_size] or [vocab_size] -> positions outside nucleus set to -inf"""
     sorted_logits, sorted_indices = torch.sort(logits, descending=True, dim=-1)
     sorted_probs = torch.softmax(sorted_logits, dim=-1)
     cumulative_probs = torch.cumsum(sorted_probs, dim=-1)
@@ -185,9 +187,12 @@ def top_p_filtering(logits, p):
     sorted_mask = (cumulative_probs - sorted_probs) > p  # outside-nucleus mask
     sorted_logits = sorted_logits.masked_fill(sorted_mask, float('-inf'))
 
-    return logits.scatter(1, sorted_indices, sorted_logits)  # restore original order
+    # scatter along the last dim so both [V] and [B, V] inputs work
+    return logits.scatter(-1, sorted_indices, sorted_logits)  # restore original order
 
 def top_p_sample(logits, p, temperature=1.0):
+    if temperature < 1e-8:
+        return logits.argmax(dim=-1, keepdim=True)  # T=0 degenerates to greedy
     logits = top_p_filtering(logits / temperature, p)
     probs = torch.softmax(logits, dim=-1)
     return torch.multinomial(probs, num_samples=1)
@@ -201,7 +206,9 @@ In practice, Temperature -> Top-k -> Top-p are usually chained:
 
 ```python
 def generate_sample(logits, temperature=1.0, top_k=50, top_p=0.9):
-    logits = logits / max(temperature, 1e-8)   # 1. Temperature (before softmax)
+    if temperature < 1e-8:
+        return logits.argmax(dim=-1, keepdim=True)  # T=0 degenerates to greedy
+    logits = logits / temperature                    # 1. Temperature (before softmax)
     logits = top_k_filtering(logits, top_k)    # 2. Top-k
     logits = top_p_filtering(logits, top_p)    # 3. Top-p
     probs = torch.softmax(logits, dim=-1)      # 4. normalize and sample

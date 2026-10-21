@@ -72,6 +72,8 @@ def dapo_policy_loss(new_logp, old_logp, advantages,
     old_logp:   [T]
     advantages: [T]
     Returns token-level loss (sum divided by token count).
+    Assumes no padding; for padded batches use the masked
+    token_level_loss() below instead.
     """
     ratio = np.exp(new_logp - old_logp)
     surr1 = ratio * advantages
@@ -91,6 +93,7 @@ def dapo_policy_loss(new_logps, old_logps, advantages,
     new_logps:  [B, seq_len]
     old_logps:  [B, seq_len]
     advantages: [B, seq_len]
+    Assumes no padding; for padded batches use token_level_loss() below.
     """
     ratio = torch.exp(new_logps - old_logps)
     surr1 = ratio * advantages
@@ -128,9 +131,10 @@ if std(rewards) == 0:
 def dynamic_sampling_filter(rewards):
     """
     rewards: [B, G]  B prompts, each with G completion rewards
-    Returns bool mask [B], True = keep.
+    Returns bool mask [B], True = keep. unbiased=False matches the
+    z-score normalizer (divide by G, not G-1); G must be > 1.
     """
-    return rewards.std(dim=1) > 1e-6
+    return rewards.std(dim=1, unbiased=False) > 1e-6
 ```
 
 ---
@@ -167,7 +171,7 @@ def token_level_loss(loss_mat, loss_mask):
     loss_mask: [B, T]  1 for valid token, 0 for padding
     Returns token-level aggregated loss.
     """
-    return (loss_mat * loss_mask).sum() / loss_mask.sum()
+    return (loss_mat * loss_mask).sum() / loss_mask.sum().clamp_min(1)
 ```
 
 ---
@@ -213,22 +217,22 @@ def soft_overlong_penalty(response_length, max_len,
 ## DAPO Total Loss (Sketch)
 
 ```
-# 1. within-group z-score normalization (same as GRPO)
-advantages = (rewards - rewards.mean(dim=G)) / (rewards.std(dim=G) + eps)
+# 1. within-group z-score normalization (same as GRPO); [B, G] -> broadcast over tokens
+advantages = (rewards - rewards.mean(dim=1, keepdim=True)) / (rewards.std(dim=1, keepdim=True, unbiased=False) + eps)
 
 # 2. dynamic sampling filter
 valid = dynamic_sampling_filter(rewards)        # drop all-correct / all-wrong prompts
 
 # 3. decoupled clipping + token-level loss
-ratio = exp(new_logp - old_logp)
+ratio = exp(new_logp - old_logp)                # [B, T], advantages broadcast [B, G] -> [B, T]
 surr1 = ratio * advantages
 surr2 = clip(ratio, 1 - eps_low, 1 + eps_high) * advantages
 loss_mat = -minimum(surr1, surr2)               # per-token
 
 # 4. token-level aggregation (key change: long answers not under-weighted)
-policy_loss = (loss_mat * mask)[valid].sum() / mask[valid].sum()
+policy_loss = (loss_mat * mask)[valid].sum() / mask[valid].sum().clamp_min(1)
 
-# 5. KL penalty (same as GRPO)
+# 5. KL penalty (optional, as in GRPO)
 kl = ((exp(ref_logp - new_logp) - 1) - (ref_logp - new_logp)).mean()
 
 loss = policy_loss + kl_coeff * kl

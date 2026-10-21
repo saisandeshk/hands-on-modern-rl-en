@@ -91,9 +91,10 @@ def grpo_loss(log_probs, old_log_probs, ref_log_probs,
     rewards:       [B, G]  group rewards
     B = num_prompts, G = group_size
     """
-    # 1. Within-group normalization (grouped by prompt)
+    # 1. Within-group normalization (grouped by prompt).
+    # unbiased=False matches the NumPy version (divide by G, not G-1).
     advantages = (rewards - rewards.mean(dim=1, keepdim=True)) \
-                 / (rewards.std(dim=1, keepdim=True) + 1e-8)   # [B, G]
+                 / (rewards.std(dim=1, keepdim=True, unbiased=False) + 1e-8)   # [B, G]
 
     # 2. Clipped policy loss (identical to PPO)
     ratio = torch.exp(log_probs - old_log_probs)
@@ -171,7 +172,7 @@ def reward_model_loss(r_chosen, r_rejected):
 | Reward source    | trained RM   | RM or verifier             | rule verifier (math/code)  |
 | Online sampling  | required     | required (G per prompt)    | required (G per prompt)    |
 
-RLVR is a special case of GRPO: rewards do not come from a learned RM but from rule-based verification of the answer (math answer equality, code test pass), so there is no reward hacking risk.
+RLVR is a special case of GRPO: rewards do not come from a learned RM but from rule-based verification of the answer (math answer equality, code test pass), which greatly reduces reward hacking from a learned proxy — though gaming the verifier (spurious solutions that pass the checks) is still possible.
 
 ---
 

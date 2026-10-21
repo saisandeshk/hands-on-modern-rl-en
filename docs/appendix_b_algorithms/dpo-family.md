@@ -1,5 +1,5 @@
 ---
-title: B.3 DPO Family
+title: B.3 DPO Methods
 ---
 
 # B.3 DPO Methods
@@ -63,7 +63,7 @@ import torch.nn.functional as F
 def dpo_loss(policy_chosen_logps, policy_rejected_logps,
              ref_chosen_logps, ref_rejected_logps,
              beta=0.1):
-    """All inputs: [B]"""
+    """All inputs: [B]. ref_* must be detached (compute under torch.no_grad())."""
     log_ratio_w = policy_chosen_logps - ref_chosen_logps
     log_ratio_l = policy_rejected_logps - ref_rejected_logps
     logits = beta * (log_ratio_w - log_ratio_l)
@@ -106,12 +106,12 @@ def ipo_loss(log_ratio_w, log_ratio_l, beta=0.1):
 
 ## KTO
 
-**Core problem**: DPO/IPO require chosen-rejected pairs, but real-world feedback is often single-sample binary ("user thumbs-up / thumbs-down"). KTO borrows from prospect theory to reformulate the alignment loss as a single-sample objective — no pairing required — and up-weights undesirable examples (loss aversion).
+**Core problem**: DPO/IPO require chosen-rejected pairs, but real-world feedback is often single-sample binary ("user thumbs-up / thumbs-down"). KTO borrows from prospect theory to reformulate the alignment loss as a single-sample objective — no pairing required — and up-weights undesirable examples (loss aversion). The form below is the TRL-style logistic implementation (`-log_sigmoid`); the original paper writes the same optimum with a $\lambda - \sigma(\cdot)$ value formulation.
 
 **Core variables**:
 
 - `log_ratio`: $\log\frac{\pi_\theta(y|x)}{\pi_{ref}(y|x)}$ for a single sample
-- `z_ref`: baseline = EMA of the desirable logits, i.e. $z_{ref} \approx \beta \mathbb{E}[\log\frac{\pi_\theta}{\pi_{ref}}]$; must `detach`
+- `z_ref`: baseline = EMA of the desirable logits, i.e. $z_{ref} \approx \beta \mathbb{E}[\log\frac{\pi_\theta}{\pi_{ref}}]$ over desirable samples; a detached scalar, not per-sample
 - `lambda_D` / `lambda_U`: weights on desirable / undesirable samples; typically $\lambda_U > \lambda_D$ (loss aversion)
 
 ### One-Line Memory
@@ -184,6 +184,7 @@ import torch.nn.functional as F
 def simpo_loss(chosen_logps, rejected_logps,
                chosen_lengths, rejected_lengths,
                beta=2.0, gamma=0.5):
+    # chosen/rejected_logps: summed log-probs [B]; lengths: token counts [B] (each >= 1)
     logp_w = chosen_logps / chosen_lengths
     logp_l = rejected_logps / rejected_lengths
     logits = beta * (logp_w - logp_l) - gamma

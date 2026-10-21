@@ -39,6 +39,8 @@ output = attn @ V                  # weighted aggregate, [seq_q, d_v]
 
 ### Python Implementation
 
+Two mask conventions appear in practice: additive (`0` = keep, `-inf` = mask, added to scores) and boolean (`1` = keep, `0` = mask, used with `masked_fill`). The NumPy version below uses the additive form; the PyTorch version uses the boolean form. Pick one per codebase and keep it consistent.
+
 ```python
 import numpy as np
 
@@ -70,7 +72,8 @@ import torch.nn.functional as F
 def scaled_dot_product_attention(Q, K, V, mask=None):
     """
     Q/K/V: [B, heads, seq, d_k]
-    mask: [B, 1, seq_q, seq_k], 1=keep, 0=mask
+    mask: [B, 1, seq_q, seq_k] (or broadcastable), 1=keep, 0=mask;
+        additive -inf masks must be added to scores instead of masked_fill
     """
     d_k = Q.size(-1)
     scores = torch.matmul(Q, K.transpose(-2, -1)) / (d_k ** 0.5)
@@ -162,11 +165,11 @@ class MultiHeadAttention(nn.Module):
 
 ### Quick Comparison
 
-| Variant | # Q heads | # K/V heads     | KV cache | Example models     |
-| ------- | --------- | --------------- | -------- | ------------------ |
-| MHA     | $h$       | $h$             | largest  | GPT-2, BERT        |
-| MQA     | $h$       | **1**           | smallest | PaLM, StarCoder    |
-| GQA     | $h$       | **$g$** ($g<h$) | middle   | LLaMA 2/3, Mistral |
+| Variant | # Q heads | # K/V heads     | KV cache | Example models                              |
+| ------- | --------- | --------------- | -------- | ------------------------------------------- |
+| MHA     | $h$       | $h$             | largest  | GPT-2, BERT                                 |
+| MQA     | $h$       | **1**           | smallest | PaLM, StarCoder                             |
+| GQA     | $h$       | **$g$** ($g<h$) | middle   | LLaMA 2 (larger variants), LLaMA 3, Mistral |
 
 ### One-Line Memory
 
