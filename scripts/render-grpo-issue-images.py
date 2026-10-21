@@ -14,7 +14,7 @@ from matplotlib.patches import FancyBboxPatch
 
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT_DIR = ROOT / "docs" / "chapter18_grpo" / "images"
+OUTPUT_DIR = ROOT / "docs" / "chapter15_grpo" / "images"
 CHINESE_FONT = FontProperties(fname="/System/Library/Fonts/STHeiti Medium.ttc")
 
 INK = "#172033"

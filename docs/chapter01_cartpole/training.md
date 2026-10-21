@@ -1,33 +1,37 @@
-# 1.3 动手：PPO 训练可视化
+---
+title: 1.3 Hands-On PPO Training Visualization
+---
 
-> **本节目标**：运行纯 PyTorch PPO，保存原始训练指标，从 CSV 生成曲线，并用训练后的模型完成一次可见的 CartPole 评估。
+# 1.3 Hands-on: PPO Training Visualization
 
-> **学习路径**：[1.1 跑通 CartPole](./principles) → [1.2 CartPole 原理](./metrics) → **1.3 PPO 训练可视化**
+> **Goal of this section**: run pure PyTorch PPO, save the raw training metrics, generate curves from the CSV, and use the trained model to complete a visible CartPole evaluation.
 
-> **本节代码与资源**：[训练脚本](https://github.com/walkinglabs/hands-on-modern-rl/blob/main/code/chapter01_cartpole/2-pytorch_ppo.py) · [绘图脚本](https://github.com/walkinglabs/hands-on-modern-rl/blob/main/code/chapter01_cartpole/plot_curves.py) · [环境帧脚本](https://github.com/walkinglabs/hands-on-modern-rl/blob/main/code/chapter01_cartpole/capture_frames.py) · [原始 CSV](https://github.com/walkinglabs/hands-on-modern-rl/blob/main/code/chapter01_cartpole/output/training_metrics_seed42.csv)
+> **Learning path**: [1.1 Run CartPole](./principles) → [1.2 CartPole Principles](./metrics) → **1.3 PPO Training Visualization**
 
-::: tip 遇到困难时善用 AI
-本节需要在自己的机器上运行脚本，环境问题在所难免。安装报错、版本冲突、运行中断时，把完整的报错信息交给 AI 编码助手，让它帮你分析原因、修改代码或给出可运行的命令，是最有效的解决方式。
+> **Code and resources for this section**: [Training script](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter01_cartpole/2-pytorch_ppo.py) · [Plotting script](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter01_cartpole/plot_curves.py) · [Frame-capture script](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter01_cartpole/capture_frames.py) · [Raw CSV](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter01_cartpole/output/training_metrics_seed42.csv)
+
+::: tip Use AI when you run into trouble
+This section requires running scripts on your own machine, so environment problems are unavoidable. When you hit installation errors, version conflicts, or interrupted runs, the most effective fix is to give the complete error message to an AI coding assistant and let it analyze the cause, modify the code, or provide a runnable command.
 :::
 
-1.2 节讲清了原理，也带我们读过仓库中保存好的训练记录。这一节从头操作一遍：自己运行训练脚本，保存原始指标，从 CSV 生成曲线，再用训练好的模型捕获环境画面。
+Section 1.2 explained the principles and also walked us through the training records saved in the repository. This section does it all from the beginning: run the training script yourself, save the raw metrics, generate curves from the CSV, and then capture environment frames with the trained model.
 
-完成后，图上的每一个点都能追溯到 CSV，CSV 能追溯到训练日志，环境帧能追溯到保存的模型——整条证据链自己走通。
+When we finish, every point on a figure can be traced back to the CSV, the CSV can be traced back to the training log, and the environment frames can be traced back to the saved model. We walk the whole chain of evidence ourselves.
 
-## 1.3.1 安装依赖
+## 1.3.1 Install Dependencies
 
-运行训练之前，先把环境搭好。进入第一章代码目录，安装 `requirements.txt` 中的依赖：
+Before running training, set up the environment first. Enter the Chapter 1 code directory and install the dependencies in `requirements.txt`:
 
 ```bash
 cd code/chapter01_cartpole
 pip install -r requirements.txt
 ```
 
-CartPole 的网络很小，默认使用 CPU 训练，不要求独立显卡。
+The CartPole network is very small and trains on the CPU by default, so no discrete GPU is required.
 
-## 1.3.2 运行一次固定配置的训练
+## 1.3.2 Run One Training Session with a Fixed Configuration
 
-依赖装好之后，开始训练。为了让运行条件可以核对，我们固定随机种子、训练轮数和每轮采样步数：
+With the dependencies installed, we start training. To make the run conditions checkable, we fix the random seed, the number of training iterations, and the number of sampled steps per iteration:
 
 ```bash
 python 2-pytorch_ppo.py \
@@ -38,41 +42,41 @@ python 2-pytorch_ppo.py \
   --log-csv output/training_metrics_seed42.csv
 ```
 
-训练共与环境交互
+Training interacts with the environment for
 
 $$
 40\times 2048=81\,920
 $$
 
-步。运行结束后，`output/` 目录中包含两个主要文件：
+steps in total. After the run finishes, the `output/` directory contains two main files:
 
-- `pytorch_ppo_cartpole.pth`：训练后的模型参数；
-- `training_metrics_seed42.csv`：每一轮的训练指标。`mean_episode_reward` 是最近 100 个回合的滑动平均，`mean_episode_reward_rollout` 是该轮结束回合的平均值，其余指标未经平滑。
+- `pytorch_ppo_cartpole.pth`: the trained model parameters.
+- `training_metrics_seed42.csv`: the training metrics of each iteration. `mean_episode_reward` is the moving average over the most recent 100 episodes, `mean_episode_reward_rollout` is the average over the episodes that ended in that iteration, and the other metrics are not smoothed.
 
-控制台最后还会给出 20 个确定性评估回合的平均奖励和标准差。本书保存的这次运行得到 `500.0 ± 0.0`。
+The console also prints, at the end, the mean reward and standard deviation over 20 deterministic evaluation episodes. The run saved in this book gives `500.0 ± 0.0`.
 
-若要使用本地 SwanLab 看板，可以把 `--swanlab-mode disabled` 改为 `--swanlab-mode local`。训练结束后运行：
+To use the local SwanLab dashboard, change `--swanlab-mode disabled` to `--swanlab-mode local`. After training finishes, run:
 
 ```bash
 swanlab watch swanlog
 ```
 
-浏览器打开 `http://127.0.0.1:5092` 即可查看本地记录。看板用于交互查看，后续绘图仍以导出的 CSV 为数据源。
+Open `http://127.0.0.1:5092` in the browser to view the local records. The dashboard is for interactive viewing, and the later plotting still uses the exported CSV as its data source.
 
-## 1.3.3 训练循环中的三个步骤
+## 1.3.3 Three Steps in the Training Loop
 
-训练跑通之后，我们来对照 1.2 节的原理，看看脚本每轮到底做了什么。
+With training running, let's compare against the principles of Section 1.2 and see what the script actually does in each iteration.
 
 ```mermaid
 flowchart LR
-    A["用当前策略<br/>收集 2048 步"] --> B["计算 TD 误差<br/>与 GAE 优势"]
-    B --> C["对同一批数据<br/>执行 PPO 更新"]
+    A["Collect 2048 steps<br/>with the current policy"] --> B["Compute TD errors<br/>and GAE advantages"]
+    B --> C["Run PPO updates<br/>on the same batch"]
     C --> A
 ```
 
-### 收集轨迹
+### Collecting Trajectories
 
-第一个环节是收集轨迹。环境的 `step` 方法返回新观测、奖励和两个结束标记：
+The first stage is collecting trajectories. The environment's `step` method returns the new observation, the reward, and two termination flags:
 
 ```python
 next_obs, reward, terminated, truncated, _ = env.step(action.item())
@@ -85,21 +89,21 @@ with torch.no_grad():
         next_value = next_value_tensor.item()
 ```
 
-`terminated=True` 表示杆子倒下或小车越界。回合已经自然结束，所以后续价值取 0。
+`terminated=True` means the pole fell or the cart went out of bounds. The episode has ended naturally, so the subsequent value is taken as 0.
 
-`truncated=True` 表示达到 500 步时间上限。这个状态仍可能保持平衡，所以代码使用 Critic 的 $V(s')$ 作为后续价值估计。
+`truncated=True` means the 500-step time limit was reached. This state may still be balanced, so the code uses the Critic's $V(s')$ as the estimate of the subsequent value.
 
-如果 2048 步采样在一个回合中间结束，脚本不会重置环境。下一轮从当前观测继续采样，并继续累计该回合的奖励和长度。
+If the 2048-step sampling ends in the middle of an episode, the script does not reset the environment. The next iteration continues sampling from the current observation and keeps accumulating the reward and length of that episode.
 
-### 计算 GAE
+### Computing GAE
 
-第二个环节是计算优势。每一步先计算 TD 误差：
+The second stage is computing advantages. For each step we first compute the TD error:
 
 $$
 \delta_t=r_t+\gamma V(s_{t+1})-V(s_t).
 $$
 
-程序从 rollout 的末尾向前递推优势：
+The program recurses backward from the end of the rollout to compute advantages:
 
 ```python
 episode_end = t["terminated"] or t["truncated"]
@@ -107,9 +111,9 @@ delta = t["reward"] + gamma * t["next_value"] - t["value"]
 gae = delta + gamma * lam * (1.0 - float(episode_end)) * gae
 ```
 
-乘数 `1 - episode_end` 在每次环境重置处切断递推。时间截断处的当前 TD 误差仍使用 `next_value`，新回合的优势不会传回旧回合。
+The factor `1 - episode_end` cuts the recursion at every environment reset. At a time-limit truncation the current TD error still uses `next_value`, and the advantage of a new episode is not passed back to the old episode.
 
-Critic 的目标由未归一化优势得到：
+The Critic's target is obtained from the unnormalized advantages:
 
 ```python
 returns = raw_advantages + values
@@ -118,18 +122,18 @@ advantages = (raw_advantages - raw_advantages.mean()) / (
 )
 ```
 
-归一化后的 `advantages` 用于更新 Actor。未归一化的 `returns` 用于训练 Critic，因此两者不能互换。
+The normalized `advantages` are used to update the Actor. The unnormalized `returns` are used to train the Critic, so the two cannot be interchanged.
 
-### 执行 PPO 更新
+### Running the PPO Update
 
-第三个环节是更新策略。PPO 比较新旧策略对已采样动作给出的概率：
+The third stage is updating the policy. PPO compares the probabilities that the new and old policies assign to the sampled actions:
 
 $$
 r_t(\theta)=\frac{\pi_\theta(a_t\mid s_t)}
 {\pi_{\theta_{\mathrm{old}}}(a_t\mid s_t)}.
 $$
 
-配套实现取 `clip_eps=0.2`：
+The accompanying implementation uses `clip_eps=0.2`:
 
 ```python
 ratio = torch.exp(new_log_probs - batch_old_log_probs)
@@ -138,11 +142,11 @@ surr2 = torch.clamp(ratio, 0.8, 1.2) * batch_advantages
 policy_loss = -torch.min(surr1, surr2).mean()
 ```
 
-优势为正的动作会得到更高概率，优势为负的动作会得到更低概率。裁剪目标限制同一批数据推动概率变化的幅度。
+Actions with positive advantage get a higher probability, and actions with negative advantage get a lower probability. The clipped objective limits how far the same batch of data can push the probabilities.
 
-## 1.3.4 从原始 CSV 生成曲线
+## 1.3.4 Generating Curves from the Raw CSV
 
-三个环节跑完，训练脚本已经把每一轮指标写入 CSV。现在我们把这些数字变成曲线。运行绘图脚本：
+After the three stages have run, the training script has written each iteration's metrics into the CSV. Now we turn these numbers into curves. Run the plotting script:
 
 ```bash
 python plot_curves.py \
@@ -150,19 +154,19 @@ python plot_curves.py \
   --output-dir output
 ```
 
-脚本读取 CSV 后生成奖励曲线和四指标诊断图，不会重新训练模型，也不会修改原始指标。
+After reading the CSV, the script generates the reward curve and a four-metric diagnostic figure. It does not retrain the model and does not modify the raw metrics.
 
-![seed=42 的 CartPole PPO 奖励曲线](./images/cartpole_reward_seed42.png)
+![The CartPole PPO reward curve for seed=42](./images/cartpole_reward_seed42.png)
 
-<div class="figure-caption">图 1-4：seed=42 的原始训练奖励。曲线由仓库中的绘图脚本直接读取 CSV 生成。</div>
+<div class="figure-caption">Figure 1-4: The raw training reward for seed=42. The curve is generated by the repository's plotting script reading the CSV directly.</div>
 
-第 1 轮的平均奖励为 21.35，第 10 轮为 500.0，第 11 轮回落到 460.4。最终确定性策略在 20 个评估回合中得到 `500.0 ± 0.0`。
+The mean reward in iteration 1 is 21.35, in iteration 10 it is 500.0, and in iteration 11 it falls back to 460.4. The final deterministic policy gets `500.0 ± 0.0` over 20 evaluation episodes.
 
-这条单种子曲线可以验证当前代码和配置能够完成任务。它不能表示所有随机种子都会在第 10 轮达到 500 分。
+This single-seed curve can verify that the current code and configuration can complete the task. It does not mean that every random seed will reach 500 in iteration 10.
 
-## 1.3.5 从模型捕获环境画面
+## 1.3.5 Capturing Environment Frames from the Model
 
-曲线说明了得分怎样变化，但它终究是抽象的数字。我们还可以加载保存的模型，观察它在环境里的实际动作。运行：
+A curve shows how the score changes, but it is still an abstract set of numbers. We can also load the saved model and watch its actual actions in the environment. Run:
 
 ```bash
 python capture_frames.py \
@@ -171,28 +175,28 @@ python capture_frames.py \
   --seed 10042
 ```
 
-脚本创建 `render_mode="rgb_array"` 的 CartPole-v1 环境，使用确定性动作运行一个回合，并从 `env.render()` 返回的画面中选取五个时间点。
+The script creates a CartPole-v1 environment with `render_mode="rgb_array"`, runs one episode with deterministic actions, and picks five time points from the frames returned by `env.render()`.
 
-![训练后策略在 Gymnasium CartPole-v1 中的实测帧](./images/cartpole_frames_seed42.png)
+![Measured frames of the trained policy in Gymnasium CartPole-v1](./images/cartpole_frames_seed42.png)
 
-<div class="figure-caption">图 1-5：同一个确定性评估回合的第 0、125、250、375 和 500 步。该回合得到 500 分，标题中的角度来自对应时刻的环境观测。</div>
+<div class="figure-caption">Figure 1-5: Steps 0, 125, 250, 375, and 500 of the same deterministic evaluation episode. The episode scores 500, and the angles in the titles come from the environment observations at the corresponding moments.</div>
 
-一幅静态画面只能展示一个时刻。这里同时保存五个时间点、完整回合得分和 20 回合评估结果，用来检查策略是否持续完成控制任务。
+A static picture shows only one moment. Here we save five time points, the full-episode score, and the 20-episode evaluation result together, to check whether the policy keeps completing the control task.
 
-## 1.3.6 改参数后怎样比较
+## 1.3.6 How to Compare After Changing Parameters
 
-基准跑通之后，自然会想试试改了参数会怎样。可以改变学习率、裁剪范围或 GAE 参数。每次只改变一个设置，其他条件保持一致，结果才容易解释。
+Once the baseline runs, it is natural to want to try changing parameters. We can change the learning rate, the clipping range, or the GAE parameters. Changing one setting at a time and keeping everything else the same makes the results easy to interpret.
 
-例如，可以比较 `lr=1e-4` 和 `lr=3e-4` 达到相同评估分数所需的环境步数。两组实验需要使用相同的环境版本、网络结构、训练量、随机种子集合和评估回合数。
+For example, we can compare the number of environment steps that `lr=1e-4` and `lr=3e-4` need to reach the same evaluation score. The two experiments must use the same environment version, network architecture, training amount, set of random seeds, and number of evaluation episodes.
 
-一次运行容易受到随机初始化和动作采样影响。正式比较时，应运行多个随机种子，并报告每个种子的原始曲线、达到目标分数的环境步数以及最终评估结果。
+A single run is easily affected by random initialization and action sampling. In a formal comparison, run multiple random seeds, and report each seed's raw curve, the number of environment steps needed to reach the target score, and the final evaluation result.
 
-## 本节小结
+## Section Summary
 
-- 训练脚本保存模型参数和未经平滑的 CSV 指标；绘图脚本只读取 CSV，图上的每个点都能回到原始记录。
-- 三个步骤对应 1.2 节的原理：收集轨迹、计算 GAE 优势、执行 PPO 裁剪更新。
-- `terminated`、`truncated` 和 rollout 边界在价值计算中具有不同含义，归一化优势用于 Actor、未归一化 returns 用于 Critic，两者不能互换。
-- 环境帧由保存的模型在 Gymnasium 中实际运行得到。
-- 参数比较需要统一实验条件，并使用多个随机种子。
+- The training script saves the model parameters and the unsmoothed CSV metrics. The plotting script only reads the CSV, and every point on a figure can be traced back to the raw record.
+- The three steps correspond to the principles of Section 1.2: collect trajectories, compute GAE advantages, and run the PPO clipped update.
+- `terminated`, `truncated`, and the rollout boundary have different meanings in the value computation. Normalized advantages go to the Actor and unnormalized returns go to the Critic, and the two cannot be interchanged.
+- The environment frames come from actually running the saved model in Gymnasium.
+- Parameter comparison requires uniform experimental conditions and multiple random seeds.
 
-下一章从多臂老虎机开始，把本章已经运行过的状态、动作、奖励和策略写成更正式的强化学习问题。
+The next chapter starts from the multi-armed bandit and writes the states, actions, rewards, and policies we have run in this chapter as a more formal reinforcement learning problem.

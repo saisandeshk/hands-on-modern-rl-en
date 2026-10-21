@@ -1,20 +1,24 @@
-# 环境配置
+---
+title: Environment Setup Guide
+---
 
-::: tip 请编码助手帮你安装
-如果你正在使用 Codex 等编码助手，可以先和它说清楚你的学习目标，再请它完成安装：
+# Environment Setup
 
-> 你好，我准备开始学习这门强化学习课程，想先把实验环境配置好。请帮我检查操作系统、Python 版本和 GPU/CUDA 情况，创建名为 `rl-course` 的 Python 3.10 环境，安装课程最小可运行环境所需的依赖，然后运行 CartPole 验证程序。遇到安装问题时请继续排查和修复；如果需要管理员权限或修改系统级配置，请先征求我的确认。
+::: tip Ask a coding assistant to install it for you
+If you are using a coding assistant such as Codex, tell it your learning goal first and then ask it to do the installation:
+
+> Hello, I am about to start this reinforcement learning course and want to set up the lab environment first. Please check my operating system, Python version, and GPU/CUDA status, create a Python 3.10 environment named `rl-course`, install the dependencies needed for the minimal runnable course environment, and then run the CartPole verification program. If you hit installation problems, keep troubleshooting and fixing them. If you need administrator privileges or system-level configuration changes, ask for my confirmation first.
 :::
 
-> **本节目标**：从零开始搭建本课程所需的完整开发环境，涵盖 Python、PyTorch、RL 工具链和 LLM 训练框架。跟着步骤走完，你就能跑通全书所有实验。
+> **Goal of this section**: build a complete development environment for this course from scratch, covering Python, PyTorch, the RL toolchain, and LLM training frameworks. Follow the steps end to end, and you will be able to run every experiment in the book.
 
-## 最小可运行环境（5 分钟上手）
+## Minimal Working Setup (Get Running in 5 Minutes)
 
-如果你迫不及待想动手，只需以下 4 步即可跑通课程前 6 章的所有实验。其余仿真环境和 LLM 框架可以后续按需安装。
+If you cannot wait to start coding, the following 4 steps are enough to run all experiments in Chapters 1 through 6. The remaining simulators and LLM frameworks can be installed later as needed.
 
 ::: code-group
 
-```bash [conda（推荐）]
+```bash [conda (recommended)]
 conda create -n rl-course python=3.10 -y
 conda activate rl-course
 pip install torch torchvision
@@ -32,7 +36,7 @@ pip install numpy scipy matplotlib tqdm
 
 :::
 
-装完后用这段代码验证——看到 `CartPole` 画面弹出来就说明一切就绪：
+After installation, verify with the following code. If a `CartPole` window pops up, everything is ready:
 
 ```python
 import gymnasium as gym
@@ -50,188 +54,188 @@ for _ in range(200):
     if terminated or truncated:
         obs, info = env.reset()
 env.close()
-print("最小环境验证通过！")
+print("Minimal environment verified!")
 ```
 
-::: details 没有 GPU 也能跑
-课程前半部分（CartPole、DQN 等）CPU 即可训练，不强制要求 GPU。后半部分 LLM 微调（Ch7-Ch10）建议至少 24 GB 显存，也可以用 [魔搭 Notebook](https://modelscope.cn/my/mynotebook) 的云端 GPU 环境完成。
+::: details No GPU? You can still run the course.
+The first half of the course (CartPole, DQN, etc.) can be trained on CPU; a GPU is not required. The second half on LLM fine-tuning (Chapters 7-10) recommends at least 24 GB of VRAM, or you can use a cloud GPU environment in [ModelScope Notebook](https://modelscope.cn/my/mynotebook).
 :::
 
 ---
 
-**以下为完整安装指南，按需查阅。**
+**The following is the complete installation guide. Consult it as needed.**
 
-## Python 环境准备
+## Python Environment
 
-推荐使用 **Python 3.10+**（3.10、3.11 或 3.12 均可）。我们建议用 conda 管理环境，方便切换 CUDA 版本。
+We recommend **Python 3.10+** (3.10, 3.11, or 3.12 are all fine). We suggest using conda to manage environments, as it makes switching CUDA versions easier.
 
 ```bash
-# 使用 conda（推荐）
+# Using conda (recommended)
 conda create -n rl-course python=3.10 -y
 conda activate rl-course
 
-# 使用 venv（轻量级）
+# Using venv (lightweight)
 python3.10 -m venv rl-course
 source rl-course/bin/activate  # Linux/macOS
 # rl-course\Scripts\activate   # Windows
 ```
 
-::: tip 为什么推荐 Python 3.10？
-PyTorch 2.x、transformers 4.x 和 gymnasium 都对 3.10 有最好的兼容性。3.12 也可以，但部分旧版库可能还没适配。
+::: tip Why Python 3.10?
+PyTorch 2.x, transformers 4.x, and gymnasium have the best compatibility with 3.10. Python 3.12 also works, but some older libraries may not yet be fully adapted.
 :::
 
-## PyTorch 安装
+## Installing PyTorch
 
-PyTorch 是本课程所有深度学习实验的基础。根据你的硬件选择对应的安装命令。
+PyTorch is the foundation for all deep learning experiments in this course. Choose the installation command that matches your hardware.
 
-**第一步：检查 GPU 驱动**
+**Step 1: Check your GPU driver**
 
 ```bash
-# 查看 NVIDIA 驱动和 CUDA 版本
+# Check NVIDIA driver and CUDA version
 nvidia-smi
 ```
 
-输出右上角会显示 `CUDA Version: 12.x`，这就是你驱动支持的最高 CUDA 版本。
+The upper-right corner of the output shows `CUDA Version: 12.x`, which is the highest CUDA version supported by your installed driver.
 
-**第二步：安装 PyTorch**
+**Step 2: Install PyTorch**
 
 ```bash
-# CUDA 12.4（推荐，适合大多数新显卡）
+# CUDA 12.4 (recommended for most modern GPUs)
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
 
-# CUDA 11.8（适合旧显卡）
+# CUDA 11.8 (for older GPUs)
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
 
-# CPU 版本（没有 GPU 的同学）
+# CPU-only (no GPU)
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 
-# Apple Silicon（M1/M2/M3/M4 Mac）
+# Apple Silicon (M1/M2/M3/M4 Macs)
 pip install torch torchvision
 ```
 
-**第三步：验证 PyTorch GPU**
+**Step 3: Verify PyTorch GPU**
 
 ```python
 import torch
-print(f"PyTorch 版本: {torch.__version__}")
-print(f"CUDA 可用: {torch.cuda.is_available()}")
+print(f"PyTorch version: {torch.__version__}")
+print(f"CUDA available: {torch.cuda.is_available()}")
 if torch.cuda.is_available():
-    print(f"GPU 名称: {torch.cuda.get_device_name(0)}")
-    print(f"GPU 显存: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+    print(f"GPU name: {torch.cuda.get_device_name(0)}")
+    print(f"GPU memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
 ```
 
-## 核心 RL 包
+## Core RL Packages
 
-这些是贯穿课程前半部分（Ch1-Ch6）的基础包。
+These packages are used throughout the first half of the course (Chapters 1-6).
 
 ```bash
-# Gymnasium（Gym 的继任者，所有环境的基础）
+# Gymnasium (the successor to OpenAI Gym; the foundation for all environments)
 pip install gymnasium
 
-# Stable-Baselines3（封装好的 RL 算法库）
+# Stable-Baselines3 (a well-tested RL algorithms library)
 pip install stable-baselines3[extra]
 
-# 科学计算与可视化
+# Scientific computing and visualization
 pip install numpy scipy matplotlib seaborn pandas
 
-# 进度条与日志
+# Progress bars and logging
 pip install tqdm tensorboard wandb
 ```
 
-## 仿真环境安装
+## Simulator Environments
 
-不同章节用到不同的仿真环境，可以按需安装。
+Different chapters use different simulators. Install them as needed.
 
 ```bash
-# PyBullet 机器人仿真
+# PyBullet robotics simulation
 pip install pybullet
 
-# Atari 游戏（需要 ale-py）
+# Atari games (requires ale-py)
 pip install "gymnasium[atari,accept-rom-license]"
 pip install ale-py
 
-# ViZDoom 第一人称3D
+# ViZDoom first-person 3D
 pip install vizdoom
 
-# stable-retro（经典游戏）
+# stable-retro (classic games)
 pip install stable-retro
 ```
 
-**MuJoCo 安装（可选，用于高精度机器人仿真）**
+**MuJoCo installation (optional, for high-fidelity robotics simulation)**
 
 ```bash
-# MuJoCo 现已免费开源，直接 pip 安装
+# MuJoCo is now free and open source; install directly via pip
 pip install mujoco
-# 如果要在 gymnasium 中使用 MuJoCo 环境
+# To use MuJoCo environments in gymnasium
 pip install "gymnasium[mujoco]"
 ```
 
-::: warning MuJoCo 深度学习版本
-MuJoCo 需要 GPU 渲染支持。在无头服务器上，需要设置 `export MUJOCO_GL=egl` 或 `export MUJOCO_GL=osmesa`。
+::: warning MuJoCo deep learning version
+MuJoCo requires GPU rendering support. On headless servers, you need to set `export MUJOCO_GL=egl` or `export MUJOCO_GL=osmesa`.
 :::
 
-**Isaac Lab 安装（可选，用于 GPU 并行机器人仿真）**
+**Isaac Lab installation (optional, for GPU-parallel robotics simulation)**
 
-Isaac Lab 是 NVIDIA Isaac Gym 的继任者，支持 GPU 上万级机器人并行训练，适用于大规模机器人 RL 研究。需要 NVIDIA GPU + Linux。
+Isaac Lab is the successor to NVIDIA Isaac Gym. It supports training thousands of robots in parallel on GPU and is suitable for large-scale robotics RL research. Requires an NVIDIA GPU + Linux.
 
 ```bash
-# Isaac Lab 依赖 Isaac Sim，需要先安装 Isaac Sim
+# Isaac Lab depends on Isaac Sim; install Isaac Sim first
 pip install isaacsim[all]
 
-# 克隆 Isaac Lab 仓库
+# Clone the Isaac Lab repository
 git clone https://github.com/isaac-sim/IsaacLab.git
 cd IsaacLab
 ./isaaclab.sh --install
 
-# 验证安装
+# Verify installation
 python -c "import isaacsim; print('Isaac Lab ready')"
 ```
 
-::: warning Isaac Lab 系统要求
-Isaac Lab 需要 Linux 系统（Ubuntu 22.04 推荐）和 NVIDIA RTX 系列 GPU（至少 8GB 显存）。macOS 不支持。如果你使用 macOS，可以跳过 Isaac Lab，使用 PyBullet 或 MuJoCo 作为替代。
+::: warning Isaac Lab system requirements
+Isaac Lab requires Linux (Ubuntu 22.04 recommended) and an NVIDIA RTX series GPU (at least 8 GB VRAM). macOS is not supported. If you use macOS, skip Isaac Lab and use PyBullet or MuJoCo as alternatives.
 :::
 
-**Unity ML-Agents 安装（可选，用于 3D 游戏 RL）**
+**Unity ML-Agents installation (optional, for 3D game RL)**
 
-Unity ML-Agents 让你在 Unity 引擎构建的 3D 环境中训练 RL 智能体，适合平台跳跃、躲避障碍等需要空间推理的任务。
+Unity ML-Agents lets you train RL agents inside 3D environments built with the Unity engine, suitable for tasks like platform jumping, obstacle avoidance, and other tasks requiring spatial reasoning.
 
 ```bash
-# 安装 Python 端的 mlagents 包
+# Install the Python-side mlagents package
 pip install mlagents-envs
 
-# 如果你需要训练功能（包含 PyTorch 依赖）
+# If you need training functionality (includes PyTorch dependencies)
 pip install mlagents
 
-# 验证安装
+# Verify installation
 python -c "from mlagents_envs.environment import UnityEnvironment; print('ML-Agents ready')"
 ```
 
-使用 ML-Agents 需要下载或自行构建 Unity 环境（`.exe` / `.app` / Linux 可执行文件）。预构建环境可从 [ML-Agents GitHub Releases](https://github.com/Unity-Technologies/ml-agents/releases) 获取。详细使用方式参见[学习资料与复现项目推荐](../appendix_paper_reading/learning-resources)。
+Using ML-Agents also requires downloading or building Unity environments (`.exe` / `.app` / Linux executables). Pre-built environments are available from [ML-Agents GitHub Releases](https://github.com/Unity-Technologies/ml-agents/releases). For detailed usage instructions, see [Learning Resources and Reproduction Projects](../appendix_c_resources/learning-resources).
 
-::: tip Unity ML-Agents 适用场景
-ML-Agents 的独特价值在于**3D 空间推理**：Atari 是 2D 像素，CartPole 是低维向量，而 ML-Agents 提供完整的 3D 物理环境（重力、碰撞、遮挡）。如果你的研究涉及视觉导航、空间推理或多智能体 3D 协作，ML-Agents 是 Gymnasium/PyBullet 之外的有力补充。
+::: tip Unity ML-Agents use cases
+The unique value of ML-Agents is **3D spatial reasoning**: Atari uses 2D pixels, CartPole uses low-dimensional vectors, while ML-Agents provides a complete 3D physics environment (gravity, collisions, occlusion). If your research involves visual navigation, spatial reasoning, or multi-agent 3D coordination, ML-Agents is a strong complement to Gymnasium/PyBullet.
 :::
 
-## LLM 训练框架
+## LLM Training Frameworks
 
-课程后半部分（Ch7-Ch10）涉及大模型对齐训练。
+The second half of the course (Chapters 7-10) involves large model alignment training.
 
 ```bash
-# Hugging Face 生态
+# Hugging Face ecosystem
 pip install transformers datasets accelerate peft
 
-# TRL（Transformer Reinforcement Learning，DPO/PPO 训练的核心）
+# TRL (Transformer Reinforcement Learning, core of DPO/PPO training)
 pip install trl
 
-# 量化推理（可选，节省显存）
+# Quantized inference (optional, saves VRAM)
 pip install bitsandbytes
 
-# 评估工具
+# Evaluation tools
 pip install lm-eval
 ```
 
-::: tip 版本兼容性
-如果遇到版本冲突，可以用以下命令安装经过测试的版本组合：
+::: tip Version compatibility
+If you encounter version conflicts, you can install a tested combination with the following command:
 
 ```bash
 pip install "transformers==4.57.3" "trl==0.23.0" "datasets==4.4.1" "accelerate==1.10.1" "peft==0.17.1"
@@ -239,104 +243,104 @@ pip install "transformers==4.57.3" "trl==0.23.0" "datasets==4.4.1" "accelerate==
 
 :::
 
-## GPU 驱动检查清单
+## GPU Driver Checklist
 
-在开始训练之前，确认以下几项都正常。
+Before starting training, confirm that all of the following are working properly.
 
-| 检查项      | 命令                             | 期望结果                |
-| ----------- | -------------------------------- | ----------------------- |
-| NVIDIA 驱动 | `nvidia-smi`                     | 显示驱动版本和 GPU 信息 |
-| CUDA 版本   | `nvcc --version`                 | 与 PyTorch 编译版本匹配 |
-| cuDNN       | `torch.backends.cudnn.version()` | 返回版本号              |
-| PyTorch GPU | `torch.cuda.is_available()`      | `True`                  |
+| Check item    | Command                          | Expected result                   |
+| ------------- | -------------------------------- | --------------------------------- |
+| NVIDIA driver | `nvidia-smi`                     | Shows driver version and GPU info |
+| CUDA version  | `nvcc --version`                 | Matches PyTorch compile version   |
+| cuDNN         | `torch.backends.cudnn.version()` | Returns a version number          |
+| PyTorch GPU   | `torch.cuda.is_available()`      | `True`                            |
 
 ```python
-# 一键检查脚本
+# One-click check script
 import torch
 print("=" * 50)
-print("环境检查报告")
+print("Environment Check Report")
 print("=" * 50)
 print(f"Python:       {__import__('sys').version}")
 print(f"PyTorch:      {torch.__version__}")
-print(f"CUDA 可用:    {torch.cuda.is_available()}")
-print(f"CUDA 版本:    {torch.version.cuda or 'CPU'}")
+print(f"CUDA available: {torch.cuda.is_available()}")
+print(f"CUDA version: {torch.version.cuda or 'CPU'}")
 if torch.cuda.is_available():
     print(f"cuDNN:        {torch.backends.cudnn.version()}")
     print(f"GPU:          {torch.cuda.get_device_name(0)}")
-    print(f"显存:         {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+    print(f"VRAM:         {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
 print(f"Apple MPS:    {torch.backends.mps.is_available()}")
 print("=" * 50)
 ```
 
-## 常见安装问题与修复
+## Common Installation Problems and Fixes
 
-### CUDA 版本不匹配
+### CUDA Version Mismatch
 
-**症状**：`RuntimeError: CUDA out of memory` 或 `Found no NVIDIA driver`
+**Symptoms**: `RuntimeError: CUDA out of memory` or `Found no NVIDIA driver`
 
-**原因**：PyTorch 编译时的 CUDA 版本与系统驱动不匹配。
+**Cause**: The CUDA version PyTorch was compiled with does not match the system driver.
 
 ```bash
-# 查看当前 PyTorch 使用的 CUDA 版本
+# Check the CUDA version used by the current PyTorch
 python -c "import torch; print(torch.version.cuda)"
 
-# 如果不匹配，重新安装对应版本的 PyTorch
-# 先卸载
+# If mismatched, reinstall the corresponding version of PyTorch
+# Uninstall first
 pip uninstall torch torchvision -y
-# 再安装匹配的版本（参见 PyTorch 安装节）
+# Then install the matching version (see the PyTorch installation section)
 ```
 
-### 包版本冲突
+### Package Version Conflicts
 
-**症状**：`ImportError` 或 `AttributeError`，提示某个包版本不对。
+**Symptoms**: `ImportError` or `AttributeError` indicating an incorrect package version.
 
 ```bash
-# 查看所有已安装包的版本
+# Check versions of all installed packages
 pip list | grep -E "torch|gymnasium|transformers|trl"
 
-# 强制重装解决冲突
-pip install --force-reinstall <包名>
+# Force reinstall to resolve conflicts
+pip install --force-reinstall <package_name>
 ```
 
-### Apple Silicon (M 系列芯片) 兼容性
+### Apple Silicon (M-Series Chip) Compatibility
 
 ```bash
-# M 系列芯片使用 MPS 加速
-# 确保安装了 arm64 版本的 PyTorch
+# M-series chips use MPS acceleration
+# Make sure the arm64 version of PyTorch is installed
 python -c "import platform; print(platform.processor())"
-# 应该输出 arm64
+# Should output arm64
 
-# 部分 RL 环境在 Mac 上不支持渲染，使用 headless 模式
+# Some RL environments do not support rendering on Mac; use headless mode
 # export PYOPENGL_PLATFORM=egl
 ```
 
-### MuJoCo 渲染失败
+### MuJoCo Rendering Failure
 
 ```bash
-# 无头服务器上设置环境变量
+# On headless servers, set the environment variable
 export MUJOCO_GL=egl
-# 或者用 osmesa
+# Or use osmesa
 export MUJOCO_GL=osmesa
 ```
 
-## 全局验证脚本
+## Global Verification Script
 
-运行以下脚本，如果全部输出 "OK"，说明环境搭建完成。
+Run the following script. If all outputs show "OK", the environment setup is complete.
 
 ```python
 """
-课程环境一键验证脚本
-运行: python verify_env.py
+Course environment one-click verification script
+Run: python verify_env.py
 """
 import sys
 
 checks = []
 
-# 1. Python 版本
+# 1. Python version
 ver = sys.version_info
 checks.append(("Python >= 3.10", ver >= (3, 10)))
 
-# 2. 核心包
+# 2. Core packages
 for pkg in ["numpy", "matplotlib", "scipy", "tqdm"]:
     try:
         __import__(pkg)
@@ -352,14 +356,14 @@ try:
 except ImportError:
     checks.append(("PyTorch", False))
 
-# 4. RL 环境
+# 4. RL environments
 try:
     import gymnasium
     checks.append(("Gymnasium", True))
 except ImportError:
     checks.append(("Gymnasium", False))
 
-# 5. LLM 框架
+# 5. LLM frameworks
 for pkg in ["transformers", "datasets", "peft", "accelerate", "trl"]:
     try:
         __import__(pkg)
@@ -367,42 +371,42 @@ for pkg in ["transformers", "datasets", "peft", "accelerate", "trl"]:
     except ImportError:
         checks.append((pkg, False))
 
-# 输出报告
+# Output report
 print("\n" + "=" * 45)
-print("  环境验证报告")
+print("  Environment Verification Report")
 print("=" * 45)
 for name, ok in checks:
     status = "OK" if ok else "MISSING"
     print(f"  {name:<25} {status}")
 print("=" * 45)
 passed = sum(1 for _, ok in checks if ok)
-print(f"  通过: {passed}/{len(checks)}")
+print(f"  Passed: {passed}/{len(checks)}")
 print("=" * 45 + "\n")
 ```
 
-## 环境包总览
+## Package Overview
 
-| 包名              | 推荐版本 | 用途                            | 相关章节     |
-| ----------------- | -------- | ------------------------------- | ------------ |
-| Python            | 3.10+    | 运行时                          | 全书         |
-| PyTorch           | 2.1+     | 深度学习框架                    | 全书         |
-| gymnasium         | 0.29+    | RL 环境接口                     | Ch1, Ch3-Ch6 |
-| stable-baselines3 | 2.2+     | 封装好的 RL 算法                | Ch1, Ch4-Ch6 |
-| numpy             | 1.24+    | 数值计算                        | 全书         |
-| matplotlib        | 3.7+     | 可视化绘图                      | 全书         |
-| pybullet          | 3.2+     | 机器人仿真                      | Ch11         |
-| mujoco            | 3.0+     | 高精度物理仿真                  | Ch11         |
-| isaacsim          | 4.0+     | GPU 并行机器人仿真（Isaac Lab） | Ch11, Ch12   |
-| mlagents          | 1.0+     | Unity 3D 游戏 RL 环境           | 附录         |
-| ale-py            | 0.8+     | Atari 模拟器                    | Ch4          |
-| transformers      | 4.45+    | LLM 模型加载                    | Ch7-Ch10     |
-| trl               | 0.12+    | LLM 强化学习训练                | Ch7-Ch8      |
-| peft              | 0.13+    | 参数高效微调 (LoRA)             | Ch7-Ch10     |
-| accelerate        | 1.0+     | 分布式训练                      | Ch7-Ch10     |
-| datasets          | 3.0+     | 数据集加载                      | Ch7-Ch10     |
-| wandb             | 0.16+    | 实验追踪                        | 全书         |
-| tensorboard       | 2.15+    | 训练可视化                      | 全书         |
+| Package           | Recommended version | Purpose                                      | Relevant chapters |
+| ----------------- | ------------------- | -------------------------------------------- | ----------------- |
+| Python            | 3.10+               | Runtime                                      | Entire book       |
+| PyTorch           | 2.1+                | Deep learning framework                      | Entire book       |
+| gymnasium         | 0.29+               | RL environment interface                     | Ch1, Ch3-Ch6      |
+| stable-baselines3 | 2.2+                | Pre-packaged RL algorithms                   | Ch1, Ch4-Ch6      |
+| numpy             | 1.24+               | Numerical computing                          | Entire book       |
+| matplotlib        | 3.7+                | Visualization and plotting                   | Entire book       |
+| pybullet          | 3.2+                | Robotics simulation                          | Ch11              |
+| mujoco            | 3.0+                | High-fidelity physics simulation             | Ch11              |
+| isaacsim          | 4.0+                | GPU-parallel robotics simulation (Isaac Lab) | Ch11, Ch12        |
+| mlagents          | 1.0+                | Unity 3D game RL environments                | Appendix          |
+| ale-py            | 0.8+                | Atari emulator                               | Ch4               |
+| transformers      | 4.45+               | LLM model loading                            | Ch7-Ch10          |
+| trl               | 0.12+               | LLM reinforcement learning training          | Ch7-Ch8           |
+| peft              | 0.13+               | Parameter-efficient fine-tuning (LoRA)       | Ch7-Ch10          |
+| accelerate        | 1.0+                | Distributed training                         | Ch7-Ch10          |
+| datasets          | 3.0+                | Dataset loading                              | Ch7-Ch10          |
+| wandb             | 0.16+               | Experiment tracking                          | Entire book       |
+| tensorboard       | 2.15+               | Training visualization                       | Entire book       |
 
-::: tip 不用一次装完
-建议按课程进度安装：先装基础包（Python 环境、PyTorch、核心 RL 包），等学到对应章节再装仿真环境和 LLM 框架，避免一次性解决太多依赖冲突。
+::: tip No need to install everything at once
+We recommend installing packages as you progress through the course: start with the basics (Python environment, PyTorch, core RL packages), then install simulator environments and LLM frameworks when you reach the corresponding chapters. This avoids having to resolve too many dependency conflicts at once.
 :::

@@ -1,18 +1,18 @@
 import DefaultTheme from 'vitepress/theme'
 import 'katex/dist/katex.min.css'
 import './style.css'
-import DpoCodeFocus from '../../chapter17_dpo/components/DpoCodeFocus.vue'
+import DpoCodeFocus from '../../chapter14_dpo/components/DpoCodeFocus.vue'
 import Layout from './Layout.vue'
 import NavCard from './components/NavCard.vue'
 import NavGrid from './components/NavGrid.vue'
 import OnlineTraining from './components/OnlineTraining.vue'
-import PpoCodeFocus from '../../chapter10_ppo/components/PpoCodeFocus.vue'
-import GrpoCodeFocus from '../../chapter18_grpo/components/GrpoCodeFocus.vue'
+import PpoCodeFocus from '../../chapter08_ppo/components/PpoCodeFocus.vue'
+import GrpoCodeFocus from '../../chapter15_grpo/components/GrpoCodeFocus.vue'
 import StepBar from './components/StepBar.vue'
 
 function loadFonts() {
-  // Apple 风格：使用系统原生字体，不加载外部字体
-  // SF Pro / PingFang SC / Hiragino Sans GB 等系统字体已足够精美
+  // Apple style: use native system fonts and load no external fonts.
+  // System fonts such as SF Pro are already polished enough.
   if (typeof document === 'undefined') return
 }
 

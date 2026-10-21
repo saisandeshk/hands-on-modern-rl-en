@@ -1,36 +1,40 @@
-# 1.1 跑通 CartPole
+---
+title: 1.1 Run CartPole
+---
 
-> **本节代码**：[SB3 版本](https://github.com/walkinglabs/hands-on-modern-rl/blob/main/code/chapter01_cartpole/1-ppo_cartpole.py) · [纯 PyTorch 版本](https://github.com/walkinglabs/hands-on-modern-rl/blob/main/code/chapter01_cartpole/2-pytorch_ppo.py)
+# 1.1 Run CartPole
 
-本节我们完成第一个实验：跑通一次 CartPole 的 PPO 训练，观察奖励曲线的变化。
+> **Code for this section**: [SB3 version](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter01_cartpole/1-ppo_cartpole.py) · [Pure PyTorch version](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter01_cartpole/2-pytorch_ppo.py)
 
-## 第一次训练
+In this section we complete our first experiment: run one PPO training session on CartPole and watch how the reward curve changes.
 
-CartPole 是强化学习入门的经典任务。一根杆子通过关节连在小车上，控制器每步只能选择向左或向右推小车，目标是让杆子尽可能长时间保持竖直。
+## The First Training Run
 
-这个任务看起来简单，实现平衡却并不容易。杆子一旦开始倾斜，就会在重力作用下越倒越快；控制器必须抢在杆子倒下之前连续反向施力，而且每次只能全力向左或全力向右，没有中间力度可选。
+CartPole is the classic introductory task in reinforcement learning. A pole is attached to a cart by a joint, and at each step the controller can only choose to push the cart left or right. The goal is to keep the pole upright for as long as possible.
 
-训练它不需要任何特殊设备，普通笔记本 CPU 约 30 秒就能完成。
+The task looks simple, but balancing is not easy. Once the pole starts to tilt, gravity makes it fall faster and faster. The controller has to reverse its force continuously, ahead of the pole's fall, and each time it can only push fully left or fully right, with no intermediate strength to choose from.
 
-![CartPole 倒立摆环境：小车通过左右移动保持杆子竖直平衡](./images/cartpole.gif)
+Training it needs no special equipment. An ordinary laptop CPU finishes in about 30 seconds.
 
-<div class="figure-caption">图 1-1：CartPole-v1 环境。智能体控制小车左右移动，使杆子保持竖直。图源：<a href="https://gymnasium.farama.org/environments/classic_control/cart_pole/" target="_blank" rel="noopener noreferrer">Gymnasium</a></div>
+![The CartPole inverted-pendulum environment: the cart moves left and right to keep the pole balanced upright](./images/cartpole.gif)
+
+<div class="figure-caption">Figure 1-1: The CartPole-v1 environment. The agent moves the cart left and right to keep the pole upright. Source: <a href="https://gymnasium.farama.org/environments/classic_control/cart_pole/" target="_blank" rel="noopener noreferrer">Gymnasium</a></div>
 
 <OnlineTraining studios="cartpole" compact />
 
-如果希望逐单元查看代码，或者在终端里完整运行脚本，可以使用下面两种方式：
+If you want to view the code cell by cell, or run the complete script in a terminal, you can use the following two options:
 
 <NavGrid>
-  <NavCard href="https://modelscope.cn/my/mynotebook" title="在线开发环境" description="启动 CPU 环境，拉取课程仓库后打开 notebooks/cartpole-ppo.ipynb，逐单元运行。" />
-  <NavCard href="https://modelscope.cn/studios/walkinglab/hands-on-modern-rl-experiment01-cartpole/file/view/master/train.py" title="本地或云端终端" description="执行 python train.py --timesteps 30000。本地环境安装和运行流程见 1.3 节。" />
+  <NavCard href="https://modelscope.cn/my/mynotebook" title="Online development environment" description="Start a CPU environment, pull the course repository, then open notebooks/cartpole-ppo.ipynb and run it cell by cell." />
+  <NavCard href="https://modelscope.cn/studios/walkinglab/hands-on-modern-rl-experiment01-cartpole/file/view/master/train.py" title="Local or cloud terminal" description="Run python train.py --timesteps 30000. For local environment installation and the running workflow, see Section 1.3." />
 </NavGrid>
 
-训练开始时，程序里的策略还是一张"白纸"：它向左推和向右推的概率几乎各占一半，杆子平均撑 20 步左右就倒下了，奖励曲线在 20 分附近震荡。
+At the start of training, the policy in the program is still a "blank sheet": it pushes left and right with almost equal probability, the pole falls after about 20 steps on average, and the reward curve oscillates around 20.
 
-随着训练推进，曲线逐步攀升，最终稳定在 500 分附近——这是环境的回合步数上限，意味着小车能撑满整个回合。
+As training proceeds, the curve climbs step by step and finally settles near 500. This is the step limit of an episode, meaning the cart can hold on for the entire episode.
 
-![训练后策略在 Gymnasium CartPole-v1 中的实测帧](./images/cartpole_frames_seed42.png)
+![Measured frames of the trained policy in Gymnasium CartPole-v1](./images/cartpole_frames_seed42.png)
 
-<div class="figure-caption">图 1-2：训练后策略在 CartPole-v1 中完成的一次评估，五帧来自同一回合的第 0、125、250、375 和 500 步。该回合撑满 500 步上限，说明策略能够持续控制小车。</div>
+<div class="figure-caption">Figure 1-2: One evaluation episode of the trained policy in CartPole-v1. The five frames come from steps 0, 125, 250, 375, and 500 of the same episode. The episode reached the 500-step limit, showing that the policy can keep controlling the cart.</div>
 
-到这里，训练已经跑通，学习现象也能观察到。它背后的机制——环境给智能体什么信息、智能体怎么做决策、PPO 怎样用一段交互数据改进策略——下一节再展开。
+At this point the training runs, and the learning phenomenon can be observed. The mechanism behind it, namely what information the environment gives the agent, how the agent makes decisions, and how PPO uses a batch of interaction data to improve the policy, comes in the next section.

@@ -10,12 +10,12 @@ import torch
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULE_PATH = ROOT / "docs/chapter18_grpo/snippets/grpo-code-map.py"
+MODULE_PATH = ROOT / "docs/chapter15_grpo/snippets/grpo-code-map.py"
 SPEC = importlib.util.spec_from_file_location("grpo_code_map", MODULE_PATH)
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
-AGENTIC_POLICY_PATH = ROOT / "docs/chapter22_agentic/code/policy.py"
+AGENTIC_POLICY_PATH = ROOT / "code/chapter19_agentic/agentic_system/policy.py"
 AGENTIC_SPEC = importlib.util.spec_from_file_location(
     "agentic_grpo_policy",
     AGENTIC_POLICY_PATH,
@@ -23,7 +23,7 @@ AGENTIC_SPEC = importlib.util.spec_from_file_location(
 AGENTIC_MODULE = importlib.util.module_from_spec(AGENTIC_SPEC)
 AGENTIC_SPEC.loader.exec_module(AGENTIC_MODULE)
 
-AGENTIC_CODE_DIR = ROOT / "docs/chapter22_agentic/code"
+AGENTIC_CODE_DIR = ROOT / "code/chapter19_agentic/agentic_system"
 sys.path.insert(0, str(AGENTIC_CODE_DIR))
 TRAINER_SPEC = importlib.util.spec_from_file_location(
     "agentic_grpo_trainer",

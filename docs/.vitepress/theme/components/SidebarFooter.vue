@@ -1,29 +1,23 @@
 <script setup>
 import { useData } from 'vitepress'
 import { computed } from 'vue'
-import { Github, MessageCircle, Moon, Sun } from 'lucide-vue-next'
+import { Github, Moon, Sun } from 'lucide-vue-next'
 
-const { isDark, lang, theme } = useData()
+const { isDark, theme } = useData()
 
-const isEnglish = computed(() => lang.value.startsWith('en'))
-const appearanceLabel = computed(() => {
-  if (isEnglish.value) {
-    return isDark.value ? 'Switch to light mode' : 'Switch to dark mode'
-  }
-  return isDark.value ? '切换到浅色' : '切换到深色'
-})
+const appearanceLabel = computed(() =>
+  isDark.value ? 'Switch to light mode' : 'Switch to dark mode'
+)
 
 function toggleAppearance() {
   isDark.value = !isDark.value
 }
 
 const githubUrl = computed(() => {
-  const repo = theme.value.editLink?.repo
-  if (repo) return `https://github.com/${repo}`
-  return 'https://github.com/walkinglabs/hands-on-modern-rl'
+  const social = theme.value.socialLinks?.find((l) => l.icon === 'github')
+  if (social?.link) return social.link
+  return 'https://github.com/saisandeshk/hands-on-modern-rl-en'
 })
-
-const discordUrl = 'https://discord.gg/XU7DQmpqk'
 </script>
 
 <template>
@@ -43,16 +37,6 @@ const discordUrl = 'https://discord.gg/XU7DQmpqk'
         </button>
         <slot name="settings" />
       </div>
-      <a
-        class="ct-sidebar-footer-link"
-        :href="discordUrl"
-        target="_blank"
-        rel="noopener noreferrer"
-        title="Discord"
-        aria-label="Discord"
-      >
-        <MessageCircle :size="16" :stroke-width="2" aria-hidden="true" />
-      </a>
       <a
         class="ct-sidebar-footer-link"
         :href="githubUrl"

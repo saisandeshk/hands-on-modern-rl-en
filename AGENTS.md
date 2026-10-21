@@ -2,74 +2,61 @@
 
 ## Project Structure
 
-- `docs/`: VitePress course site content.
-- `docs/.vitepress/`: site configuration and theme overrides.
-- `docs/public/`: static assets copied to the final site.
-- `docs/en/`: English translation stubs (mirror of Chinese structure).
-- `code/`: runnable Python experiments aligned with chapters.
-- `scripts/`: repo maintenance scripts such as sitemap, verification, and asset optimization.
-- `.github/workflows/`: deployment workflow for GitHub Pages.
+- `docs/`: VitePress course site, English only. Each chapter is `docs/chapterNN_<slug>/`; appendices are `docs/appendix_[a-d]_<slug>/`. The number `NN` is the displayed chapter number.
+- Images for a page live in `images/` next to the page. Vue components and code-map snippets used by a chapter live in that chapter's `components/` and `snippets/`.
+- `docs/.vitepress/config.mjs`: navigation (`nav`) and the hand-written `sidebar`. Every navigable page must be listed there.
+- `docs/.vitepress/theme/`: layout and components. `docs/public/`: static assets copied to the site root.
+- `code/`: runnable Python experiments, numbered like the chapters (`code/chapter05_dqn` belongs to Chapter 5). `code/online-experiments/` and `modelscope-space/` are upstream ModelScope material, kept as is.
+- `scripts/`: checks, sitemap, asset optimization, PDF/EPUB builds.
+- `planning/`: upstream outline notes; `planning/content-review-notes.md` tracks suspected content errors.
 
 ## Commands
 
 ```bash
 npm install
-npm run dev            # dev server with asset optimization
-npm run dev:fast       # dev server skipping asset optimization (~5s startup)
+npm run dev:fast        # dev server, no asset optimization (~5s startup)
+npm run dev             # dev server with asset optimization
 npm run build
 npm run preview
-npm run verify
-npm run assets:optimize
+npm run verify          # format, lint, English checks, code-link check, build
+npm run fix:headings    # sync heading numbers with the sidebar
 ```
 
 ## Editing Rules
 
 - Keep changes scoped. Do not rewrite unrelated docs or config.
-- When editing existing course material, preserve the original structure, narrative style, examples, and level of detail. By default, make the smallest local changes needed to correct errors or improve wording. A request to review, polish, or fix a page does not authorize a full rewrite, course reorganization, or edits to neighboring pages. If a broader restructuring appears necessary, explain the proposed scope and obtain explicit confirmation before applying it.
-- Prefer adding new course material under `docs/` and updating sidebar/nav in `docs/.vitepress/config.mjs`.
-- Run `npm run verify` before pushing if you touched config, theme, or build scripts.
-- When adding/moving/renaming pages, update both Chinese and English sidebars if applicable.
+- When editing existing course material, preserve the structure, narrative style, examples, and level of detail. By default make the smallest local change that corrects an error or improves wording. A request to review, polish, or fix a page does not authorize a full rewrite, a course reorganization, or edits to neighboring pages. If broader restructuring seems necessary, explain the scope and get explicit confirmation first.
+- New pages go under the right `docs/chapterNN_*` directory and must be added to the sidebar in `docs/.vitepress/config.mjs`. Section numbers in page headings follow the sidebar (`npm run fix:headings`).
+- New code goes under the matching `code/chapterNN_*` directory with a `requirements.txt` entry for any new dependency.
+- Links into the repository from pages use `https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/<path>`; `npm run verify:code-links` checks that each target exists.
+- Run `npm run verify` after touching config, theme, scripts, or many pages.
+- When fixing a factual error, record it (and the fix) in `planning/content-review-notes.md`.
 
 ## TikZ → SVG Workflow
 
 For academic-style diagrams with proper LaTeX math rendering:
 
-1. Write the diagram as a `standalone` TikZ document (see `docs/preface/images/actor-critic.tex` for style reference)
-2. Compile: `xelatex <file>.tex && pdf2svg <file>.pdf <file>.svg`
-3. Keep both `.tex` (source) and `.svg` (output) in the same `images/` directory
-4. Reference the `.svg` from markdown with `<img src="./images/<name>.svg">`
+1. Write the diagram as a `standalone` TikZ document (see `docs/preface/images/actor-critic.tex`).
+2. Compile: `xelatex <file>.tex && pdf2svg <file>.pdf <file>.svg`.
+3. Keep both `.tex` (source) and `.svg` (output) in the same `images/` directory.
+4. Reference the `.svg` from markdown with `<img src="./images/<name>.svg">`.
 
-Style: rounded-corner boxes (`draw=black!70, fill=black!3`), Stealth arrows, Songti SC font, `$...$` for math.
+Style: rounded-corner boxes (`draw=black!70, fill=black!3`), Stealth arrows, `$...$` for math. All labels in English.
 
 ## Writing Conventions
 
-- Write docs as tutorial and lecture material, not as terse reference notes.
-- **Direct and concise**: No guiding filler like "用...做解释会更直观". Present the example or formula directly.
-- **No redundancy**: Avoid saying the same thing twice in different words.
-- **No vague qualifiers**: Replace metaphors ("相当于...") and hedging ("由于...") with precise causal statements.
-- **Follow the causal line**: Do not circle around the same point with "first summarize, then restate, then contrast". Write in the order the idea actually changes: new capability or setting appears → it changes the training/problem object → this enables or forces a new formulation.
-- When opening a new concept, prefer the pattern "有了新的 X，系统会 Y，于是可以/必须 Z". Avoid unnecessary callbacks to previous chapters unless they are needed for the next sentence.
-- Avoid slogan-like summary phrases such as "一问一答一打分", "骨架始终未变", "系统地扩展", or "完全不涉及". State the concrete mechanism instead.
-- Avoid AI-like error lists. Instead of listing many parallel mistakes ("query 太宽、没比价、库存错、参数错"), describe the process and show how an early wrong state propagates into later actions.
-- Prefer Chinese terms in Chinese prose. Use "一段回答" instead of "completion", "奖励" instead of "reward", "动作掩码" instead of "action mask", "逐步记录/逐步优势" instead of "step-level record/advantage". Keep English only when it is a standard acronym or the local chapter title requires it, and explain it in Chinese.
-- Match the narrative style of Chapter 3.1 and 3.2: conversational, patient, and problem-driven.
-- Open sections by connecting to what the learner already knows, then name the new problem the section solves.
-- Use concrete scenes before abstractions: examples like CartPole, multi-armed bandits, LLM generation, game tasks, and everyday choices should make the concept feel necessary.
-- Prefer a guided lecture voice. Use phrases like "Let's start with the intuition", "Look at it from another angle", "What this step means is…", "The real issue is…", while keeping the tone serious and precise.
-- Maintain textbook prose for course material. Avoid chatty, assistant-like, slogan-like, or casual internet phrasing; write as a polished Chinese textbook chapter.
-- Ensure every conceptual step has a textbook-style transition. Do not jump directly from a definition to a formula, term, algorithm, or conclusion; explain why the next idea is needed before introducing it.
-- Avoid encyclopedia-style exposition that only lists definitions. Definitions should appear after motivation and should be followed by interpretation.
-- Keep formulas close to their meaning: explain every important symbol, then restate the formula in plain English.
-- Avoid the "不是……而是……" / "not A, but B" contrast pattern. It makes the prose feel indirect. State the positive claim directly, then explain the reason.
-- Let paragraphs flow from question to answer. Good sections often follow this rhythm: familiar example → confusion or tension → formal tool → worked example → takeaway.
-- Use bold sparingly to mark conceptual pivots, not decoration.
-- Explain ideas progressively: intuition first, then formal definitions, then code or practice.
-- Prefer learner-facing prose in Chinese, with concrete examples, small derivations, and explicit transitions.
-- When introducing formulas or algorithms, state what problem they solve before showing the notation.
-- Keep paragraphs teachable and paced for reading aloud or self-study.
-- Use short sections and explicit headings.
-- Use kebab-case for paths under `docs/`.
-- Prefer directory-based routes with `index.md`.
+- Write docs as tutorial and lecture material, not terse reference notes: polished English textbook prose in a patient, guided lecture voice ("Let's start with the intuition", "Look at it from another angle", "What this step means is…", "The real issue is…"), serious and precise.
+- Open a section by connecting to what the learner already knows, then name the new problem the section solves. Use concrete scenes before abstractions (CartPole, bandits, LLM generation, games).
+- Follow the causal line: new capability or setting appears → it changes the training/problem object → this enables or forces a new formulation. Do not circle the same point with summarize-restate-contrast.
+- Every conceptual step needs a transition. Do not jump from a definition straight to a formula or algorithm; say why the next idea is needed. Definitions come after motivation and are followed by interpretation.
+- Before a formula or algorithm, state the problem it solves. Explain every important symbol, then restate the formula in plain English.
+- Good rhythm: familiar example → tension → formal tool → worked example → takeaway. Intuition first, then formal definitions, then code or practice.
+- Be direct: no filler ("it is more intuitive to explain with…"), no redundancy, no vague metaphors or hedging; state precise causal mechanisms.
+- Avoid the "not A, but B" construction where a direct positive claim works. Avoid slogan-like summaries; state the mechanism.
+- Avoid AI-style parallel error lists. Describe the process and show how an early wrong state propagates into later actions.
+- Use bold sparingly, for conceptual pivots only. Use short sections with explicit headings.
+- Terminology: advantage, return, reward model, behavior cloning, value function, action value, rollout, trajectory, verifier, process reward model (PRM), outcome reward model (ORM), KL penalty, importance sampling ratio, group-relative advantage, test-time compute, credit assignment. Keep standard acronyms (PPO, GRPO, DPO, RLHF, RLVR, SFT, MDP, TD, GAE, MCTS) and expand them on first use in a chapter.
+- Use kebab-case file names under `docs/`; prefer directory routes with `index.md` for multi-page sections.
 
 ## Commit Style
 

@@ -1,136 +1,137 @@
 ---
+title: 1.2 CartPole Principles
 outline: [2, 3]
 ---
 
-# 1.2 CartPole 原理
+# 1.2 CartPole Principles
 
-> **本节目标**：先讲清 CartPole 与 PPO 的原理，再从一次真实训练的原始记录出发，学会阅读回合奖励和四个 PPO 辅助指标。
+> **Goal of this section**: first explain the principles of CartPole and PPO, then start from the raw records of one real training run and learn to read the episode reward and four auxiliary PPO metrics.
 
-> **学习路径**：[1.1 跑通 CartPole](./principles) → **1.2 CartPole 原理** → [1.3 PPO 训练可视化](./training)
+> **Learning path**: [1.1 Run CartPole](./principles) → **1.2 CartPole Principles** → [1.3 PPO Training Visualization](./training)
 
-> **本节代码与数据**：[纯 PyTorch PPO](https://github.com/walkinglabs/hands-on-modern-rl/blob/main/code/chapter01_cartpole/2-pytorch_ppo.py) · [原始训练指标 CSV](https://github.com/walkinglabs/hands-on-modern-rl/blob/main/code/chapter01_cartpole/output/training_metrics_seed42.csv) · [绘图脚本](https://github.com/walkinglabs/hands-on-modern-rl/blob/main/code/chapter01_cartpole/plot_curves.py)
+> **Code and data for this section**: [Pure PyTorch PPO](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter01_cartpole/2-pytorch_ppo.py) · [Raw training metrics CSV](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter01_cartpole/output/training_metrics_seed42.csv) · [Plotting script](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter01_cartpole/plot_curves.py)
 
-::: tip 可选阅读
-本节属于选读内容。如果你已有一定的 Python、PyTorch 或深度学习基础，可以直接往下读；如果还没有，可以先跳到 [1.3 动手：PPO 训练可视化](./training)，等需要弄清训练背后的机制时，再倒回来看这一节。
+::: tip Optional reading
+This section is optional. If you already have some background in Python, PyTorch, or deep learning, you can read straight through. If not, you can skip ahead to [1.3 Hands-on: PPO Training Visualization](./training) and come back to this section when you need to understand the mechanism behind training.
 :::
 
-上一节我们跑通了第一次 CartPole 训练，看到奖励曲线从 20 分涨到 500 分。这一节先拆解它背后的原理——环境给智能体什么信息、智能体怎么做决策、PPO 怎样用一段交互数据改进策略；然后回到训练记录本身，学会阅读回合奖励和四个 PPO 辅助指标。
+In the previous section we ran our first CartPole training and watched the reward curve rise from 20 to 500. This section first takes apart the principles behind it: what information the environment gives the agent, how the agent makes decisions, and how PPO uses a batch of interaction data to improve the policy. Then we return to the training records themselves and learn to read the episode reward and four auxiliary PPO metrics.
 
-## 环境规则：观测、动作与奖励
+## Environment Rules: Observations, Actions, and Rewards
 
-我们先来看环境本身的规则——上一节的曲线变化，正是发生在每一步的交互里。
+Let's first look at the rules of the environment itself. The change in the curve in the previous section happens inside the interaction at every step.
 
-CartPole 的画面很简单：一条水平轨道上有一辆小车，车顶通过转轴连着一根杆子。每隔一个很短的时间步，控制器要做一次选择——向左推小车，还是向右推小车。除此之外，它什么也做不了。
+The CartPole scene is simple: on a horizontal track there is a cart, and on top of the cart a pole is attached by a pivot. At every short time step, the controller has to make one choice, to push the cart left or to push it right. Besides that, it can do nothing.
 
-杆子受重力影响，一旦开始倾斜就会越倒越快。控制器只有不断调整推的方向，才能让杆子尽量长时间保持直立。
+Under gravity, once the pole starts to tilt it falls faster and faster. Only by continually adjusting the direction of the push can the controller keep the pole upright for as long as possible.
 
-### 观测：环境每步返回四个数
+### Observations: Four Numbers Returned at Each Step
 
-控制器要决定向哪边推，就得先知道当前局面。人看一眼画面就能判断杆子是否倾斜，程序拿不到画面，需要的是数值。CartPole 每一步返回四个数字，作为控制器能看到的状态：
+To decide which way to push, the controller must first know the current situation. A person can glance at the picture and tell whether the pole is tilting, but a program does not get the picture and needs numbers. At every step CartPole returns four numbers as the state the controller can see:
 
 $$
 s_t=[x_t,\ \dot{x}_t,\ \theta_t,\ \dot{\theta}_t].
 $$
 
-下标 $t$ 表示当前时刻，四个量依次是小车位置、小车速度、杆子角度和杆子角速度。
+The subscript $t$ denotes the current time, and the four quantities are, in order, the cart position, the cart velocity, the pole angle, and the pole angular velocity.
 
-| 编号 | 观测量       | 含义                   | `observation_space` 中的边界 |
-| ---- | ------------ | ---------------------- | ---------------------------- |
-| 0    | $x$          | 小车位于轨道上的位置   | $[-4.8,\ 4.8]$               |
-| 1    | $\dot{x}$    | 小车移动的方向和快慢   | $(-\infty,\ +\infty)$        |
-| 2    | $\theta$     | 杆子偏离竖直方向的角度 | 约 $[-24^\circ,\ 24^\circ]$  |
-| 3    | $\dot\theta$ | 杆子转动的方向和快慢   | $(-\infty,\ +\infty)$        |
+| Index | Observation  | Meaning                                        | Bounds in `observation_space` |
+| ----- | ------------ | ---------------------------------------------- | ----------------------------- |
+| 0     | $x$          | Position of the cart on the track              | $[-4.8,\ 4.8]$                |
+| 1     | $\dot{x}$    | Direction and speed of the cart's movement     | $(-\infty,\ +\infty)$         |
+| 2     | $\theta$     | Angle of the pole from the vertical            | About $[-24^\circ,\ 24^\circ]$ |
+| 3     | $\dot\theta$ | Direction and speed of the pole's rotation     | $(-\infty,\ +\infty)$         |
 
-角度和角速度必须同时出现。只知道杆子向右倾，还无法判断它正在快速倒向右侧，还是正在回到中间——这两种情况需要的动作可能完全相反。
+The angle and the angular velocity must appear together. Knowing only that the pole leans to the right does not tell us whether it is falling quickly to the right or returning to the middle, and these two situations may call for exactly opposite actions.
 
-下面的代码可以读取环境声明的观测范围和终止阈值：
+The following code reads the observation ranges and termination thresholds declared by the environment:
 
 ```python
 import gymnasium as gym
 import numpy as np
 
 env = gym.make("CartPole-v1")
-print("观测上限:", env.observation_space.high)
-print("观测下限:", env.observation_space.low)
-print("小车位置阈值:", env.unwrapped.x_threshold)
+print("Observation upper bound:", env.observation_space.high)
+print("Observation lower bound:", env.observation_space.low)
+print("Cart position threshold:", env.unwrapped.x_threshold)
 print(
-    "杆子角度阈值:",
+    "Pole angle threshold:",
     np.degrees(env.unwrapped.theta_threshold_radians),
-    "度",
+    "degrees",
 )
 ```
 
-这里的无穷大表示 Gymnasium 没有给速度声明有限的观测边界，并不表示一次实际运行会产生无穷大的速度。
+The infinity here means that Gymnasium declares no finite observation bound for the velocities. It does not mean that an actual run will produce infinite velocities.
 
-### 动作：向左或向右
+### Actions: Left or Right
 
-知道了状态，控制器还要从中选择一个动作。CartPole 的动作集合为
+Knowing the state, the controller still has to choose an action from it. The action set of CartPole is
 
 $$
 \mathcal{A}=\{0,1\}.
 $$
 
-| 动作 | 环境中的含义 |
-| ---- | ------------ |
-| 0    | 向左推小车   |
-| 1    | 向右推小车   |
+| Action | Meaning in the environment |
+| ------ | -------------------------- |
+| 0      | Push the cart left         |
+| 1      | Push the cart right        |
 
-注意，动作集合里没有"不推"，也不能选择推力大小。程序每一步都必须在左和右之间做出选择。
+Note that the action set has no "do not push," and the strength of the push cannot be chosen. At every step the program must choose between left and right.
 
-从控制的角度看，动作先改变小车的运动，再通过小车和杆子的连接影响杆子。一次动作通常不能立即消除倾斜，策略需要根据下一步的新观测继续调整。
+From a control point of view, an action first changes the motion of the cart and then affects the pole through the connection between cart and pole. A single action usually cannot remove the tilt immediately, and the policy has to keep adjusting according to the new observation at the next step.
 
-控制杆子需要连续决策，每一步的选择都会改变下一步的处境。
+Controlling the pole requires continuous decisions, and every choice changes the situation at the next step.
 
-### 奖励：每存活一步得一分
+### Rewards: One Point for Each Step Survived
 
-观测和动作定义了"能看到什么"和"能做什么"，还差一个信号告诉程序哪些行为更好，这个信号就是奖励。环境每运行一步就给出 $+1$ 奖励。一个回合在以下任一情况发生时结束：
+Observations and actions define "what can be seen" and "what can be done." One more signal is needed to tell the program which behaviors are better, and this signal is the reward. The environment gives a reward of $+1$ for every step it runs. An episode ends when any of the following occurs:
 
-- 小车位置超出 $\pm 2.4$；
-- 杆子角度超出约 $\pm 12^\circ$；
-- 回合达到 500 步时间上限。
+- The cart position goes beyond $\pm 2.4$.
+- The pole angle goes beyond about $\pm 12^\circ$.
+- The episode reaches the 500-step time limit.
 
-因此，CartPole-v1 的回合奖励与存活步数相等。坚持 37 步得到 37 分，撑满上限得到 500 分。
+The episode reward of CartPole-v1 is therefore equal to the number of steps survived. Holding on for 37 steps earns 37 points, and reaching the limit earns 500 points.
 
-细看这个奖励，会发现它并不直接指明"当前应该向左推"，只记录一次动作之后任务是否还在继续。程序需要比较许多次交互，逐渐找出哪些状态和动作更容易带来较长的回合——这就是后面策略和价值网络要做的事。
+Looking closely at this reward, we see that it does not directly say "the right move now is to push left." It only records whether the task is still going after an action. The program has to compare many interactions and gradually find which states and actions more easily lead to longer episodes, which is exactly what the policy and value networks below do.
 
-## 策略与 Actor 网络
+## The Policy and the Actor Network
 
-有了观测、动作和奖励，还差一条规则：在某个状态下，应该选哪个动作。这条规则称为**策略**，记作 $\pi$。
+With observations, actions, and rewards in hand, one more rule is missing: in a given state, which action should be chosen. This rule is called the **policy**, written $\pi$.
 
-对 CartPole 来说，策略接收四维观测，输出两个动作的概率：
+For CartPole, the policy takes the four-dimensional observation and outputs the probabilities of the two actions:
 
 $$
 \pi(a\mid s)=P(A_t=a\mid S_t=s).
 $$
 
-先看一个具体状态。假设杆子正在向右倾，策略可能给出
+Let's look at a concrete state. Suppose the pole is tilting to the right, and the policy may output
 
 $$
 \pi(0\mid s)=0.3,\qquad \pi(1\mid s)=0.7.
 $$
 
-这表示训练时有 30% 的概率向左推，70% 的概率向右推。策略根据完整的四维观测计算概率，不能只用杆子向哪边倾来决定动作——小车速度、杆子角速度等信息同样影响最优选择。
+This means that during training there is a 30% probability of pushing left and a 70% probability of pushing right. The policy computes the probabilities from the complete four-dimensional observation, and it cannot decide the action only by which side the pole leans toward, since the cart velocity, the pole angular velocity, and other information also affect the best choice.
 
-实现上用一个小型神经网络表示策略。输入层接收四个数，输出层产生两个动作的分数，再通过概率分布采样：
+In implementation, a small neural network represents the policy. The input layer receives the four numbers, the output layer produces a score for each of the two actions, and an action is then sampled from the resulting probability distribution:
 
 ```mermaid
 flowchart LR
-    S["四维观测 s"] --> N["Actor 网络<br/>4 → 64 → 64 → 2"]
-    N --> L["向左的概率"]
-    N --> R["向右的概率"]
+    S["4-dimensional observation s"] --> N["Actor network<br/>4 → 64 → 64 → 2"]
+    N --> L["Probability of left"]
+    N --> R["Probability of right"]
 ```
 
-Actor 的输出层使用较小的初始权重，因此训练刚开始时，两个动作的概率通常都接近 0.5，策略会尝试左右两种动作。随着训练推进，策略逐渐学会在不同状态下给出不同的概率分布。
+The output layer of the Actor uses small initial weights, so at the start of training the probabilities of the two actions are usually both close to 0.5, and the policy tries both left and right actions. As training proceeds, the policy gradually learns to give different probability distributions in different states.
 
-## Critic 与状态价值
+## The Critic and State Value
 
-策略能输出动作概率，但仅凭某一步的 $+1$ 奖励，很难判断这个动作是否改善了长期结果。在 CartPole 里，同一个"向右推"的动作，有时能让杆子多撑几十步，有时只是推迟了倒下的时间。单看一步的奖励区分不出这两种情况。
+The policy can output action probabilities, but from the single-step reward of $+1$ alone it is hard to tell whether an action improved the long-term outcome. In CartPole, the same "push right" action sometimes lets the pole hold on for dozens more steps and sometimes only postpones the fall. The reward of a single step cannot tell the two situations apart.
 
-PPO 为此增加了第二个网络，称为 **Critic**。
+PPO adds a second network for this, called the **Critic**.
 
-Critic 接收状态 $s_t$，输出状态价值 $V(s_t)$。这个数表示：从当前状态继续按照现有策略行动，预计还能获得多少折扣回报。
+The Critic takes the state $s_t$ and outputs the state value $V(s_t)$. This number says how much discounted return we can still expect to earn if we continue to act under the current policy from the current state.
 
-代码把两个网络放在同一个 `ActorCritic` 类中：
+The code puts the two networks in the same `ActorCritic` class:
 
 ```python
 class ActorCritic(nn.Module):
@@ -152,13 +153,13 @@ class ActorCritic(nn.Module):
         )
 ```
 
-Actor 决定怎样行动，Critic 估计当前局面的长期价值。训练时，两个网络都根据采集到的轨迹更新。后面的 PPO 训练流程会用到 Critic 的输出来计算优势——也就是判断某一步的动作到底比预期好多少。
+The Actor decides how to act, and the Critic estimates the long-term value of the current situation. During training, both networks are updated from the collected trajectories. The PPO training procedure below uses the Critic's output to compute the advantage, that is, to judge how much better than expected the action at a given step was.
 
-## PPO 训练流程
+## The PPO Training Procedure
 
-到目前为止，我们分别介绍了 Actor 和 Critic，但还没有说它们怎样配合。现在把两个网络连起来，看一次完整的 PPO 迭代怎样进行。
+So far we have introduced the Actor and the Critic separately, but we have not said how they work together. Now let's connect the two networks and see how one complete PPO iteration proceeds.
 
-一次迭代先使用当前策略收集 2048 步。每一步保存状态、动作、奖励、动作的对数概率和 Critic 给出的价值：
+An iteration first uses the current policy to collect 2048 steps. At every step it saves the state, the action, the reward, the log probability of the action, and the value given by the Critic:
 
 ```python
 for _ in range(num_steps):
@@ -166,34 +167,34 @@ for _ in range(num_steps):
     next_obs, reward, terminated, truncated, _ = env.step(action.item())
 ```
 
-这段数据称为一段 **rollout**。它可以包含多个完整回合，也可能在某个回合中间结束。
+This chunk of data is called a **rollout**. It can contain several complete episodes, or it may end in the middle of an episode.
 
-收集完之后，程序要做两件事：先判断每一步的动作比预期好多少（优势），再据此更新策略——但更新的幅度要有限制。
+After collection, the program does two things: it first judges how much better than expected the action at each step was (the advantage), and then updates the policy accordingly, but with a limit on the size of the update.
 
-### TD 误差与 GAE 优势
+### TD Error and the GAE Advantage
 
-采样结束后，程序先计算每一步的 TD 误差：
+After sampling, the program first computes the TD error of each step:
 
 $$
 \delta_t=r_t+\gamma V(s_{t+1})-V(s_t).
 $$
 
-$V(s_t)$ 是 Critic 在动作执行前给出的预期，$r_t+\gamma V(s_{t+1})$ 是执行动作后得到的新估计。若 $\delta_t>0$，说明这一步的结果高于 Critic 原来的预期。
+$V(s_t)$ is the expectation the Critic gave before the action was executed, and $r_t+\gamma V(s_{t+1})$ is the new estimate obtained after executing the action. If $\delta_t>0$, the result of this step is higher than the Critic's original expectation.
 
-只使用一步的误差容易受到 Critic 估计偏差的影响。代码使用 GAE，把当前和后续若干步的 TD 误差合成优势 $A_t$：
+Using the error of a single step is easily affected by bias in the Critic's estimates. The code uses GAE, which combines the TD errors of the current step and several following steps into the advantage $A_t$:
 
 $$
 A_t=\delta_t+\gamma\lambda\delta_{t+1}
 +(\gamma\lambda)^2\delta_{t+2}+\cdots.
 $$
 
-优势为正时，PPO 会提高这次动作在相同状态下出现的概率；优势为负时，则会降低这个概率。这正是 Critic 存在的意义：它给每一步的动作提供一个比较基准。
+When the advantage is positive, PPO raises the probability of this action in the same state, and when it is negative, PPO lowers that probability. This is precisely the purpose of the Critic: it provides a baseline for comparing the action at each step.
 
-### 概率比与裁剪目标
+### The Probability Ratio and the Clipped Objective
 
-有了优势，还需要一个更新规则来调整策略。这里有一个问题：同一批 rollout 数据来自更新前的旧策略。如果新策略可以随意偏离旧策略，一次更新就可能把策略推到一个很差的区域。
+With the advantage in hand, we still need an update rule to adjust the policy. There is a problem here: the same rollout data comes from the old policy before the update. If the new policy could deviate from the old one freely, a single update might push the policy into a very poor region.
 
-为了比较新旧策略，PPO 计算已采样动作的概率比：
+To compare the new and old policies, PPO computes the probability ratio of the sampled action:
 
 $$
 r_t(\theta)=
@@ -201,7 +202,7 @@ r_t(\theta)=
 {\pi_{\theta_{\mathrm{old}}}(a_t\mid s_t)}.
 $$
 
-代码取裁剪范围 $[0.8,1.2]$。当概率比超出这个范围时，裁剪目标会限制这条样本继续推动策略大幅变化：
+The code takes the clipping range $[0.8,1.2]$. When the probability ratio goes outside this range, the clipped objective limits this sample from continuing to push the policy through a large change:
 
 ```python
 ratio = torch.exp(new_log_probs - batch_old_log_probs)
@@ -210,32 +211,32 @@ surr2 = torch.clamp(ratio, 0.8, 1.2) * batch_advantages
 policy_loss = -torch.min(surr1, surr2).mean()
 ```
 
-裁剪不保证每次更新都更好，但它限制了同一批数据能带来的策略变化幅度，使新策略不会因为一批样本发生过大的单次偏移。
+Clipping does not guarantee that every update is better, but it limits how much policy change the same batch of data can produce, so that the new policy does not make an overly large single shift because of one batch of samples.
 
-## 终止、截断与 rollout 边界
+## Termination, Truncation, and Rollout Boundaries
 
-前面提到回合会在三种情况下结束。Gymnasium 用两个标记区分它们：`terminated` 和 `truncated`。它们都会让环境执行 `reset`，但在价值计算中含义不同。
+Earlier we mentioned that an episode ends in three situations. Gymnasium distinguishes them with two flags: `terminated` and `truncated`. Both cause the environment to run `reset`, but they mean different things in the value computation.
 
-`terminated=True` 表示杆子倒下或小车越界——回合已经自然结束，后续不可能再获得奖励，因此后续价值为 0。
+`terminated=True` means the pole fell or the cart went out of bounds. The episode has ended naturally, no further reward can be obtained, and so the subsequent value is 0.
 
-`truncated=True` 表示回合达到 500 步时间上限——杆子此时可能仍然保持平衡，因此程序仍使用 $V(s_{t+1})$ 估计截断位置之后的价值。
+`truncated=True` means the episode reached the 500-step time limit. The pole may still be balanced at this point, so the program still uses $V(s_{t+1})$ to estimate the value after the truncation point.
 
-无论是哪一种结束，GAE 都必须在 `reset` 处切断。新回合的优势不能传回上一个回合，否则相当于让上一局的结果去影响下一局的判断。
+Whichever way it ends, GAE must be cut at the `reset`. The advantage of a new episode cannot be passed back to the previous episode, or the outcome of the previous game would influence the judgment of the next one.
 
-rollout 的 2048 步边界也不等于回合结束。如果采样在一个回合中间停止，下一轮应从当前状态继续，并继续累计这一回合的奖励。
+The 2048-step boundary of a rollout also does not mean the episode has ended. If sampling stops in the middle of an episode, the next iteration should continue from the current state and keep accumulating that episode's reward.
 
-## 训练主循环
+## The Main Training Loop
 
-现在可以把一次完整训练连起来。核心是三步：收集轨迹，计算优势，更新 Actor 和 Critic，然后重复。
+Now we can connect one complete training run. The core is three steps: collect trajectories, compute advantages, update the Actor and Critic, and then repeat.
 
 ```mermaid
 flowchart LR
-    A["用当前策略<br/>收集 2048 步"] --> B["计算 TD 误差<br/>与 GAE 优势"]
-    B --> C["更新 Actor<br/>与 Critic"]
+    A["Collect 2048 steps<br/>with the current policy"] --> B["Compute TD errors<br/>and GAE advantages"]
+    B --> C["Update the Actor<br/>and the Critic"]
     C --> A
 ```
 
-脚本重复这个过程 40 次：
+The script repeats this process 40 times:
 
 ```python
 for iteration in range(40):
@@ -250,25 +251,25 @@ for iteration in range(40):
     )
 ```
 
-第 1 轮使用接近随机的策略收集数据。更新后的策略会改变下一轮的数据分布，新的数据又会带来下一次更新。
+Iteration 1 collects data with a nearly random policy. The updated policy changes the data distribution of the next iteration, and the new data in turn brings the next update.
 
-策略在迭代中逐步修正，奖励曲线也就从 20 分逐步接近 500。
+The policy is corrected step by step through the iterations, and the reward curve likewise moves from 20 gradually toward 500.
 
-## 本页数据从哪里来
+## Where the Data on This Page Comes From
 
-原理讲完之后，训练记录里还有更多值得看的东西——曲线上的每个点、日志里的每个数字都对应着刚才的某个环节。本页分析仓库中保存的一次真实运行，训练曲线、诊断曲线和控制台数字都来自同一份 CSV，没有把不同脚本或不同随机种子的结果拼在一起。
+Once the principles are covered, there is more worth looking at in the training records: every point on the curve and every number in the log corresponds to some stage we just discussed. This page analyzes one real run saved in the repository. The training curve, the diagnostic curves, and the console numbers all come from the same CSV, and no results from different scripts or different random seeds are stitched together.
 
-| 项目     | 本次运行设置                                                 |
-| -------- | ------------------------------------------------------------ |
-| 日期     | 2026-08-13                                                   |
-| 环境     | `CartPole-v1`                                                |
-| 算法     | 仓库中的纯 PyTorch PPO                                       |
-| 随机种子 | `42`                                                         |
-| 训练量   | 40 轮 × 2048 步 = 81,920 个环境步                            |
-| 评估     | 训练后使用确定性策略独立运行 20 回合                         |
-| 软件版本 | Python 3.12.13、PyTorch 2.13.0、Gymnasium 1.3.0、NumPy 2.5.2 |
+| Item            | Settings of this run                                                      |
+| --------------- | ------------------------------------------------------------------------- |
+| Date            | 2026-08-13                                                                |
+| Environment     | `CartPole-v1`                                                             |
+| Algorithm       | The repository's pure PyTorch PPO                                         |
+| Random seed     | `42`                                                                      |
+| Training amount | 40 iterations × 2048 steps = 81,920 environment steps                     |
+| Evaluation      | After training, 20 episodes run independently with the deterministic policy |
+| Software versions | Python 3.12.13, PyTorch 2.13.0, Gymnasium 1.3.0, NumPy 2.5.2            |
 
-复现命令如下。`--swanlab-mode disabled` 只关闭看板记录，不改变训练过程。
+The reproduction commands are as follows. `--swanlab-mode disabled` only turns off dashboard logging and does not change the training process.
 
 ```bash
 cd code/chapter01_cartpole
@@ -284,129 +285,129 @@ python plot_curves.py \
   --output-dir output
 ```
 
-下面摘录六轮训练日志。每个数字都可以在原始 CSV 中找到。这份记录生成于加入 100 回合滑动平均之前，日志里的平均奖励是该轮结束回合的平均值，对应现在的 `mean_episode_reward_rollout`。
+Below is an excerpt of six iterations from the training log. Every number can be found in the raw CSV. This record was generated before the 100-episode rolling average was added, so the mean reward in the log is the average over the episodes that ended in that iteration, which corresponds to the current `mean_episode_reward_rollout`.
 
 ```text
-迭代  1/40 | 回合数:  91 | 平均奖励:   21.4 | KL: 0.0087 | clip%: 14.5%
-迭代  5/40 | 回合数:  15 | 平均奖励:  133.4 | KL: 0.0043 | clip%:  5.2%
-迭代 10/40 | 回合数:   4 | 平均奖励:  500.0 | KL: 0.0059 | clip%:  7.4%
-迭代 11/40 | 回合数:   5 | 平均奖励:  460.4 | KL: 0.0077 | clip%: 12.8%
-迭代 20/40 | 回合数:   4 | 平均奖励:  500.0 | KL: 0.0019 | clip%:  1.6%
-迭代 40/40 | 回合数:   4 | 平均奖励:  500.0 | KL: 0.0004 | clip%:  0.0%
-训练完成！20 回合评估: 500.0 +/- 0.0
+Iteration  1/40 | episodes:  91 | mean reward:   21.4 | KL: 0.0087 | clip%: 14.5%
+Iteration  5/40 | episodes:  15 | mean reward:  133.4 | KL: 0.0043 | clip%:  5.2%
+Iteration 10/40 | episodes:   4 | mean reward:  500.0 | KL: 0.0059 | clip%:  7.4%
+Iteration 11/40 | episodes:   5 | mean reward:  460.4 | KL: 0.0077 | clip%: 12.8%
+Iteration 20/40 | episodes:   4 | mean reward:  500.0 | KL: 0.0019 | clip%:  1.6%
+Iteration 40/40 | episodes:   4 | mean reward:  500.0 | KL: 0.0004 | clip%:  0.0%
+Training complete! 20-episode evaluation: 500.0 +/- 0.0
 ```
 
-## 先看回合奖励
+## First Look at the Episode Reward
 
-拿到记录后，我们最先看的是回合奖励。回合奖励等于存活步数，越高表示策略让杆子保持直立的时间越长。
+Once we have the records, the first thing we look at is the episode reward. The episode reward equals the number of steps survived, and the higher it is, the longer the policy keeps the pole upright.
 
-训练脚本每轮收集 2048 步。跨越两轮采样边界的回合会继续累计，直到环境真正结束该回合。控制台、CSV 的 `mean_episode_reward` 和 SwanLab 的 `rollout/ep_rew_mean` 取最近 100 个完整回合的滑动平均，与 SB3 默认的统计窗口相同，SwanLab 的横轴是累计环境步数。只统计本轮结束回合的平均值另记为 `mean_episode_reward_rollout` 和 `rollout/ep_rew_mean_rollout`。
+The training script collects 2048 steps per iteration. An episode that spans the boundary between two sampling iterations keeps accumulating until the environment actually ends it. The console, the CSV's `mean_episode_reward`, and SwanLab's `rollout/ep_rew_mean` take the rolling average over the most recent 100 complete episodes, the same statistics window as SB3's default, and the x-axis in SwanLab is the cumulative number of environment steps. The average over only the episodes that ended in the current iteration is recorded separately as `mean_episode_reward_rollout` and `rollout/ep_rew_mean_rollout`.
 
-![seed=42 的实测奖励曲线](./images/cartpole_reward_seed42.png)
+![Measured reward curve for seed=42](./images/cartpole_reward_seed42.png)
 
-<div class="figure-caption">图 1-3：seed=42 的原始训练奖励，数据来自仓库中保存的 CSV。每个点表示该轮结束的完整回合的平均奖励，即现在的 <code>mean_episode_reward_rollout</code>。曲线没有平滑，虚线表示单回合 500 步上限。</div>
+<div class="figure-caption">Figure 1-3: The raw training reward for seed=42, with data from the CSV saved in the repository. Each point is the average reward of the complete episodes that ended in that iteration, that is, the current <code>mean_episode_reward_rollout</code>. The curve is not smoothed, and the dashed line marks the 500-step limit for a single episode.</div>
 
-第一轮结束了 91 个回合，平均奖励为 21.35。策略接近随机，因此多数回合很快结束。
+Iteration 1 ended 91 episodes, with an average reward of 21.35. The policy is close to random, so most episodes end quickly.
 
-第 10 轮结束了 4 个回合，平均奖励为 500.0。此时累计采样了 20,480 个环境步。
+Iteration 10 ended 4 episodes, with an average reward of 500.0. By then a cumulative 20,480 environment steps had been sampled.
 
-第 11 轮的平均奖励降到 460.4。PPO 训练使用随机动作采样，每轮包含的完整回合数也很少，因此单个点可以暂时下降。后续大多数轮次重新达到 500 分。
+The average reward in iteration 11 drops to 460.4. PPO training samples actions stochastically, and each iteration contains very few complete episodes, so a single point can drop temporarily. Most of the later iterations reach 500 again.
 
-这些数字只描述 seed=42 的一次运行。若要比较两个算法的样本效率，需要运行多个随机种子，并使用相同的训练量和评估方法。
+These numbers describe only one run with seed=42. To compare the sample efficiency of two algorithms, we need to run multiple random seeds and use the same training amount and evaluation method.
 
-## 训练奖励与独立评估
+## Training Reward vs. Independent Evaluation
 
-看懂曲线之后，还有一个问题需要澄清：曲线上的训练奖励，和"模型到底好不好"并不是一回事。训练时，程序按照策略给出的概率抽取动作——即使向右的概率更大，仍可能抽到向左。这样的随机性让策略继续尝试不同动作，也会给训练奖励带来波动。
+After reading the curve, one more issue needs clarifying: the training reward on the curve is not the same thing as "is the model actually good?" During training, the program draws actions according to the probabilities the policy gives. Even if the probability of right is higher, left may still be drawn. This randomness lets the policy keep trying different actions, and it also brings fluctuation into the training reward.
 
-独立评估使用确定性策略。程序在每一步选择概率最大的动作，并从新的环境初始状态运行 20 个回合。本次结果为：
+The independent evaluation uses the deterministic policy. At every step the program chooses the action with the highest probability, and runs 20 episodes from fresh initial states of the environment. The result of this run is:
 
 ```text
 mean = 500.0
 std  = 0.0
 ```
 
-平均值 500.0 表示 20 个回合都运行到时间上限，标准差 0.0 表示这 20 个得分没有差异。
+A mean of 500.0 means all 20 episodes ran to the time limit, and a standard deviation of 0.0 means there is no difference among the 20 scores.
 
-独立评估检查保存下来的策略在固定规则下能达到什么结果。报告实验时，两者需要分开说明。
+The independent evaluation checks what result the saved policy achieves under fixed rules. When reporting experiments, the two must be described separately.
 
-## 再看四个辅助指标
+## Then Look at the Four Auxiliary Metrics
 
-回合奖励告诉我们任务完成得怎样，但训练失败时它给不出原因。下面的四个指标正好检查原理部分的三个环节：策略是否过早固定、Critic 是否学会预测、每次 PPO 更新是否过大。
+The episode reward tells us how well the task was completed, but when training fails it cannot give the reason. The four metrics below check exactly the three stages of the principles section: whether the policy has become fixed too early, whether the Critic has learned to predict, and whether each PPO update is too large.
 
-下面四条曲线与奖励曲线来自同一次运行。
+The four curves below come from the same run as the reward curve.
 
-![同一次实测的四个训练诊断指标](./images/cartpole_diagnostics_seed42.png)
+![Four training diagnostics from the same measured run](./images/cartpole_diagnostics_seed42.png)
 
-<div class="figure-caption">图 1-4：Value Loss、Policy Entropy、Approximate KL 和 Clip Fraction 的原始值。四幅图共用 seed=42 的同一次训练记录。</div>
+<div class="figure-caption">Figure 1-4: Raw values of Value Loss, Policy Entropy, Approximate KL, and Clip Fraction. The four panels share the same training record with seed=42.</div>
 
-### 策略熵：动作选择有多确定
+### Policy Entropy: How Decisive the Action Choice Is
 
-先看策略熵。原理部分说过，训练开始时两个动作的概率各接近 0.5。策略熵衡量的就是这种分散程度，此时熵接近
+Start with the policy entropy. The principles section said that at the start of training the probabilities of the two actions are each close to 0.5. Policy entropy measures exactly this degree of spread, and at that point the entropy is close to
 
 $$
 \ln 2\approx 0.693.
 $$
 
-本次运行的策略熵从 0.685 降到 0.421。这说明动作概率逐渐拉开，但策略仍会根据不同状态给出不同结果。
+In this run the policy entropy falls from 0.685 to 0.421. This shows that the action probabilities gradually spread apart, but the policy still gives different results in different states.
 
-熵下降只表示策略变得更确定。若奖励没有同时上升，策略也可能只是更确定地选择了错误动作。
+A drop in entropy only means the policy has become more decisive. If the reward does not rise at the same time, the policy may simply be choosing a wrong action more decisively.
 
-### 价值损失：Critic 的预测误差
+### Value Loss: The Critic's Prediction Error
 
-接下来看 Critic 学得怎样。Critic 预测从状态 $s_i$ 出发的折扣回报，价值损失比较预测值 $V(s_i)$ 和训练目标 $\hat G_i$：
+Next, how well has the Critic learned? The Critic predicts the discounted return starting from state $s_i$, and the value loss compares the prediction $V(s_i)$ with the training target $\hat G_i$:
 
 $$
 L_V=\frac{1}{|B|}\sum_{i\in B}
 \left(V(s_i)-\hat G_i\right)^2.
 $$
 
-$B$ 表示一个训练小批次。预测与目标相差越大，价值损失越大。
+$B$ denotes a training mini-batch. The larger the gap between prediction and target, the larger the value loss.
 
-本次运行的价值损失前期在 41.8 到 64.1 之间波动，最后降到 0.00014。训练中间的上升表示策略到达了新的状态分布，Critic 需要重新调整预测。
+In this run the value loss fluctuates between 41.8 and 64.1 early on and finally falls to 0.00014. The rise in the middle of training means the policy reached a new state distribution, and the Critic needed to readjust its predictions.
 
-价值损失较小只说明 Critic 更接近当前目标。策略是否完成任务仍要看回合奖励和独立评估。
+A small value loss only shows that the Critic is closer to the current target. Whether the policy completes the task still has to be judged by the episode reward and the independent evaluation.
 
-### 近似 KL：新旧策略相差多大
+### Approximate KL: How Far the New Policy Is from the Old
 
-第三个指标对应裁剪目标之前的概率比。近似 KL 比较更新前后的动作概率，数值越大，表示一次 PPO 更新使策略发生的变化越大。
+The third metric corresponds to the probability ratio before the clipped objective. Approximate KL compares the action probabilities before and after the update, and the larger the value, the larger the change a PPO update made to the policy.
 
-本次 40 轮中的最大值为 0.00871，最后一轮为 0.00038。仓库代码没有根据 KL 提前停止训练，因此本页只报告实测值，不给出一个适用于所有任务的固定阈值。
+The maximum over the 40 iterations in this run is 0.00871, and the last iteration is 0.00038. The repository code does not stop training early based on KL, so this page only reports measured values and gives no fixed threshold that applies to all tasks.
 
-### 裁剪比例：多少样本触发限制
+### Clip Fraction: How Many Samples Hit the Limit
 
-最后一个指标直接来自裁剪目标。PPO 使用 $\epsilon=0.2$，把概率比限制在 $[0.8,1.2]$ 附近。裁剪比例统计超出这个范围的样本占比：
+The last metric comes directly from the clipped objective. PPO uses $\epsilon=0.2$ to limit the probability ratio to around $[0.8,1.2]$. The clip fraction counts the share of samples that fall outside this range:
 
 $$
 \operatorname{clipfrac}=\frac{1}{|B|}\sum_{i\in B}
 \mathbf 1\left[|r_i(\theta)-1|>\epsilon\right].
 $$
 
-本次运行第一轮为 14.48%，最后三轮为 0%。后期学习率逐渐降到 0，策略变化也随之变小。
+In this run it is 14.48% in the first iteration and 0% in the last three. Later the learning rate gradually decays to 0, and the policy change shrinks with it.
 
-裁剪比例需要与近似 KL、学习率和奖励一起阅读。单独一个高值或低值不能说明训练成功或失败。
+The clip fraction must be read together with the approximate KL, the learning rate, and the reward. A single high or low value alone cannot show that training succeeded or failed.
 
-## 训练异常时的检查顺序
+## The Order of Checks When Training Behaves Abnormally
 
-把指标和原理对应起来之后，训练出问题时就有了一条清晰的排查路径。如果奖励曲线没有达到预期，可以沿着数据产生的顺序检查：
+After linking the metrics to the principles, there is a clear troubleshooting path whenever training goes wrong. If the reward curve does not reach expectations, we can check along the order in which the data is produced:
 
-1. 检查 `terminated` 与 `truncated`。自然终止后的价值为 0，时间截断仍要使用 $V(s')$。
-2. 检查 GAE 是否在每次 `reset` 处切断。优势不能从新回合传回旧回合。
-3. 检查日志是否只统计完整回合，并继续累计跨 rollout 边界的回合。
-4. 比较训练奖励和独立评估，确认问题发生在训练过程还是最终策略。
-5. 再用策略熵、价值损失、近似 KL 和裁剪比例定位具体环节。
+1. Check `terminated` and `truncated`. After natural termination the value is 0, and after a time-limit truncation $V(s')$ must still be used.
+2. Check whether GAE is cut at every `reset`. The advantage must not be passed from a new episode back to an old one.
+3. Check whether the log counts only complete episodes and keeps accumulating episodes that cross rollout boundaries.
+4. Compare the training reward with the independent evaluation, to confirm whether the problem lies in the training process or the final policy.
+5. Then use the policy entropy, value loss, approximate KL, and clip fraction to locate the specific stage.
 
-这个顺序先检查数据是否正确，再解释优化指标。错误的回合边界会直接改变训练目标，仅调学习率无法修正这类问题。
+This order first checks whether the data is correct and only then interprets the optimization metrics. Wrong episode boundaries directly change the training target, and tuning the learning rate alone cannot fix that kind of problem.
 
-## 本节小结
+## Section Summary
 
-- CartPole 用四个观测量、两个动作和每步 $+1$ 的奖励定义了任务；策略输出动作概率，Critic 估计长期价值，GAE 合成优势，裁剪目标限制更新幅度。
-- 回合奖励等于存活步数，直接反映任务表现；训练奖励包含随机采样带来的探索，独立评估使用确定性动作。
-- 策略熵、价值损失、近似 KL 和裁剪比例分别对应原理中的各个环节，用于解释训练过程，不能代替奖励。
-- 本页曲线来自一次可复现的单种子运行；算法比较需要多个随机种子。
+- CartPole defines the task with four observations, two actions, and a reward of $+1$ per step. The policy outputs action probabilities, the Critic estimates long-term value, GAE combines advantages, and the clipped objective limits the size of updates.
+- The episode reward equals the number of steps survived and reflects task performance directly. The training reward includes the exploration brought by stochastic sampling, whereas the independent evaluation uses deterministic actions.
+- Policy entropy, value loss, approximate KL, and clip fraction each correspond to a stage in the principles. They are used to explain the training process and cannot replace the reward.
+- The curves on this page come from one reproducible single-seed run. Comparing algorithms requires multiple random seeds.
 
-下一节 [PPO 训练可视化](./training) 将从同一条复现命令出发，生成原始 CSV、训练曲线和真实环境帧。
+The next section, [PPO Training Visualization](./training), starts from the same reproduction commands and generates the raw CSV, the training curves, and real environment frames.
 
-## 参考文献
+## References
 
 [^1]: Schulman, J., Moritz, P., Levine, S., Jordan, M., & Abbeel, P. (2016). High-Dimensional Continuous Control Using Generalized Advantage Estimation. _ICLR 2016_.
 

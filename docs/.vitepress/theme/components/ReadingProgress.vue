@@ -4,7 +4,9 @@
       v-if="showProgress"
       class="ct-reading-progress"
       :class="{ 'is-dragging': isDragging }"
-      :title="isDragging ? '拖动调整位置' : `阅读进度 ${progress}%`"
+      :title="
+        isDragging ? 'Drag to reposition' : `Reading progress ${progress}%`
+      "
       @mousedown="startDrag"
       @touchstart="startDrag"
       @click="handleClick"
@@ -33,7 +35,7 @@
         <div v-else key="percent" class="ct-progress-text">{{ progress }}%</div>
       </Transition>
 
-      <div v-if="isDragging" class="ct-progress-hint">拖动调整</div>
+      <div v-if="isDragging" class="ct-progress-hint">Drag to move</div>
     </div>
   </Transition>
 </template>

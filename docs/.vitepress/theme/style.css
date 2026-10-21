@@ -1,20 +1,20 @@
 /* ===================================================
    Modern RL Course Theme — Apple Design Language
-   设计方向：极简留白、精致排版、去装饰化、沉浸式阅读
-   保留原主色调：Indigo (#3f51b5)
+   Design direction: minimal whitespace, refined typography, no decoration, immersive reading
+   Original brand color kept: Indigo (#3f51b5)
    =================================================== */
 
 /* ===================================================
    1. Design Tokens / CSS Variables
    =================================================== */
 :root {
-  /* ---- Brand Colors: 保留原 Indigo 主色调 ---- */
+  /* ---- Brand Colors: original Indigo brand color kept ---- */
   --vp-c-brand-1: #3f51b5;
   --vp-c-brand-2: #3949ab;
   --vp-c-brand-3: #303f9f;
   --vp-c-brand-soft: rgba(63, 81, 181, 0.06);
 
-  /* ---- Typography: Apple 风格字体栈 ---- */
+  /* ---- Typography: Apple-style font stack ---- */
   --ct-doc-font-size: 17px;
   --ct-doc-line-height: 1.7;
 
@@ -33,7 +33,7 @@
   --vp-font-family-base: var(--font-sans);
   --vp-font-family-mono: var(--font-mono);
 
-  /* ---- Hero Gradients (Apple 风格：极柔和、朦胧光晕) ---- */
+  /* ---- Hero Gradients (Apple style: very soft, hazy glow) ---- */
   --vp-home-hero-name-background: linear-gradient(
     180deg,
     #1a237e 0%,
@@ -53,7 +53,7 @@
     );
   --vp-home-hero-image-filter: blur(100px);
 
-  /* ---- Apple 风格 Surface Colors ---- */
+  /* ---- Apple-style Surface Colors ---- */
   --surface-primary: #ffffff;
   --surface-secondary: #f5f5f7;
   --surface-tertiary: #fafafa;
@@ -73,20 +73,20 @@
   --code-text: #1d1d1f;
   --blockquote-border: rgba(0, 0, 0, 0.08);
 
-  /* ---- Apple 风格 Admonition Colors (更克制) ---- */
+  /* ---- Apple-style Admonition Colors (more restrained) ---- */
   --adm-note: #0071e3;
   --adm-tip: #34c759;
   --adm-warning: #ff9500;
   --adm-danger: #ff3b30;
 
-  /* ---- Apple 风格 Shadows (极淡、极自然) ---- */
+  /* ---- Apple-style Shadows (very light, natural) ---- */
   --shadow-subtle: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-light: 0 2px 8px rgba(0, 0, 0, 0.04);
   --shadow-medium: 0 4px 16px rgba(0, 0, 0, 0.06);
   --shadow-heavy: 0 8px 32px rgba(0, 0, 0, 0.08);
   --shadow-brand: 0 2px 8px rgba(63, 81, 181, 0.15);
 
-  /* ---- Apple 风格 Border Radius (克制、优雅) ---- */
+  /* ---- Apple-style Border Radius (restrained, elegant) ---- */
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
@@ -141,7 +141,7 @@
   background: var(--surface-primary);
 }
 
-/* ---- 页面内容区背景层次 ---- */
+/* ---- Page content background layers ---- */
 .VPDoc {
   background: var(--bg-app, #f5f7fa);
 }
@@ -150,7 +150,7 @@
   background: var(--bg-app-dark, #0f1219);
 }
 
-/* 内容卡片容器：视觉聚焦 */
+/* Content card container: visual focus */
 .VPDoc .content-container {
   max-width: 860px !important;
   margin: 0 auto;
@@ -168,7 +168,7 @@
 }
 
 /* ===================================================
-   3. Navigation Bar (Apple 风格：极简、去线化)
+   3. Navigation Bar (Apple style: minimal, no divider lines)
    =================================================== */
 .VPNav {
   backdrop-filter: saturate(180%) blur(20px);
@@ -1048,7 +1048,7 @@ aside.VPSidebar {
 }
 
 /* ===================================================
-   5. Doc Content Area (Apple 风格排版)
+   5. Doc Content Area (Apple-style typography)
    =================================================== */
 .vp-doc {
   font-size: var(--ct-doc-font-size);
@@ -1088,7 +1088,7 @@ aside.VPSidebar {
   margin-right: auto;
 }
 
-/* ---- Headings (Apple 风格：超大字号、大留白、强对比) ---- */
+/* ---- Headings (Apple style: large type, generous whitespace, strong contrast) ---- */
 .vp-doc h1,
 .vp-doc h2,
 .vp-doc h3,
@@ -1170,7 +1170,7 @@ aside.VPSidebar {
   scroll-margin-top: 80px;
 }
 
-/* ---- Paragraph spacing (Apple 超大宽松感) ---- */
+/* ---- Paragraph spacing (Apple's very airy feel) ---- */
 .vp-doc p {
   margin-top: 0;
   margin-bottom: 1.5rem;
@@ -1186,7 +1186,7 @@ aside.VPSidebar {
 }
 
 /* ===================================================
-   6. Code Blocks (Apple 风格：去阴影、去边框)
+   6. Code Blocks (Apple style: no shadows, no borders)
    =================================================== */
 .vp-doc :not(pre) > code {
   font-family: var(--font-mono);
@@ -1231,7 +1231,7 @@ aside.VPSidebar {
 }
 
 /* ===================================================
-   7. Blockquote (Apple 风格：大号引用、居中、品牌色)
+   7. Blockquote (Apple style: large centered quotes in brand color)
    =================================================== */
 .vp-doc blockquote {
   border-left: none;
@@ -1353,7 +1353,7 @@ aside.VPSidebar {
 }
 
 /* ===================================================
-   8. Custom Containers / Admonitions (Apple 风格：去背景、去阴影)
+   8. Custom Containers / Admonitions (Apple style: no background, no shadows)
    =================================================== */
 .vp-doc .custom-block {
   border: none;
@@ -1456,7 +1456,7 @@ aside.VPSidebar {
 }
 
 /* ===================================================
-   9. Tables (Apple 风格：去阴影、去边框、极简)
+   9. Tables (Apple style: no shadows, no borders, minimal)
    =================================================== */
 .vp-doc table {
   position: relative;
@@ -1522,7 +1522,7 @@ aside.VPSidebar {
 }
 
 /* ===================================================
-   10. Images (Apple 风格：大圆角、极淡阴影)
+   10. Images (Apple style: large radius, very light shadow)
    =================================================== */
 .vp-doc p > img,
 .vp-doc figure > img,
@@ -1589,7 +1589,7 @@ aside.VPSidebar {
 }
 
 /* ===================================================
-   12. Feature Cards (Homepage Apple 风格)
+   12. Feature Cards (Homepage Apple style)
    =================================================== */
 .VPFeature {
   border: none;
@@ -1797,7 +1797,7 @@ mjx-container[display='true'] {
 }
 
 /* ===================================================
-   16. Aside Outline (Apple 风格)
+   16. Aside Outline (Apple style)
    =================================================== */
 .VPDocAsideOutline {
   max-height: calc(100vh - 160px);
@@ -1950,7 +1950,7 @@ mjx-container[display='true'] {
 }
 
 /* ===================================================
-   17. Prev / Next Navigation (Apple 风格)
+   17. Prev / Next Navigation (Apple style)
    =================================================== */
 .VPDocFooter .pager {
   border-top: 0;
