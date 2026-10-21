@@ -1447,6 +1447,10 @@ const sidebar = {
             {
               text: '26.4 How LLMs Search for New Algorithms',
               link: '/chapter26_selfplay_frontiers/alphaevolve/'
+            },
+            {
+              text: '26.5 Summary and Exercises',
+              link: '/chapter26_selfplay_frontiers/review'
             }
           ]
         }

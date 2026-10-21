@@ -1,8 +1,8 @@
 ---
-title: 26.R Summary and Exercises
+title: 26.5 Summary and Exercises
 ---
 
-# 26.R Summary and Exercises
+# 26.5 Summary and Exercises
 
 This chapter followed one question: once a policy can generate its own data, where should the next unit of compute and supervision go? Section 26.1 built self-play and generator-judge loops, Section 26.2 compared training-time and test-time compute with outcome and process rewards, Section 26.3 extended the problem to several language agents that must share credit, Section 26.4 showed how the same closed loop discovers programs when a trustworthy evaluator exists, and the offline-RL supplement handled the case where no new interaction is allowed at all.
 
