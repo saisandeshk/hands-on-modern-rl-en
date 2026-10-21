@@ -1137,6 +1137,10 @@ const sidebar = {
             {
               text: '16.6 Reasoning Trace Presentation and Alignment',
               link: '/chapter16_reasoning/cot-visibility-alignment'
+            },
+            {
+              text: '16.7 Summary and Exercises',
+              link: '/chapter16_reasoning/review'
             }
           ]
         },
