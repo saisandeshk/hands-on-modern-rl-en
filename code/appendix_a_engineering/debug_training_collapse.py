@@ -24,8 +24,10 @@ It then demonstrates correct training after the fixes, along with a 4-step debug
 
 How to run:
     python debug_training_collapse.py
+    python debug_training_collapse.py --smoke   # fast CPU smoke test writing under runs/
 """
 
+import argparse
 import os
 import random
 import collections
@@ -34,6 +36,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import gymnasium as gym
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 # Create the output directory
@@ -113,13 +118,15 @@ class ConfigurableDQNAgent:
     def __init__(self, state_dim, action_dim,
                  lr=1e-3, gamma=0.99,
                  clip_grad=True, clip_max_norm=10.0,
-                 epsilon_start=1.0, epsilon_end=0.01, epsilon_decay=0.995):
+                 epsilon_start=1.0, epsilon_end=0.01, epsilon_decay=0.995,
+                 device="cpu"):
         self.action_dim = action_dim
         self.gamma = gamma
+        self.device = torch.device(device)
 
         # Q-network and target network
-        self.q_net = QNetwork(state_dim, action_dim)
-        self.target_net = QNetwork(state_dim, action_dim)
+        self.q_net = QNetwork(state_dim, action_dim).to(self.device)
+        self.target_net = QNetwork(state_dim, action_dim).to(self.device)
         self.target_net.load_state_dict(self.q_net.state_dict())
         self.target_net.eval()
 
@@ -146,7 +153,7 @@ class ConfigurableDQNAgent:
         if random.random() < self.epsilon:
             return random.randint(0, self.action_dim - 1)
         else:
-            state_tensor = torch.FloatTensor(state).unsqueeze(0)
+            state_tensor = torch.as_tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
             with torch.no_grad():
                 q_values = self.q_net(state_tensor)
             return q_values.argmax(dim=1).item()
@@ -165,11 +172,11 @@ class ConfigurableDQNAgent:
 
         states, actions, rewards, next_states, dones = self.buffer.sample(batch_size)
 
-        states = torch.FloatTensor(states)
-        actions = torch.LongTensor(actions)
-        rewards = torch.FloatTensor(rewards)
-        next_states = torch.FloatTensor(next_states)
-        dones = torch.FloatTensor(dones)
+        states = torch.as_tensor(states, dtype=torch.float32, device=self.device)
+        actions = torch.as_tensor(actions, dtype=torch.int64, device=self.device)
+        rewards = torch.as_tensor(rewards, dtype=torch.float32, device=self.device)
+        next_states = torch.as_tensor(next_states, dtype=torch.float32, device=self.device)
+        dones = torch.as_tensor(dones, dtype=torch.float32, device=self.device)
 
         q_values = self.q_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)
 
@@ -209,7 +216,7 @@ class ConfigurableDQNAgent:
 # Part 3: Unified training function
 # ==========================================
 def train_scenario(agent, env, label, num_episodes=300, batch_size=64,
-                   target_update_freq=10, verbose=True):
+                   target_update_freq=10, verbose=True, seed=0):
     """
     Train the DQN agent under a given configuration
 
@@ -239,7 +246,7 @@ def train_scenario(agent, env, label, num_episodes=300, batch_size=64,
         print(f"{'─' * 60}")
 
     for episode in range(num_episodes):
-        state, _ = env.reset()
+        state, _ = env.reset(seed=seed + episode)
         episode_reward = 0.0
         episode_loss = 0.0
         episode_grad_norm = 0.0
@@ -436,7 +443,7 @@ def four_step_diagnosis(results):
 # ==========================================
 # Part 5: Main experiment flow
 # ==========================================
-def run_all_scenarios():
+def run_all_scenarios(num_episodes=300, batch_size=64, seed=0, device="cpu"):
     """
     Run the training experiments for all scenarios
 
@@ -445,12 +452,15 @@ def run_all_scenarios():
     Scenario 3: Epsilon not decaying (fixed epsilon=1.0)
     Scenario 4: Correct training after the fixes
     """
-    NUM_EPISODES = 300
+
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
 
     print("=" * 60)
     print("  Appendix A: Training collapse diagnosis and fix experiments")
     print("=" * 60)
-    print(f"  Each scenario trains for {NUM_EPISODES} episodes")
+    print(f"  Each scenario trains for {num_episodes} episodes")
     print(f"  The first 3 scenarios deliberately trigger a failure; the 4th shows the correct configuration")
     print("=" * 60)
 
@@ -473,8 +483,10 @@ def run_all_scenarios():
         epsilon_start=1.0,
         epsilon_end=0.01,
         epsilon_decay=0.995,
+        device=device,
     )
-    results_lr_high = train_scenario(agent_lr_high, env1, "lr=1.0 (too high)")
+    results_lr_high = train_scenario(agent_lr_high, env1, "lr=1.0 (too high)",
+                                     num_episodes=num_episodes, batch_size=batch_size, seed=seed)
 
     # -- Scenario 2: missing gradient clipping --
     print("\n" + "=" * 60)
@@ -491,8 +503,10 @@ def run_all_scenarios():
         epsilon_start=1.0,
         epsilon_end=0.01,
         epsilon_decay=0.995,
+        device=device,
     )
-    results_no_clip = train_scenario(agent_no_clip, env2, "No gradient clipping")
+    results_no_clip = train_scenario(agent_no_clip, env2, "No gradient clipping",
+                                     num_episodes=num_episodes, batch_size=batch_size, seed=seed + 1)
 
     # -- Scenario 3: epsilon not decaying --
     print("\n" + "=" * 60)
@@ -510,8 +524,10 @@ def run_all_scenarios():
         epsilon_start=1.0,
         epsilon_end=1.0,       # Epsilon does not decay! Always fully random
         epsilon_decay=1.0,     # Decay factor of 1.0 = no decay
+        device=device,
     )
-    results_no_decay = train_scenario(agent_no_decay, env3, "epsilon=1.0 (no decay)")
+    results_no_decay = train_scenario(agent_no_decay, env3, "epsilon=1.0 (no decay)",
+                                      num_episodes=num_episodes, batch_size=batch_size, seed=seed + 2)
 
     # -- Scenario 4: correct training after the fixes --
     print("\n" + "=" * 60)
@@ -529,8 +545,10 @@ def run_all_scenarios():
         epsilon_start=1.0,     # Initial epsilon
         epsilon_end=0.01,      # Final epsilon
         epsilon_decay=0.995,   # Decay factor
+        device=device,
     )
-    results_correct = train_scenario(agent_correct, env4, "Correct configuration")
+    results_correct = train_scenario(agent_correct, env4, "Correct configuration",
+                                     num_episodes=num_episodes, batch_size=batch_size, seed=seed + 3)
 
     return [results_lr_high, results_no_clip, results_no_decay, results_correct]
 
@@ -538,7 +556,7 @@ def run_all_scenarios():
 # ==========================================
 # Part 6: Diagnostic visualization
 # ==========================================
-def plot_diagnosis(all_results):
+def plot_diagnosis(all_results, out_dir="output"):
     """
     Plot the diagnostic comparison across the 4 scenarios
 
@@ -638,9 +656,11 @@ def plot_diagnosis(all_results):
         ax4.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig("output/training_collapse_diagnosis.png", dpi=150, bbox_inches='tight')
-    print("\nDiagnostic plot saved to output/training_collapse_diagnosis.png")
-    plt.show()
+    os.makedirs(out_dir, exist_ok=True)
+    diag_path = os.path.join(out_dir, "training_collapse_diagnosis.png")
+    plt.savefig(diag_path, dpi=150, bbox_inches='tight')
+    print(f"\nDiagnostic plot saved to {diag_path}")
+    plt.close()
 
 
 # ==========================================
@@ -747,16 +767,51 @@ def print_fix_summary():
 # ==========================================
 # Program entry point
 # ==========================================
-if __name__ == "__main__":
+def parse_args():
+    parser = argparse.ArgumentParser(description="Training collapse diagnosis (Appendix A)")
+    parser.add_argument("--seed", type=int, default=0, help="Random seed")
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="cpu")
+    parser.add_argument("--num-episodes", type=int, default=300, help="Episodes per scenario")
+    parser.add_argument("--batch-size", type=int, default=64, help="Batch size")
+    parser.add_argument("--output-dir", type=str, default="output", help="Directory for figures")
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: tiny CPU run writing only under runs/",
+    )
+    return parser.parse_args()
+
+
+def resolve_device(choice):
+    if choice == "auto":
+        return "cuda" if torch.cuda.is_available() else "cpu"
+    return choice
+
+
+def main(args=None):
+    if args is None:
+        args = parse_args()
+    device = resolve_device(args.device)
+    if args.smoke:
+        device = "cpu"
+        args.num_episodes = 4
+        args.batch_size = 32
+    out_dir = os.path.join("runs", "smoke_debug_training_collapse") if args.smoke else args.output_dir
+    os.makedirs(out_dir, exist_ok=True)
+
     # Run all scenarios
-    all_results = run_all_scenarios()
+    all_results = run_all_scenarios(num_episodes=args.num_episodes, batch_size=args.batch_size,
+                                    seed=args.seed, device=device)
 
     # Run the 4-step diagnosis on each scenario
     for results in all_results:
         four_step_diagnosis(results)
 
     # Plot the diagnostic comparison
-    plot_diagnosis(all_results)
+    plot_diagnosis(all_results, out_dir=out_dir)
 
     # Print the summary of fixes
     print_fix_summary()
+
+
+if __name__ == "__main__":
+    main()

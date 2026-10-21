@@ -19,7 +19,11 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-import ale_py
+try:
+    import ale_py
+except ImportError:
+    ale_py = None
+
 import gymnasium as gym
 import imageio
 import numpy as np
@@ -28,10 +32,17 @@ from stable_baselines3 import DQN
 from stable_baselines3.common.atari_wrappers import AtariWrapper
 
 
-gym.register_envs(ale_py)
+if ale_py is not None:
+    gym.register_envs(ale_py)
 
 
 def make_render_env(args: argparse.Namespace):
+    if ale_py is None:
+        raise SystemExit(
+            "ale_py is not installed, so Atari environments are unavailable. "
+            "Install the Atari extras (needs network):\n\n"
+            "  pip install -r code/chapter05_dqn/requirements.txt"
+        )
     env_kwargs = {}
     if args.env_id.startswith("ALE/"):
         env_kwargs = {
@@ -71,6 +82,13 @@ def scaled_frame(frame: np.ndarray, scale: int) -> np.ndarray:
 
 
 def render(args: argparse.Namespace) -> None:
+    if args.smoke:
+        args.policy = "random"
+        args.max_steps = 16
+        args.render_every = 4
+        args.output = Path("runs/smoke_render_atari/pong_smoke.gif")
+    if args.output is None:
+        raise SystemExit("--output is required without --smoke")
     if args.policy == "model":
         if args.model is None:
             raise SystemExit("--model is required when --policy model is used.")
@@ -119,9 +137,14 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render an Atari DQN model.")
     parser.add_argument("--model", type=Path, default=None)
     parser.add_argument("--policy", choices=["model", "random", "noop"], default="model")
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--env-id", type=str, default="ALE/Pong-v5")
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="cpu")
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: random policy, few steps, writes only under runs/",
+    )
     parser.add_argument("--max-steps", type=int, default=1200)
     parser.add_argument("--fps", type=int, default=20)
     parser.add_argument("--render-every", type=int, default=4)

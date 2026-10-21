@@ -1,8 +1,9 @@
 """
-Chapter 6: Render an A2C Pendulum-v1 replay
+Chapter 7: Render an A2C Pendulum-v1 replay
 
 Usage:
     python render_pendulum.py --model output/actor_critic_pendulum.zip
+    python render_pendulum.py --smoke   # random-action smoke render writing under runs/
 """
 
 import argparse
@@ -14,19 +15,52 @@ from stable_baselines3 import A2C
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
 
+def render_smoke_random(args):
+    """Smoke path: random actions, no model or VecNormalize needed."""
+    import gymnasium as gym
+
+    output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    env = gym.make("Pendulum-v1", render_mode="rgb_array")
+    env.action_space.seed(args.seed)
+    env.reset(seed=args.seed)
+    frames = []
+    for _ in range(args.max_steps):
+        frames.append(env.render())
+        _, _, terminated, truncated, _ = env.step(env.action_space.sample())
+        if terminated or truncated:
+            break
+    env.close()
+    imageio.mimsave(output_path, frames, duration=1000 / args.fps, loop=0)
+    print(f"Smoke GIF saved to {output_path} ({len(frames)} frames)")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Render a Pendulum A2C replay")
-    parser.add_argument("--model", type=str, required=True, help="Model path")
+    parser.add_argument("--model", type=str, default=None, help="Model path")
     parser.add_argument("--vecnormalize", type=str,
                         default="output/actor_critic_pendulum_vecnormalize.pkl",
                         help="VecNormalize statistics file")
     parser.add_argument("--output", type=str, default="output/pendulum_actor_critic.gif",
                         help="GIF output path")
     parser.add_argument("--seed", type=int, default=0, help="Environment seed")
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="cpu")
     parser.add_argument("--max-steps", type=int, default=200, help="Maximum number of steps")
     parser.add_argument("--fps", type=int, default=30, help="GIF frame rate")
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: random actions, few frames, writes only under runs/",
+    )
     args = parser.parse_args()
 
+    if args.smoke:
+        args.output = "runs/smoke_render_pendulum/pendulum_smoke.gif"
+        args.max_steps = 10
+        render_smoke_random(args)
+        return
+
+    if args.model is None:
+        raise SystemExit("--model is required without --smoke")
     model = A2C.load(args.model)
     render_env = gym.make("Pendulum-v1", render_mode="rgb_array")
     vec_env = DummyVecEnv([lambda: render_env])

@@ -220,8 +220,8 @@ def moving_average(values: list[float], window: int = 20) -> list[float]:
     return result
 
 
-def run_schedule(name: str, schedule: Callable[[int], float]) -> dict[str, object]:
-    runs = [train_q_learning(seed, schedule) for seed in range(N_SEEDS)]
+def run_schedule(name: str, schedule: Callable[[int], float], seed_offset: int = 0) -> dict[str, object]:
+    runs = [train_q_learning(seed + seed_offset, schedule) for seed in range(N_SEEDS)]
     aggregate = aggregate_runs(runs)
     evaluations = [greedy_evaluation(run.q_values) for run in runs]
     return {
@@ -412,10 +412,25 @@ def copy_assets(source_dir: Path, assets_dir: Path | None) -> None:
 
 
 def main() -> None:
+    global EPISODES, N_SEEDS
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, default=Path("output/value-experiment"))
     parser.add_argument("--assets-dir", type=Path)
+    parser.add_argument("--seed", type=int, default=0, help="Seed offset added to every training seed")
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="cpu")
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: tiny run writing only under runs/",
+    )
+    parser.add_argument("--episodes", type=int, default=EPISODES)
+    parser.add_argument("--seeds", type=int, default=N_SEEDS)
     args = parser.parse_args()
+    if args.smoke:
+        args.output_dir = Path("runs/smoke_gridworld_q_learning")
+        args.episodes = 20
+        args.seeds = 2
+    EPISODES = args.episodes
+    N_SEEDS = args.seeds
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     values, history = value_iteration()
@@ -426,9 +441,10 @@ def main() -> None:
         ("固定 ε = 0.05", constant_epsilon(0.05)),
         ("固定 ε = 0.30", constant_epsilon(0.30)),
     ]
-    schedule_results = [run_schedule(name, schedule) for name, schedule in schedules]
-    assert all(result["success_rate"] == 1.0 for result in schedule_results)
-    assert all(result["evaluation_steps"] == 6.0 for result in schedule_results)
+    schedule_results = [run_schedule(name, schedule, seed_offset=args.seed) for name, schedule in schedules]
+    if not args.smoke:
+        assert all(result["success_rate"] == 1.0 for result in schedule_results)
+        assert all(result["evaluation_steps"] == 6.0 for result in schedule_results)
 
     render_environment_svg(args.output_dir / "gridworld-environment.svg")
     render_value_svg(history, values, args.output_dir / "gridworld-value-iteration.svg")

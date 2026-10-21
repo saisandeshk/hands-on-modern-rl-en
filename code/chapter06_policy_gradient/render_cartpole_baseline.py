@@ -1,5 +1,5 @@
 """
-Render CartPole rollouts for Chapter 5.3.
+Render CartPole rollouts for Chapter 6.
 
 This script trains two policies on CartPole-v1:
 1. Vanilla REINFORCE
@@ -9,6 +9,7 @@ It then renders deterministic rollouts as GIFs for the course notes.
 """
 
 import argparse
+import random
 from pathlib import Path
 
 import gymnasium as gym
@@ -59,13 +60,13 @@ def compute_returns(rewards, gamma=0.99):
     return returns
 
 
-def collect_episode(policy, env):
+def collect_episode(policy, env, device="cpu"):
     state, _ = env.reset()
     states, actions, rewards = [], [], []
     terminated = truncated = False
 
     while not (terminated or truncated):
-        state_t = torch.FloatTensor(state).unsqueeze(0)
+        state_t = torch.as_tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
         with torch.no_grad():
             probs = policy(state_t)
         action = torch.distributions.Categorical(probs).sample().item()
@@ -78,24 +79,26 @@ def collect_episode(policy, env):
     return states, actions, rewards, float(sum(rewards))
 
 
-def train_vanilla(seed, episodes=500, gamma=0.99, lr=1e-3):
+def train_vanilla(seed, episodes=500, gamma=0.99, lr=1e-3, device="cpu"):
+    random.seed(seed)
     torch.manual_seed(seed)
     np.random.seed(seed)
     env = gym.make("CartPole-v1")
     env.reset(seed=seed)
+    env.action_space.seed(seed)
     policy = PolicyNetwork(
         state_dim=env.observation_space.shape[0],
         action_dim=env.action_space.n,
-    )
+    ).to(device)
     optimizer = optim.Adam(policy.parameters(), lr=lr)
     rewards_history = []
 
     for _ in range(episodes):
-        states, actions, rewards, episode_reward = collect_episode(policy, env)
+        states, actions, rewards, episode_reward = collect_episode(policy, env, device)
         returns = compute_returns(rewards, gamma)
-        states_t = torch.FloatTensor(np.array(states))
-        actions_t = torch.LongTensor(actions)
-        returns_t = torch.FloatTensor(returns)
+        states_t = torch.as_tensor(np.array(states), dtype=torch.float32, device=device)
+        actions_t = torch.as_tensor(actions, dtype=torch.int64, device=device)
+        returns_t = torch.as_tensor(returns, dtype=torch.float32, device=device)
 
         probs = policy(states_t)
         action_probs = probs.gather(1, actions_t.unsqueeze(1)).squeeze(1)
@@ -111,26 +114,28 @@ def train_vanilla(seed, episodes=500, gamma=0.99, lr=1e-3):
     return policy, rewards_history
 
 
-def train_with_baseline(seed, episodes=500, gamma=0.99, lr=1e-3):
+def train_with_baseline(seed, episodes=500, gamma=0.99, lr=1e-3, device="cpu"):
+    random.seed(seed)
     torch.manual_seed(seed)
     np.random.seed(seed)
     env = gym.make("CartPole-v1")
     env.reset(seed=seed)
+    env.action_space.seed(seed)
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
 
-    policy = PolicyNetwork(state_dim=state_dim, action_dim=action_dim)
-    value_net = ValueNetwork(state_dim=state_dim)
+    policy = PolicyNetwork(state_dim=state_dim, action_dim=action_dim).to(device)
+    value_net = ValueNetwork(state_dim=state_dim).to(device)
     policy_optimizer = optim.Adam(policy.parameters(), lr=lr)
     value_optimizer = optim.Adam(value_net.parameters(), lr=lr)
     rewards_history = []
 
     for _ in range(episodes):
-        states, actions, rewards, episode_reward = collect_episode(policy, env)
+        states, actions, rewards, episode_reward = collect_episode(policy, env, device)
         returns = compute_returns(rewards, gamma)
-        states_t = torch.FloatTensor(np.array(states))
-        actions_t = torch.LongTensor(actions)
-        returns_t = torch.FloatTensor(returns)
+        states_t = torch.as_tensor(np.array(states), dtype=torch.float32, device=device)
+        actions_t = torch.as_tensor(actions, dtype=torch.int64, device=device)
+        returns_t = torch.as_tensor(returns, dtype=torch.float32, device=device)
 
         values = value_net(states_t)
         value_loss = nn.MSELoss()(values, returns_t)
@@ -181,17 +186,26 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--episodes", type=int, default=500)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="cpu")
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: tiny CPU run writing only under runs/",
+    )
     parser.add_argument(
         "--output-dir",
         type=Path,
         default=Path("docs/chapter06_policy_gradient/images"),
     )
     args = parser.parse_args()
+    if args.smoke:
+        args.episodes = 3
+        args.output_dir = Path("runs/smoke_render_cartpole_baseline")
+        args.device = "cpu"
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    vanilla_policy, vanilla_rewards = train_vanilla(args.seed, args.episodes)
-    baseline_policy, baseline_rewards = train_with_baseline(args.seed + 100, args.episodes)
+    vanilla_policy, vanilla_rewards = train_vanilla(args.seed, args.episodes, device=args.device)
+    baseline_policy, baseline_rewards = train_with_baseline(args.seed + 100, args.episodes, device=args.device)
 
     vanilla_return, vanilla_frames = render_policy(
         vanilla_policy,

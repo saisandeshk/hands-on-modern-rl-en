@@ -1,5 +1,5 @@
 """
-Chapter 6: Implementing PPO (Proximal Policy Optimization) from scratch
+Chapter 8: Implementing PPO (Proximal Policy Optimization) from scratch
 ——Understanding every step of PPO in pure PyTorch on CartPole-v1
 
 Core PPO formula:
@@ -9,15 +9,21 @@ Core PPO formula:
 
 How to run:
     python ppo_from_scratch.py
+    python ppo_from_scratch.py --smoke   # fast CPU smoke test writing under runs/
 """
 
+import argparse
 import os
+import random
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import gymnasium as gym
 import numpy as np
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from torch.distributions import Categorical
 
@@ -78,7 +84,8 @@ class ActorCritic(nn.Module):
 
     def get_action(self, state):
         """Sample an action from the current state, return action, log-prob, value"""
-        state_tensor = torch.FloatTensor(state).unsqueeze(0)
+        device = next(self.parameters()).device
+        state_tensor = torch.as_tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
         action_probs, value = self.forward(state_tensor)
 
         # Sample using a Categorical distribution
@@ -229,9 +236,10 @@ def collect_trajectories(
     if obs is None:
         obs, _ = env.reset()
     episode_rewards = []
+    device = next(model.parameters()).device
 
     for step in range(n_steps):
-        state_tensor = torch.FloatTensor(obs)
+        state_tensor = torch.as_tensor(obs, dtype=torch.float32, device=device)
 
         # Sample an action with the current policy
         with torch.no_grad():
@@ -256,7 +264,7 @@ def collect_trajectories(
             next_value = 0.0
         else:
             with torch.no_grad():
-                _, next_state_value = model(torch.FloatTensor(next_obs))
+                _, next_state_value = model(torch.as_tensor(next_obs, dtype=torch.float32, device=device))
             next_value = next_state_value.item()
         next_values.append(next_value)
         episode_ends.append(episode_end)
@@ -271,10 +279,11 @@ def collect_trajectories(
         obs = next_obs
 
     # Convert to tensors
+    model_device = next(model.parameters()).device
     batch = {
-        "states": torch.FloatTensor(np.array(states)),
-        "actions": torch.LongTensor(actions),
-        "old_logprobs": torch.FloatTensor(old_logprobs),
+        "states": torch.as_tensor(np.array(states), dtype=torch.float32, device=model_device),
+        "actions": torch.as_tensor(actions, dtype=torch.int64, device=model_device),
+        "old_logprobs": torch.as_tensor(old_logprobs, dtype=torch.float32, device=model_device),
         "rewards": rewards,
         "next_values": next_values,
         "episode_ends": episode_ends,
@@ -311,10 +320,12 @@ def ppo_update(model, optimizer, batch, n_epochs=10, batch_size=64,
         gamma=0.99, lam=0.95
     )
 
-    # Keep the data on CPU (keep things simple)
+    # Keep the data on the model's device
     states = batch["states"]
     actions = batch["actions"]
     old_logprobs = batch["old_logprobs"]
+    advantages = advantages.to(states.device)
+    returns = returns.to(states.device)
 
     dataset_size = states.shape[0]
     total_policy_loss = 0
@@ -383,19 +394,53 @@ def ppo_update(model, optimizer, batch, n_epochs=10, batch_size=64,
 # ==========================================
 # Part 6: Main training loop
 # ==========================================
-def train():
+def parse_args():
+    parser = argparse.ArgumentParser(description="From-scratch PPO on CartPole-v1 (Chapter 8)")
+    parser.add_argument("--seed", type=int, default=0, help="Random seed")
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="cpu")
+    parser.add_argument("--n-steps", type=int, default=2048, help="Steps collected per rollout")
+    parser.add_argument("--n-epochs", type=int, default=10, help="Update rounds per batch of data")
+    parser.add_argument("--batch-size", type=int, default=64, help="Mini-batch size")
+    parser.add_argument("--total-episodes", type=int, default=1000, help="Total training episodes")
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: tiny CPU run writing only under runs/",
+    )
+    return parser.parse_args()
+
+
+def resolve_device(choice):
+    if choice == "auto":
+        return "cuda" if torch.cuda.is_available() else "cpu"
+    return choice
+
+
+def train(args=None):
     """PPO main training function"""
+    if args is None:
+        args = parse_args()
     print("=" * 50)
-    print("Chapter 6: Implementing PPO from scratch — CartPole-v1")
+    print("Chapter 8: Implementing PPO from scratch — CartPole-v1")
     print("=" * 50)
+
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    device = resolve_device(args.device)
+    if args.smoke:
+        device = "cpu"
+    out_dir = os.path.join("runs", "smoke_ppo_from_scratch") if args.smoke else "output"
+    os.makedirs(out_dir, exist_ok=True)
 
     # Create the environment
     env = gym.make("CartPole-v1")
+    env.reset(seed=args.seed)
+    env.action_space.seed(args.seed)
     state_dim = env.observation_space.shape[0]   # 4
     action_dim = env.action_space.n               # 2
 
     # Create the model and optimizer
-    model = ActorCritic(state_dim, action_dim)
+    model = ActorCritic(state_dim, action_dim).to(device)
     optimizer = optim.Adam(model.parameters(), lr=3e-4)
 
     print(f"\nNetwork structure:")
@@ -403,11 +448,11 @@ def train():
     print(f"\nState dim: {state_dim}, Action dim: {action_dim}")
 
     # Training parameters
-    n_steps = 2048        # Steps collected per rollout
-    n_epochs = 10         # Update rounds per batch of data
-    batch_size = 64       # Mini-batch size
+    n_steps = 64 if args.smoke else args.n_steps            # Steps collected per rollout
+    n_epochs = 2 if args.smoke else args.n_epochs           # Update rounds per batch of data
+    batch_size = args.batch_size   # Mini-batch size
     clip_eps = 0.2        # PPO clip range
-    total_episodes = 1000 # Total number of training episodes
+    total_episodes = 6 if args.smoke else args.total_episodes  # Total number of training episodes
 
     # Record training metrics
     all_rewards = []
@@ -421,7 +466,7 @@ def train():
 
     episode_count = 0
     iteration = 0
-    rollout_obs = None
+    rollout_obs, _ = env.reset(seed=args.seed)
     current_ep_reward = 0.0
 
     while episode_count < total_episodes:
@@ -470,12 +515,12 @@ def train():
 
     # Final evaluation
     test_rewards = []
-    for _ in range(20):
-        obs, _ = env.reset()
+    for ep in range(2 if args.smoke else 20):
+        obs, _ = env.reset(seed=args.seed + 10_000 + ep)
         done, truncated = False, False
         total_reward = 0
         while not (done or truncated):
-            state_tensor = torch.FloatTensor(obs)
+            state_tensor = torch.as_tensor(obs, dtype=torch.float32, device=device)
             with torch.no_grad():
                 action_probs, _ = model(state_tensor)
             action = torch.argmax(action_probs).item()
@@ -546,9 +591,9 @@ def train():
     ax4.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig("output/ppo_from_scratch_curves.png", dpi=150, bbox_inches="tight")
-    print("Training curves saved to: output/ppo_from_scratch_curves.png")
-    plt.show()
+    plt.savefig(os.path.join(out_dir, "ppo_from_scratch_curves.png"), dpi=150, bbox_inches="tight")
+    print(f"Training curves saved to: {os.path.join(out_dir, 'ppo_from_scratch_curves.png')}")
+    plt.close()
 
 
 # ==========================================

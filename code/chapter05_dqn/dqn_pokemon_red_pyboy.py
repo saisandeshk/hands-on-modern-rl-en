@@ -48,7 +48,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Train a DQN baseline for early Pokemon Red exploration with PyBoy."
     )
-    parser.add_argument("--rom", type=Path, required=True, help="Path to a legal Pokemon Red ROM.")
+    parser.add_argument("--rom", type=Path, default=None, help="Path to a legal Pokemon Red ROM.")
     parser.add_argument(
         "--state",
         type=Path,
@@ -68,6 +68,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sticky-action-prob", type=float, default=0.08)
     parser.add_argument("--progress-bar", action="store_true")
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="cpu")
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: check imports/env wiring only (needs no ROM), writes nothing",
+    )
     parser.add_argument("--log-dir", type=Path, default=Path("output/dqn_pokemon_red"))
     parser.add_argument(
         "--skip-rom-check",
@@ -301,6 +306,15 @@ def make_env(args: argparse.Namespace, seed: int, monitor_dir: Path):
 
 def main() -> None:
     args = parse_args()
+    if args.smoke:
+        args.log_dir = Path("runs/smoke_dqn_pokemon_red")
+        args.log_dir.mkdir(parents=True, exist_ok=True)
+        # Smoke mode must not require a ROM or the pyboy package: it only
+        # checks that this module imports cleanly and the CLI is wired up.
+        print("smoke: dqn_pokemon_red_pyboy imports OK (needs a legal ROM for real training)")
+        return
+    if args.rom is None:
+        raise SystemExit("--rom is required for real training (omit it only with --smoke)")
     validate_inputs(args.rom, args.state, args.skip_rom_check)
 
     args.log_dir.mkdir(parents=True, exist_ok=True)
@@ -329,6 +343,7 @@ def main() -> None:
         tensorboard_log=str(args.log_dir / "tb"),
         verbose=1,
         seed=args.seed,
+        device=args.device,
     )
 
     checkpoint_callback = CheckpointCallback(

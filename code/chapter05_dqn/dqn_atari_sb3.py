@@ -22,7 +22,11 @@ from typing import Any
 
 import gymnasium as gym
 import numpy as np
-import ale_py
+
+try:
+    import ale_py
+except ImportError:
+    ale_py = None
 from stable_baselines3 import DQN
 from stable_baselines3.common.callbacks import BaseCallback, CallbackList, CheckpointCallback, EvalCallback
 from stable_baselines3.common.env_util import make_atari_env
@@ -31,7 +35,8 @@ from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import VecFrameStack, VecTransposeImage
 
 
-gym.register_envs(ale_py)
+if ale_py is not None:
+    gym.register_envs(ale_py)
 
 
 def patch_swanlab_cpu_count() -> None:
@@ -219,6 +224,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--eval-episodes", type=int, default=5)
     parser.add_argument("--checkpoint-freq", type=int, default=250_000)
     parser.add_argument("--progress-bar", action="store_true")
+    parser.add_argument("--smoke", action="store_true",
+                        help="Smoke-test mode: tiny CPU run writing only under runs/")
     parser.add_argument("--no-swanlab", action="store_true")
     parser.add_argument("--swanlab-project", type=str, default="hands-on-modern-rl-dqn")
     parser.add_argument("--swanlab-run-name", type=str, default=None)
@@ -228,6 +235,13 @@ def parse_args() -> argparse.Namespace:
 
 def build_env(args: argparse.Namespace, monitor_dir: Path):
     """Create the Atari environment with SB3's production wrapper stack."""
+    if ale_py is None:
+        raise SystemExit(
+            "ale_py is not installed, so Atari environments are unavailable. "
+            "Install the Atari extras (needs network):\n\n"
+            "  pip install -r code/chapter05_dqn/requirements.txt\n\n"
+            "For a CPU smoke test without Atari, use code/chapter05_dqn/dqn_gym_sb3.py --smoke."
+        )
     wrapper_kwargs = {
         "noop_max": args.noop_max,
         "frame_skip": args.frame_skip,
@@ -261,6 +275,20 @@ def build_env(args: argparse.Namespace, monitor_dir: Path):
 
 def main() -> None:
     args = parse_args()
+    smoke_wiring_only = bool(args.smoke)
+    if args.smoke:
+        args.device = "cpu"
+        args.total_timesteps = 256
+        args.learning_starts = 64
+        args.buffer_size = 1_000
+        args.batch_size = 32
+        args.eval_freq = 0
+        args.checkpoint_freq = 0
+        args.eval_episodes = 1
+        args.no_swanlab = True
+        args.output_dir = Path("runs/smoke_dqn_atari")
+        args.n_envs = 1
+        args.progress_bar = False
     if args.run_name is None:
         env_name = args.env_id.replace("/", "_")
         args.run_name = f"{env_name}_dqn_seed{args.seed}"
@@ -291,9 +319,29 @@ def main() -> None:
             "and ROM license first:\n\n"
             "  pip install -r code/chapter05_dqn/requirements.txt\n\n"
             "If you installed dependencies from inside code/, use:\n\n"
-            "  pip install -r chapter04_dqn/requirements.txt\n\n"
+            "  pip install -r chapter05_dqn/requirements.txt\n\n"
             f"Original Gymnasium error: {exc}"
         ) from exc
+
+    if smoke_wiring_only:
+        # Smoke mode validates env construction + model wiring only: no
+        # gradient training, so it stays well under a minute on CPU.
+        import numpy as np
+
+        obs = train_env.reset()
+        action, _ = DQN(
+            "CnnPolicy", train_env, verbose=0, seed=args.seed, device=args.device
+        ).predict(obs, deterministic=True)
+        for _ in range(4):
+            train_env.step(action)
+        write_summary(
+            run_dir / "summary.json",
+            {"env_id": args.env_id, "smoke": True, "wiring": "ok"},
+        )
+        print("smoke: Atari env + DQN wiring OK")
+        train_env.close()
+        eval_env.close()
+        return
 
     model = DQN(
         "CnnPolicy",

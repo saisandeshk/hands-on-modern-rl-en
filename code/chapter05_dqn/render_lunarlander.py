@@ -12,6 +12,7 @@ def render_episode(model, env_id="LunarLander-v3", max_steps=150, seed=None):
     import gymnasium as gym
 
     env = gym.make(env_id, render_mode="rgb_array")
+    env.action_space.seed(seed if seed is not None else 0)
     state, _ = env.reset(seed=seed)
 
     frames = []
@@ -32,16 +33,52 @@ def render_episode(model, env_id="LunarLander-v3", max_steps=150, seed=None):
     return frames, total_reward
 
 
+def render_smoke_random(args):
+    """Smoke path: no model needed, random actions, writes under runs/."""
+    import gymnasium as gym
+
+    output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    env = gym.make("LunarLander-v3", render_mode="rgb_array")
+    env.action_space.seed(args.seed)
+    state, _ = env.reset(seed=args.seed)
+    frames = []
+    for _ in range(args.max_steps):
+        frames.append(env.render())
+        state, _, terminated, truncated, _ = env.step(env.action_space.sample())
+        if terminated or truncated:
+            break
+    env.close()
+    imageio.mimsave(output_path, frames, duration=1000 / args.fps, loop=0)
+    print(f"Saved smoke render to {output_path} ({len(frames)} frames)")
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, required=True)
+    parser.add_argument("--model", type=str, default=None)
     parser.add_argument("--output", type=str, default="output/lunarlander_play.gif")
     parser.add_argument("--episodes", type=int, default=3)
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--seeds", type=int, nargs="*", default=None)
     parser.add_argument("--max-steps", type=int, default=150)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="cpu")
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: random policy, few steps, writes only under runs/",
+    )
     args = parser.parse_args()
 
+    if args.smoke:
+        args.output = "runs/smoke_render_lunarlander/lunarlander_smoke.gif"
+        args.episodes = 1
+        args.max_steps = 20
+        args.seeds = [args.seed]
+        render_smoke_random(args)
+        return
+
+    if args.model is None:
+        raise SystemExit("--model is required without --smoke")
     model = DQN.load(args.model)
     all_frames = []
 

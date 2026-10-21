@@ -1,4 +1,4 @@
-# Chapter 5: Dependencies for policy gradient and Actor-Critic experiments
+# Chapter 6: Dependencies for policy gradient and Actor-Critic experiments
 gymnasium[classic-control]>=0.29.0
 torch>=2.0.0
 numpy>=1.24.0

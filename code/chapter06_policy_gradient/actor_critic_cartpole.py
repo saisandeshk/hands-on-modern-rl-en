@@ -1,5 +1,5 @@
 """
-Chapter 5: Actor-Critic algorithm -- CartPole-v1
+Chapter 6: Actor-Critic algorithm -- CartPole-v1
 A single-step-update policy gradient method, more efficient than REINFORCE
 
 Problems with REINFORCE:
@@ -21,14 +21,20 @@ Network architecture:
 
 How to run:
     python actor_critic_cartpole.py
+    python actor_critic_cartpole.py --smoke   # fast CPU smoke test writing under runs/
 """
 
+import argparse
 import os
+import random
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import gymnasium as gym
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 # Create output directory
@@ -171,7 +177,28 @@ def compute_actor_critic_losses(
 # ==========================================
 # Part 3: Main training loop
 # ==========================================
-def train():
+def parse_args():
+    parser = argparse.ArgumentParser(description="Actor-Critic on CartPole-v1 (Chapter 6)")
+    parser.add_argument("--seed", type=int, default=0, help="Random seed")
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="cpu")
+    parser.add_argument("--num-episodes", type=int, default=500, help="Training episodes")
+    parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
+    parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
+    parser.add_argument("--hidden-dim", type=int, default=128, help="Hidden layer width")
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: tiny CPU run writing only under runs/",
+    )
+    return parser.parse_args()
+
+
+def resolve_device(choice):
+    if choice == "auto":
+        return "cuda" if torch.cuda.is_available() else "cpu"
+    return choice
+
+
+def train(args=None):
     """
     The full Actor-Critic training pipeline
 
@@ -182,19 +209,32 @@ def train():
     This means Actor-Critic can learn online, without waiting for episodes
     to end, giving it higher data efficiency.
     """
+    if args is None:
+        args = parse_args()
     # ---------- Hyperparameters ----------
-    num_episodes = 500
-    gamma = 0.99
-    learning_rate = 1e-3
-    hidden_dim = 128
+    num_episodes = 5 if args.smoke else args.num_episodes
+    gamma = args.gamma
+    learning_rate = args.lr
+    hidden_dim = args.hidden_dim
+
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    device = resolve_device(args.device)
+    if args.smoke:
+        device = "cpu"
+    out_dir = os.path.join("runs", "smoke_actor_critic") if args.smoke else "output"
+    os.makedirs(out_dir, exist_ok=True)
 
     # ---------- Initialization ----------
     env = gym.make("CartPole-v1")
+    env.reset(seed=args.seed)
+    env.action_space.seed(args.seed)
     model = ActorCritic(
         state_dim=env.observation_space.shape[0],
         action_dim=env.action_space.n,
         hidden_dim=hidden_dim,
-    )
+    ).to(device)
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     # Record training data
@@ -213,7 +253,7 @@ def train():
     print("=" * 60)
 
     for episode in range(num_episodes):
-        state, _ = env.reset()
+        state, _ = env.reset(seed=args.seed + episode)
         episode_reward = 0
         total_actor_loss = 0
         total_critic_loss = 0
@@ -224,7 +264,7 @@ def train():
 
         while not (done or truncated):
             # ========== Step 1: observe the current state ==========
-            state_tensor = torch.FloatTensor(state).unsqueeze(0)
+            state_tensor = torch.as_tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
 
             # Forward pass: get both the action probabilities and the state value
             probs, value = model(state_tensor)
@@ -244,7 +284,7 @@ def train():
             steps += 1
 
             # ========== Step 4: compute the value of the next state ==========
-            next_state_tensor = torch.FloatTensor(next_state).unsqueeze(0)
+            next_state_tensor = torch.as_tensor(next_state, dtype=torch.float32, device=device).unsqueeze(0)
             with torch.no_grad():
                 _, next_value = model(next_state_tensor)
                 next_value = next_value.squeeze()
@@ -307,7 +347,7 @@ def train():
     compare_with_reinforce(episode_rewards)
 
     # ---------- Plot the training curve ----------
-    plot_training_curve(episode_rewards)
+    plot_training_curve(episode_rewards, out_dir)
 
 
 # ==========================================
@@ -352,7 +392,7 @@ def compare_with_reinforce(actor_critic_rewards):
 # ==========================================
 # Part 5: Plot the training curve
 # ==========================================
-def plot_training_curve(episode_rewards):
+def plot_training_curve(episode_rewards, out_dir="output"):
     """
     Plot the Actor-Critic training reward curve
 
@@ -381,9 +421,11 @@ def plot_training_curve(episode_rewards):
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig('output/actor_critic_cartpole_rewards.png', dpi=150, bbox_inches='tight')
-    print("  Training curve saved to output/actor_critic_cartpole_rewards.png")
-    plt.show()
+    os.makedirs(out_dir, exist_ok=True)
+    curve_path = os.path.join(out_dir, 'actor_critic_cartpole_rewards.png')
+    plt.savefig(curve_path, dpi=150, bbox_inches='tight')
+    print(f"  Training curve saved to {curve_path}")
+    plt.close()
 
 
 # ==========================================

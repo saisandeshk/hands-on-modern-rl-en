@@ -33,33 +33,56 @@ def parse_args():
         default=os.path.join(here, "output", "cartpole_frames_seed42.png"),
     )
     parser.add_argument("--seed", type=int, default=10042)
+    parser.add_argument(
+        "--device", choices=["auto", "cpu", "cuda"], default="cpu",
+        help="Torch device for policy evaluation",
+    )
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: random policy, few steps, writes only under runs/",
+    )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
+    if args.smoke:
+        args.output = "runs/smoke_capture_frames/cartpole_frames_smoke.png"
+        args.device = "cpu"
     here = os.path.dirname(os.path.abspath(__file__))
-    actor_critic = load_actor_critic(os.path.join(here, "2-pytorch_ppo.py"))
-    model = actor_critic()
-    model.load_state_dict(torch.load(args.model, map_location="cpu", weights_only=True))
-    model.eval()
+    use_model = os.path.exists(args.model) and not args.smoke
+    actor_critic = None
+    model = None
+    if use_model:
+        actor_critic = load_actor_critic(os.path.join(here, "2-pytorch_ppo.py"))
+        model = actor_critic()
+        model.load_state_dict(torch.load(args.model, map_location="cpu", weights_only=True))
+        model.eval()
 
     env = gym.make("CartPole-v1", render_mode="rgb_array")
+    env.action_space.seed(args.seed)
     obs, _ = env.reset(seed=args.seed)
     frames = []
     score = 0
     terminated = truncated = False
+    max_steps = 50 if args.smoke else None
 
     while not (terminated or truncated):
         if score in {0, 125, 250, 375}:
             frames.append((score, env.render(), np.array(obs, copy=True)))
-        with torch.no_grad():
-            action, _, _ = model.get_action(
-                torch.as_tensor(obs, dtype=torch.float32),
-                deterministic=True,
-            )
-        obs, reward, terminated, truncated, _ = env.step(action.item())
+        if use_model:
+            with torch.no_grad():
+                action, _, _ = model.get_action(
+                    torch.as_tensor(obs, dtype=torch.float32),
+                    deterministic=True,
+                )
+            action = action.item()
+        else:
+            action = env.action_space.sample()
+        obs, reward, terminated, truncated, _ = env.step(action)
         score += int(reward)
+        if max_steps is not None and score >= max_steps:
+            break
 
     frames.append((score, env.render(), np.array(obs, copy=True)))
     env.close()

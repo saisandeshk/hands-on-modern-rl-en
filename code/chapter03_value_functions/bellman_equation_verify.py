@@ -10,14 +10,35 @@ This experiment demonstrates:
 
 How to run:
     python bellman_equation_verify.py
+    python bellman_equation_verify.py --smoke   # fast smoke test writing under runs/
 """
 
+import argparse
 import os
 import numpy as np
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 # Create output directory
 os.makedirs("output", exist_ok=True)
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Numerically verify the Bellman equations")
+    parser.add_argument("--seed", type=int, default=0, help="Random seed (unused, kept for CLI consistency)")
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="cpu")
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: verify equations, write figure under runs/",
+    )
+    parser.add_argument(
+        "--output",
+        default="output/bellman_equation_verify_results.png",
+        help="Where to save the convergence figure",
+    )
+    return parser.parse_args()
 
 
 # ==========================================
@@ -267,7 +288,7 @@ def extract_optimal_policy(V):
 # ==========================================
 # Part 5: Comparing results and visualization
 # ==========================================
-def verify_results():
+def verify_results(output_path="output/bellman_equation_verify_results.png"):
     """Verify the consistency between manual computation and iterative computation"""
 
     # Uniform random policy
@@ -345,10 +366,11 @@ def verify_results():
     # ------------------------------------------
     # Visualization: value iteration convergence process
     # ------------------------------------------
-    visualize_convergence(iter_history, vi_history)
+    visualize_convergence(iter_history, vi_history, output_path)
 
 
-def visualize_convergence(expectation_history, optimal_history):
+def visualize_convergence(expectation_history, optimal_history,
+                            output_path="output/bellman_equation_verify_results.png"):
     """
     Visualize the convergence process of value iteration
 
@@ -401,9 +423,12 @@ def visualize_convergence(expectation_history, optimal_history):
     ax2.set_xlim(0, n_show2)
 
     plt.tight_layout()
-    plt.savefig('output/bellman_equation_verify_results.png', dpi=150, bbox_inches='tight')
-    print("\nFigure saved to output/bellman_equation_verify_results.png")
-    plt.show()
+    directory = os.path.dirname(output_path)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    print(f"\nFigure saved to {output_path}")
+    plt.close()
 
 
 # ==========================================
@@ -477,14 +502,22 @@ def print_value_iteration_steps(n_steps=10):
 # ==========================================
 # Main program
 # ==========================================
-def main():
+def main(args=None):
     """Main function: run all verification experiments"""
+    if args is None:
+        args = parse_args()
+    output_path = "runs/smoke_bellman/output.png" if args.smoke else args.output
 
     # 1. Verify the consistency between manual computation and iterative computation
-    verify_results()
+    verify_results(output_path=output_path)
 
     # 2. Show the step-by-step convergence of value iteration
     print_value_iteration_steps(n_steps=20)
+
+    # Hard assertions so `pytest` and `--smoke` both catch regressions.
+    manual_v = manual_bellman_expectation()
+    iter_v, _ = policy_evaluation(np.ones((N_STATES, N_ACTIONS)) / N_ACTIONS)
+    assert np.allclose(manual_v, iter_v, atol=1e-6), "Bellman expectation mismatch"
 
 
 if __name__ == "__main__":

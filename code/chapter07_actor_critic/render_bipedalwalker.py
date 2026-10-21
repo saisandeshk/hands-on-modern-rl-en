@@ -1,8 +1,9 @@
 """
-Chapter 6: Render a trained A2C agent's replay on BipedalWalker-v3
+Chapter 7: Render a trained A2C agent's replay on BipedalWalker-v3
 
 Usage:
     python render_bipedalwalker.py --model output/actor_critic_bipedalwalker.zip
+    python render_bipedalwalker.py --smoke   # random-action smoke render writing under runs/
 """
 
 import argparse
@@ -42,7 +43,7 @@ def downsample_frames(frames, max_frames):
 
 def main():
     parser = argparse.ArgumentParser(description="Render an A2C BipedalWalker replay")
-    parser.add_argument("--model", type=str, required=True, help="Path to the trained A2C model")
+    parser.add_argument("--model", type=str, default=None, help="Path to the trained A2C model")
     parser.add_argument("--output-dir", type=str, default="output/bipedalwalker_a2c_episodes",
                         help="GIF output directory")
     parser.add_argument("--episodes", type=int, default=3, help="Number of episodes to render")
@@ -53,8 +54,37 @@ def main():
                         help="Maximum number of steps per episode")
     parser.add_argument("--max-frames", type=int, default=200,
                         help="Maximum number of GIF frames (uniformly downsampled if exceeded)")
+    parser.add_argument("--seed", type=int, default=0, help="Default seed")
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="cpu")
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: random actions, few frames, writes only under runs/",
+    )
     args = parser.parse_args()
 
+    if args.smoke:
+        import gymnasium as gym
+
+        args.output_dir = "runs/smoke_render_bipedalwalker_a2c"
+        out_dir = Path(args.output_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        env = gym.make("BipedalWalker-v3", render_mode="rgb_array")
+        env.action_space.seed(args.seed)
+        env.reset(seed=args.seed)
+        frames = [env.render()]
+        for _ in range(9):
+            _, _, terminated, truncated, _ = env.step(env.action_space.sample())
+            frames.append(env.render())
+            if terminated or truncated:
+                break
+        env.close()
+        imageio.mimsave(out_dir / "bipedalwalker_a2c_ep1.gif", frames,
+                        duration=1000 / args.fps, loop=0)
+        print(f"Saved smoke render to {out_dir} ({len(frames)} frames)")
+        return
+
+    if args.model is None:
+        raise SystemExit("--model is required without --smoke")
     print(f"Loading model: {args.model}")
     model = A2C.load(args.model)
 

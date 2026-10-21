@@ -1,4 +1,4 @@
-"""Export Chapter 4 DQN evaluation curves for the VitePress docs.
+"""Export Chapter 5 DQN evaluation curves for the VitePress docs.
 
 The training scripts write `eval/eval_metrics.csv` and `summary.json` under
 their run directories. This helper turns those CSV files into stable image
@@ -66,18 +66,46 @@ def export_curve(csv_path: Path, output_path: Path, title: str, color: str, fill
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Export Chapter 4 DQN evaluation curves.")
+    parser = argparse.ArgumentParser(description="Export Chapter 5 DQN evaluation curves.")
     parser.add_argument(
         "--run",
         choices=["all", *DEFAULT_RUNS.keys()],
         default="all",
         help="Which default run to export.",
     )
+    parser.add_argument("--seed", type=int, default=0, help="Random seed (unused, kept for CLI consistency)")
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="cpu")
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: export a tiny synthetic curve under runs/",
+    )
+    parser.add_argument("--csv", type=Path, default=None, help="Override the input CSV")
+    parser.add_argument("--output", type=Path, default=None, help="Override the output image")
     return parser.parse_args()
+
+
+def write_tiny_csv(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["timesteps", "mean_reward", "std_reward", "mean_ep_length", "std_ep_length"])
+        for step in (100, 200):
+            writer.writerow([step, 20.0 + step / 100.0, 1.0, 100.0, 5.0])
 
 
 def main() -> None:
     args = parse_args()
+    if args.smoke:
+        tiny_csv = Path("runs/smoke_export_dqn/eval_metrics.csv")
+        write_tiny_csv(tiny_csv)
+        export_curve(tiny_csv, Path("runs/smoke_export_dqn/eval_curve.png"),
+                     "smoke DQN evaluation", "#2563EB", "#93C5FD")
+        return
+    if args.csv is not None or args.output is not None:
+        if args.csv is None or args.output is None:
+            raise SystemExit("--csv and --output must be given together")
+        export_curve(args.csv, args.output, "DQN evaluation", "#2563EB", "#93C5FD")
+        return
     items = DEFAULT_RUNS.items() if args.run == "all" else [(args.run, DEFAULT_RUNS[args.run])]
     for _, cfg in items:
         export_curve(cfg["csv"], cfg["output"], cfg["title"], cfg["color"], cfg["fill"])

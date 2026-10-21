@@ -1,5 +1,5 @@
 """
-Chapter 4: Deep Q-Network (DQN) -- implemented from scratch
+Chapter 5: Deep Q-Network (DQN) -- implemented from scratch
 Trains a complete DQN agent on the CartPole-v1 environment
 
 Core idea:
@@ -19,8 +19,10 @@ Key components:
 
 How to run:
     python dqn_cartpole.py
+    python dqn_cartpole.py --smoke   # fast CPU smoke test writing under runs/
 """
 
+import argparse
 import os
 import random
 import collections
@@ -29,6 +31,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import gymnasium as gym
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 # Create output directory
@@ -120,15 +125,16 @@ class DQNAgent:
     3. Epsilon-Greedy: balances exploration and exploitation
     """
 
-    def __init__(self, state_dim, action_dim, lr=1e-3, gamma=0.99):
+    def __init__(self, state_dim, action_dim, lr=1e-3, gamma=0.99, device="cpu"):
         self.action_dim = action_dim
         self.gamma = gamma  # Discount factor: decay rate for future rewards
+        self.device = torch.device(device)
 
         # Q network: the main network, updated in real time
-        self.q_net = QNetwork(state_dim, action_dim)
+        self.q_net = QNetwork(state_dim, action_dim).to(self.device)
         # Target network: periodically copies weights from the Q network,
         # used to compute stable target values
-        self.target_net = QNetwork(state_dim, action_dim)
+        self.target_net = QNetwork(state_dim, action_dim).to(self.device)
         # Sync the target network with the Q network at initialization
         self.target_net.load_state_dict(self.q_net.state_dict())
         # The target network doesn't need gradients
@@ -153,7 +159,7 @@ class DQNAgent:
             return random.randint(0, self.action_dim - 1)
         else:
             # Exploit: pick the action with the highest Q value
-            state_tensor = torch.FloatTensor(state).unsqueeze(0)  # Add batch dimension
+            state_tensor = torch.as_tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)  # Add batch dimension
             with torch.no_grad():
                 q_values = self.q_net(state_tensor)
             return q_values.argmax(dim=1).item()
@@ -177,11 +183,11 @@ class DQNAgent:
         states, actions, rewards, next_states, dones = self.buffer.sample(batch_size)
 
         # Convert to PyTorch tensors
-        states = torch.FloatTensor(states)
-        actions = torch.LongTensor(actions)
-        rewards = torch.FloatTensor(rewards)
-        next_states = torch.FloatTensor(next_states)
-        dones = torch.FloatTensor(dones)
+        states = torch.as_tensor(states, dtype=torch.float32, device=self.device)
+        actions = torch.as_tensor(actions, dtype=torch.int64, device=self.device)
+        rewards = torch.as_tensor(rewards, dtype=torch.float32, device=self.device)
+        next_states = torch.as_tensor(next_states, dtype=torch.float32, device=self.device)
+        dones = torch.as_tensor(dones, dtype=torch.float32, device=self.device)
 
         # Compute Q(s, a): the current network's estimate
         # gather selects the Q value corresponding to each action
@@ -219,22 +225,53 @@ class DQNAgent:
 # ==========================================
 # Part 4: Training loop
 # ==========================================
-def train():
-    """The full DQN training pipeline"""
+def parse_args():
+    parser = argparse.ArgumentParser(description="From-scratch DQN on CartPole-v1 (Chapter 5)")
+    parser.add_argument("--seed", type=int, default=0, help="Random seed")
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="cpu")
+    parser.add_argument("--num-episodes", type=int, default=500, help="Number of training episodes")
+    parser.add_argument("--batch-size", type=int, default=64, help="Batch size per update")
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: tiny CPU run writing only under runs/",
+    )
+    return parser.parse_args()
 
+
+def resolve_device(choice):
+    if choice == "auto":
+        return "cuda" if torch.cuda.is_available() else "cpu"
+    return choice
+
+
+def train(args=None):
+    """The full DQN training pipeline"""
+    if args is None:
+        args = parse_args()
     # Hyperparameter settings
-    NUM_EPISODES = 500       # Number of training episodes
-    BATCH_SIZE = 64          # Batch size per update
+    NUM_EPISODES = 5 if args.smoke else args.num_episodes  # Number of training episodes
+    BATCH_SIZE = 32 if args.smoke else args.batch_size     # Batch size per update
     EPSILON_START = 1.0      # Initial exploration rate
     EPSILON_END = 0.01       # Final exploration rate
     EPSILON_DECAY = 0.995    # Exploration rate decay coefficient
     TARGET_UPDATE_FREQ = 10  # Target network update frequency (every N episodes)
 
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    device = resolve_device(args.device)
+    if args.smoke:
+        device = "cpu"
+    out_dir = os.path.join("runs", "smoke_dqn_cartpole") if args.smoke else "output"
+    os.makedirs(out_dir, exist_ok=True)
+
     # Create the environment and the agent
     env = gym.make("CartPole-v1")
+    env.reset(seed=args.seed)
+    env.action_space.seed(args.seed)
     state_dim = env.observation_space.shape[0]   # 4
     action_dim = env.action_space.n               # 2
-    agent = DQNAgent(state_dim, action_dim, lr=1e-3, gamma=0.99)
+    agent = DQNAgent(state_dim, action_dim, lr=1e-3, gamma=0.99, device=device)
 
     print("=" * 60)
     print("  Deep Q-Network (DQN) -- CartPole-v1 training")
@@ -252,7 +289,7 @@ def train():
     epsilon = EPSILON_START
 
     for episode in range(NUM_EPISODES):
-        state, _ = env.reset()
+        state, _ = env.reset(seed=args.seed + episode)
         episode_reward = 0
 
         while True:
@@ -261,6 +298,8 @@ def train():
             # Execute the action
             next_state, reward, done, truncated, _ = env.step(action)
             # Store into experience replay
+            # `done` is the terminated flag only: on time-limit truncation we
+            # keep bootstrapping from V(s'), which matches the target formula.
             agent.buffer.push(state, action, reward, next_state, float(done))
             # Update the Q network
             agent.update(BATCH_SIZE)
@@ -316,9 +355,10 @@ def train():
     ax.legend()
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig("output/dqn_cartpole_training.png", dpi=150)
-    print("\nTraining curve saved to output/dqn_cartpole_training.png")
-    plt.show()
+    curve_path = os.path.join(out_dir, "dqn_cartpole_training.png")
+    plt.savefig(curve_path, dpi=150)
+    print(f"\nTraining curve saved to {curve_path}")
+    plt.close()
 
     # ==========================================
     # Part 6: Test the trained agent
@@ -330,8 +370,9 @@ def train():
     test_env = gym.make("CartPole-v1")
     test_rewards = []
 
-    for ep in range(10):
-        state, _ = test_env.reset()
+    n_test = 2 if args.smoke else 10
+    for ep in range(n_test):
+        state, _ = test_env.reset(seed=args.seed + 10_000 + ep)
         total_reward = 0
 
         while True:
@@ -353,7 +394,7 @@ def train():
     test_env.close()
 
     # Save the model
-    agent.save("output/dqn_cartpole.pth")
+    agent.save(os.path.join(out_dir, "dqn_cartpole.pth"))
 
     return reward_history
 

@@ -1,4 +1,4 @@
-# Chapter 7: dependencies for PPO stable training experiments
+# Chapter 8: dependencies for PPO stable training experiments
 gymnasium[classic-control,box2d]>=0.29.0
 stable-baselines3>=2.0.0
 torch>=2.0.0

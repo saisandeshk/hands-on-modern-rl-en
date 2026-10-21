@@ -22,8 +22,10 @@ This script includes three scenarios:
 
 How to run:
     python debug_reward_hacking.py
+    python debug_reward_hacking.py --smoke   # fast CPU smoke test writing under runs/
 """
 
+import argparse
 import os
 import random
 import collections
@@ -32,6 +34,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import gymnasium as gym
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 # Create the output directory
@@ -105,12 +110,13 @@ class DQNAgent:
     environment wrapper instead.
     """
 
-    def __init__(self, state_dim, action_dim, lr=1e-3, gamma=0.99):
+    def __init__(self, state_dim, action_dim, lr=1e-3, gamma=0.99, device="cpu"):
         self.action_dim = action_dim
         self.gamma = gamma
+        self.device = torch.device(device)
 
-        self.q_net = QNetwork(state_dim, action_dim)
-        self.target_net = QNetwork(state_dim, action_dim)
+        self.q_net = QNetwork(state_dim, action_dim).to(self.device)
+        self.target_net = QNetwork(state_dim, action_dim).to(self.device)
         self.target_net.load_state_dict(self.q_net.state_dict())
         self.target_net.eval()
 
@@ -122,7 +128,7 @@ class DQNAgent:
         if random.random() < epsilon:
             return random.randint(0, self.action_dim - 1)
         else:
-            state_tensor = torch.FloatTensor(state).unsqueeze(0)
+            state_tensor = torch.as_tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
             with torch.no_grad():
                 q_values = self.q_net(state_tensor)
             return q_values.argmax(dim=1).item()
@@ -134,11 +140,11 @@ class DQNAgent:
 
         states, actions, rewards, next_states, dones = self.buffer.sample(batch_size)
 
-        states = torch.FloatTensor(states)
-        actions = torch.LongTensor(actions)
-        rewards = torch.FloatTensor(rewards)
-        next_states = torch.FloatTensor(next_states)
-        dones = torch.FloatTensor(dones)
+        states = torch.as_tensor(states, dtype=torch.float32, device=self.device)
+        actions = torch.as_tensor(actions, dtype=torch.int64, device=self.device)
+        rewards = torch.as_tensor(rewards, dtype=torch.float32, device=self.device)
+        next_states = torch.as_tensor(next_states, dtype=torch.float32, device=self.device)
+        dones = torch.as_tensor(dones, dtype=torch.float32, device=self.device)
 
         q_values = self.q_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)
 
@@ -248,7 +254,27 @@ class BadShapingWrapper(gym.Wrapper):
 # ==========================================
 # Part 3: Unified training function
 # ==========================================
-def train_agent(env, label, num_episodes=300, batch_size=64):
+def parse_args():
+    parser = argparse.ArgumentParser(description="Reward hacking diagnosis (Appendix A)")
+    parser.add_argument("--seed", type=int, default=0, help="Random seed")
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="cpu")
+    parser.add_argument("--num-episodes", type=int, default=300, help="Episodes per scenario")
+    parser.add_argument("--batch-size", type=int, default=64, help="Batch size")
+    parser.add_argument("--output-dir", type=str, default="output", help="Directory for figures")
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: tiny CPU run writing only under runs/",
+    )
+    return parser.parse_args()
+
+
+def resolve_device(choice):
+    if choice == "auto":
+        return "cuda" if torch.cuda.is_available() else "cpu"
+    return choice
+
+
+def train_agent(env, label, num_episodes=300, batch_size=64, seed=0, device="cpu"):
     """
     Train a DQN agent in the given environment, returning the training curves
     and task metrics
@@ -266,7 +292,11 @@ def train_agent(env, label, num_episodes=300, batch_size=64):
     """
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
-    agent = DQNAgent(state_dim, action_dim, lr=1e-3, gamma=0.99)
+    agent = DQNAgent(state_dim, action_dim, lr=1e-3, gamma=0.99, device=device)
+
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
 
     EPSILON_START = 1.0
     EPSILON_END = 0.01
@@ -279,7 +309,7 @@ def train_agent(env, label, num_episodes=300, batch_size=64):
     loss_history = []
 
     for episode in range(num_episodes):
-        state, _ = env.reset()
+        state, _ = env.reset(seed=seed + episode)
         episode_reward = 0.0
         episode_task_score = 0.0  # Tracks only the original CartPole reward
         episode_loss = 0.0
@@ -292,7 +322,10 @@ def train_agent(env, label, num_episodes=300, batch_size=64):
             next_state, reward, done, truncated, _ = env.step(action)
 
             # Also compute the true task score (excluding the hacked bonus)
-            # The original CartPole reward is 1.0 per step
+            # The original CartPole reward is 1.0 per step. On time-limit
+            # truncation the episode still ended, but the modified reward
+            # below keeps the bootstrap convention of the DQN update (which
+            # masks only on true termination).
             original_reward = 1.0
 
             agent.buffer.push(state, action, reward, next_state, float(done))
@@ -407,7 +440,7 @@ def diagnose_reward_hacking(reward_history, task_score_history, label):
 # ==========================================
 # Part 5: Main experiment flow
 # ==========================================
-def run_all_experiments():
+def run_all_experiments(num_episodes=300, batch_size=64, seed=0, device="cpu"):
     """
     Run the comparison experiment across all three scenarios
 
@@ -416,12 +449,10 @@ def run_all_experiments():
     Scenario 3: Correct design (original CartPole reward)
     """
 
-    NUM_EPISODES = 300  # Train each scenario for 300 episodes
-
     print("=" * 60)
     print("  Appendix A: Reward Hacking experiments")
     print("=" * 60)
-    print(f"  Each scenario trains for {NUM_EPISODES} episodes")
+    print(f"  Each scenario trains for {num_episodes} episodes")
     print(f"  Hacking is diagnosed by comparing the 'modified reward' against the 'true task score'")
     print("=" * 60)
 
@@ -437,7 +468,8 @@ def run_all_experiments():
         survival_bonus=2.0,  # Extra survival bonus
     )
     hacked_rewards, hacked_task_scores, hacked_losses = train_agent(
-        hacked_env, "Hacked reward", num_episodes=NUM_EPISODES
+        hacked_env, "Hacked reward", num_episodes=num_episodes, batch_size=batch_size,
+        seed=seed, device=device,
     )
     diagnose_reward_hacking(hacked_rewards, hacked_task_scores, "Scenario 1 - Passive survival hacking")
 
@@ -453,7 +485,8 @@ def run_all_experiments():
         position_reward_weight=5.0,  # Position reward weight too large
     )
     shaping_rewards, shaping_task_scores, shaping_losses = train_agent(
-        bad_shaping_env, "Bad shaping", num_episodes=NUM_EPISODES
+        bad_shaping_env, "Bad shaping", num_episodes=num_episodes, batch_size=batch_size,
+        seed=seed + 1, device=device,
     )
     diagnose_reward_hacking(shaping_rewards, shaping_task_scores, "Scenario 2 - Bad shaping")
 
@@ -466,7 +499,8 @@ def run_all_experiments():
 
     correct_env = gym.make("CartPole-v1")
     correct_rewards, correct_task_scores, correct_losses = train_agent(
-        correct_env, "Correct reward", num_episodes=NUM_EPISODES
+        correct_env, "Correct reward", num_episodes=num_episodes, batch_size=batch_size,
+        seed=seed + 2, device=device,
     )
     diagnose_reward_hacking(correct_rewards, correct_task_scores, "Scenario 3 - Correct design")
 
@@ -480,7 +514,7 @@ def run_all_experiments():
 # ==========================================
 def plot_comparison(hacked_rewards, hacked_task_scores,
                     shaping_rewards, shaping_task_scores,
-                    correct_rewards, correct_task_scores):
+                    correct_rewards, correct_task_scores, out_dir="output"):
     """
     Plot the comparison across the three scenarios
 
@@ -535,9 +569,11 @@ def plot_comparison(hacked_rewards, hacked_task_scores,
         ax_bot.legend(fontsize=9)
 
     plt.tight_layout()
-    plt.savefig("output/reward_hacking_diagnosis.png", dpi=150, bbox_inches='tight')
-    print("\nDiagnostic plot saved to output/reward_hacking_diagnosis.png")
-    plt.show()
+    os.makedirs(out_dir, exist_ok=True)
+    diag_path = os.path.join(out_dir, "reward_hacking_diagnosis.png")
+    plt.savefig(diag_path, dpi=150, bbox_inches='tight')
+    print(f"\nDiagnostic plot saved to {diag_path}")
+    plt.close()
 
 
 # ==========================================
@@ -612,9 +648,20 @@ def print_reward_design_principles():
 # ==========================================
 # Program entry point
 # ==========================================
-if __name__ == "__main__":
+def main(args=None):
+    if args is None:
+        args = parse_args()
+    device = resolve_device(args.device)
+    if args.smoke:
+        device = "cpu"
+        args.num_episodes = 4
+        args.batch_size = 32
+    out_dir = os.path.join("runs", "smoke_debug_reward_hacking") if args.smoke else args.output_dir
+    os.makedirs(out_dir, exist_ok=True)
+
     # Run all experiments
-    results = run_all_experiments()
+    results = run_all_experiments(num_episodes=args.num_episodes, batch_size=args.batch_size,
+                                  seed=args.seed, device=device)
 
     # Unpack the results
     (hacked_rewards, hacked_task_scores,
@@ -626,7 +673,12 @@ if __name__ == "__main__":
         hacked_rewards, hacked_task_scores,
         shaping_rewards, shaping_task_scores,
         correct_rewards, correct_task_scores,
+        out_dir=out_dir,
     )
 
     # Print the reward design principles
     print_reward_design_principles()
+
+
+if __name__ == "__main__":
+    main()
