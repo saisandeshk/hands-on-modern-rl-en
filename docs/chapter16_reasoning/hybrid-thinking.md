@@ -167,6 +167,24 @@ The first three methods all start from "already having a long model that can sol
 
 **Model weight merging** directly averages the weights of a long-CoT model and a short-CoT model. It does not generate new compressed text, and it does not guarantee that each ability of the merged model lies between those of the two, so a full evaluation is required after use.
 
+### Distillation Vocabulary: Teacher, Student, and On-Policy Data
+
+Whenever compressed or filtered traces come from a stronger model rather than from the model being trained, the same procedure is called **distillation**, and three terms fix the vocabulary:
+
+- **Teacher**: the strong model that generates reasoning traces (for example a large reasoning model). **Student**: the smaller model trained to imitate them (for example a 32B distilled model such as the R1-Distill family mentioned in Section 16.6).
+- **Off-policy distillation**: the student trains on traces the teacher generated once, independently of what the student itself would output. Shortest rejection sampling above is off-policy in this sense: the data is fixed before student training starts.
+- **On-policy (rollout) distillation**: the student first generates its own attempts (**rollouts**); only the rollouts that pass the verifier are kept for training. Because the kept data stays close to the student's own output distribution, the student meets less unfamiliar text at deployment than with purely teacher-generated data.
+
+The standard training loss is sequence-level cross-entropy against the kept traces:
+
+$$
+\mathcal{L}_{\text{distill}}(\theta)=-\mathbb{E}_{(x,y)\sim\mathcal{D}_{\text{kept}}}\sum_{t=1}^{|y|}\log\pi_\theta(y_t\mid x,y_{<t}),
+$$
+
+where $\mathcal{D}_{\text{kept}}$ is the filtered set of correct (and possibly short) traces. In words: for each kept trace, maximize the student's likelihood of reproducing it token by token.
+
+A tiny example shows why the "kept" filter matters. Suppose the teacher solves 100 problems and the student trains on all 100 traces, of which 30 end in a wrong answer. The student then imitates wrong reasoning on 30% of its training data. Keeping only the 70 verified traces (rejection fine-tuning) removes that failure mode before training starts — which is why rejection sampling and distillation are usually combined rather than used alone.
+
 ### Compressing with Reinforcement Learning
 
 The finest-grained method is long2short RL: continue training from a model that has already reached a good balance between accuracy and length, shortening the permitted rollout length cap while adding a length term to the reward.

@@ -41,11 +41,13 @@ This is why [Section 16.1](./emergence-and-o1) distinguishes "RL creates ability
 
 For math problems, the final answer can be extracted and compared with the reference answer; for code problems, unit tests can be run; for logic problems, rules can check the answer format. The verifier $v(x,y)$ must satisfy this: if the answer is correct, it almost surely judges it correct; if the answer is wrong, it almost surely judges it wrong. When the verifier itself has loopholes, the model may learn to "fool the verifier" instead of truly solving problems.
 
+Two engineering practices keep the verifier honest. First, **hold out hidden tests**: grade training rollouts on one set of tests and evaluate on a disjoint, undisclosed set, so memorizing or gaming the visible tests earns no reward. Second, **isolate execution**: run generated code in a sandbox with fixed time, memory, and network limits, so a rollout cannot alter its own grading environment. (The sandbox tooling is developed with the [code-generation setup in Chapter 15](../chapter15_grpo/verl-code-sandbox); [Chapter 19](../chapter19_agentic/overview) extends the same idea to tool-calling agents.)
+
 ### A Sampled Group Needs Both Right and Wrong Answers
 
 This is the most critical precondition for GRPO. If we sample $G$ times on a problem and the results are all right or all wrong, that problem provides no learning signal in this round, the within-group advantages are all near zero, and the parameters are not updated.
 
-Take the quadratic equation example of Section 16.1: of 100 samples from the base model, 6 are correct and 94 are wrong, so with $G=8$ the probability that a group contains both right and wrong answers is very high. It is exactly these groups containing both positive and negative samples that drive the policy update.
+Take the quadratic equation example of Section 16.1: of 100 samples from the base model, 6 are correct and 94 are wrong, so with $G=8$ about $1-0.94^8\approx39\%$ of groups contain both right and wrong answers — enough to supply a steady learning signal. It is exactly these groups containing both positive and negative samples that drive the policy update.
 
 ### The Correctness Reward
 
@@ -154,7 +156,7 @@ print("Example 2 (three right, one wrong):", grpo_advantage([1, 1, 1, 0]))
 print("Example 3 (all right):", grpo_advantage([1, 1, 1, 1]))
 ```
 
-:::output Output
+:::output
 Example 1 (two right, two wrong): [ 1. 1. -1. -1.]
 Example 2 (three right, one wrong): [ 0.57735 0.57735 0.57735 -1.73205]
 Example 3 (all right): [0. 0. 0. 0.]
