@@ -795,6 +795,10 @@ const sidebar = {
             {
               text: '5.5 Hands-on: Visual Game Projects',
               link: '/chapter05_dqn/visual-game-projects'
+            },
+            {
+              text: '5.6 Summary and Exercises',
+              link: '/chapter05_dqn/review'
             }
           ]
         },

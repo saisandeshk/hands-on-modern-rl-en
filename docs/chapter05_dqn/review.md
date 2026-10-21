@@ -1,8 +1,8 @@
 ---
-title: 5.R Summary and Exercises
+title: 5.6 Summary and Exercises
 ---
 
-# 5.R Summary and Exercises
+# 5.6 Summary and Exercises
 
 This chapter turned tabular Q-Learning into a deep reinforcement learning algorithm that works on continuous states and pixel input. The core substitution is one line — a neural network $Q(s,a;\theta)$ replaces the Q table — and everything else in the chapter exists to make that substitution train stably: experience replay breaks sample correlation, and a target network freezes the moving TD target. LunarLander showed the full loop on a low-dimensional control task, and the DQN family (Double, Dueling, prioritized replay, multi-step, distributional, Noisy Nets, Rainbow) showed how each structural weakness of the original DQN gets its own fix. The visual-games project then moved the same algorithm to pixels, where the TD target stays the same but state representation and training conditions become the hard part.
 
