@@ -109,7 +109,7 @@ Results from a single 3M-timestep training run are shown below. A2C's training c
 ![A2C BipedalWalker-v3 episode reward curve](./images/actor_critic_bipedalwalker_reward.png)
 
 <div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 6.6-1: Episode reward curve. Light blue = raw returns; dark blue = 50-episode moving average. The dashed green line marks the solved threshold (300 points).</em>
+  <em>Figure 7.6-1: Episode reward curve. Light blue = raw returns; dark blue = 50-episode moving average. The dashed green line marks the solved threshold (300 points).</em>
 </div>
 
 The curve breaks down into three phases:
@@ -125,7 +125,7 @@ Compared to the Pendulum reward curve from the previous section, BipedalWalker's
 ![A2C BipedalWalker-v3 policy entropy loss curve](./images/actor_critic_bipedalwalker_entropy.png)
 
 <div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 6.6-2: Policy entropy loss (negative entropy). The curve rises slowly from -5.37 to -4.38, corresponding to actual entropy decreasing from 5.37 to 4.38.</em>
+  <em>Figure 7.6-2: Policy entropy loss (negative entropy). The curve rises slowly from -5.37 to -4.38, corresponding to actual entropy decreasing from 5.37 to 4.38.</em>
 </div>
 
 Policy entropy drops from 5.37 to 4.38 — a much smaller decrease than on Pendulum. This indicates that on BipedalWalker, A2C's policy converges more slowly; coordinating four joints requires more exploration before effective patterns emerge.
@@ -137,7 +137,7 @@ Note that the entropy curve is more jagged than Pendulum's. Because A2C updates 
 ![A2C BipedalWalker-v3 Actor/Critic loss curves](./images/actor_critic_bipedalwalker_loss.png)
 
 <div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 6.6-3: Policy loss and Value loss. Note the Y-axis scale — loss spikes correspond to sudden policy changes.</em>
+  <em>Figure 7.6-3: Policy loss and Value loss. Note the Y-axis scale — loss spikes correspond to sudden policy changes.</em>
 </div>
 
 A key feature of the loss curves is **periodic sharp spikes**. Value loss (red) periodically surges to 100–200, meaning the Critic's estimates suddenly become very inaccurate. This typically occurs after a large policy update — the new policy generates trajectory data that differs completely from what the Critic was trained on, and the Critic has not yet adapted.

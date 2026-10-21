@@ -25,16 +25,14 @@ This chapter is a synthesis of everything we have built so far. The following co
 
 | Section                                                      | Core Question                                                                        |
 | ------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| [Advantage Function](./advantage-function)                   | What is the advantage function $A(s,a)$? Why is it better than using $G_t$ directly? |
+| This section: Advantage Function                             | What is the advantage function $A(s,a)$? Why is it better than using $G_t$ directly? |
 | [Training the Critic](./critic-training)                     | How do we train a Critic to estimate $V(s)$? Concrete implementations of DP/MC/TD    |
 | [Actor-Critic Architecture](./actor-critic)                  | How do the Actor and Critic collaborate? How does TD Error replace $G_t$?            |
 | [Frontier-Scale Applications of Actor-Critic](./ac-frontier) | AlphaStar, SAC robots, Isaac Lab: how AC lands in industrial-scale practice          |
 | [Hands-on: Pendulum Balancing](./pendulum)                   | How does Actor-Critic handle continuous action spaces?                               |
 | [Hands-on: BipedalWalker](./bipedalwalker)                   | Can Actor-Critic learn complex continuous control?                                   |
 
-Let’s begin with the advantage function. It is the bridge that connects the Actor and the Critic: [Advantage Function](./advantage-function).
-
-At the end of Chapter 6, we found that subtracting a baseline $V(s)$ reduces the variance of policy gradients without changing the gradient direction. This section deepens that insight and introduces the advantage function -- the bridge connecting the Actor and the Critic.
+This section deepens that insight and introduces the advantage function -- the bridge connecting the Actor and the Critic.
 
 ::: tip Prerequisites
 
@@ -137,9 +135,9 @@ Now using $A = G_t - V(s)$:
 
 With $G_t$, all four episodes produce positive gradient signals -- the policy cannot distinguish "truly good" from "lucky high return." With $A$, the signal is calibrated: above-average returns get positive signals, below-average returns get negative signals.
 
-To see the variance reduction quantitatively: using $G_t$, the four signals have mean $\frac{18+15+7+4}{4} = 11$ and variance $\frac{(18-11)^2+(15-11)^2+(7-11)^2+(4-11)^2}{4} = \frac{49+16+16+49}{4} = 32.5$. Using $A$, the four signals have mean $\frac{8+5-3-6}{4} = 1$ and variance $\frac{(8-1)^2+(5-1)^2+(-3-1)^2+(-6-1)^2}{4} = \frac{49+16+16+49}{4} = 32.5$.
+To see the variance question precisely: using $A$, the four signals have mean $\frac{8+5-3-6}{4} = 1$ and variance $\frac{(8-1)^2+(5-1)^2+(-3-1)^2+(-6-1)^2}{4} = \frac{49+16+16+49}{4} = 32.5$. Using $G_t$, the four signals have mean $\frac{18+15+7+4}{4} = 11$ and the same four-sample variance, $32.5$ — subtracting a constant baseline cannot change the variance of this fixed state-action slice, since every signal shifts by the same $10$.
 
-The four-sample variance is the same, but $A$ has a mean much closer to zero. As sample size grows, $G_t$'s range is determined by the randomness of the entire trajectory (potentially spanning from 0 to dozens), while $A$'s range is centered by $V(s)$, with positive and negative values canceling out to produce a more stable expected gradient direction. This is exactly the mechanism by which "subtracting a baseline reduces variance."
+The real variance reduction appears once we average over the states and actions the policy actually visits. Because $\mathbb{E}_{a \sim \pi}[\nabla_\theta \log \pi_\theta(a|s)] = 0$, a state-dependent baseline leaves the expected gradient unchanged while recentering the per-sample signal: returns that merely reflect "this state is good anyway" (the $V(s) = 10$ part) no longer push the gradient in one direction every time. Positive and negative advantages can then cancel across samples instead of accumulating into a large, lucky-or-unlucky common component. That centering is exactly the mechanism by which "subtracting a baseline reduces variance," and the learned Critic supplies the baseline $V(s)$ at every newly visited state.
 
 ## Estimating the Advantage with the TD Error
 
