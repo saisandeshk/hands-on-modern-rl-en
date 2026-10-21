@@ -205,7 +205,7 @@ z
      </g>
     </g>
     <g id="text_6">
-     <!-- 训练步数 -->
+     <!-- Training steps -->
      <g transform="translate(170.426875 231.885) scale(0.12 -0.12)">
       <defs>
        <path id="PingFangHK-Regular-8bad" d="M 4083 4787 
@@ -438,10 +438,10 @@ L 429 4000
 z
 " transform="scale(0.015625)"/>
       </defs>
-      <use xlink:href="#PingFangHK-Regular-8bad"/>
-      <use xlink:href="#PingFangHK-Regular-7ec3" transform="translate(99.999985 0)"/>
-      <use xlink:href="#PingFangHK-Regular-6b65" transform="translate(199.999969 0)"/>
-      <use xlink:href="#PingFangHK-Regular-6570" transform="translate(299.999954 0)"/>
+      <text x="200" y="0" text-anchor="middle" transform="scale(1 -1)" font-family="Inter, Helvetica, Arial, sans-serif" font-size="92">Training steps</text>
+      
+      
+      
      </g>
     </g>
    </g>
@@ -906,7 +906,7 @@ L 342.511875 201.964062
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_13">
-    <!-- ln2 ≈ 0.69（随机水平） -->
+    <!-- ln2 ~= 0.69 (chance) -->
     <g style="fill: #9ca3af" transform="translate(66.569109 49.30185) scale(0.09 -0.09)">
      <defs>
       <path id="PingFangHK-Regular-6c" d="M 499 4659 
@@ -1227,12 +1227,12 @@ z
      <use xlink:href="#PingFangHK-Regular-2e" transform="translate(344.199905 0)"/>
      <use xlink:href="#PingFangHK-Regular-36" transform="translate(370.599899 0)"/>
      <use xlink:href="#PingFangHK-Regular-39" transform="translate(430.599884 0)"/>
-     <use xlink:href="#PingFangHK-Regular-ff08" transform="translate(490.599869 0)"/>
-     <use xlink:href="#PingFangHK-Regular-968f" transform="translate(590.599854 0)"/>
-     <use xlink:href="#PingFangHK-Regular-673a" transform="translate(690.599838 0)"/>
-     <use xlink:href="#PingFangHK-Regular-6c34" transform="translate(790.599823 0)"/>
-     <use xlink:href="#PingFangHK-Regular-5e73" transform="translate(890.599808 0)"/>
-     <use xlink:href="#PingFangHK-Regular-ff09" transform="translate(990.599792 0)"/>
+     <text x="495" y="0" transform="scale(1 -1)" font-family="Inter, Helvetica, Arial, sans-serif" font-size="100" fill="#9ca3af">(chance)</text>
+     
+     
+     
+     
+     
     </g>
    </g>
    <g id="text_14">

@@ -1,8 +1,6 @@
 \documentclass[border=10pt,tikz]{standalone}
 \usepackage{tikz}
-\usepackage{fontspec}
-\setmainfont{Songti SC}
-\setsansfont{Heiti SC}
+\usepackage{lmodern}
 \usetikzlibrary{arrows.meta,positioning}
 
 \begin{document}
@@ -11,12 +9,12 @@
   accent/.style={draw=blue!55!black,fill=blue!4,rounded corners=7pt,minimum width=2.55cm,minimum height=1.2cm,align=center,font=\small},
   arrow/.style={-{Stealth[length=6pt,width=5pt]},line width=1pt,black!65,shorten >=3pt,shorten <=3pt}
 ]
-\node[box] (task) {任务描述};
-\node[box,right=0.85cm of task] (screen) {屏幕截图\\[-1pt]{\footnotesize 观察 $o_t$}};
-\node[accent,right=0.85cm of screen] (policy) {定位与决策\\[-1pt]{\footnotesize 策略 $\pi_\theta$}};
-\node[box,right=0.85cm of policy] (action) {鼠标 / 键盘\\[-1pt]{\footnotesize 动作 $a_t$}};
-\node[box,below=1.25cm of action] (env) {界面变化\\[-1pt]{\footnotesize 环境转移}};
-\node[accent,below=1.25cm of screen] (verify) {任务验证器\\[-1pt]{\footnotesize 奖励 $r_t$}};
+\node[box] (task) {Task description};
+\node[box,right=0.85cm of task] (screen) {Screenshot\\[-1pt]{\footnotesize observation $o_t$}};
+\node[accent,right=0.85cm of screen] (policy) {Ground + decide\\[-1pt]{\footnotesize policy $\pi_\theta$}};
+\node[box,right=0.85cm of policy] (action) {Mouse / keyboard\\[-1pt]{\footnotesize action $a_t$}};
+\node[box,below=1.25cm of action] (env) {UI changes\\[-1pt]{\footnotesize env transition}};
+\node[accent,below=1.25cm of screen] (verify) {Task verifier\\[-1pt]{\footnotesize reward $r_t$}};
 \draw[arrow] (task) -- (screen);
 \draw[arrow] (screen) -- (policy);
 \draw[arrow] (policy) -- (action);

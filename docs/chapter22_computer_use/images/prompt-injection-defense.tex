@@ -1,8 +1,6 @@
 \documentclass[border=10pt,tikz]{standalone}
 \usepackage{tikz}
-\usepackage{fontspec}
-\setmainfont{Songti SC}
-\setsansfont{Heiti SC}
+\usepackage{lmodern}
 \usetikzlibrary{arrows.meta,positioning}
 
 \begin{document}
@@ -12,12 +10,12 @@
   stop/.style={draw=red!55!black,fill=red!4,rounded corners=7pt,minimum width=3.0cm,minimum height=1.15cm,align=center,font=\small},
   arrow/.style={-{Stealth[length=6pt,width=5pt]},line width=1pt,black!65,shorten >=3pt,shorten <=3pt}
 ]
-\node[trusted] (user) {用户目标\\[-1pt]{\footnotesize 已授权指令}};
-\node[box,below=1.05cm of user] (tool) {网页 / 邮件 / PDF\\[-1pt]{\footnotesize 不可信内容}};
-\node[trusted,right=1.3cm of user,yshift=-1.15cm] (policy) {指令层级\\[-1pt]{\footnotesize 判断冲突}};
-\node[box,right=1.3cm of policy] (gate) {动作与权限检查};
-\node[trusted,right=1.15cm of gate,yshift=0.85cm] (run) {低风险且已授权\\执行};
-\node[stop,right=1.15cm of gate,yshift=-0.85cm] (confirm) {高风险或越界\\拒绝 / 请求确认};
+\node[trusted] (user) {User goal\\[-1pt]{\footnotesize authorized instruction}};
+\node[box,below=1.05cm of user] (tool) {Web / mail / PDF\\[-1pt]{\footnotesize untrusted content}};
+\node[trusted,right=1.3cm of user,yshift=-1.15cm] (policy) {Instruction hierarchy\\[-1pt]{\footnotesize resolve conflicts}};
+\node[box,right=1.3cm of policy] (gate) {Action + permission check};
+\node[trusted,right=1.15cm of gate,yshift=0.85cm] (run) {Low risk, authorized\\execute};
+\node[stop,right=1.15cm of gate,yshift=-0.85cm] (confirm) {Risky or out of scope\\block / ask to confirm};
 \draw[arrow] (user.east) -- (policy.north west);
 \draw[arrow] (tool.east) -- (policy.south west);
 \draw[arrow] (policy) -- (gate);

@@ -187,7 +187,7 @@ z
      </g>
     </g>
     <g id="text_6">
-     <!-- 奖励差距 -->
+     <!-- Reward margin -->
      <g transform="translate(215.280893 284.169062) scale(0.13 -0.13)">
       <defs>
        <path id="PingFangHK-Regular-5956" d="M 442 1658 
@@ -393,10 +393,10 @@ L 3565 3040
 z
 " transform="scale(0.015625)"/>
       </defs>
-      <use xlink:href="#PingFangHK-Regular-5956"/>
-      <use xlink:href="#PingFangHK-Regular-52b1" transform="translate(99.999985 0)"/>
-      <use xlink:href="#PingFangHK-Regular-5dee" transform="translate(199.999969 0)"/>
-      <use xlink:href="#PingFangHK-Regular-8ddd" transform="translate(299.999954 0)"/>
+      <text x="200" y="0" text-anchor="middle" transform="scale(1 -1)" font-family="Inter, Helvetica, Arial, sans-serif" font-size="92">Reward margin</text>
+      
+      
+      
      </g>
     </g>
    </g>
@@ -1405,7 +1405,7 @@ L 244.048026 212.710906
 " style="fill: none; stroke: #6b7280; stroke-width: 1.2; stroke-linecap: round"/>
    </g>
    <g id="text_26">
-    <!-- x=0 时 -->
+    <!-- at x = 0 -->
     <g style="fill: #6b7280" transform="translate(269.86625 117.202887) scale(0.11 -0.11)">
      <defs>
       <path id="PingFangHK-Regular-78" d="M 173 3309 
@@ -1484,11 +1484,11 @@ L 4749 -576
 z
 " transform="scale(0.015625)"/>
      </defs>
-     <use xlink:href="#PingFangHK-Regular-78"/>
-     <use xlink:href="#PingFangHK-Regular-3d" transform="translate(50.899994 0)"/>
-     <use xlink:href="#PingFangHK-Regular-30" transform="translate(111.399979 0)"/>
-     <use xlink:href="#PingFangHK-Regular-20" transform="translate(171.399963 0)"/>
-     <use xlink:href="#PingFangHK-Regular-65f6" transform="translate(204.699951 0)"/>
+     <text x="0" y="0" transform="scale(1 -1)" font-family="Inter, Helvetica, Arial, sans-serif" font-size="91">at x = 0</text>
+     
+     
+     
+     
     </g>
     <!-- loss = ln2 ≈ 0.69 -->
     <g style="fill: #6b7280" transform="translate(269.86625 128.98973) scale(0.11 -0.11)">
@@ -1587,10 +1587,10 @@ L 122.432967 105.471548
    <g id="text_28">
     <g id="patch_15">
      <path d="M 349.430625 245.417738 
-L 390.399375 245.417738 
-Q 394.399375 245.417738 394.399375 241.417738 
-L 394.399375 221.441175 
-Q 394.399375 217.441175 390.399375 217.441175 
+L 408.399375 245.417738 
+Q 412.399375 245.417738 412.399375 241.417738 
+L 412.399375 221.441175 
+Q 412.399375 217.441175 408.399375 217.441175 
 L 349.430625 217.441175 
 Q 345.430625 217.441175 345.430625 221.441175 
 L 345.430625 241.417738 
@@ -1623,7 +1623,7 @@ z
      <use xlink:href="#PingFangHK-Regular-20" transform="translate(316.399918 0)"/>
      <use xlink:href="#PingFangHK-Regular-30" transform="translate(349.699905 0)"/>
     </g>
-    <!-- 梯度弱 -->
+    <!-- weak gradient -->
     <g style="fill: #15803d" transform="translate(354.915 239.43805) scale(0.1 -0.1)">
      <defs>
       <path id="PingFangHK-Regular-68af" d="M 1658 2586 
@@ -1816,18 +1816,18 @@ C 4307 1850 3955 1965 3584 2042
 z
 " transform="scale(0.015625)"/>
      </defs>
-     <use xlink:href="#PingFangHK-Regular-68af"/>
-     <use xlink:href="#PingFangHK-Regular-5ea6" transform="translate(99.999985 0)"/>
-     <use xlink:href="#PingFangHK-Regular-5f31" transform="translate(199.999969 0)"/>
+     
+     
+     <text x="0" y="0" transform="scale(1 -1)" font-family="Inter, Helvetica, Arial, sans-serif" font-size="70" fill="#15803d">weak gradient</text>
     </g>
    </g>
-   <g id="text_29">
+   <g id="text_29" transform="translate(28 34)">
     <g id="patch_16">
      <path d="M 96.827254 68.330751 
-L 128.466317 68.330751 
-Q 132.466317 68.330751 132.466317 64.330751 
-L 132.466317 44.054189 
-Q 132.466317 40.054189 128.466317 40.054189 
+L 160.466317 68.330751 
+Q 164.466317 68.330751 164.466317 64.330751 
+L 164.466317 44.054189 
+Q 164.466317 40.054189 160.466317 40.054189 
 L 96.827254 40.054189 
 Q 92.827254 40.054189 92.827254 44.054189 
 L 92.827254 64.330751 
@@ -1858,7 +1858,7 @@ z
      <use xlink:href="#PingFangHK-Regular-20" transform="translate(183.099945 0)"/>
      <use xlink:href="#PingFangHK-Regular-2191" transform="translate(216.399933 0)"/>
     </g>
-    <!-- 梯度强 -->
+    <!-- strong gradient -->
     <g style="fill: #dc2626" transform="translate(97.646786 62.351064) scale(0.1 -0.1)">
      <defs>
       <path id="PingFangHK-Regular-5f3a" d="M 2682 2829 
@@ -1927,9 +1927,9 @@ L 5210 3763
 z
 " transform="scale(0.015625)"/>
      </defs>
-     <use xlink:href="#PingFangHK-Regular-68af"/>
-     <use xlink:href="#PingFangHK-Regular-5ea6" transform="translate(99.999985 0)"/>
-     <use xlink:href="#PingFangHK-Regular-5f3a" transform="translate(199.999969 0)"/>
+     
+     
+     <text x="0" y="0" transform="scale(1 -1)" font-family="Inter, Helvetica, Arial, sans-serif" font-size="70" fill="#dc2626">strong gradient</text>
     </g>
    </g>
   </g>
