@@ -127,7 +127,7 @@ Moving from 2D images to 3D scenes, VLMs need to understand depth, occlusion, an
 
 ### Robotic VLM-RL
 
-VLM-RL has the broadest application prospects in robotics. Robots need to understand the environment from camera input, then make manipulation decisions. Unlike the continuous control discussed in Section 24.3 on embodied intelligence, the core of VLM-RL is "using visual understanding to guide actions" — not directly from pixels to torques, but first understanding "what object is in front" and then deciding "how to manipulate it."
+VLM-RL has the broadest application prospects in robotics. Robots need to understand the environment from camera input, then make manipulation decisions. Unlike the continuous control discussed in Chapter 9, the core of VLM-RL is "using visual understanding to guide actions" — not directly from pixels to torques, but first understanding "what object is in front" and then deciding "how to manipulate it."
 
 | Approach            | How Input Enters Policy                                        | Strengths                                             | Risks                                                          |
 | ------------------- | -------------------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------- |
@@ -199,14 +199,14 @@ def robot_vlm_rl_train(vlm, simulator, num_episodes=10000):
 
 Reviewing the full learning path across chapters, we see RL develop from the simplest tabular methods to complex multimodal scenarios:
 
-| Chapter               | Input                    | Action Space        | Reward Source             | Core Algorithm |
-| --------------------- | ------------------------ | ------------------- | ------------------------- | -------------- |
-| Ch 4: DQN             | State vectors / pixels   | Discrete            | Built-in environment      | DQN            |
-| Ch 5: Policy Gradient | State vectors            | Discrete/continuous | Built-in environment      | REINFORCE      |
-| Ch 8: RLHF/PPO        | Token sequence           | Discrete (tokens)   | RM scoring                | PPO            |
-| Ch 9: GRPO            | Token sequence           | Discrete (tokens)   | Rule verification         | GRPO           |
-| Ch 10: Agentic RL     | Text + tool trajectories | Tool calls / tokens | Outcome + process rewards | PPO/GRPO       |
-| Ch 11: VLM RL         | Image + tokens           | Discrete (tokens)   | Rules + model + grounding | GRPO           |
+| Chapter                 | Input                    | Action Space        | Reward Source             | Core Algorithm |
+| ----------------------- | ------------------------ | ------------------- | ------------------------- | -------------- |
+| Ch 5: DQN               | State vectors / pixels   | Discrete            | Built-in environment      | DQN            |
+| Ch 6: Policy Gradient   | State vectors            | Discrete/continuous | Built-in environment      | REINFORCE      |
+| Ch 13: RLHF / Ch 8: PPO | Token sequence           | Discrete (tokens)   | RM scoring                | PPO            |
+| Ch 15: GRPO             | Token sequence           | Discrete (tokens)   | Rule verification         | GRPO           |
+| Ch 19: Agentic RL       | Text + tool trajectories | Tool calls / tokens | Outcome + process rewards | PPO/GRPO       |
+| Ch 23: VLM RL           | Image + tokens           | Discrete (tokens)   | Rules + model + grounding | GRPO           |
 
 The core ideas remain the same throughout — the policy gradient theorem (Chapter 6), Actor-Critic architecture (Chapter 7), PPO's clipping stability (Chapter 8), GRPO's within-group advantage (Chapter 15). What changes is the input modality, the action space, and the reward source. This is why earlier chapters spent considerable time building theoretical foundations — these foundations apply fully in multimodal settings.
 

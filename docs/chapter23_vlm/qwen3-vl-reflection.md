@@ -1,3 +1,7 @@
+---
+title: '23.2 Visual Reflection RL: Answering with Evidence'
+---
+
 # 23.2 Visual Reflection RL: Answering with Evidence
 
 Consider a bar chart in which category A is 42, B is 57, and C is 39. The question asks "how much higher is B than A." A model that only grabs the tallest bar will easily answer 57. If it first reads the values of the two bars and then computes $57-42$, the answer is 15.
@@ -219,9 +223,9 @@ The last item is a counterfactual check. If the intermediate evidence and the an
 Visual reflection is not an isolated concept. It ties together several ideas from the earlier chapters:
 
 - **Multimodal reward design (23.1)**: Visual reflection turns part of the intermediate process into a verifiable trajectory, so that the reward checks the use of evidence as well as the result.
-- **GRPO's within-group normalization (Chapter 18)**: The reasoning RL of the Thinking version uses a similar mechanism, comparing relative advantages among multiple reasoning trajectories under the same condition.
-- **Tool-calling RL (Chapter 22, Agents)**: Thinking with Images turns zoom and search into actions, letting the model observe again when evidence is insufficient.
-- **Multi-dimensional rewards in RLHF (Chapter 15)**: Visual reflection uses multi-dimensional rewards (answer, evidence, tools, cost) to keep the model from catering to a single metric.
+- **GRPO's within-group normalization (Chapter 15)**: The reasoning RL of the Thinking version uses a similar mechanism, comparing relative advantages among multiple reasoning trajectories under the same condition.
+- **Tool-calling RL (Chapter 19, Agentic RL)**: Thinking with Images turns zoom and search into actions, letting the model observe again when evidence is insufficient.
+- **Multi-dimensional rewards in RLHF (Chapter 13)**: Visual reflection uses multi-dimensional rewards (answer, evidence, tools, cost) to keep the model from catering to a single metric.
 - **Counterfactual checks (Chapter 25)**: Checking by swapping the image whether the model relies on question-type priors follows from the same line as the methods for identifying reward hacking.
 
 ## Frontier: From Visual Reflection to Audio-Grounded Reasoning

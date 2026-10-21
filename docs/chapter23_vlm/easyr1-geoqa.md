@@ -1,5 +1,5 @@
 ---
-title: '23.4 Hands-On: Train GeoQA Geometry Reasoning with EasyR1'
+title: '23.4 Hands-on: GeoQA Geometric Reasoning'
 ---
 
 # 23.4 Hands-on: GeoQA Geometric Reasoning
@@ -103,7 +103,7 @@ cd EasyR1
 pip install -e ".[vllm]"
 ```
 
-After installation, EasyR1's training entry point is `python3 -m verl.tainer.main`. You do not need an additional `pip install easyr1` -- it runs directly as a Python module.
+After installation, EasyR1's training entry point is `python3 -m verl.trainer.main`. You do not need an additional `pip install easyr1` -- it runs directly as a Python module.
 
 ### Dataset
 
@@ -270,7 +270,7 @@ export PYTHONUNBUFFERED=1
 
 MODEL_PATH=Qwen/Qwen2.5-VL-3B-Instruct  # or a local path
 
-python3 -m verl.tainer.main \
+python3 -m verl.trainer.main \
     config=examples/config.yaml \
     data.train_files=leonardPKU/GEOQA_8K_R1V@train \
     data.val_files=leonardPKU/GEOQA_8K_R1V@test \
@@ -292,7 +292,7 @@ What does this command do?
 6. **`worker.reward.reward_function=...`**: specifies the reward function file and entry function name (separated by a colon)
 7. **`trainer.n_gpus_per_node=8`**: uses 8 GPUs
 
-The CLI dot syntax overrides the corresponding fields in the YAML layer by layer. For example, `worker.actor.model.model_path` corresponds to `worker.actor.model.path` in the YAML. This design lets you quickly switch experiment configurations without creating new YAML files.
+The CLI dot syntax overrides the corresponding fields in the YAML layer by layer. For example, `worker.actor.model.model_path` corresponds to the `model_path` key under `worker.actor.model` in the YAML. This design lets you quickly switch experiment configurations without creating new YAML files.
 
 ### Full Configuration Explained
 
@@ -408,7 +408,7 @@ trainer:
 If you only have 1-2 GPUs with 24GB, you can enable LoRA to train larger models:
 
 ```bash
-python3 -m verl.tainer.main \
+python3 -m verl.trainer.main \
     config=examples/config.yaml \
     data.train_files=leonardPKU/GEOQA_8K_R1V@train \
     data.val_files=leonardPKU/GEOQA_8K_R1V@test \
@@ -444,7 +444,7 @@ bash examples/baselines/qwen2_5_vl_3b_geoqa8k.sh
 Or use CLI overrides (suitable for quick hyperparameter tuning):
 
 ```bash
-python3 -m verl.tainer.main \
+python3 -m verl.trainer.main \
     config=examples/config.yaml \
     data.train_files=leonardPKU/GEOQA_8K_R1V@train \
     data.val_files=leonardPKU/GEOQA_8K_R1V@test \
@@ -473,7 +473,7 @@ ray start --address=<head_node_ip>:6379
 ray status
 
 # Run training on the head node
-python3 -m verl.tainer.main \
+python3 -m verl.trainer.main \
     config=examples/config.yaml \
     data.train_files=leonardPKU/GEOQA_8K_R1V@train \
     data.val_files=leonardPKU/GEOQA_8K_R1V@test \
@@ -647,7 +647,7 @@ If LoRA was enabled, `model_merger.py` automatically merges the LoRA weights bac
 
 ## 23.4.11 Comparison with the Handwritten Experiment in Section 23.3
 
-| Aspect              | 11.1 Handwritten GRPO                       | EasyR1 in this section                       |
+| Aspect              | 23.3 Handwritten GRPO                       | EasyR1 in this section                       |
 | ------------------- | ------------------------------------------- | -------------------------------------------- |
 | Dataset             | Synthetic geometric shapes (self-generated) | GeoQA-8K real dataset                        |
 | Inference engine    | `model.generate()` one-by-one               | vLLM continuous batching                     |

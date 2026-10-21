@@ -1,5 +1,5 @@
 ---
-title: '23.1 Visual Reward Design'
+title: '23.1 Why a VLM Can Guess Right Without Looking: Visual Rewards and Hallucination'
 ---
 
 # 23.1 Why a VLM Can Guess Right Without Looking: Visual Rewards and Hallucination
@@ -105,7 +105,7 @@ In this situation, a more practical approach is to split one error into several 
 
 The mainstream approach at present is **holistic attribution**: assign the reward to the whole sequence (visual tokens + text tokens) and let the gradient update the vision encoder and the text decoder at the same time. This approach is simple and direct, but it has a fundamental problem: if the parameters of the vision encoder are damaged by the RL gradient, the model may lose its image understanding, like a person who is shoved hard while doing a math problem and can no longer even read the question.
 
-Another approach is to **freeze the vision encoder**: RL updates only the parameters of the text decoder. This guarantees that visual understanding is not damaged, but at the cost that the model cannot improve its visual understanding through RL. In the geometric-figure experiment of the previous section, this might leave the model forever unable to distinguish overlapping figures accurately, since the vision encoder never has a chance to learn this ability.
+Another approach is to **freeze the vision encoder**: RL updates only the parameters of the text decoder. This guarantees that visual understanding is not damaged, but at the cost that the model cannot improve its visual understanding through RL. In the geometric-shape counting experiment of Section 23.3, this might leave the model forever unable to distinguish overlapping figures accurately, since the vision encoder never has a chance to learn this ability.
 
 The three strategies each have their applicable scenarios. **Full update** achieves joint optimization of vision and text, but the vision encoder may be damaged, and it suits tasks where visual understanding needs to improve. **Freezing the encoder** protects visual ability but cannot improve visual understanding, and it suits cases where the vision encoder is already strong. **Differentiated learning rates** balance protection and optimization, but hyperparameter tuning is more complicated, and it is the generally recommended strategy.
 

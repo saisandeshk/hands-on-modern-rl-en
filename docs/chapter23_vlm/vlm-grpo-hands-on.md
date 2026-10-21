@@ -1,5 +1,5 @@
 ---
-title: '23.3 Hands-On: Train a VLM with GRPO'
+title: '23.3 Hands-on: Multimodal GRPO'
 ---
 
 # 23.3 Hands-on: Multimodal GRPO
@@ -219,7 +219,7 @@ def vlm_grpo_train(model, tokenizer, dataset, num_epochs=3, group_size=4, lr=1e-
                 all_rewards.append(group_rewards)
 
             # GRPO core: compute group-relative advantages
-            # Recall Chapter 16: group-relative advantage = (R_i - mean) / std
+            # Recall Chapter 15: group-relative advantage = (R_i - mean) / std
             rewards_tensor = torch.tensor(all_rewards)
             mean_r = rewards_tensor.mean(dim=-1, keepdim=True)
             std_r = rewards_tensor.std(dim=-1, keepdim=True) + 1e-8
@@ -268,7 +268,7 @@ In practice, a common approach is to use different learning rates for the vision
 
 </details>
 
-This experiment is simple, but it demonstrates the core VLM RL workflow: the algorithm is exactly the same as pure-text RL (GRPO), but the input now includes images, and reward evaluation needs to account for visual understanding dimensions. Next, we will dive deeper into what new challenges arise when input goes from pure text to "image + text" that simply do not exist in pure-text scenarios -- [Special Challenges in VLM RL](./vlm-challenges).
+This experiment is simple, but it demonstrates the core VLM RL workflow: the algorithm is exactly the same as pure-text RL (GRPO), but the input now includes images, and reward evaluation needs to account for visual understanding dimensions. The new challenges that arise when input goes from pure text to "image + text" -- challenges that simply do not exist in pure-text scenarios -- are analyzed in [23.1 Visual Reward Design](./vlm-challenges).
 
 ## References
 
