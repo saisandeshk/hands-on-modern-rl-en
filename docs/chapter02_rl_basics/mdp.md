@@ -110,7 +110,7 @@ The type of action space strongly influences algorithm choice:
 
 $$P(s' \mid s, a) = \text{probability of transitioning to } s' \text{ after taking action } a \text{ in state } s$$
 
-In a bandit, the state never changes. In CartPole, the dynamics $P$ are determined by Newtonian mechanics. Suppose the current pole angle is $\theta = 0.05$ (a small tilt) and the action is "push right":
+In a bandit, the state never changes. In CartPole, the dynamics $P$ are determined by Newtonian mechanics. To see what a stochastic transition looks like, take a hypothetical noisy version of the same situation. Suppose the current pole angle is $\theta = 0.05$ (a small tilt), the action is "push right", and actuation noise makes the outcome uncertain:
 
 $$P(\theta' = 0.03 \mid \theta = 0.05, \text{push right}) \approx 0.7 \qquad (\text{angle decreases; pole returns toward upright})$$
 
@@ -134,7 +134,7 @@ Richard Sutton proposed the **reward hypothesis**: any goal can be described as 
 
 But designing a good reward function is one of the hardest parts of RL engineering. The classic failure mode is **reward hacking**: the agent finds loopholes in the reward and achieves a high score in unintended ways. In LLM alignment, even defining "what deserves a high score" is itself a research problem, which is exactly what RLHF and DPO are trying to address.
 
-A subtler trap is **reward shaping that changes the optimal policy**. Suppose CartPole gave +1 per step plus a bonus proportional to how far right the cart sits, intended to encourage centering correction. An agent maximizing that shaped reward may park the cart at the right edge and let the pole wobble, collecting the position bonus while surviving fewer steps: the shaped reward's optimal policy is no longer the true task's optimal policy. Extra progress signals are legitimate when they preserve the intended optimum, but every added term should be checked by asking "what behavior earns the maximum of this reward, and is that the behavior I actually want?"
+A subtler trap is **reward shaping that changes the optimal policy**. Suppose CartPole gave +1 per step plus a bonus proportional to the cart's rightward displacement, intended to reward "making progress". An agent maximizing that shaped reward as written may park the cart at the right edge of the track: every step near the edge collects the displacement bonus on top of the +1 survival reward, so edge-riding outscores centered balancing. The shaped reward's optimal policy (ride the edge, fragilely close to the track limit) is no longer the true task's optimal policy (stay centered and balanced). Extra progress signals are legitimate when they preserve the intended optimum, but every added term should be checked by asking "what behavior earns the maximum of this reward, and is that the behavior I actually want?"
 
 ### Discount Factor $\gamma$
 
@@ -182,7 +182,7 @@ The MDP tuple specifies the rules. But rules alone are not enough: we must defin
 
 To evaluate how well an episode went, we aggregate rewards across steps. $G_t$ is that objective: it sums rewards along the interaction and discounts future rewards, defining "how many points you can still get starting from now".
 
-The tuple defines the one-step rules, but RL is not a one-step game. CartPole runs for up to 200 steps; an LLM may generate hundreds of tokens. Each step yields a state, action, and reward. Chaining them forms a **trajectory**:
+The tuple defines the one-step rules, but RL is not a one-step game. CartPole runs for up to 500 steps; an LLM may generate hundreds of tokens. Each step yields a state, action, and reward. Chaining them forms a **trajectory**:
 
 $$s_0, a_0, r_0, \; s_1, a_1, r_1, \; s_2, a_2, r_2, \; \ldots$$
 
@@ -190,9 +190,9 @@ In episodic tasks, a full episode usually corresponds to a full trajectory. But 
 
 ### Termination Versus Truncation
 
-An episode can end for two very different reasons, and confusing them corrupts value estimates in later chapters. **Termination** means the task itself reached an absorbing outcome: the pole fell, the game was won or lost, the robot broke. There is genuinely no future, so the value of the terminal state is zero and bootstrapped targets use no future value. **Truncation** means an external limit cut the interaction short: CartPole's 500-step cap fired while the pole was still balanced, or a training loop collected a fixed-length rollout slice. The task could have continued, so the state at cutoff still has future value and bootstrapping should include the estimated value of continuing.
+An episode can end for two very different reasons, and confusing them corrupts value estimates in later chapters. **Termination** means the task itself reached an absorbing outcome: the pole fell, the game was won or lost, the robot broke. There is genuinely no future, so the value of the terminal state is zero and bootstrapped targets use no future value. **Truncation** means an external limit cut the interaction short: CartPole's 500-step cap fired while the pole was still balanced, or a continuing task was cut into fixed-length rollout slices for batched training. (A rollout slice is not a Gymnasium-style episode end — the environment is not reset at the slice boundary — but it plays the same role: the task could have continued, so the state at the cutoff still has future value and bootstrapping should include the estimated value of continuing.)
 
-Concretely, suppose CartPole balances all 500 steps without falling. That episode was truncated, not terminated: the return $G_0$ counts only the 500 observed rewards, but a learner estimating $V(s_{500})$ must treat it as "500 rewards so far plus whatever balancing longer would add," not as zero future. Libraries such as Gymnasium report these separately (`terminated` versus `truncated` flags) for exactly this reason. Episodes that always end by termination are episodic tasks; a task with no natural end, such as a robot patrolling indefinitely, is a continuing task, where discounting ($\gamma < 1$) keeps the objective finite and truncation is the only way to cut experience into training batches.
+Concretely, suppose CartPole balances all 500 steps without falling. That episode was truncated, not terminated: the return $G_0$ counts only the 500 observed rewards, but a learner must not treat the cutoff as worth zero. The state at the cutoff still has continuation value $V(s_{500})$ (whatever balancing longer would add), so a bootstrapped training target for the truncated episode must add $\gamma^{500}V(s_{500})$ instead of 0. Libraries such as Gymnasium report these separately (`terminated` versus `truncated` flags) for exactly this reason. Episodes that always end by termination are episodic tasks; a task with no natural end, such as a robot patrolling indefinitely, is a continuing task, where discounting ($\gamma < 1$) keeps the objective finite and experience is cut into fixed-length training batches whose boundaries likewise bootstrap rather than terminate.
 
 A bandit has only one step, so the trajectory is $(s_0, a_0, r_0)$ and the score is just that single reward. What if CartPole survives for 4 steps and gets +1 each step? The most direct score is the sum: $1 + 1 + 1 + 1 = 4$. But is 1 point now really equal to 1 point 10 steps later?
 

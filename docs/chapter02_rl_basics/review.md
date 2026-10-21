@@ -118,7 +118,7 @@ CartPole gives +1 per step.
 
 ### Exercise 8 (coding): Add a Decaying-Epsilon Strategy to the Chapter Script
 
-Extend `code/chapter02_rl_basics/two_armed_bandit.py` with a `strategy_epsilon_decay` function (start $\epsilon = 1.0$, multiply by 0.995 each step, floor at 0.01), run it alongside the existing four strategies for 1000 steps averaged over 200 runs, and compare total regret. Explain why it ranks where it does.
+Extend `code/chapter02_rl_basics/two_armed_bandit.py` with a `strategy_epsilon_decay` function (start $\epsilon = 1.0$, multiply by 0.995 each step, floor at 0.01), run it alongside the existing strategies for 1000 steps averaged over 200 runs (seed run $r$ with `np.random.seed(r)`, one loop per strategy), and compare total regret. Explain why it ranks where it does.
 
 ::: details Solution
 
@@ -141,12 +141,12 @@ def strategy_epsilon_decay(bandit, n_steps, eps_start=1.0, eps_end=0.01, decay=0
     return np.array(rewards)
 ```
 
-Reference result (200 runs, 1000 steps, seeds 0–199): fixed $\epsilon = 0.1$ totals about 588 (regret $\approx 12$), decaying $\epsilon$ about 579 (regret $\approx 21$), against the optimal 600. The decaying schedule starts at full exploration ($\epsilon \approx 0.61$ still at step 100), so it pays heavy early exploration cost inside a 1000-step horizon; its advantage (vanishing late exploration) only dominates over longer horizons. Your exact numbers will vary with seeds, but the ordering fixed < decay regret here is robust for this horizon and decay rate. Trying a faster decay (e.g. 0.99) or a longer horizon flips the comparison, which is the point: the schedule must match the horizon.
+Reference result (200 runs, 1000 steps, `np.random.seed(run)` per run, one loop per strategy): fixed $\epsilon = 0.1$ totals about 586 (regret $\approx 14$), decaying $\epsilon$ about 578 (regret $\approx 22$), against the optimal 600. The decaying schedule starts at full exploration ($\epsilon \approx 0.61$ still at step 100), so it pays heavy early exploration cost inside a 1000-step horizon; its advantage (vanishing late exploration) only dominates over longer horizons. Your exact numbers will vary with seeds, but the ordering fixed < decay regret here is robust for this horizon and decay rate. Trying a faster decay (e.g. 0.99) or a longer horizon flips the comparison, which is the point: the schedule must match the horizon.
 :::
 
 ### Exercise 9 (coding): Thompson Sampling From Scratch
 
-Implement Beta-Bernoulli Thompson sampling for the chapter's 0.6/0.4 bandit without looking at the text's pseudocode first, then compare: run it, epsilon-greedy ($\epsilon = 0.1$), and UCB ($c = 2$) for 1000 steps over 200 seeds and report mean totals. Explain the mechanism behind the ranking.
+Implement Beta-Bernoulli Thompson sampling for the chapter's 0.6/0.4 bandit without looking at the text's pseudocode first, then compare: run it, epsilon-greedy ($\epsilon = 0.1$), and UCB ($c = 2$) for 1000 steps over 200 seeds (`np.random.seed(run)` per run, one loop per strategy) and report mean totals. Explain the mechanism behind the ranking, including why UCB with this $c$ ranks where it does.
 
 ::: details Solution
 
@@ -167,5 +167,5 @@ def strategy_thompson(bandit, n_steps):
 
 `Beta(1, 1)` is uniform, expressing total initial ignorance. Each 1 reward increments `alpha`, each 0 increments `beta`, so the posterior mean `alpha / (alpha + beta)` tracks the observed win rate while its width shrinks with evidence, concentrating future pulls on the likely-best arm.
 
-Reference result (200 runs, 1000 steps): Thompson sampling totals about 594–595 (regret $\approx$ 5–6), ahead of epsilon-greedy ($\approx$ 588, regret $\approx$ 12). UCB ($c = 2$) is competitive with Thompson sampling on this easy two-arm gap; the clear gap is between both directed methods and undirected epsilon exploration. Exact totals shift with seeds, but directed exploration (UCB, Thompson) should beat fixed-epsilon randomness, because it spends trials on arms proportional to their chance of being optimal rather than at a flat rate.
+Reference result (200 runs, 1000 steps, `np.random.seed(run)` per run): Thompson sampling totals about 592–593 (regret $\approx$ 7–8), ahead of epsilon-greedy ($\approx$ 586, regret $\approx$ 14). UCB with $c = 2$ totals only about 564 (regret $\approx$ 36) — worse than plain epsilon-greedy here, not competitive with Thompson sampling. The reason is over-exploration: the chapter's bonus $c\sqrt{\ln t / N_a}$ lacks the $\sqrt{2}$ factor of the standard UCB1 rule, so $c = 2$ explores far too aggressively on this easy two-arm gap (it pulls the worse arm roughly 185 times out of 1000). With $c = 0.5$ the same code totals about 595 (regret $\approx$ 5), competitive with Thompson sampling. Exact totals shift by a point or two with the seeding protocol, but the lesson is robust: directed exploration (UCB, Thompson) beats fixed-epsilon randomness only when its exploration parameter matches the problem — an over-tuned bonus spends more trials on bad arms than a flat $\epsilon$ ever would.
 :::
