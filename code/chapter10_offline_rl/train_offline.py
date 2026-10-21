@@ -24,7 +24,9 @@ Outputs (under ``runs/chapter10_offline_rl/``)
 ----------------------------------------------
 - ``offline/summary.json`` / ``offline/summary.csv``: return of every
   (dataset, method) pair.
-- ``offline/q_curves_<dataset>.png``: mean max-Q on held-out states during
+- ``offline/<dataset>_<method>_q.pt``: trained weights (e.g.
+  ``offline/random_cql_q.pt``), so extension exercises can fine-tune them.
+- ``offline/q_curves_<dataset>.png``: mean max-Q on dataset states during
   training (watch naive DQN inflate vs CQL staying bounded).
 - ``offline/returns.png``: bar chart of return vs dataset quality.
 
@@ -37,6 +39,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import os
 import time
@@ -60,6 +63,19 @@ from common import (
 )
 
 METHODS = ("bc", "dqn", "cql")
+
+
+def run_seed(base_seed: int, *parts: str) -> int:
+    """Stable per-(dataset, method) seed so init order cannot change results.
+
+    Network initialisation draws from the global torch RNG, which earlier
+    code left shared across datasets and methods: running ``--dataset expert``
+    alone gave a different expert Q-network than running ``--dataset all``.
+    Deriving an independent seed per (dataset, method) from ``base_seed``
+    makes every run reproducible regardless of processing order.
+    """
+    h = hashlib.sha256(("|".join([str(base_seed), *parts])).encode()).digest()
+    return int.from_bytes(h[:4], "little") % (2**31)
 
 
 # ---------------------------------------------------------------------------
@@ -95,6 +111,7 @@ def train_bc(
 ) -> tuple[PolicyMLP, list[float]]:
     """Supervised cloning of the behaviour policy (cross-entropy loss)."""
     rng = np.random.default_rng(seed)
+    torch.manual_seed(seed)
     state_dim = arrays["states"].shape[1]
     action_dim = int(arrays["actions"].max()) + 1
     net = PolicyMLP(state_dim, action_dim, hidden=hidden).to(device)
@@ -121,7 +138,7 @@ def train_q_offline(
     hidden: int = 64,
     lr: float = 1e-3,
     gamma: float = 0.99,
-    target_sync_every: int = 500,
+    target_sync_every: int = 100,
     eval_states: torch.Tensor | None = None,
 ) -> tuple[QMLP, dict]:
     """Naive offline DQN (``alpha=0``) or discrete CQL (``alpha>0``).
@@ -130,6 +147,7 @@ def train_q_offline(
     :func:`cql_penalty`. Returns the Q-network plus training curves.
     """
     rng = np.random.default_rng(seed + 7919)
+    torch.manual_seed(seed)
     state_dim = arrays["states"].shape[1]
     action_dim = int(arrays["actions"].max()) + 1
     q_net = QMLP(state_dim, action_dim, hidden=hidden).to(device)
@@ -180,6 +198,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--steps", type=int, default=15000, help="gradient steps per method")
     p.add_argument("--batch-size", type=int, default=256)
     p.add_argument("--cql-alpha", type=float, default=1.0)
+    p.add_argument("--target-sync-every", type=int, default=100,
+                   help="target-network sync interval in gradient steps")
     p.add_argument("--eval-episodes", type=int, default=20)
     p.add_argument("--outdir", type=str, default=None)
     return p.parse_args()
@@ -210,31 +230,38 @@ def run_one_dataset(
 ) -> tuple[dict, dict]:
     arrays, meta = load_dataset(os.path.join(outdir, "datasets", f"{name}.npz"))
     n_eval_states = min(2000, len(arrays["states"]))
+    # NOTE: these are the first 2000 *training* states, not held-out states.
     eval_states = torch.as_tensor(
         arrays["states"][:n_eval_states], dtype=torch.float32, device=device
     )
     results: dict = {"behaviour_return": meta.get("mean_episode_return")}
     curves: dict = {}
+    offline_dir = os.path.join(outdir, "offline")
 
     # 1. Behaviour cloning.
+    bc_seed = run_seed(args.seed, name, "bc")
     bc_net, bc_losses = train_bc(arrays, args.steps, args.batch_size,
-                                 args.seed, device)
+                                 bc_seed, device)
     bc_eval = evaluate_greedy(bc_as_q(bc_net), n_episodes=args.eval_episodes,
                               base_seed=50_000 + args.seed, device=str(device))
     results["bc"] = bc_eval.as_dict()
     curves["bc_loss"] = bc_losses[:: max(1, len(bc_losses) // 60)]
+    torch.save(bc_net.state_dict(), os.path.join(offline_dir, f"{name}_bc.pt"))
 
     # 2. Naive offline DQN vs 3. discrete CQL.
     for method, alpha in (("dqn", 0.0), ("cql", args.cql_alpha)):
+        q_seed = run_seed(args.seed, name, method)
         q_net, hist = train_q_offline(
-            arrays, args.steps, args.batch_size, args.seed, device,
+            arrays, args.steps, args.batch_size, q_seed, device,
             alpha=alpha, eval_states=eval_states,
+            target_sync_every=args.target_sync_every,
         )
         ev = evaluate_greedy(q_net, n_episodes=args.eval_episodes,
                              base_seed=60_000 + args.seed, device=str(device))
         results[method] = ev.as_dict()
         curves[f"{method}_max_q"] = hist["max_q"]
         curves[f"{method}_bellman"] = hist["bellman"]
+        torch.save(q_net.state_dict(), os.path.join(offline_dir, f"{name}_{method}_q.pt"))
         if method == "cql":
             curves["cql_penalty"] = hist["cql"]
 
@@ -255,8 +282,8 @@ def plot_q_curves(curves: dict, datasets: list[str], path: str) -> None:
         ax.set_title(f"dataset: {name}")
         ax.set_xlabel("checkpoint (x200 steps)")
         ax.legend(fontsize=8)
-    axes[0].set_ylabel("mean max_a Q(s,a) on held-out states")
-    fig.suptitle("Offline Q-values on held-out states (divergence = OOD overestimation)")
+    axes[0].set_ylabel("mean max_a Q(s,a) on dataset states")
+    fig.suptitle("Offline Q-values on dataset states (divergence = OOD overestimation)")
     fig.tight_layout()
     fig.savefig(path, dpi=150)
     plt.close(fig)
@@ -286,6 +313,7 @@ def main() -> None:
         args.steps = 400
         args.eval_episodes = 4
         args.batch_size = 128
+        args.target_sync_every = 50
     seed_everything(args.seed)
     device = resolve_device(args.device)
     outdir = args.outdir or default_outdir()

@@ -11,8 +11,8 @@ environment, then compare against the true online value:
 2. **Weighted (self-normalized) IS (WIS)** -- biased but far lower
    variance: ``sum_i w_i G_i / sum_i w_i`` with full-trajectory weights.
 3. **Fitted Q evaluation (FQE)** -- fit ``Q^{pi_e}`` by regression on fixed
-   batches (``y = r + gamma Q_target(s', pi_e(s'))``, no ``max`` over OOD
-   actions, no importance ratios), then average over initial states.
+   batches (``y = r + gamma E_{a' ~ pi_e}[Q_target(s',a')]``, no ``max``
+   over OOD actions, no importance ratios), then average over initial states.
 
 Poor coverage (e.g. evaluating the expert from ``random`` data) makes IS
 weights degenerate -- the script reports the effective sample size (ESS)
@@ -141,13 +141,15 @@ def train_fqe(
     lr: float = 1e-3,
     gamma: float = GAMMA,
 ) -> QMLP:
-    """Fit Q^{pi_e} on fixed data: ``y = r + gamma (1-d) Q_bar(s', pi_e(s'))``.
+    """Fit Q^{pi_e} on fixed data: ``y = r + gamma (1-d) E_{a' ~ pi_e}[Q_bar(s',a')]``.
 
     Unlike Q-learning there is no ``max`` over actions -- the backup follows
-    the target policy exactly, so no OOD action is ever optimistically
-    maximised. The target net is a periodically synced copy (FQE iteration).
+    the smoothed target policy ``pi_e`` in expectation, so no OOD action is
+    ever optimistically maximised. The target net is a periodically synced
+    copy (FQE iteration).
     """
     rng = np.random.default_rng(seed + 331)
+    torch.manual_seed(seed)
     q_target_policy = q_target_policy.to(device).eval()
     state_dim = arrays["states"].shape[1]
     action_dim = int(arrays["actions"].max()) + 1
@@ -164,8 +166,15 @@ def train_fqe(
         ns = torch.as_tensor(arrays["next_states"][idx], device=device)
         d = torch.as_tensor(arrays["dones"][idx], device=device)
         with torch.no_grad():
-            pi_next = q_target_policy(ns).argmax(dim=1, keepdim=True)
-            y = r + gamma * (1.0 - d) * q_bar(ns).gather(1, pi_next).squeeze(1)
+            # Expected backup under the eps-smoothed target (matches
+            # ``target_probs_for`` and ``true_target_value``): with prob
+            # (1-eps) follow the greedy action, otherwise act uniformly.
+            greedy_next = q_target_policy(ns).argmax(dim=1)
+            q_bar_next = q_bar(ns)
+            greedy_q = q_bar_next.gather(1, greedy_next.unsqueeze(1)).squeeze(1)
+            mean_q = q_bar_next.mean(dim=1)
+            exp_q = (1.0 - TARGET_EPS) * greedy_q + TARGET_EPS * mean_q
+            y = r + gamma * (1.0 - d) * exp_q
         loss = nn.functional.mse_loss(q(s).gather(1, a.unsqueeze(1)).squeeze(1), y)
         opt.zero_grad()
         loss.backward()
@@ -241,14 +250,25 @@ def run_ope_for(behaviour: str, outdir: str, args: argparse.Namespace,
     wis = wis_estimate(disc_returns, w)
     ess = float(w.sum() ** 2 / max(1e-12, (w ** 2).sum()))
 
-    # FQE then average over initial states.
+    # FQE then average over the dataset episodes' initial states (every
+    # CartPole episode starts from env.reset(), so this matches the reset
+    # distribution). The value uses the smoothed-target expectation to match
+    # the backup and the online truth.
     n_fqe = args.fqe_steps
-    q_fqe = train_fqe(arrays, q_target, n_fqe, 256, args.seed, device)
+    import hashlib as _hashlib
+
+    _h = _hashlib.sha256(f"{args.seed}|{behaviour}|fqe".encode()).digest()
+    fqe_seed = int.from_bytes(_h[:4], "little") % (2**31)
+    q_fqe = train_fqe(arrays, q_target, n_fqe, 256, fqe_seed, device)
     s0 = np.array([arrays["states"][e[0]] for e in episodes if len(e) > 0])
     with torch.no_grad():
-        q0 = q_fqe(torch.as_tensor(s0, dtype=torch.float32, device=device))
-        pi0 = q_target(torch.as_tensor(s0, dtype=torch.float32, device=device)).argmax(dim=1, keepdim=True)
-        fqe_v = float(q0.gather(1, pi0).squeeze(1).mean().item())
+        s0_t = torch.as_tensor(s0, dtype=torch.float32, device=device)
+        q0 = q_fqe(s0_t)
+        greedy0 = q_target(s0_t).argmax(dim=1)
+        greedy_q0 = q0.gather(1, greedy0.unsqueeze(1)).squeeze(1)
+        mean_q0 = q0.mean(dim=1)
+        exp_q0 = (1.0 - TARGET_EPS) * greedy_q0 + TARGET_EPS * mean_q0
+        fqe_v = float(exp_q0.mean().item())
 
     _ = n_actions
     return {

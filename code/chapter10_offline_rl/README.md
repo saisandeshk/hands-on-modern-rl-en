@@ -13,15 +13,20 @@ PyTorch — no RL libraries. The lab has three steps:
    importance sampling.
 2. **`train_offline.py`** — from each fixed dataset, with _zero_ environment
    interaction: behaviour cloning (supervised cross-entropy), naive offline
-   DQN (fixed-data Bellman MSE with `max` over actions), and discrete CQL
+   DQN (fixed-data Bellman MSE with `max` over actions; target sync every 100
+   steps via `--target-sync-every`), and discrete CQL
    (naive DQN plus `alpha * (logsumexp_a Q(s,a) − Q(s,a_data))`, Section 10.1).
-   Policies are evaluated with real rollouts only for measurement.
+   Policies are evaluated with real rollouts only for measurement. Each
+   (dataset, method) pair uses its own derived seed, so per-dataset runs
+   reproduce the full-run rows; trained weights are saved as
+   `offline/<dataset>_<method>_q.pt`.
 3. **`ope.py`** — off-policy evaluation of the frozen expert target policy
-   from each behaviour dataset: per-decision IS (unbiased, high variance),
-   self-normalized weighted IS (biased, lower variance) and fitted Q
-   evaluation (Bellman regression with no `max` and no ratios), compared
-   against the true online value. Reports effective sample size (ESS) so poor
-   coverage is visible.
+   (5%-smoothed) from each behaviour dataset: per-decision IS (unbiased, high
+   variance), self-normalized weighted IS (biased, lower variance) and fitted Q
+   evaluation (Bellman regression against the smoothed-target expectation,
+   no `max`, no ratios; FQE averages over the dataset episodes' initial
+   states), compared against the true online value. Reports effective sample
+   size (ESS) so poor coverage is visible.
 
 Shared plumbing (seeding, device selection, MLPs, dataset save/load, online
 evaluation) lives in `common.py`. Unit tests plus subprocess smoke runs of
@@ -77,28 +82,31 @@ Offline training (20 eval episodes each):
 
 | dataset | behaviour | BC          | naive DQN    | CQL (alpha=1) |
 | ------- | --------- | ----------- | ------------ | ------------- |
-| random  | 21.9      | 9.1 ± 0.8   | 332.9 ± 76.8 | 241.6 ± 69.4  |
-| medium  | 203.2     | 500.0 ± 0.0 | 479.5 ± 46.3 | 500.0 ± 0.0   |
+| random  | 21.9      | 42.1 ± 8.8  | 500.0 ± 0.0  | 111.8 ± 3.1   |
+| medium  | 203.2     | 500.0 ± 0.0 | 99.1 ± 3.5   | 500.0 ± 0.0   |
 | expert  | 490.9     | 500.0 ± 0.0 | 9.3 ± 0.6    | 500.0 ± 0.0   |
-| mixed   | 233.3     | 500.0 ± 0.0 | 500.0 ± 0.0  | 500.0 ± 0.0   |
+| mixed   | 233.3     | 500.0 ± 0.0 | 238.4 ± 14.5 | 500.0 ± 0.0   |
 
-Read it as: BC copies (and denoises) the behaviour policy but cannot exceed
-it on random data; naive offline DQN is fine under broad coverage
-(random/medium/mixed) yet collapses on the narrow expert dataset (9.3),
-where the `max` keeps querying poorly covered actions — mean max-Q on
-held-out states ends at 34.7 vs CQL's 26.9; CQL matches or beats every
-baseline on every dataset.
+Read it as: BC copies (and argmax denoises) the behaviour policy but cannot exceed
+it on random data (the cloned softmax is near-uniform; the 42.1 is the luck of the
+deterministic argmax policy, not a solution); naive offline DQN degrades as coverage
+narrows (500.0 → 238.4 → 99.1 → 9.3 from random to expert), collapsing on the narrow
+expert dataset (9.3), where the `max` keeps querying poorly covered actions — mean
+max-Q on the first 2000 dataset states explodes to ~2.2M vs CQL's 81.1; CQL is never
+catastrophic (500 on medium/expert/mixed) at the price of some conservatism on random
+data (111.8).
 
 OPE of the expert target (true discounted value 93.03, gamma=0.99):
 
 | behaviour | PDIS  | WIS   | FQE   | ESS (% of episodes) |
 | --------- | ----- | ----- | ----- | ------------------- |
-| random    | 27.71 | 18.37 | 92.23 | 0.0%                |
-| medium    | 35.74 | 31.89 | 86.46 | 4.9%                |
-| expert    | 78.84 | 90.91 | 86.34 | 5.1%                |
-| mixed     | 47.24 | 90.17 | 85.69 | 2.4%                |
+| random    | 27.71 | 18.37 | 86.21 | 0.0%                |
+| medium    | 35.74 | 31.89 | 85.08 | 4.9%                |
+| expert    | 78.84 | 90.91 | 86.13 | 5.1%                |
+| mixed     | 47.24 | 90.17 | 84.35 | 2.4%                |
 
 Read it as: IS estimates are accurate only under good coverage (WIS ≈ 91 on
-expert/mixed) and degenerate otherwise (ESS ≈ 0% on random, both IS variants
-collapse toward the behaviour value); FQE stays within ~7 points of truth on
-_all four_ datasets because it never uses importance ratios.
+expert/mixed) and degenerate otherwise (ESS ≈ 0% on random; WIS sits near the
+discounted behaviour average while PDIS shows a high-variance realisation
+above it); FQE stays within ~7-9 points of truth on _all four_ datasets
+(undershoots of 6.8/8.0/6.9/8.7) because it never uses importance ratios.
