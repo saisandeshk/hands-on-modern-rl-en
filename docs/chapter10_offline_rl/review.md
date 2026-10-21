@@ -24,7 +24,7 @@ After working through Sections 10.1–10.3, you should be able to:
 - CQL regularizer: $\alpha\,(\mathbb{E}_s[\log\sum_a \exp Q(s,a)] - \mathbb{E}_{(s,a) \sim \mathcal{D}}[Q(s,a)])$ — push down Q everywhere (including OOD actions), pull it back up on data actually seen.
 - IQL expectile loss: $L_2^\tau(x) = |\tau - \mathbb{1}(x < 0)|\,x^2$ with $x = Q(s,a) - V(s)$ — an asymmetric square that makes $V$ lean toward the best in-data actions without ever maximizing over OOD actions.
 - Advantage-weighted policy loss: $-\mathbb{E}_{(s,a) \sim \mathcal{D}}[\exp(\beta A(s,a)) \log \pi_\theta(a \mid s)]$ — clone the data selectively, imitating high-advantage actions exponentially more.
-- TD3+BC actor: $\mathcal{L} = -\lambda\,\mathbb{E}[Q(s, \mu(s))] + \mathbb{E}[(\mu(s) - a)^2]$, $\lambda = \alpha / \text{mean}|Q|$ — scale the Q-term (not the BC term) so both forces stay balanced at any reward scale.
+- TD3+BC actor: $\mathcal{L} = -\lambda\,\mathbb{E}[Q(s, \mu(s))] + \mathbb{E}[(\mu(s) - a)^2]$, $\lambda = \alpha / \text{mean}|Q(s, \mu(s))|$ over the batch — scale the Q-term (not the BC term) so both forces stay balanced at any reward scale.
 - Return-to-go: $\hat{R}_t = \sum_{t'=t}^{T} r_{t'}$ — the remaining return, used by Decision Transformer as the prompt that steers generation toward good or bad behavior.
 - Trajectory IS: $\hat{J}_{\text{IS}} = \frac{1}{N}\sum_i \rho_i G_i$, $\rho_i = \prod_t \pi(a_t\mid s_t)/\mu(a_t\mid s_t)$ — unbiased reweighting of logged returns, with variance that explodes in horizon.
 - Per-decision IS: $\hat{J}_{\text{PDIS}} = \frac{1}{N}\sum_i \sum_t \gamma^t \rho_{1:t}^{(i)} r_{i,t}$ — scale each reward only by the action ratios that precede it.
@@ -86,7 +86,7 @@ $\rho_1 = (1/0.5)(1/0.5) = 4$, $\rho_2 = (1/0.5)(0/0.5) = 0$, $\rho_3 = (0/0.5)(
 Compute the WIS estimate on the Exercise 5 logs. It happens to be exact here in a special sense — explain why, and state whether WIS is unbiased in general.
 
 ::: details Solution
-$\hat{J}_{\text{WIS}} = (4\cdot10 + 0 + 0)/(4 + 0 + 0) = 40/4 = 10$. It equals $10$ because after normalization only $\tau_1$ survives, and $\tau_1$'s return ($10$) is exactly the return of the candidate's deterministic action sequence $(a_1, a_1)$ under these logged rewards. This exactness is luck of the tiny example, not a property of WIS: self-normalized IS is biased in general (ratio of two expectations) but consistent, converging to the truth as $N \to \infty$ with much lower variance than plain IS.
+$\hat{J}_{\text{WIS}} = (4\cdot10 + 0 + 0)/(4 + 0 + 0) = 40/4 = 10$. It equals $10$ because, under the same-start-state assumption of this example, after normalization only $\tau_1$ survives, and $\tau_1$'s return ($10$) is exactly the return of the candidate's deterministic action sequence $(a_1, a_1)$. This exactness is luck of the tiny example, not a property of WIS: self-normalized IS is biased in general (ratio of two expectations) but consistent, converging to the truth as $N \to \infty$ with much lower variance than plain IS.
 :::
 
 ### Exercise 7 (derivation): TD3+BC Is Scale-Invariant
@@ -141,15 +141,21 @@ def ope_once(pull_arm1_prob=0.5, n=50, seed=0):
     mu = np.where(arms == 1, pull_arm1_prob, 1 - pull_arm1_prob)
     rho = np.where(arms == 1, 1.0 / mu, 0.0)  # candidate always pulls arm 1
     is_est = (rho * rew).mean()
-    wis_est = (rho * rew).sum() / rho.sum()
-    ess = rho.sum() ** 2 / (rho ** 2).sum()
+    den = rho.sum()
+    if den == 0:  # logger never pulled arm 1: no information about the candidate
+        return np.nan, np.nan, 0.0
+    wis_est = (rho * rew).sum() / den
+    ess = den ** 2 / (rho ** 2).sum()
     return is_est, wis_est, ess
 
 est = np.array([ope_once(seed=s) for s in range(200)])
+# Drop degenerate seeds with zero overlap before averaging.
+est = est[~np.isnan(est[:, 1])]
+print("kept seeds:", len(est), "of 200")
 print("IS  mean/var:", est[:, 0].mean().round(3), est[:, 0].var().round(3))
 print("WIS mean/var:", est[:, 1].mean().round(3), est[:, 1].var().round(3))
 print("mean ESS:", est[:, 2].mean().round(1))
 ```
 
-Expected behavior: both estimators center near the true value $1.0$, WIS shows clearly smaller variance across seeds (normalization damps the lucky/unlucky draws of high-weight pulls), and mean ESS is around $25$ ($N$ times the $0.5$ overlap). With the logger pulling arm 1 only 5% of the time, most weights are $0$ and the rare survivors carry weight $20$: ESS collapses to roughly $N \times 0.05 \approx 2$–$3$, correctly warning that the logs barely overlap the candidate and neither estimate should be trusted for selection.
+Expected behavior: both estimators center near the true value $1.0$, WIS shows clearly smaller variance across seeds (normalization damps the lucky/unlucky draws of high-weight pulls), and mean ESS is around $25$ ($N$ times the $0.5$ overlap). With the logger pulling arm 1 only 5% of the time, most weights are $0$ and the rare survivors carry weight $20$: ESS collapses to roughly $N \times 0.05 \approx 2$–$3$, correctly warning that the logs barely overlap the candidate and neither estimate should be trusted for selection. Note that with $N = 50$ and $p = 0.05$, about $0.95^{50} \approx 8\%$ of seeds never pull arm 1 at all ($\sum_i \rho_i = 0$); those runs carry zero information and are dropped before averaging.
 :::

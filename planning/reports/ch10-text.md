@@ -53,42 +53,64 @@ Read all three in-scope pages fully and made targeted correctness fixes plus tig
 
 ## Coverage against checklist RL-6 (in-scope verdicts)
 
-| Item | Verdict |
-| --- | --- |
-| Demonstrations and behavior cloning | Partial (BC-as-regularizer covered; full BC is Ch11's topic) |
-| Behavior-cloning likelihood and action distributions | Out of scope (Ch11) — mentioned via AWR losses |
-| Covariate shift and compounding imitation error | Out of scope (Ch11) |
-| Interactive data aggregation and DAgger vocabulary | Out of scope (Ch11) |
-| Inverse RL and reward-learning boundary | Out of scope (Ch11) |
-| GAIL and occupancy-matching vocabulary | Out of scope (Ch11) |
-| Offline transition datasets and behavior-policy identity | Covered (10.1 §1) |
-| Dataset coverage, support and action gaps | Covered (10.1 §§1–2 + new §2.5) |
-| Offline distribution shift and extrapolation error | Covered (10.1 §1) |
-| Pessimism and conservative value estimation | Covered (10.1 §2) |
-| Conservative Q-Learning vocabulary | Covered (10.1 §2.2) |
-| Implicit Q-Learning expectile and advantage weighting | Covered (10.1 §2.3) |
-| Advantage-weighted actor update vocabulary | Covered (10.1 §§2.3, 3.2–3.3) |
-| Decision Transformer and sequence-modeling view (Optional) | Covered (10.2) |
-| Online fine-tuning after offline initialization | Partial → extended (10.1 §3.2 protocol note) |
-| Off-policy evaluation target and logging policies | Was missing → added (10.3 §5) |
-| Trajectory and per-decision IS for evaluation | Was missing → added with worked example |
-| Weight clipping, normalization and ESS | Was missing → added |
-| Direct, model-based and doubly robust estimator vocabulary | Was missing → added |
-| Fitted Q Evaluation vocabulary | Was missing → added |
-| Unsupported actions and impossible counterfactuals | Partial (unsupported/OOD covered; "impossible counterfactuals" now named in §5) |
-| Offline model selection without online feedback | Was missing → added (§5.4) |
-| Dataset quality, diversity and coverage sweeps | Was partial → added (§2.5) |
-| Action and observation normalization consistency | Was missing → added (§2.5) |
-| Policy abstention, fallback and data-collection triggers | Was missing → added (§5.4) |
-| Online ground truth reserved for estimator audit | Was missing → added (§5.4) |
-| Full offline-RL theory and minimax guarantees (Depth) | Skipped per instructions |
-| High-stakes deployment from observational logs alone (Later) | Skipped per instructions |
+| Item                                                         | Verdict                                                                         |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| Demonstrations and behavior cloning                          | Partial (BC-as-regularizer covered; full BC is Ch11's topic)                    |
+| Behavior-cloning likelihood and action distributions         | Out of scope (Ch11) — mentioned via AWR losses                                  |
+| Covariate shift and compounding imitation error              | Out of scope (Ch11)                                                             |
+| Interactive data aggregation and DAgger vocabulary           | Out of scope (Ch11)                                                             |
+| Inverse RL and reward-learning boundary                      | Out of scope (Ch11)                                                             |
+| GAIL and occupancy-matching vocabulary                       | Out of scope (Ch11)                                                             |
+| Offline transition datasets and behavior-policy identity     | Covered (10.1 §1)                                                               |
+| Dataset coverage, support and action gaps                    | Covered (10.1 §§1–2 + new §2.5)                                                 |
+| Offline distribution shift and extrapolation error           | Covered (10.1 §1)                                                               |
+| Pessimism and conservative value estimation                  | Covered (10.1 §2)                                                               |
+| Conservative Q-Learning vocabulary                           | Covered (10.1 §2.2)                                                             |
+| Implicit Q-Learning expectile and advantage weighting        | Covered (10.1 §2.3)                                                             |
+| Advantage-weighted actor update vocabulary                   | Covered (10.1 §§2.3, 3.2–3.3)                                                   |
+| Decision Transformer and sequence-modeling view (Optional)   | Covered (10.2)                                                                  |
+| Online fine-tuning after offline initialization              | Partial → extended (10.1 §3.2 protocol note)                                    |
+| Off-policy evaluation target and logging policies            | Was missing → added (10.3 §5)                                                   |
+| Trajectory and per-decision IS for evaluation                | Was missing → added with worked example                                         |
+| Weight clipping, normalization and ESS                       | Was missing → added                                                             |
+| Direct, model-based and doubly robust estimator vocabulary   | Was missing → added                                                             |
+| Fitted Q Evaluation vocabulary                               | Was missing → added                                                             |
+| Unsupported actions and impossible counterfactuals           | Partial (unsupported/OOD covered; "impossible counterfactuals" now named in §5) |
+| Offline model selection without online feedback              | Was missing → added (§5.4)                                                      |
+| Dataset quality, diversity and coverage sweeps               | Was partial → added (§2.5)                                                      |
+| Action and observation normalization consistency             | Was missing → added (§2.5)                                                      |
+| Policy abstention, fallback and data-collection triggers     | Was missing → added (§5.4)                                                      |
+| Online ground truth reserved for estimator audit             | Was missing → added (§5.4)                                                      |
+| Full offline-RL theory and minimax guarantees (Depth)        | Skipped per instructions                                                        |
+| High-stakes deployment from observational logs alone (Later) | Skipped per instructions                                                        |
 
 ## Needs external verification
 
 - "StARformer" fix for "Star-Vector": high-confidence inference (only well-known DT-era paper matching the garbled name), but could not check the cited source offline.
 - Paper years/venues/arXiv IDs in Further Reading and TT/Diffuser attributions were checked against solid knowledge and look right, but not against the papers themselves (no internet).
-- The `target_return = 9000` HalfCheetah-expert comment is hedged ("roughly") and plausible; exact DT-paper target values not verified.
+- The `target_return = 9000` HalfCheetah-expert comment is hedged ("roughly") and plausible; exact DT-paper target values not verified. (Addressed in this revision: replaced with a neutral example value plus "pick from the dataset's return range".)
+
+## Review response
+
+One line per reviewer finding (Errors 1–7, Doubts 1–10 from `planning/reviews/ch10-text.md`):
+
+- Error 1 (DT `act` call-site mismatch): **accepted** — inference pseudocode now calls `model.act(state, target_return, history)` (3 args, matching the definition) and documents the buffer's `(rtg, state, action)` column contract.
+- Error 2 (TD3+BC $\lambda$ denominator): **accepted** — restored $\lambda = \alpha / \mathrm{mean}_i|Q(s_i, \mu_\theta(s_i))|$ with "current policy's actions" wording (matches Fujimoto & Gu 2021 and the official implementation); my earlier claim that the dataset-action form "matches Fujimoto & Gu 2021" was wrong, and I retract it. Scale-invariance argument is unaffected.
+- Error 3 (DPO $\beta$ "step size" paragraph): **accepted** — lead-in now reads "strength of the KL anchor to the reference policy (equivalently, the temperature of the implicit reward)" and both bullets rewritten without step-size language, consistent with Chapter 14.
+- Error 4 (AWAC $\max_{a'}\pi(a'|s')$): **accepted** — now $\max\_{a'} Q(s', a')`.
+- Error 5 (Exercise 9 division by zero): **accepted** — solution guards `den == 0` (returns NaN/0.0, dropped before averaging) and states ~8% of seeds at $p = 0.05$ carry zero information; verified by execution (18/200 degenerate, kept ESS mean 2.76 / median 3.0, WIS variance below IS).
+- Error 6 (sidebar `config.mjs`): **no change — out of scope** (worker rules forbid editing `docs/.vitepress/config.mjs`). Coordinator action needed: add `{ text: '10.4 Summary and Exercises', link: '/chapter10_offline_rl/review' }` to the chapter-10 group. "Sidebar additions" entry retained for this.
+- Error 7 (`content-review-notes.md` checkboxes): **no change — out of scope** (that file is outside my editable set). Coordinator action needed: mark both chapter-10 items `[x]`; fixes were the CQL snippet rewrite + expectation-under-$\pi$ guarantee correction, and the RvS/StARformer relabel.
+- Doubt 1 (CQL `q_next` evaluated at wrong state): **accepted** — regularizer now uses a dedicated `a_pi = self.actor(s)` / `q_pi` at the same state $s$; `a_next` remains only for the Bellman target.
+- Doubt 2 (CQL guarantee missing slack/assumptions): **accepted** — added "up to sampling and function-approximation error, and under coverage of the data" qualifier.
+- Doubt 3 (IQL "guessing" in action gaps): **accepted** — sentence restricted to CQL-style logsumexp methods, with an explicit note that IQL never evaluates OOD actions.
+- Doubt 4 ($K$ double meaning): **accepted** — diffusion horizon renamed to $N_{\text{diff}}$ in both places; §1 keeps $K$ for DT context length.
+- Doubt 5 (buffer contract + `target_return = 9000`): **accepted** — pseudocode documents the `rtg [T,1] / states [T,D] / actions [T,A]` contract and appends `(target_return, state, action)`; value replaced with a neutral example plus dataset-range advice.
+- Doubt 6 (OPE example same-state assumption + undefined $T$): **accepted** — added "assume all three episodes start from the same state" and defined $T$ as the episode length; same assumption noted in `review.md` Exercise 6.
+- Doubt 7 (DR cumulative vs per-decision weight): **accepted with note** — formula kept (cumulative form is still doubly robust via the telescoping identity) with a parenthetical citing Jiang & Li 2016's per-decision form.
+- Doubt 8 (roadmap paragraph missing §5): **accepted** — roadmap now names the OPE grading step.
+- Doubt 9 (BCQ $n = 100$ vs $n = 10$): **accepted** — now "say n=10, as in BCQ Algorithm 1".
+- Doubt 10 (`10.R` numbering): **rejected — per task spec**: the task explicitly requires front matter `title: 10.R Summary and Exercises` and H1 `# 10.R Summary and Exercises`, and forbids editing the sidebar; renumbering is the coordinator's job at merge time.
 
 ## Sidebar additions
 
@@ -96,12 +118,12 @@ Read all three in-scope pages fully and made targeted correctness fixes plus tig
 
 ## Commands run and results
 
-- `git status --short` (and one `head`-equivalent read attempt) via shell: **rejected by the sandbox** ("non-interactive run cannot ask the user for permission"). Per worker rules I did not retry or seek workarounds.
-- Consequently `npx prettier --write` and `npx vitepress build docs` **could not be run**; all edits were kept stylistically consistent with surrounding pages by hand (blank lines around blocks, existing table/header conventions), but formatting and the full build still need coordinator verification.
-- All numeric claims were verified by hand derivation (details in Technical fixes and the review.md solutions).
+- `npx prettier --write` on the four touched chapter files plus the report: chapter files already conformant ("unchanged"); report reformatted.
+- Exercise 9 OPE snippet executed via `.venv/bin/python`: 200 seeds at 50% overlap give IS mean 0.978 / var 0.056, WIS mean 0.980 / var 0.036, mean ESS 24.9; at 5% overlap 18/200 seeds degenerate (zero arm-1 pulls), kept ESS mean 2.76 / median 3.0 with WIS variance (0.497) below IS (0.803) — matches the reviewer's numbers and the solution's stated expected behavior.
+- `npx vitepress build docs`: **succeeds** (build complete, pages rendered).
 
 ## Open issues
 
-1. **Build/format not verified** (see above) — coordinator should run `npx prettier --write` on the four touched files and `npx vitepress build docs` before merging.
+1. **Build/format verified in this revision** — `npx prettier --write` clean and `npx vitepress build docs` succeeds. Two required follow-ups are outside my scope and left for the coordinator: adding `review.md` to the VitePress sidebar (`config.mjs`) and marking the two chapter-10 items `[x]` in `planning/content-review-notes.md`.
 2. New OPE section lives in 10.3 (`experiments.md`), whose title is "Offline Reinforcement Learning and Preference Data" — the section fits ("selecting without deploying" for both robots and LLMs) but the coordinator may prefer retitling the page or relocating it.
 3. Code in `code/` untouched per scope; the corrected CQL/DT snippets in the text were shape-traced by hand, not executed.

@@ -14,7 +14,7 @@ In the previous section, [10.2](./sequence-modeling), we saw how Decision Transf
 
 Let's stop and think: does LLM preference optimization (for example DPO) also fit the "offline learning" setting? Yes! The training set already provides the prompt, a better answer, and a worse answer. During training you cannot go back to the annotators and ask "which of these two answers is actually better", and you cannot interact with an environment online to correct things. You can only use the fixed preference data that has already been collected.
 
-In this section we connect the two fields. First we explain the deep link between DPO and offline optimization with a KL constraint, then we map preference data onto classical offline trajectories item by item, then we show how the sequence-modeling idea enters LLM reasoning search, and finally we point out what this analogy can explain and what it cannot replace. The goal is a unified view of offline RL for robots and post-training of large models.
+In this section we connect the two fields. First we explain the deep link between DPO and offline optimization with a KL constraint, then we map preference data onto classical offline trajectories item by item, then we show how the sequence-modeling idea enters LLM reasoning search, then we show how to grade candidate policies without deploying them via off-policy evaluation, and finally we point out what this analogy can explain and what it cannot replace. The goal is a unified view of offline RL for robots and post-training of large models.
 
 ## 1. Placing DPO Back in Offline RL
 
@@ -64,10 +64,10 @@ The full derivation needs some mathematics (starting from the optimal policy und
 3. **How does DPO avoid extrapolation error?** It learns relative merits directly from preference data and avoids the explicit $\max_a Q(s',a')$ operation, and thus the extrapolation path where Q-learning most easily goes wrong. Of course, when the preference data has insufficient coverage there is still an out-of-distribution generalization problem, so independent evaluation is always necessary.
    :::
 
-This correspondence also helps us understand the real role of the hyperparameter $\beta$: it controls the update step size of the current policy relative to the reference policy.
+This correspondence also helps us understand the real role of the hyperparameter $\beta$: it controls the strength of the KL anchor to the reference policy (equivalently, the temperature of the implicit reward).
 
-- If β is too small: the KL constraint is weak, the update steps are too big, and the model easily drifts into regions not covered by the preference data (OOD) and generates strange outputs
-- If β is too large: the update is too conservative — the model clings to the reference policy, the probability gap between good and bad answers cannot be pulled apart, and the training effect is not obvious
+- If β is too small: the KL constraint is weak, the model easily drifts into regions not covered by the preference data (OOD) and generates strange outputs
+- If β is too large: the KL anchor is too strong — the model clings to the reference policy, the probability gap between good and bad answers cannot be pulled apart, and the training effect is not obvious
 
 So when tuning DPO's β in practice, you cannot look only at the preference accuracy on the training set. You also need to monitor the KL divergence (the gap from the reference model), the answer-length distribution, and, most importantly, the actual performance on an independent evaluation set.
 
@@ -141,7 +141,7 @@ If the logger chose actions with known probabilities $\mu(a \mid s)$, each logge
 
 $$\rho(\tau_i) = \prod_{t} \frac{\pi(a_t \mid s_t)}{\mu(a_t \mid s_t)}, \qquad \hat{J}_{\text{IS}} = \frac{1}{N}\sum_{i=1}^{N} \rho(\tau_i)\, G_i$$
 
-This ordinary importance-sampling estimator is unbiased provided $\mu$ covers $\pi$ (every action $\pi$ might take has positive probability under $\mu$), but its variance grows roughly exponentially in the horizon, because $T$ noisy ratios multiply. A three-trajectory example shows the pathology concretely. Let the logger pick $a_1/a_2$ fifty-fifty and the candidate always pick $a_1$:
+This ordinary importance-sampling estimator is unbiased provided $\mu$ covers $\pi$ (every action $\pi$ might take has positive probability under $\mu$), but its variance grows roughly exponentially in the horizon $T$ (the episode length), because $T$ noisy ratios multiply. A three-trajectory example shows the pathology concretely. Assume all three episodes start from the same state, so their returns are directly comparable. Let the logger pick $a_1/a_2$ fifty-fifty and the candidate always pick $a_1$:
 
 - $\tau_1 = (a_1, a_1)$, $G_1 = 10$: $\rho_1 = (1/0.5)\cdot(1/0.5) = 4$
 - $\tau_2 = (a_1, a_2)$, $G_2 = 2$: $\rho_2 = (1/0.5)\cdot(0/0.5) = 0$
@@ -159,7 +159,7 @@ Three standard tools trade a little bias for much lower variance. **Weight clipp
 
 $$\hat{J}_{\text{WIS}} = \frac{\sum_i \rho_i G_i}{\sum_i \rho_i}$$
 
-On the example above, $\hat{J}_{\text{WIS}} = 40/4 = 10$: biased in general, but consistent and far steadier. Finally, always report the **effective sample size**:
+On the example above, $\hat{J}_{\text{WIS}} = 40/4 = 10$: biased in general, but consistent and far steadier. Under the same-start-state assumption of this example, 10 is the return of the candidate's deterministic action sequence $(a_1, a_1)$. Finally, always report the **effective sample size**:
 
 $$\text{ESS} = \frac{(\sum_i \rho_i)^2}{\sum_i \rho_i^2}$$
 
@@ -171,7 +171,7 @@ Reweighting alone ignores everything we know about the environment's structure. 
 
 $$\hat{J}_{\text{DR}} = \frac{1}{N}\sum_i\left[\hat{V}(s_1) + \sum_t \gamma^t \rho_{1:t}\left(r_t + \gamma\hat{V}(s_{t+1}) - \hat{Q}(s_t, a_t)\right)\right]$$
 
-Read it inside out: start from the model's guess $\hat{V}(s_1)$, then add each step's surprise (actual reward plus next-state value minus what the model predicted), reweighted onto $\pi$'s distribution. It is unbiased if _either_ the model _or_ the ratios are correct — hence "doubly" robust — and its variance collapses when the model is good.
+Read it inside out: start from the model's guess $\hat{V}(s_1)$, then add each step's surprise (actual reward plus next-state value minus what the model predicted), reweighted onto $\pi$'s distribution. It is unbiased if _either_ the model _or_ the ratios are correct — hence "doubly" robust — and its variance collapses when the model is good. (Written here with the cumulative weight $\rho_{1:t}$; Jiang & Li 2016 state the standard form with the per-decision weight at step $t$, which the same telescoping identity justifies.)
 
 **Fitted Q Evaluation (FQE)** takes the regression route: fit $Q^\pi$ by iterating $Q_{k+1} = \arg\min_Q\, \mathbb{E}_{\mathcal{D}}[(Q(s,a) - (r + \gamma\,\mathbb{E}_{a' \sim \pi}[Q_k(s',a')]))^2]$ on the fixed data, then average $Q(s_0, \pi(s_0))$ over logged start states. Notice there is no $\max$ over actions anywhere — FQE evaluates the candidate's own actions, so it never queries maximizing OOD actions the way offline Q-learning does. That makes it calmer than training a full offline agent, though a candidate that strays far from the logs still forces the regressor to extrapolate.
 

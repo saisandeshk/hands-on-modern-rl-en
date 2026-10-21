@@ -121,7 +121,7 @@ $$a' = \arg\max_{a \in \{a_i + \xi \Phi(s, a_i)\}} Q_\phi(s', a)$$
 
 Let's take this expression apart:
 
-- $\{a_i\} \sim \pi_\beta$: sample n candidate actions (say n=100) from the learned behavior-policy model. These are all actions that appear in the data with high probability.
+- $\{a_i\} \sim \pi_\beta$: sample n candidate actions (say n=10, as in BCQ Algorithm 1) from the learned behavior-policy model.
 - $\Phi(s, a)$: a perturbation network that makes small corrections to the sampled actions to approach the local optimum. Otherwise we could only imitate the behavior policy exactly and could not improve.
 - $\xi$: the upper limit of the perturbation magnitude, a hyperparameter. The perturbation cannot be too large, or we are out of the dataset again.
 - Finally, among these n perturbed candidates, choose the one with the highest Q-value as a'
@@ -144,7 +144,7 @@ This loss looks a bit complicated, so let's take apart the roles of its two term
 
 Between the push and the pull a "penalty gap" forms: the Q-values of OOD actions are systematically underestimated, while the Q-values of in-data actions stay within a reasonable range.
 
-CQL has a clean theoretical guarantee: the learned $\hat{Q}$ **lower-bounds the true value in expectation under the policy being evaluated** — that is, the estimated policy value $\hat{V}^\pi(s) = \mathbb{E}_{a \sim \pi(\cdot \mid s)}[\hat{Q}(s, a)]$ sits below the true $V^\pi(s)$ on states covered by the data, so the policy's return is never overestimated on average. Note this is an expectation-under-$\pi$ guarantee, not a pointwise inequality $\hat{Q}(s, a) \leq Q^\pi(s, a)$ for every single $(s, a)$. CQL further opens a penalty gap that grows with $\alpha$: the value of $\hat{Q}$ on OOD actions sits below its value on in-distribution actions, so greedy improvement steers away from actions the data never tried.
+CQL has a clean theoretical guarantee (up to sampling and function-approximation error, and under coverage of the data): the learned $\hat{Q}$ **lower-bounds the true value in expectation under the policy being evaluated** — that is, the estimated policy value $\hat{V}^\pi(s) = \mathbb{E}_{a \sim \pi(\cdot \mid s)}[\hat{Q}(s, a)]$ sits below the true $V^\pi(s)$ on states covered by the data, so the policy's return is never overestimated on average. Note this is an expectation-under-$\pi$ guarantee, not a pointwise inequality $\hat{Q}(s, a) \leq Q^\pi(s, a)$ for every single $(s, a)$. CQL further opens a penalty gap that grows with $\alpha$: the value of $\hat{Q}$ on OOD actions sits below its value on in-distribution actions, so greedy improvement steers away from actions the data never tried.
 
 In practice α does not need to be tuned by hand. Automatic adjustment with Lagrangian duality gives just the right conservatism:
 
@@ -170,11 +170,12 @@ class CQL(SAC):
         # CQL conservative regularizer (shown for Q1; repeat the same for Q2)
         # Sample random actions as a tractable stand-in for OOD actions
         rand_a = torch.empty_like(a).uniform_(-1, 1)
+        a_pi = self.actor(s)                 # policy action at the SAME state s
         q_rand = self.critic1(s, rand_a)   # [B, 1], OOD stand-in
         q_curr = self.critic1(s, a)        # [B, 1], in-dataset
-        q_next = self.critic1(s, a_next)   # [B, 1], policy actions
+        q_pi = self.critic1(s, a_pi)       # [B, 1], policy actions at s
         # Concatenate along the action axis: [B, 3], then soft-max over it
-        cat_q = torch.cat([q_rand, q_curr, q_next], dim=1)
+        cat_q = torch.cat([q_rand, q_curr, q_pi], dim=1)
         logsumexp_q = torch.logsumexp(cat_q, dim=1).mean()
 
         conservative_loss = self.alpha * (logsumexp_q - q_curr.mean())
@@ -237,7 +238,7 @@ Before choosing an algorithm, audit the dataset itself, because no conservative 
 
 **Quality and diversity.** Ask which behavior policies produced the logs and how good they are. A dataset of purely random trajectories can at best teach a mediocre policy, while a mixture of medium and expert trajectories gives Decision Transformer–style methods the return contrast they need and gives advantage-weighted methods something worth upweighting. A cheap diagnostic is a **coverage sweep**: train your algorithm on nested fractions of the data (say 10%, 50%, 100%) and on quality splits (random only vs. mixed), and plot the offline-estimated return (see Section 10.3 on off-policy evaluation for how to estimate it without deploying). If performance jumps when expert trajectories are added but barely moves when random ones are, your bottleneck is data quality, not the algorithm.
 
-**Coverage and action gaps.** For a sample of states, check how many distinct actions the data shows and how far apart they are. Large **action gaps** — regions of the action space with no samples — are exactly where the logsumexp penalty of CQL or the expectile of IQL has to guess. If whole regions of the state space are missing, consider collecting more data there before training; conservatism manages extrapolation, it does not replace coverage.
+**Coverage and action gaps.** For a sample of states, check how many distinct actions the data shows and how far apart they are. Large **action gaps** — regions of the action space with no samples — are exactly where the logsumexp penalty of CQL-style methods has to guess. (IQL never evaluates an out-of-dataset action at all, so it sidesteps rather than guesses in the gaps.) If whole regions of the state space are missing, consider collecting more data there before training; conservatism manages extrapolation, it does not replace coverage.
 
 **Normalization consistency.** Neural critics and actors are sensitive to input and reward scales, so normalize states with the dataset's own statistics (zero mean, unit variance) and keep action scaling consistent with the policy head (for example a $\tanh$ output in $[-1, 1]$ matched to rescaled actions). The golden rule: compute the statistics on the training dataset once, freeze them, and apply the identical transform at deployment. Recomputing statistics on new inputs leaks deployment distribution into the transform and silently shifts every Q-value. Reward scale matters too: it sets the size of Q and hence the balance of every regularizer, which is why TD3+BC auto-scales its weight while CQL's $\alpha$ may need retuning when you move to an environment with very different returns.
 
@@ -258,9 +259,9 @@ This loss is very easy to understand:
 
 Note that the weight $\lambda$ sits in front of the Q-term, not the BC term. It adapts automatically to the reward scale of different environments and needs no tuning at all:
 
-$$\lambda = \frac{\alpha}{\frac{1}{N}\sum_i |Q(s_i, a_i)|}$$
+$$\lambda = \frac{\alpha}{\frac{1}{N}\sum_i |Q(s_i, \mu_\theta(s_i))|}$$
 
-What is the denominator? The mean absolute Q-value over the dataset, that is, the scale of the return in different environments. If an environment's Q-values are generally large (for example the reward is not normalized and runs into the hundreds or thousands), the denominator is large, $\lambda$ automatically becomes smaller, and the Q-term is scaled down so that it stays on the same footing as the BC term. If Q-values are generally small, $\lambda$ becomes larger so that the improvement signal is not drowned out by the cloning term. Either way the two forces stay balanced. The paper fixes $\alpha=2.5$ and obtains good results on all D4RL MuJoCo tasks with a single set of hyperparameters.
+What is the denominator? The mean absolute Q-value of the current policy's actions, that is, the scale of the return in different environments. If an environment's Q-values are generally large (for example the reward is not normalized and runs into the hundreds or thousands), the denominator is large, $\lambda$ automatically becomes smaller, and the Q-term is scaled down so that it stays on the same footing as the BC term. If Q-values are generally small, $\lambda$ becomes larger so that the improvement signal is not drowned out by the cloning term. Either way the two forces stay balanced. The paper fixes $\alpha=2.5$ and obtains good results on all D4RL MuJoCo tasks with a single set of hyperparameters.
 
 The simplicity of TD3+BC makes it a very practical strong baseline in offline RL. Its performance also points to a somewhat counterintuitive fact: **on many offline RL benchmarks, this most basic BC regularization already reaches performance close to complex algorithms such as CQL and IQL**. Never underestimate the power of simple methods.
 
@@ -282,7 +283,7 @@ $$\mathcal{L}_\pi^{\text{AWAC}} = -\mathbb{E}\left[\exp\left(\frac{A(s, a)}{\bet
 
 The forms are almost the same. β sits in the denominator in one and the numerator in the other, but both can be seen as temperature coefficients, used in different ways. So where is the core difference? It lies in **how the advantage function A(s,a) is estimated**:
 
-- **AWAC**: $A = Q_\phi(s, a) - V_\psi(s)$, where Q still goes through the standard Bellman backup. That is, the target still has the step $\max_{a'} \pi(a'|s')$, so OOD actions may still be queried.
+- **AWAC**: $A = Q_\phi(s, a) - V_\psi(s)$, where Q still goes through the standard Bellman backup. That is, the target still has the step $\max_{a'} Q(s', a')$, so OOD actions may still be queried.
 - **IQL**: $A = Q_\phi(s, a) - V_\psi(s)$, but the backup of Q is done through V. The target directly uses V(s') rather than $\max_a Q(s', a')$, and V is estimated with expectile regression on in-data actions, leaning toward the better actions in the data.
 
 By changing the Bellman target from $\max Q$ to $V$, IQL eliminates the path by which extrapolation error arises at its root. AWAC keeps the standard Bellman target and relies only on weighted BC to keep the policy from drifting too far. This constraint is weaker than IQL's implicit constraint, so when the Q-values in the dataset are very noisy, AWAC can still step on an OOD landmine. A seemingly tiny difference like this has a large effect on stability on sparse data.

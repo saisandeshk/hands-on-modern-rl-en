@@ -133,16 +133,18 @@ The training process is exactly like training any sequence model: cut a history 
 
 Training is this simple, so how is it used at deployment time? You will find it even simpler. DT does not need to take an argmax of Q over the action space. You only need to **specify a target RTG** (for example, check roughly what score expert trajectories in your dataset get and set the target to that number), and DT then generates actions autoregressively, like GPT generating text, trying to make the cumulative return of the whole trajectory approach the target you set.
 
-Here is the inference pseudocode:
+Here is the inference pseudocode (the buffer stores one row per step with the
+RTG fed at that step, plus the state and the action taken, so its three
+columns stay aligned):
 
 ```python
-target_return = 9000  # Roughly the expert-level score in the HalfCheetah environment
+target_return = 6000  # example value: pick from the return range in your dataset
 state = env.reset()
-history = TrajectoryBuffer()  # Stores the most recent K steps of history
+history = TrajectoryBuffer()  # columns: rtg [T,1], states [T,D], actions [T,A]
 for t in range(max_steps):
-    action = model.act(state, target_return, history, t)
+    action = model.act(state, target_return, history)
     next_state, reward, done, _ = env.step(action)
-    history.append(state, action, reward)
+    history.append(target_return, state, action)
     state = next_state
     # Key: subtract the reward actually received from the RTG at each step, as the "remaining target"
     target_return -= reward
@@ -228,14 +230,14 @@ $$\min_\theta \; \mathbb{E}_{\tau, t, \epsilon}\left[\|\epsilon - \epsilon_\thet
 Let's take this training objective apart:
 
 - $\tau$: a real trajectory sampled from the dataset
-- $t$: the diffusion step (from 0 to $K$, where $t=0$ is the clean trajectory and $t=K$ is pure noise)
+- $t$: the diffusion step (from 0 to $N_{\text{diff}}$, where $t=0$ is the clean trajectory and $t=N_{\text{diff}}$ is pure noise)
 - $\epsilon \sim \mathcal{N}(0, I)$: the Gaussian noise we actually add
 - $\tau_t$: the noisy trajectory after t steps of noise
 - $\epsilon_\theta(\tau_t, t)$: the network's prediction of "what noise was added at this step"
 
 The training objective is to make the predicted noise as close as possible to the noise actually added (an MSE loss). This is standard diffusion-model training, without any special modification.
 
-At inference we go in reverse: start from pure random noise and iterate the reverse process over its $K$ diffusion steps. At each step the network predicts the noise, and this noise is subtracted from the current noisy trajectory, and in the end we obtain a clean trajectory that looks like those in the training data.
+At inference we go in reverse: start from pure random noise and iterate the reverse process over its $N_{\text{diff}}$ diffusion steps. At each step the network predicts the noise, and this noise is subtracted from the current noisy trajectory, and in the end we obtain a clean trajectory that looks like those in the training data.
 
 But wait! What we want is not just trajectories that "look like real data" but **high-return trajectories**. How do we control whether the generated trajectory is good or bad? Diffuser uses **classifier-free guidance**, a well-established technique from image diffusion. During training the conditioning information (such as reward or the starting state) is randomly dropped, so the model learns both conditional and unconditional generation. At inference the predictions of the two are combined by a weighted extrapolation:
 
