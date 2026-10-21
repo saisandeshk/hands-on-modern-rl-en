@@ -498,13 +498,15 @@ _Figure 11: GPU pipeline from the Isaac Gym paper. Learning Framework, Environme
 _Figure 12: Isaac Gym's in-GPU producer/consumer closed loop. PhysX produces state tensors on the GPU, the policy network directly consumes state tensors and produces action tensors, and task logic writes actions back into the next round of physics simulation. The core benefit is avoiding CPU/GPU round-trip transfers at each step. (Compiled from the Isaac Gym paper [^isaac])_
 
 ```
-Traditional:  CPU physics engine × 64 envs → GPU policy inference
-Isaac Gym:    GPU physics simulation × 4096 envs + GPU policy inference
+Traditional:  CPU physics engine × dozens of envs → GPU policy inference
+Isaac Gym:    GPU physics simulation × thousands of envs + GPU policy inference
 ```
 
+The exact speedup is workload- and hardware-dependent; treat published fps figures as order-of-magnitude illustrations and benchmark your own environment mix:
+
 - **Comparison — sampling speed**
-  - CPU parallel (MuJoCo × 64): ~10K fps
-  - GPU parallel (Isaac Gym × 4096): ~1M fps
+  - CPU parallel (MuJoCo × 64): ~10K fps (illustrative)
+  - GPU parallel (Isaac Gym × 4096): ~1M fps (illustrative)
 - **Comparison — data transfer**
   - CPU parallel (MuJoCo × 64): CPU→GPU every step
   - GPU parallel (Isaac Gym × 4096): zero-copy
