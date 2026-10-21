@@ -987,6 +987,10 @@ const sidebar = {
             {
               text: '12.3 Hierarchical RL and World Models',
               link: '/chapter12_exploration_marl_hierarchical/hierarchical'
+            },
+            {
+              text: '12.4 Summary and Exercises',
+              link: '/chapter12_exploration_marl_hierarchical/review'
             }
           ]
         }

@@ -1,8 +1,8 @@
 ---
-title: 12.R Summary and Exercises
+title: 12.4 Summary and Exercises
 ---
 
-# 12.R Summary and Exercises
+# 12.4 Summary and Exercises
 
 ## What You Should Now Be Able to Do
 
