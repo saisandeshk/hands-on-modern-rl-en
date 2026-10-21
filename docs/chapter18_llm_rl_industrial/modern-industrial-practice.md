@@ -1,3 +1,7 @@
+---
+title: 18.3 Training Stability
+---
+
 # 18.3 Training Stability
 
 > **Goal of this section**: Master the four-layer order for diagnosing training stability (data and rewards, policy change, numerical updates, training system), learn to read KL and entropy and loss and gradient norm, and be able to use public cases to judge which layer a stability tool acts on.

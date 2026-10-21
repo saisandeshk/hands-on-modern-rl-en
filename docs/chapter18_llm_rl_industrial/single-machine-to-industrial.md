@@ -1,3 +1,7 @@
+---
+title: 18.1 From Single-Machine Experiments to Industrial Training
+---
+
 # 18.1 From Single-Machine Experiments to Industrial Training
 
 From RLHF and DPO to GRPO, reasoning-model training, and process rewards, we have learned a series of post-training algorithms: how to align a model with human preferences, replace the Critic with within-group comparisons, train long-horizon reasoning, and search for better answers at inference time.
@@ -178,7 +182,7 @@ The standard approach is to perform z-score normalization by task domain:
 
 $$\tilde{r}_{\text{domain}} = \frac{r - \mu_{\text{domain}}}{\sigma_{\text{domain}}}$$
 
-where $\mu_{\text{domain}}, \sigma_{\text{domain}}$ are the mean and standard deviation of the rewards within the same domain in the current batch. After normalization, all rewards are in the scale of $[-3, 3]$, making them safe to add together.
+where $\mu_{\text{domain}}, \sigma_{\text{domain}}$ are the mean and standard deviation of the rewards within the same domain in the current batch. After normalization, rewards from different domains are typically concentrated on a comparable scale (roughly $[-3, 3]$ for most samples), so they can be added without one domain dominating the gradient. Normalization does not hard-bound the values: outliers can still exceed that range, which is why extreme rewards are additionally clipped.
 
 Another approach is to perform intra-group normalization for the $G$ rollouts of the same prompt. GRPO uses this statistic to construct relative advantages, ensuring that the original reward scales of different prompts do not directly enter the same intra-group comparison.
 
@@ -207,7 +211,21 @@ $$C_{\text{RL-step}} = C_{\text{rollout}} + C_{\text{actor-update}} + C_{\text{r
 
 The four terms are the costs of generating responses, updating the Actor, running the reference model, and computing rewards. In a typical configuration with a 7B model and a batch of 512 prompts × 8 rollouts, rollout generation accounts for 50%–60% of total computation. Frameworks therefore optimize generation throughput, asynchronous scheduling, and parameter synchronization separately.
 
-### 3.3 Cost-Control Strategies
+### 3.3 Measuring Throughput: Tokens, Verifiers, and Update Utilization
+
+FLOP counts say whether a plan fits the budget. They do not say where a running job is stuck. Three rates, read together each step, locate the bottleneck:
+
+- **Rollout tokens per second**: total generated tokens divided by rollout wall time. If this falls while GPU power draw stays high, generation is memory-bound (KV cache, small batches) rather than compute-bound.
+- **Verifier throughput**: scored trajectories per second, tracked separately for rule verifiers, code sandboxes, and model judges. A sandbox that runs one test at a time can stall thousands of rollout GPUs; slow judges belong in an offline scoring queue, not on the critical path.
+- **Update utilization**: fraction of wall time the trainer spends in forward-backward passes versus waiting for rollouts or weights. Sustained low utilization with a full rollout queue points at synchronization or data loading; low utilization with an empty queue is learner starvation (see [18.4](./distributed-sync)).
+
+Total compute then splits into three buckets that scale differently:
+
+$$C_{\text{total}} = C_{\text{sample}} + C_{\text{inference}} + C_{\text{training}}.$$
+
+$C_{\text{sample}}$ covers discarded work: prompts filtered by difficulty, all-correct/all-wrong groups, and retries after environment failure. $C_{\text{inference}}$ covers rollout generation and judge scoring. $C_{\text{training}}$ covers forward-backward updates of the Actor (and Critic, if any). Example: if 30% of generated groups carry no learning signal and each training token costs roughly three times a rollout token (forward plus backward versus forward only), cutting the zero-signal fraction from 30% to 10% saves more than a 10% faster trainer. Measure all three before buying more GPUs.
+
+### 3.4 Cost-Control Strategies
 
 - **Filter data before adding compute**: 10K high-quality examples can be more useful than 100K low-quality examples, although filtering itself also consumes compute.
 - **Validate on a small model first**: test the algorithm and hyperparameters on a 7B model before scaling to 70B or 400B, avoiding failed retraining runs at large scale.

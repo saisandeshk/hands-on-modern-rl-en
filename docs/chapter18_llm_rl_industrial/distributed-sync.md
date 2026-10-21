@@ -1,3 +1,7 @@
+---
+title: 18.4 Distributed RL Training
+---
+
 # 18.4 Distributed RL Training
 
 > **Goal of this section**: understand the sources and corrections of training-inference mismatch, learn how veRL assigns models and GPUs with ResourcePool, Worker, and Driver, review common techniques for generation throughput and training memory, and decide when asynchronous scheduling is necessary.
@@ -104,6 +108,14 @@ HybridFlow's “hybrid” design allows one framework to combine 3D parallelism 
 
 Choose from current scale and the existing stack: TRL for learning and prototypes; OpenRLHF or veRL for research and medium scale; veRL or NeMo-Aligner for large production systems.
 
+### Colocated versus Disaggregated Deployment
+
+A ResourcePool can host several roles on the same GPUs (**colocated**) or give each role its own GPUs (**disaggregated**). Colocation time-shares memory: the rollout engine borrows the GPUs during generation and releases them for the update, often with weights offloaded to CPU in between. Nothing crosses the network and every GPU works in each phase, but each switch pays unload/reload cost and peak memory must hold both roles' transient states.
+
+Disaggregation keeps rollout and training resident on separate GPUs and streams weights between them, typically with an NCCL broadcast after each update. Generation and training can then overlap — rollout GPUs produce batch $k+1$ while the trainer updates on batch $k$ — which suits asynchronous loops, but one side idles whenever the other is slower, and every update pays a broadcast. Synchronizing a small LoRA adapter instead of full weights shrinks that transfer by orders of magnitude.
+
+A practical rule: colocate when the model fits one GPU pool with offloading and batches stay synchronous, since that maximizes utilization per GPU. Disaggregate when rollout and update times differ sharply, when generation wants a different parallel layout than training, or when an async queue must never block on a phase switch. Mixed layouts are common: colocate the Actor with rollout, and disaggregate a large reward model that only scores.
+
 ---
 
 ## Generation Speed and Training Memory
@@ -145,24 +157,24 @@ A 70B model cannot perform full-parameter BF16 training on one 80GB H100. With B
 
 [DeepSpeed ZeRO](https://arxiv.org/abs/1910.02054) shards progressively more state:
 
-| Level  | Optimizer State | Gradients  | Weights    | Per-GPU Saving    | Communication | Best Fit                                       |
-| ------ | --------------- | ---------- | ---------- | ----------------- | ------------- | ---------------------------------------------- |
-| ZeRO-1 | Sharded         | Replicated | Replicated | ~4×               | Low           | Medium models or communication-limited systems |
-| ZeRO-2 | Sharded         | Sharded    | Replicated | ~8×               | Medium        | Default for many training jobs                 |
-| ZeRO-3 | Sharded         | Sharded    | Sharded    | $N$× for $N$ GPUs | High          | Full-parameter large-model training            |
+| Level  | Optimizer State | Gradients  | Weights    | Per-GPU Saving (large $N$) | Communication | Best Fit                                       |
+| ------ | --------------- | ---------- | ---------- | -------------------------- | ------------- | ---------------------------------------------- |
+| ZeRO-1 | Sharded         | Replicated | Replicated | up to ~4×                  | Low           | Medium models or communication-limited systems |
+| ZeRO-2 | Sharded         | Sharded    | Replicated | up to ~8×                  | Medium        | Default for many training jobs                 |
+| ZeRO-3 | Sharded         | Sharded    | Sharded    | $N$× for $N$ GPUs          | High          | Full-parameter large-model training            |
 
 ZeRO-3 all-gathers the needed parameters temporarily during forward and backward passes. [FSDP](https://pytorch.org/docs/stable/fsdp.html) is PyTorch's native equivalent and veRL's default training backend.
 
 **Gradient checkpointing** exchanges compute for memory. It saves only selected forward activations and recomputes the rest during backpropagation, reducing activation memory from $O(L)$ to $O(\sqrt L)$ for $L$ Transformer layers while slowing training by roughly 20%–30%.
 
-For a 70B model on 80GB H100s:
+For a 70B model on 32× 80GB H100s, sharded state is about $1.12\,\text{TB} / 32 \approx 35\,\text{GB}$ per GPU, plus transient gathered parameters and activations:
 
-| Configuration                       | Per-GPU Memory | Speed                                                    | Feasible? |
-| ----------------------------------- | -------------- | -------------------------------------------------------- | --------- |
-| Full parameters + Adam, no sharding | ~940 GB        | Baseline                                                 | No        |
-| ZeRO-3 training-state sharding      | ~118 GB        | 10%–15% slower                                           | Still no  |
-| ZeRO-3 + gradient checkpointing     | ~30 GB         | 30%–40% slower                                           | Yes       |
-| ZeRO-3 + checkpointing + LoRA       | ~8 GB          | ~40% slower per step, but far fewer trainable parameters | Yes       |
+| Configuration                       | Per-GPU Memory             | Speed                                                    | Feasible?                          |
+| ----------------------------------- | -------------------------- | -------------------------------------------------------- | ---------------------------------- |
+| Full parameters + Adam, no sharding | ~1.12 TB                   | Baseline                                                 | No                                 |
+| ZeRO-3 training-state sharding      | ~35 GB + activations       | 10%–15% slower                                           | Yes, tight                         |
+| ZeRO-3 + gradient checkpointing     | ~35 GB + small activations | 30%–40% slower                                           | Yes, room for a larger micro-batch |
+| ZeRO-3 + checkpointing + LoRA       | ~8 GB                      | ~40% slower per step, but far fewer trainable parameters | Yes                                |
 
 Industrial 70B RL often combines LoRA with FSDP to balance memory, speed, and training quality.
 
@@ -183,6 +195,18 @@ Asynchronous training lets generation and updating advance independently through
 | [AgentRL](https://arxiv.org/abs/2510.04206) | THUDM/Zhipu, 2025          | Asynchronous generation-training pipeline plus a unified environment interface         | Queues, task isolation, and independently managed multi-turn sessions                           | Multi-machine, multi-environment | Used for AutoGLM                            | SWE, computer use, and deep research      |
 
 LlamaRL favors simple horizontal scale: no central worker and no explicit correction. AReaL stores more trajectory metadata to compute and clip an explicit correction. AgentRL adds environment management because external interaction can take longer than model generation itself.
+
+Reuse is a second drift source beyond staleness. PPO classically takes several gradient epochs over one rollout batch, and each extra epoch reuses the same behavior data while the policy moves further from it. The importance-ratio denominator stays fixed at the sampling policy, so clipping and early stopping on KL bound how far reuse may go. GRPO-style setups usually take a single gradient step per batch precisely to stay near on-policy; if you add epochs, watch the mean ratio and KL per epoch, not just the loss.
+
+### Keeping the Queue Healthy: Batching, Backpressure, and Recovery
+
+An async loop is a producer-consumer queue, and three failure modes have nothing to do with the RL objective:
+
+- **Generation batching.** Rollout workers should bucket prompts by expected length so one long sequence does not hold a whole batch hostage (the straggler row in the table below). Without bucketing, batch time equals the longest sequence every step.
+- **Backpressure.** If rollout outpaces training, the queue grows without bound and staleness grows with it. Bound the queue: pause rollout or evict the oldest entries when full. Monitor queue depth and the oldest queued policy version as first-class metrics — a queue of 50 versions is not a speedup, it is off-policy training.
+- **Learner starvation.** The reverse stall: the trainer idles because scoring is slow (a serial code sandbox, a model judge). Decouple scoring from generation with an offline scoring queue and keep a ready-buffer of scored trajectories, so the trainer never waits on a sandbox.
+
+Recovery must cover four states together: model weights, optimizer state, queued rollouts with their policy versions, and sampler state (which prompts were served, difficulty statistics). Restoring weights without sampler state silently resamples already-seen prompts and skews the curriculum; restoring the queue without versions trains on data whose provenance is unknown. Every rollout therefore carries an ID of prompt, policy version, and attempt number: retries after a crash or timeout resume under the same ID so they are neither counted twice in advantages and pass rates nor mistaken for fresh samples. Failed rollouts — environment crashes, timeouts, out-of-memory generations — are labeled by cause against a failed-rollout budget and excluded from the loss, but retained for diagnosis. [18.5](./data-engineering) follows those labels into the data pipeline.
 
 ---
 
@@ -252,7 +276,7 @@ Distributed training still follows **generation → reward → update → synchr
 
 - **Training-inference mismatch**: identical weights do not guarantee identical probabilities. PPO clipping cannot repair differences between inference and training computation paths. Align precision, record the true behavior policy, and clip extreme importance ratios.
 - **Resource allocation**: veRL groups GPUs with ResourcePool, encapsulates models with Worker, and runs the algorithm loop through a single Driver.
-- **Two bottlenecks**: PagedAttention, Continuous Batching, and Prefix Caching improve rollout throughput; FSDP/ZeRO and gradient checkpointing distribute training memory. A 70B model needs roughly 1.2TB for full training state, while ZeRO-3 plus checkpointing can reduce the per-GPU requirement to about 30GB.
+- **Two bottlenecks**: PagedAttention, Continuous Batching, and Prefix Caching improve rollout throughput; FSDP/ZeRO and gradient checkpointing distribute training memory. A 70B model needs roughly 1.12TB for full training state, while ZeRO-3 across 32 GPUs brings the per-GPU share to about 35GB plus activations.
 - **Synchronous versus asynchronous**: synchronous training keeps data fresh. Asynchronous training reduces waiting but introduces stale trajectories. LlamaRL applies no explicit correction, AReaL corrects explicitly, and AgentRL isolates multi-turn environment tasks.
 - **MoE and pipelines**: MoE adds expert imbalance and all-to-all communication; DualPipe and Best-Fit Packing reduce idle time.
 
