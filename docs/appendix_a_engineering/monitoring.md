@@ -24,18 +24,18 @@ Six metrics you should watch in real time during training:
 | **Value Loss**      | Keeps decreasing     | Not decreasing = the critic is not learning                                |
 | **Reward Margin**   | Stable or increasing | Shrinking = the reward model is losing discrimination                      |
 
-**The most dangerous signal**: reward goes up while entropy collapses. The model may be reward hacking (learning a shortcut that "games" the reward). See Appendix A for more discussion: [Appendix A](/appendix_a_engineering/training-debugging).
+**The most dangerous signal**: reward goes up while entropy collapses. The model may be reward hacking (learning a shortcut that "games" the reward). See [A.1](./training-debugging) for the full diagnostic flow.
 
 ## Quick Lookup Table for Common Problems
 
-| Symptom                           | Likely Cause           | Fix                                                           |
-| --------------------------------- | ---------------------- | ------------------------------------------------------------- |
-| Reward crashes                    | Policy collapse        | Lower the learning rate; increase the clip epsilon            |
-| KL spikes                         | Step size too large    | Decrease batch size or increase the KL penalty coefficient    |
-| Entropy collapses                 | Not enough exploration | Increase the entropy bonus                                    |
-| Evaluation metrics do not improve | Reward hacking         | Check correlation between RM score and true quality           |
-| OOM                               | Model/data too large   | Use FSDP/ZeRO-3; reduce batch size                            |
-| Reward rises but quality drops    | Reward model failure   | Roll back to the best checkpoint and retrain the reward model |
+| Symptom                           | Likely Cause           | Fix                                                            |
+| --------------------------------- | ---------------------- | -------------------------------------------------------------- |
+| Reward crashes                    | Policy collapse        | Lower the learning rate; reduce the clip epsilon or PPO epochs |
+| KL spikes                         | Step size too large    | Increase batch size or increase the KL penalty coefficient     |
+| Entropy collapses                 | Not enough exploration | Increase the entropy bonus                                     |
+| Evaluation metrics do not improve | Reward hacking         | Check correlation between RM score and true quality            |
+| OOM                               | Model/data too large   | Use FSDP/ZeRO-3; reduce batch size                             |
+| Reward rises but quality drops    | Reward model failure   | Roll back to the best checkpoint and retrain the reward model  |
 
 ## Monitoring Tools
 

@@ -7,7 +7,7 @@ search: false
 
 > This page is kept as an entry point for legacy links. The core content has been merged into the “Distributed Parallelism and Memory Optimization” part of [Appendix A.2 Training Infrastructure](./rl-infrastructure). The original text is preserved below so readers coming from old links can map the content.
 
-PPO training often needs to load four models at the same time (Actor, Critic, Reference, Reward Model). A 7B model in FP16 is roughly 14 GB just for parameters. Four of them is roughly 56 GB, which does not fit comfortably on a single A100 (80 GB) once you include optimizer states, gradients, and runtime overhead. Larger models only make this problem worse.
+PPO training often needs to hold several models at once (Actor, Critic, Reference, Reward Model). A 7B model in FP16 needs roughly 14 GB just for parameters; a full training replica with gradients and Adam optimizer states needs roughly six times that (about 14 GB parameters + 14 GB gradients + 56 GB for Adam's two FP32 moments, before activations), which does not fit on a single 80 GB GPU. Larger models only make this problem worse.
 
 This section answers one question: **when the model does not fit on one GPU, how do you split it across multiple GPUs?** We start with the four core parallelism strategies, then discuss mixed precision choices, and finally explain why RL training has additional challenges compared with ordinary fine-tuning.
 
@@ -17,7 +17,7 @@ This section answers one question: **when the model does not fit on one GPU, how
 
 The simplest approach. Each GPU holds a full replica of the model, but processes a different data batch. Gradients are synchronized with AllReduce.
 
-Limitation: a single GPU must fit the entire model. For a 7B model in FP16, you need roughly 14 GB for parameters plus optimizer states and gradients; in practice you can easily end up near ~56 GB, which exceeds many consumer GPUs.
+Limitation: a single GPU must fit the entire model. For a 7B model in FP16, parameters alone are roughly 14 GB, and gradients plus Adam optimizer states add roughly another 70 GB, so a single training replica substantially exceeds what most single GPUs can hold.
 
 ### Tensor Parallelism (TP)
 
@@ -72,7 +72,7 @@ Practical guidance: use BF16 for training, and quantization (INT4/INT8) for infe
 
 RL training (PPO/GRPO) is more complex than ordinary fine-tuning, because you must manage multiple models and two distinct phases.
 
-**The rollout phase is inference-intensive**. For GRPO, a setting like k=16 means each prompt generates 16 answers. You need many GPUs for high-throughput generation. vLLM's PagedAttention can often improve batch inference throughput by 2-4×.
+**The rollout phase is inference-intensive**. For GRPO, a setting like k=16 means each prompt generates 16 answers. You need substantial GPU throughput for generation. Techniques like PagedAttention improve batch inference throughput by reducing KV-cache waste (the exact speedup is workload-dependent; measure it on your own sequence mix).
 
 **The training phase is compute-intensive**. Backpropagation consumes substantial GPU compute.
 
@@ -80,11 +80,11 @@ RL training (PPO/GRPO) is more complex than ordinary fine-tuning, because you mu
 
 **Common memory-saving tricks**:
 
-| Trick                     | Why It Works                                                       | Savings                       |
-| ------------------------- | ------------------------------------------------------------------ | ----------------------------- |
-| Share the reference model | The reference model is frozen; it can share weights with the actor | ~25%                          |
-| LoRA rollout              | Inference only loads LoRA adapters                                 | ~50%                          |
-| Gradient checkpointing    | Recompute instead of storing activations                           | ~40% (trades time for memory) |
+| Trick                     | Why It Works                                                       | Savings                                           |
+| ------------------------- | ------------------------------------------------------------------ | ------------------------------------------------- |
+| Share the reference model | The reference model is frozen; it can share weights with the actor | roughly one fewer model replica in memory         |
+| LoRA rollout              | Inference only loads LoRA adapters                                 | much smaller sync payload; exact savings vary     |
+| Gradient checkpointing    | Recompute instead of storing activations                           | large activation savings (trades time for memory) |
 
 ## Frontier Topics: New Issues from MoE and PRM
 

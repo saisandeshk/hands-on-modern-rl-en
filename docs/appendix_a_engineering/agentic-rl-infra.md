@@ -167,7 +167,7 @@ The training backend uses Megatron-LM, supporting the full set of TP/PP/CP/EP pa
 
 Recall the async training mechanism from A.2: Rollout generates data and writes it to Buffer, Training reads data from Buffer for training. Traditional buffers are batch-level — Rollout finishes generating an entire batch before writing, and Training waits until data is available before reading. This causes one side to always be waiting: if Rollout writes too fast the buffer overflows; if Training reads too fast the buffer is empty leading to idle GPUs. In Agentic RL this problem is compounded by tool execution waiting, so queues should be able to carry finer-grained sample streams.
 
-TransferQueue changes this interaction to streaming: Rollout writes each sample to the queue as soon as it is generated, and the Training side begins processing as soon as it gets a sample, without waiting for the entire batch to finish generating. For Agentic RL, a sample is not just a completion — it may be an entire episode containing multiple rounds of tool results. This works with DCS (Distributed Checkpoint Service) for weight sync — every time Training updates parameters by one step, DCS broadcasts via NCCL to Rollout and other components, overlapping with the next training computation and taking no extra time.
+TransferQueue changes this interaction to streaming: Rollout writes each sample to the queue as soon as it is generated, and the Training side begins processing as soon as it gets a sample, without waiting for the entire batch to finish generating. For Agentic RL, a sample is not just a completion — it may be an entire episode containing multiple rounds of tool results. This works with DCS (Distributed Checkpoint Service) for weight sync — every time Training updates parameters by one step, DCS broadcasts via NCCL to Rollout and other components, overlapping with the next training computation to hide most of the transfer cost.
 
 This design reduces batch-level waiting in async training to sample-level waiting, lowering wait time by an order of magnitude.
 
@@ -213,12 +213,12 @@ The `external` mode is noteworthy — it can leverage idle resources or preempti
 
 - **Framework — AReaL**
   - Producer: Ant Group and Tsinghua
-  - Features: fully async, 2.77x speedup
+  - Features: fully async, reported 2.77x speedup
   - Multimodal: no
   - Async: fully async
 - **Framework — Seer**
   - Producer: Moonshot AI (Kimi)
-  - Features: extreme synchrony, rollout throughput +74–97%
+  - Features: extreme synchrony, reported rollout throughput +74–97%
   - Multimodal: no
   - Async: synchronous
 - **Framework — Agent-R1**

@@ -238,11 +238,12 @@ If the learning rate is too large, PPO epochs too many, batch too small, or adva
 ### Watch Three Metrics
 
 - **Metric — KL divergence**
-  - How to read it: distance between new policy and old/reference policy
+  - How to read it: distance between new policy and old (or reference) policy
   - What anomaly means: policy is drifting too fast
+  - How it is estimated: logs usually report an _approximate_ KL computed from the log-probability ratio $r = \log \pi_{\text{new}}(a|s) - \log \pi_{\text{old}}(a|s)$. Two common unbiased or low-bias estimators are $k_1 = r$ averaged with the exact term, and Schulman's $k_3 = e^{-r} - 1 + r$, which stays non-negative and is numerically stable when the policies are close. Either way, what matters is the trend: a sudden spike means the update left the trust region.
 - **Metric — clip fraction**
-  - How to read it: what fraction of samples are being clipped
-  - What anomaly means: PPO is frequently hitting the brakes
+  - How to read it: the fraction of tokens or samples where the PPO probability ratio $\pi_{\text{new}} / \pi_{\text{old}}$ hit the clipping bounds $[1-\epsilon, 1+\epsilon]$
+  - What anomaly means: PPO is frequently hitting the brakes. A low clip fraction (roughly below 0.1–0.2) means most updates are inside the trust region; a sustained fraction above roughly 0.3–0.4 means updates are too aggressive — reduce the learning rate or PPO epochs rather than widening $\epsilon$.
 - **Metric — entropy**
   - How to read it: how much randomness remains in the policy
   - What anomaly means: premature convergence or degenerate randomness
@@ -271,7 +272,8 @@ In Actor-Critic, the Critic's job is to estimate state value. It doesn't directl
 ### Signals the Critic Is Broken
 
 - **Signal — value loss doesn't decrease over time:** Critic hasn't fit returns
-- **Signal — explained variance < 0:** worse than predicting the mean
+- **Signal — explained variance $\le$ 0:** the value prediction is no better than predicting the mean return. Explained variance is $1 - \mathrm{Var}(y - \hat{V}) / \mathrm{Var}(y)$, where $y$ is the return target and $\hat{V}$ the Critic prediction; 1 is perfect, 0 means "as good as a constant," negative means worse. Track it alongside value loss, because loss alone is scale-dependent while explained variance is normalized.
+- **Signal — TD error or Q-scale drift:** track the mean and max of the TD error $\delta = r + \gamma V(s') - V(s)$ (or the Q-prediction scale in Q-learning). A sudden jump in $|\delta|$ or in predicted-value magnitude usually precedes value-loss explosion; it often traces back to reward outliers, a broken `done` mask (bootstrapping past termination), or a target-network sync failure.
 - **Signal — policy reward oscillates:** Actor is pushed around by noisy advantage
 - **Signal — value prediction scale much smaller than return:** reward scale or value target has problems
 
@@ -319,8 +321,8 @@ Agentic RL is more prone to this pitfall, because a single trajectory can be lon
 NaNs rarely appear out of nowhere. They are typically preceded by grad norm spikes, extreme logprob values, reward outliers, value loss explosions, or mixed-precision overflow.
 
 - **Problem — grad norm spike**
-  - Check: p95 / max grad norm
-  - Fix: gradient clipping, reduce lr
+  - Check: p95 / max grad norm (separately for actor and critic, before clipping)
+  - Fix: gradient clipping (clip the global norm, commonly to around 0.5–1.0, and log both pre- and post-clip norms so you can see how often clipping binds), reduce lr
 - **Problem — extreme logprob**
   - Check: whether log is taken of zero probability
   - Fix: clamp, check masks
@@ -439,8 +441,22 @@ The two examples correspond to completely different fixes. That's why "what do I
 - **Deliverable — last checkpoint:** useful for reproducing tail-of-training issues
 - **Deliverable — failure checkpoint:** useful for analyzing collapse precursors
 - **Deliverable — reward audit samples:** for judging whether reward hacking occurred
-- **Deliverable — multi-seed results:** avoid accidental success
+- **Deliverable — multi-seed results:** avoid accidental success (see the empirical checklist below; the full protocol lives in [A.4](./evaluation-badcase))
 - **Deliverable — private set report:** prevent public set overfitting
+
+## Report Results with Uncertainty, Not Single Seeds
+
+A single training run proves almost nothing in RL. Henderson et al. showed that the same algorithm and hyperparameters can produce markedly different results under different random seeds, and that implementation details alone can flip algorithm comparisons[^drltm]. The seed — not the checkpoint, not the eval sample — is therefore the unit of uncertainty: vary the training seed (and, where affordable, data order and environment stochasticity), and report the spread.
+
+In practice this means five habits:
+
+1. **Run multiple seeds and report a confidence interval, not just the mean.** Three seeds is a common minimum for cheap control tasks; five to ten is the usual recommendation when each run is affordable. Report mean and standard deviation at minimum, and preferably a 95% confidence interval. Never select the best seed as "the result" — that is selection bias, and it is exactly how irreproducible findings are manufactured.
+2. **Use the interquartile mean (IQM) when aggregating across tasks.** The mean is dominated by outlier tasks and the median discards half the data; the IQM (the mean of the middle 50% of runs) is more robust than the mean and more efficient than the median. Agarwal et al. recommend reporting IQM together with stratified bootstrap confidence intervals, which resample runs within each task so that no single task dominates the uncertainty estimate[^rliable].
+3. **Compare on matched budgets.** Fix the number of environment steps (or generated samples) _and_ the compute budget before comparing two methods. An algorithm that saw twice the data or twice the FLOPs has not necessarily beaten anything. Log `timing_s/*` and token counts (see [C.3](../appendix_c_resources/metrics-glossary)) so the budget claim is auditable.
+4. **Separate tuning from final evaluation.** Tune hyperparameters, prompts, reward weights, and early-stopping rules on the dev set only; report final numbers on data that played no role in any decision — the private test set and a held-out seed. Every peek at the test set (checkpoint selection included) leaks information; log which split each decision used.
+5. **Fix whether evaluation is deterministic or stochastic — and report both where it matters.** A greedy (temperature 0) policy measures what the model "knows"; a sampled policy (temperature > 0, pass@k, majority voting) measures what a deployment that retries or reranks will deliver. The two can rank checkpoints differently, and sampling temperature changes answers, so write the decoding settings into the eval config ([A.4](./evaluation-badcase)) and never compare a greedy score against a sampled one.
+
+The full evaluation-side protocol — evaluation contracts, public benchmarks, agent trajectory scoring, and badcase reflux — is in [A.4](./evaluation-badcase). The rule of thumb here: if the error bars of two methods overlap, or the budgets differ, you do not have a finding yet — you have a hypothesis for the next controlled run.
 
 ## Summary
 
@@ -467,6 +483,8 @@ That is where RL training moves from "mystical hyperparameter tuning" toward eng
 [^trlgrpo]: Hugging Face TRL, [GRPO Trainer](https://huggingface.co/docs/trl/grpo_trainer).
 
 [^drltm]: Henderson et al., [Deep Reinforcement Learning that Matters](https://arxiv.org/abs/1709.06560), 2018.
+
+[^rliable]: Agarwal et al., [Deep Reinforcement Learning at the Edge of the Statistical Precipice](https://arxiv.org/abs/2105.05246), NeurIPS 2021.
 
 [^implementation]: Engstrom et al., [Implementation Matters in Deep RL: A Case Study on PPO and TRPO](https://openreview.net/forum?id=r1etN1rtPB), 2020.
 

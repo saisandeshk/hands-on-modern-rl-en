@@ -275,6 +275,31 @@ A common misjudgment in RL post-training comes from `pass@k`. A model whose `pas
 
 If the training goal is improving single-attempt usability, don't report only `pass@k`. If the product inherently does multi-candidate search, also report cost: how many extra tokens, verifier calls, and latency are needed per 1-point improvement.
 
+### Comparing Checkpoints Honestly: Seeds, Budgets, and Uncertainty
+
+A single score per checkpoint cannot support a release decision. RL training is stochastic in seeds, data order, environment dynamics, and (for LLM agents) sampling — so the comparison itself needs a protocol. The debugging-side version of this discipline is in [A.1](./training-debugging); what follows is the evaluation-side mechanics.
+
+**Run multiple training seeds; never ship on one.** Three seeds is a common minimum for cheap control tasks and five to ten is the usual recommendation when affordable. Report the mean with a 95% confidence interval, and never report the best seed as the headline number. When aggregating across tasks, prefer the interquartile mean (IQM) — the mean of the middle 50% of runs, which resists outlier tasks better than the mean and uses data more efficiently than the median — with stratified bootstrap confidence intervals that resample runs within each task so no single task dominates the uncertainty[^rliable].
+
+**Compare on matched budgets.** Two checkpoints are comparable only if they consumed the same training budget: the same number of environment steps or generated samples, and the same compute (GPU-hours, tokens processed). Record both from the training logs (see the `timing_s/*` and `perf/*` fields in [C.3](../appendix_c_resources/metrics-glossary)) and print them next to every score table. A checkpoint that trained twice as long has not "won" — it has spent more.
+
+**Separate tuning from final evaluation.** All iteration decisions — hyperparameters, prompt templates, reward weights, checkpoint selection, early stopping — belong to the dev set. The private test set is read once, at release time, on a held-out seed. Checkpoint selection counts as tuning: picking the checkpoint with the best private-set score and then reporting that same score is circular. Log which split each decision used.
+
+**Fix deterministic vs stochastic evaluation, and don't mix them.** A greedy decode (temperature 0) measures what the model knows; a sampled decode (temperature > 0) measures what a deployment with retries, reranking, or majority voting will deliver. The two can rank checkpoints differently. Write the decoding settings into the eval config above, and compare greedy against greedy, sampled against sampled. When both matter, report both — `pass@1` greedy for capability, `pass@k` / `majority@k` sampled for deployment — with the sampling parameters attached.
+
+A minimal honest report for one comparison therefore looks like this:
+
+```text
+comparison: grpo-step-1800 (5 seeds) vs sft (5 seeds)
+budget: 200k env steps each, 96 GPU-hours each
+eval: private test set, greedy decode (temperature 0.0), unseen by tuning
+primary: task_success IQM 46.2% [43.1, 49.0] vs 41.0% [38.2, 43.9]
+cost: cost_to_success mean $1.20 vs $0.95 per task
+decision: ship only if IQM gap survives the CI and cost is within budget
+```
+
+If the confidence intervals overlap substantially, or the budgets differ, the correct conclusion is "no evidence yet" — run more seeds or fix the budget before claiming a win.
+
 ## Step Four: Bring the Agent's Full Trajectory into Evaluation
 
 The object of Agentic RL evaluation is not a single answer, but a **trajectory**:
@@ -543,7 +568,7 @@ from pathlib import Path
 import math
 import matplotlib.pyplot as plt
 
-OUT = Path("docs/appendix_industrial_training/images")
+OUT = Path("docs/appendix_a_engineering/images")
 OUT.mkdir(parents=True, exist_ok=True)
 
 COLORS = ["#2b6cb0", "#c53030", "#2f855a", "#6b46c1"]
@@ -981,3 +1006,5 @@ If you can remember only one principle: don't let training reward prove training
 [^taubench]: Shunyu Yao et al. [τ-bench: A Benchmark for Tool-Agent-User Interaction in Real-World Domains](https://arxiv.org/abs/2406.12045), arXiv 2024.
 
 [^agentbench]: Xiao Liu et al. [AgentBench: Evaluating LLMs as Agents](https://arxiv.org/abs/2308.03688), ICLR 2024.
+
+[^rliable]: Rishabh Agarwal et al. [Deep Reinforcement Learning at the Edge of the Statistical Precipice](https://arxiv.org/abs/2105.05246), NeurIPS 2021.
