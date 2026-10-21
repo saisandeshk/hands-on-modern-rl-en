@@ -240,10 +240,12 @@ The script repeats this process 40 times:
 
 ```python
 for iteration in range(40):
-    # Simplified: the real collect_rollout also threads through
-    # the device and the ongoing-episode counters, and returns
-    # the completed-episode statistics alongside the transitions.
-    transitions, obs = collect_rollout(model, env, obs, device, num_steps=2048)
+    # Simplified: the real collect_rollout also threads the ongoing-episode
+    # reward/length counters through each call; here we keep the
+    # completed-episode lists and ignore the carryover with *_.
+    transitions, obs, ep_rewards, ep_lengths, *_ = collect_rollout(
+        model, env, obs, device, num_steps=2048
+    )
     advantages, returns = compute_gae(transitions)
     metrics = ppo_update(
         model,
@@ -251,6 +253,7 @@ for iteration in range(40):
         transitions,
         advantages,
         returns,
+        device,
     )
 ```
 
@@ -281,14 +284,14 @@ python 2-pytorch_ppo.py \
   --iterations 40 \
   --steps-per-rollout 2048 \
   --swanlab-mode disabled \
-  --log-csv output/training_metrics_seed42.csv
+  --log-csv output/training_metrics_rerun.csv
 
 python plot_curves.py \
-  --input output/training_metrics_seed42.csv \
+  --input output/training_metrics_rerun.csv \
   --output-dir output
 ```
 
-Below is an excerpt of six iterations from the training log. Every number can be found in the raw CSV. This record was generated before the 100-episode rolling average was added, so the mean reward in the log is the average over the episodes that ended in that iteration, which corresponds to the current `mean_episode_reward_rollout`.
+Below is an excerpt of six iterations from the training log. Every number can be found in the raw CSV. This record was generated before the 100-episode rolling average was added, so the mean reward in the log is the average over the episodes that ended in that iteration, which corresponds to the current `mean_episode_reward_rollout`. The commands above write a rerun to a new file so the archived CSV behind the figures is not overwritten; note that a freshly generated CSV stores the rolling 100-episode average in `mean_episode_reward`, unlike the archived file.
 
 ```text
 Iteration  1/40 | episodes:  91 | mean reward:   21.4 | KL: 0.0087 | clip%: 14.5%
@@ -366,7 +369,7 @@ $$
 
 $B$ denotes a training mini-batch. The larger the gap between prediction and target, the larger the value loss.
 
-In this run the value loss fluctuates between 41.8 and 64.1 early on and finally falls to 0.00014. The rise in the middle of training means the policy reached a new state distribution, and the Critic needed to readjust its predictions.
+In this run the value loss stays between 41.8 and 64.1 over the first five iterations and finally falls to 0.00014. The rise in the middle of training partly reflects the policy reaching a new state distribution, which forces the Critic to readjust its predictions, and partly the growing scale of the regression targets themselves as episodes get longer.
 
 A small value loss only shows that the Critic is closer to the current target. Whether the policy completes the task still has to be judged by the episode reward and the independent evaluation.
 

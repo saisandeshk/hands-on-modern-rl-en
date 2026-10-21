@@ -5,6 +5,10 @@ outline: [2, 3]
 
 # 1.R Summary and Exercises
 
+> **Learning path**: [1.1 Run CartPole](./principles) → [1.2 CartPole Principles](./metrics) → [1.3 PPO Training Visualization](./training) → **1.R Summary and Exercises**
+
+> **Code and data for this section**: [Pure PyTorch PPO](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter01_cartpole/2-pytorch_ppo.py) · [Plotting script](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter01_cartpole/plot_curves.py) · [Raw training metrics CSV](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter01_cartpole/output/training_metrics_seed42.csv)
+
 This chapter ran a first end-to-end reinforcement learning experiment: PPO on CartPole-v1, from raw interaction data to a trained policy that balances the pole for the full 500-step episode. This page collects what to take away and gives exercises to check that the mechanism is really understood.
 
 ## What You Should Now Be Able to Do
@@ -109,7 +113,7 @@ $$
 
 ### 7. Coding: reproduce the run and check the numbers
 
-Run the chapter's training script with the book's settings, then open the saved CSV and verify three facts from Section 1.2: iteration 1 ends about 91 episodes near a mean reward of 21, iteration 10 reaches 500, and entropy falls from about 0.68 to about 0.42.
+Run the chapter's training script with the book's settings ([Section 1.2](./metrics)), then open the saved CSV and verify three facts from Section 1.2: iteration 1 ends about 91 episodes near a mean reward of 21, iteration 10 reaches 500, and entropy falls from about 0.68 to about 0.42.
 
 ```bash
 cd code/chapter01_cartpole
@@ -118,11 +122,11 @@ python 2-pytorch_ppo.py \
   --iterations 40 \
   --steps-per-rollout 2048 \
   --swanlab-mode disabled \
-  --log-csv output/training_metrics_check.csv
+  --log-csv output/rerun_check/metrics.csv
 ```
 
 ::: details Solution
-After the run finishes, inspect the CSV (any spreadsheet tool or `python -c` with `csv` works). Expected pattern for seed 42: row 1 shows `completed_episodes` near 91 with `mean_episode_reward_rollout` near 21 (per-iteration average over short episodes from the near-random initial policy); by iteration 10 the per-iteration mean reaches 500.0 with only 4 completed episodes (each episode now spans the full 2048-step rollout, $2048 / 500 \approx 4$); the `entropy` column declines from $\approx 0.68$ toward $\approx 0.42$. Exact digits may differ from the book's saved file if the installed library versions differ, but the three qualitative facts (many short episodes early, 500 by about iteration 10, entropy decline) must hold. If iteration 1 shows far fewer episodes or entropy starts near 0, the Actor's output layer was probably mis-initialized (check the gain-0.01 orthogonal initialization).
+After the run finishes, inspect the CSV (any spreadsheet tool or `python -c` with `csv` works). Expected pattern for seed 42: row 1 shows `completed_episodes` near 91 with `mean_episode_reward_rollout` near 21 (per-iteration average over short episodes from the near-random initial policy); by iteration 10 the per-iteration mean reaches 500.0 with only 4 completed episodes (each episode now spans the full 2048-step rollout, $2048 / 500 \approx 4$); the `entropy` column declines from $\approx 0.68$ toward $\approx 0.42$. The repository's `requirements.txt` only lower-bounds the library versions rather than pinning them, so exact digits may differ from the book's saved file if the installed versions differ, but the three qualitative facts (many short episodes early, 500 by about iteration 10, entropy decline) must hold. Write the check to a new directory (for example `output/rerun_check/metrics.csv` as above) rather than overwriting the archived `training_metrics_seed42.csv`; the script derives the model path from the CSV directory, so running in `output/` directly would also overwrite the saved `pytorch_ppo_cartpole.pth`. If iteration 1 shows far fewer episodes or entropy starts near 0, the Actor's output layer was probably mis-initialized (check the gain-0.01 orthogonal initialization).
 :::
 
 ### 8. Coding: clipping range ablation
@@ -136,11 +140,11 @@ Suggested commands (edit `clip_eps` default in `ppo_update` or pass it through a
 cd code/chapter01_cartpole
 python 2-pytorch_ppo.py --seed 42 --iterations 10 \
   --steps-per-rollout 2048 --swanlab-mode disabled \
-  --log-csv output/ablation_clip005.csv   # with clip_eps=0.05
+  --log-csv output/ablation_clip005/metrics.csv   # with clip_eps=0.05
 python 2-pytorch_ppo.py --seed 42 --iterations 10 \
   --steps-per-rollout 2048 --swanlab-mode disabled \
-  --log-csv output/ablation_clip050.csv   # with clip_eps=0.5
+  --log-csv output/ablation_clip050/metrics.csv   # with clip_eps=0.5
 ```
 
-What to look for: with `clip_eps=0.05` the allowed band is $[0.95, 1.05]$, so many more ratios fall outside it and the reported `clip_fraction` is much larger than the baseline's $\approx 14.5\%$ at iteration 1, while `approx_kl` per iteration shrinks because each update is constrained more tightly. With `clip_eps=0.5` (band $[0.5, 1.5]$) the reverse holds: clip fraction drops toward zero and `approx_kl` grows, since almost nothing gets clipped. Either way the diagnostic pair moves in opposite directions, which is exactly the trade-off the clipped objective encodes: a tighter band means more clipping and smaller policy steps. Remember to restore `clip_eps=0.2` afterwards.
+What to look for: with `clip_eps=0.05` the allowed band is $[0.95, 1.05]$, so many more ratios fall outside it and the reported `clip_fraction` is much larger than the baseline's $\approx 14.5\%$ at iteration 1, while `approx_kl` per iteration shrinks because each update is constrained more tightly. With `clip_eps=0.5` (band $[0.5, 1.5]$) the reverse holds: clip fraction drops toward zero and `approx_kl` grows, since almost nothing gets clipped. Either way the diagnostic pair moves in opposite directions here, which is exactly the trade-off the clipped objective encodes: a tighter band means more clipping and smaller policy steps. (The pairing moves this way because the clip-fraction threshold itself moves with `clip_eps` — the metric counts `|r - 1| > clip_eps`. For a fixed threshold, a larger update normally raises both the clip fraction and the KL divergence, as in Chapter 8.) Remember to restore `clip_eps=0.2` afterwards. Back up `output/pytorch_ppo_cartpole.pth` first (or point `--log-csv` into a fresh directory): the script derives the model path from the CSV directory, so each ablation run in `output/` silently overwrites that saved model.
 :::
