@@ -1,5 +1,5 @@
 ---
-title: C.3 Training Metrics Glossary
+title: C.3 Metrics Glossary
 ---
 
 # C.3 Metrics Glossary
@@ -282,7 +282,7 @@ Common fields: `timing_per_token_ms/gen`, `timing_per_token_ms/ref`, `timing_per
 
 MFU measures "how much of the GPU's compute capacity is actually used." Think of it like factory capacity utilization — if the factory can produce 100 units/hour but only produces 40, utilization is 40%.
 
-During normal training, MFU is typically 50%–60%. Below 30% means GPUs are spending a lot of time waiting (communication bottlenecks, data loading bottlenecks, or load imbalance), with room for optimization.
+During normal training, MFU is typically 40%–55%. Below 30% means GPUs are spending a lot of time waiting (communication bottlenecks, data loading bottlenecks, or load imbalance), with room for optimization.
 
 ---
 
@@ -293,7 +293,7 @@ Different frameworks may use different field names for the same metric. The core
 | Meaning         | veRL / OpenRLHF        | TRL                                 |
 | --------------- | ---------------------- | ----------------------------------- |
 | Policy entropy  | `actor/entropy`        | `policy/approx_kl` or `entropy`     |
-| KL divergence   | `actor/ppo_kl`         | `objective/kl`                      |
+| KL divergence   | `actor/approx_kl`      | `objective/kl`                      |
 | Gradient norm   | `actor/grad_norm`      | gradient monitoring in `loss/total` |
 | Response length | `response_length/mean` | `response_length`                   |
 | Generation time | `timing_s/gen`         | usually not logged separately       |
@@ -309,7 +309,7 @@ If you are using TRL's `SFTTrainer` + `DPOTrainer`, metrics are automatically lo
 ### PPO / GRPO Training
 
 1. **Effectiveness first**: `val-core/*/acc/mean@1` (accuracy), `critic/rewards/mean` (reward trend)
-2. **Stability next**: `actor/loss`, `actor/grad_norm`, `actor/ppo_kl`, `actor/pg_clipfrac`
+2. **Stability next**: `actor/loss`, `actor/grad_norm`, `actor/approx_kl`, `actor/pg_clipfrac`
 3. **Efficiency**: `perf/throughput`, `timing_s/gen`
 4. **Data**: `response_length/mean`, `response_length/clip_ratio`, `global_seqlen/minmax_diff`
 
@@ -329,7 +329,7 @@ If you are using TRL's `SFTTrainer` + `DPOTrainer`, metrics are automatically lo
 | Symptom                      | Check First                         | Then Check                                     |
 | ---------------------------- | ----------------------------------- | ---------------------------------------------- |
 | Reward crashes               | did `actor/entropy` drop suddenly?  | is `actor/pg_clipfrac` spiking?                |
-| KL spikes                    | `actor/ppo_kl` trend                | is the learning rate schedule correct?         |
+| KL spikes                    | `actor/approx_kl` trend             | is the learning rate schedule correct?         |
 | Eval stalls but reward rises | is `response_length/mean` changing? | is `response/aborted_ratio` high?              |
 | Training is slow             | `timing_s/step` sub-items           | `perf/throughput`, `global_seqlen/minmax_diff` |
 | OOM                          | is `global_seqlen/max` too large?   | `response_length/max`, `prompt_length/max`     |

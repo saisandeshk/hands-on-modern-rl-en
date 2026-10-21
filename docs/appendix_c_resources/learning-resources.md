@@ -1,3 +1,7 @@
+---
+title: C.1 Learning Resources and Project Roadmap
+---
+
 # C.1 Learning Resources and Project Roadmap
 
 > After completing the first 17 chapters of this book, readers have acquired all the mathematical and engineering foundations necessary to read cutting-edge reinforcement learning (RL) papers. However, the RL literature is vast—arXiv adds thousands of papers each year, but only a handful are truly direction-defining and worth rereading repeatedly. This appendix organizes these "must-read papers" by theme, with each paper annotated with a **one-sentence summary of its core contribution** and a **reading priority** (★ Must-read / ◆ Recommended / ◇ Extension), helping readers build a complete map of the literature from classical RL to the forefront of research in 2026.
@@ -28,7 +32,7 @@ After 2013, RL entered the era of deep learning. This set of papers defined the 
 | Priority | Paper                                                                                                                                     | Core Contribution                                                                                                                                                                                      |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | ★        | Mnih et al. _Playing Atari with Deep Reinforcement Learning_ (arXiv:1312.5602, 2013)                                                      | Early version of DQN (NIPS Workshop), first combined CNN with Q-Learning, initiating the era of deep RL.                                                                                               |
-| ★        | Mnih et al. _Human-level Control through Deep Reinforcement Learning_ (Nature, 2015)                                                      | Complete version of DQN: experience replay + target network, achieving human-level performance on 49 Atari games.                                                                                      |
+| ★        | Mnih et al. _Human-level Control through Deep Reinforcement Learning_ (Nature, 2015)                                                      | Complete journal version of DQN: experience replay + target network. Already listed in C.1.1.                                                                                                          |
 | ★        | Mnih et al. _Asynchronous Methods for Deep Reinforcement Learning_ (A3C, arXiv:1602.01783, 2016)                                          | Asynchronous actor-critic: parallel sampling with multiple threads to eliminate correlation, without experience replay; A2C is its synchronous version, still a baseline today.                        |
 | ★        | Schulman et al. _Proximal Policy Optimization Algorithms_ (arXiv:1707.06347, 2017)                                                        | PPO: clip instead of TRPO's second-order optimization, engineering-friendly and stable training. LLMs are trained with PPO directly. See [Chapter 8](../chapter08_ppo/ppo-bipedal-walker).             |
 | ★        | Lillicrap et al. _Continuous Control with Deep Reinforcement Learning_ (DDPG, arXiv:1509.02971, 2015)                                     | Extended DPG to deep networks, deterministic policy gradient + experience replay, the foundational work for continuous control. See [Chapter 9](../chapter09_continuous_control/ddpg).                 |
@@ -44,7 +48,7 @@ After 2013, RL entered the era of deep learning. This set of papers defined the 
 | ◆        | Van Hasselt et al. _Deep RL with Double Q-Learning_ (arXiv:1509.06461, 2015)                                                              | Double DQN: decoupled action selection from value estimation, suppressed Q-value overestimation.                                                                                                       |
 | ◆        | Bellemare et al. _A Distributional Perspective on RL_ (C51, arXiv:1707.06887, 2017)                                                       | Learned the **distribution** of rewards rather than the expectation, more robust to noisy rewards.                                                                                                     |
 | ◇        | Janner et al. _When to Trust Your Model: Model-Based RL in the Stochastic World_ (MBPO, arXiv:1906.08253, 2019)                           | Short horizon rollout balances model bias and sample efficiency.                                                                                                                                       |
-| ◇        | Chua et al. _Deep RL in a Handful of Trials Using Probabilistic Dynamics Models_ (PETS, arXiv:1805.12114, 2018)                           | Integrated + probabilistic model for cognitive and epistemic uncertainty.                                                                                                                              |
+| ◇        | Chua et al. _Deep RL in a Handful of Trials Using Probabilistic Dynamics Models_ (PETS, arXiv:1805.12114, 2018)                           | Integrated ensemble of probabilistic models capturing aleatoric and epistemic uncertainty.                                                                                                             |
 
 ## C.1.3 Must-Read Papers on LLM RL
 
@@ -57,7 +61,7 @@ LLM RL is the largest application of reinforcement learning (RL) after 2022. Thi
 | ★        | Rafailov et al. _Direct Preference Optimization: Your Language Model is Secretly a Reward Model_ (arXiv:2305.18290, 2023) | DPO: using the Bradley-Terry model to reparameterize, converting RLHF into supervised learning, **completely eliminating the need for RM and PPO**. One of the most elegant mathematical derivations in LLM post-training. See [Chapter 14](../chapter14_dpo/dpo-objective-derivation). |
 | ★        | DeepSeek-AI. _DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via RL_ (arXiv:2501.12948, 2025)                    | R1: Pure RL (GRPO + rule-based reward) makes a 7B model's mathematical reasoning close to GPT-4o; R1-Zero proves that long CoT can be triggered without SFT. A landmark paper of the RLVR paradigm. See [Chapter 15](../chapter15_grpo/grpo-practice-and-mechanism).                    |
 | ★        | Shao et al. _DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models_ (arXiv:2402.03300, 2024) | The original paper of GRPO: removing the critic of PPO, using group-wise normalization to estimate baseline. The starting point of the Group-Normalized Policy Gradient paradigm.                                                                                                       |
-| ★        | Yu et al. _DAPO: Decoupled Clip and Dynamic Sampling Policy Optimization_ (arXiv:2503.14476, 2025)                        | Fixes four shortcomings of GRPO—length bias, entropy collapse, noise advantage, and long/short horizon conflicts—proposing Clip-Higher, Dynamic Sampling, Token-Level Loss, and Overlong Reward Shaping. Engineering improvements by the Qwen team.                                     |
+| ★        | Yu et al. _DAPO: Decoupled Clip and Dynamic Sampling Policy Optimization_ (arXiv:2503.14476, 2025)                        | Fixes four shortcomings of GRPO—length bias, entropy collapse, noise advantage, and long/short horizon conflicts—proposing Clip-Higher, Dynamic Sampling, Token-Level Loss, and Overlong Reward Shaping. Engineering improvements by the ByteDance Seed team.                           |
 | ★        | Kimi Team. _Kimi K2: Open Agentic Intelligence_ (arXiv:2507.20534, 2025)                                                  | 1T parameter MoE (32B activation) open training, validating the scalability of GSPO (Group Sequence Policy Optimization) in ultra-large agent training.                                                                                                                                 |
 | ★        | Zheng et al. _Group Sequence Policy Optimization_ (arXiv:2507.18071, 2025)                                                | Sequence-level importance sampling + sequence-level loss, fixing GRPO's high token-level variance in long sequences and long horizon tasks.                                                                                                                                             |
 | ★        | MiniMax. _MiniMax-M1: Scaling Test-Time Compute Efficiently with Lightning Attention_ (arXiv:2506.13585, 2025)            | Proposes CISPO (Cropped Importance Sampling Policy Optimization) on a 456B hybrid attention MoE, using cropped importance sampling weights instead of token updates, combined with lightning attention to complete RL training on 512 H800s in three weeks.                             |
@@ -97,7 +101,7 @@ Starting from 2025, RL enters its second boom period: process reward models driv
 
 | Priority | Paper                                                                                                                                                 | Core Contribution                                                                                                                                    |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ★        | Yu et al. _DAPO_ (arXiv:2503.14476, 2025)                                                                                                             | Engineering fix of GRPO, Qwen team opens the full training details. Already listed in C.1.3.                                                         |
+| ★        | Yu et al. _DAPO_ (arXiv:2503.14476, 2025)                                                                                                             | Engineering fix of GRPO; the ByteDance Seed team opens the full training details. Already listed in C.1.3.                                           |
 | ★        | Zheng et al. _GSPO_ (arXiv:2507.18071, 2025)                                                                                                          | Sequence-level IS, core algorithm used by Kimi K2. Already listed in C.1.3.                                                                          |
 | ★        | MiniMax. _CISPO_ (arXiv:2506.13585, 2025)                                                                                                             | Truncating invalid IS samples. Already listed in C.1.3.                                                                                              |
 | ★        | Khalifa et al. _Process Reward Models That Think_ (ThinkPRM, arXiv:2504.16828, 2025)                                                                  | Using a lightweight PRM to replace dense process reward annotations, making RLVR usable with low data.                                               |
@@ -138,9 +142,9 @@ Starting from 2025, RL enters its second boom period: process reward models driv
 The optimal path varies for different readers:
 
 - **From the Basics**: C.1.1 → C.1.2 → C.1.3 → C.1.4, to understand the full evolution of RL from 1992 to 2026 in chronological order.
-- **For LLM Post-Training Engineers**: C.1.3 (entire) + C.1.4 (first five chapters) + C.1.5.1 (entire). Focus on the engineering details of InstructGPT, DPO, GRPO, R1, and DAPO.
+- **For LLM Post-Training Engineers**: C.1.3 (entire) + C.1.4 (first five papers) + C.1.5.1 (entire). Focus on the engineering details of InstructGPT, DPO, GRPO, R1, and DAPO.
 - **For Agentic RL Researchers**: C.1.3 (GRPO/R1) + C.1.5.2 (entire) + C.1.2 (AlphaZero/MuZero/Dreamer) to understand search and world models.
-- **For Safety Researchers**: C.1.4 (entire) + C.1.1 (Sutton & Barto, Chapter 15 on exploration and exploitation failure patterns) + C.1.3 (RLHF over-optimization related papers).
+- **For Safety Researchers**: C.1.4 (entire) + C.1.1 (Sutton & Barto, Chapter 2 on the multi-armed bandit exploration–exploitation trade-off) + C.1.3 (RLHF over-optimization related papers).
 - **For Theoretical Researchers**: C.1.1 (entire) + C.1.2 (Rainbow/Dreamer ablation studies) + C.1.5 (GSPO/CISPO mathematical derivations).
 
 ## Reading Methods
@@ -157,7 +161,7 @@ RL papers from 2025–2026 often assume readers are familiar with the details of
 The "Extended Reading" section at the end of each chapter in this book lists the core papers for that chapter. This appendix provides a more comprehensive map of papers across chapters. It is recommended to use this appendix in conjunction with the lists at the end of each chapter:
 
 - [Chapter 14 DPO](../chapter14_dpo/dpo-objective-derivation) → C.1.3 Rafailov et al.
-- [Chapter 8 PPO](../chapter08_ppo/ppo-bipedal-walker) → C.1.1 Schulman PPO, C.1.2 A3C
+- [Chapter 8 PPO](../chapter08_ppo/ppo-bipedal-walker) → C.1.2 Schulman PPO, C.1.2 A3C
 - [Chapter 13 RLHF](../chapter13_rlhf/base-model-to-assistant) → C.1.3 InstructGPT
 - [Chapter 15 GRPO/RLVR](../chapter15_grpo/grpo-practice-and-mechanism) → C.1.3 R1, Shao et al.
 - [Chapter 9 Continuous Control](../chapter09_continuous_control/ddpg) → C.1.2 DDPG/TD3/SAC/Dreamer V3
@@ -167,7 +171,7 @@ The "Extended Reading" section at the end of each chapter in this book lists the
 
 ## Chapter Summary
 
-The 100+ papers in this appendix constitute a complete map of the reinforcement learning (RL) literature, from 1992 Q-Learning to 2026 Kimi K2.5. They are not a "read and forget" list, but rather a **resource to be revisited repeatedly, accompanying your professional growth** — each additional paper you understand deepens your comprehension of modern RL. When you can uncover an engineering detail that the author left unexplained in a paper, or identify an assumption that has not been ablated, you have the capability to conduct independent research.
+The 80+ entries in this appendix constitute a complete map of the reinforcement learning (RL) literature, from 1992 Q-Learning to 2026 Kimi K2.5. They are not a "read and forget" list, but rather a **resource to be revisited repeatedly, accompanying your professional growth** — each additional paper you understand deepens your comprehension of modern RL. When you can uncover an engineering detail that the author left unexplained in a paper, or identify an assumption that has not been ablated, you have the capability to conduct independent research.
 
 ## Supplement: Learning Resources and Reproduction Projects
 
@@ -231,7 +235,7 @@ Stanford's Deep Reinforcement Learning course. Assumes students have a basic und
 
 **Website**: [web.mit.edu/6.7920/www/](https://web.mit.edu/6.7920/www/)
 
-MIT's Reinforcement Learning theory course. Two-thirds of the course focuses on "exploitation" (known theory: DP 7 lectures + core RL methods 9 lectures), and one-third on "exploration" (frontier topics). The DP portion is very solid, covering finite/infinite horizon, LQR, policy/ value iteration, and convergence proofs. **Suitable for learners who seek theoretical depth.**
+MIT's Reinforcement Learning theory course. Two-thirds of the course covers established foundations (DP 7 lectures + core RL methods 9 lectures), and one-third covers frontier topics. The DP portion is very solid, covering finite/infinite horizon, LQR, policy/value iteration, and convergence proofs. **Suitable for learners who seek theoretical depth.**
 
 **UC Berkeley CS285: Deep Reinforcement Learning (Sergey Levine)**
 
@@ -249,7 +253,7 @@ CMU's Deep RL course. After covering classical theory (MDP, DP, MC, TD), the cou
 
 **Address**: [Syllabus PDF](https://webdocs.cs.ualberta.ca/~machado/cmput365/w26/syllabus.pdf)
 
-Sutton's university's RL introductory course strictly follows the order of the Sutton & Barto textbook: Bandits → MDP → DP (including PI, VI, GPI) → MC Prediction and Control → TD Prediction → **TD Control (Sarsa, Q-Learning)** → Planning (Dyna-Q) → Function Approximation → Policy Gradients. **The most faithful implementation of the Sutton & Barto textbook in a course.**
+The University of Alberta's introductory RL course strictly follows the order of the Sutton & Barto textbook: Bandits → MDP → DP (including PI, VI, GPI) → MC Prediction and Control → TD Prediction → **TD Control (Sarsa, Q-Learning)** → Planning (Dyna-Q) → Function Approximation → Policy Gradients. **The most faithful implementation of the Sutton & Barto textbook in a course.**
 
 **Georgia Tech CS 7642: Reinforcement Learning (OMSCS)**
 
@@ -317,7 +321,7 @@ Enters the subject with Policy Gradient as the main thread, and provides in-dept
 
 **Address**: [Bilibili Video](https://www.bilibili.com/video/BV1oEWDz1Ez5/)
 
-A video companion for the course offered by the College of Mathematics, Peking University. It consists of five modules: basic concepts → value learning (DQN) → policy learning (Policy Gradient) → Actor-Critic (A3C, TRPO) → advanced topics (DDPG, AlphaGo, multi-agent systems). It is paired with Zhang Zihua's textbook _Deep Reinforcement Learning_. **Content is concise and ideal for a quick start.**
+A video companion for the course offered by the College of Mathematics, Peking University. It consists of five modules: basic concepts → value learning (DQN) → policy learning (Policy Gradient) → Actor-Critic (A3C, TRPO) → advanced topics (DDPG, AlphaGo, multi-agent systems). It is paired with Zhihua Zhang's textbook _Deep Reinforcement Learning_. **Content is concise and ideal for a quick start.**
 
 **Mushroom Book EasyRL (Datawhale)**
 
@@ -330,6 +334,8 @@ A synthesis of the essentials from Zhou Bolei's _Outline of Reinforcement Learni
 **Address**: [spinningup.qiwihui.com/zh-cn/latest](https://spinningup.qiwihui.com/zh-cn/latest/)
 
 A Chinese translation of OpenAI's Spinning Up. It includes core concepts, algorithm classification, derivation of policy gradient methods, and implementations of six algorithms: VPG, TRPO, PPO, DDPG, TD3, and SAC.
+
+**IV. LLM Alignment and Post-Training Courses**
 
 **Nathan Lambert — RLHF Book + Course**
 
@@ -879,7 +885,7 @@ For a minimal project, one can choose a very narrow prompt set, such as "generat
 
 | Resource                                                              | Focus                                                       | Suitable for Doing                                                                 |
 | --------------------------------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| [DDPO](https://github.com/jannerm/dd/F)                               | Classic implementation of diffusion model RL                | Understand how to perform policy gradient after treating denoising steps as an MDP |
+| [DDPO](https://github.com/jannerm/ddpo)                               | Classic implementation of diffusion model RL                | Understand how to perform policy gradient after treating denoising steps as an MDP |
 | [Diffusers DDPO](https://huggingface.co/docs/diffusers/training/ddpo) | Fine-tuning diffusion models with DDPO                      | Reproduce policy gradient optimization for text-to-image models                    |
 | [ddpo-pytorch](https://github.com/kvablack/ddpo-pytorch)              | Original open-source implementation of DDPO                 | Study RL updates on the sampling trajectory of diffusion models                    |
 | [AlignProp](https://align-prop.github.io/)                            | Optimizing generative models through differentiable rewards | Compare backprop-through-reward with policy gradient                               |

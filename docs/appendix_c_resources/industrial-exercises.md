@@ -156,16 +156,6 @@ Practice:
 
 ### Exercise 2: Minimal Domain Post-Training Loop
 
-Tasks:
-
-1. Collect 20 job posts for the role type you are targeting.
-2. Decompose each job into 6 columns: algorithms, data, evaluation, systems, product/business, safety/compliance.
-3. Mark what evidence projects you already have, and what evidence you still need.
-
-Deliverable: a capability-matrix table plus a ~300-word summary stating which roles you target and the single most important project gap to close next.
-
-### Exercise 2: Minimal Domain Post-Training Loop
-
 Scenario: build a finance research assistant or legal QA assistant, aiming for more professional and reliable answers.
 
 Tasks:
