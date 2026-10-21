@@ -96,7 +96,7 @@ Shift the middle sum's index ($j = k+1$): it becomes $\sum_{j=1}^{N+1}\gamma^j V
 Near some state, action $a_L$ was tried 3 times with returns $80, 100, 70$, and action $a_R$ 3 times with returns $120, 140, 130$. The current policy picks each with probability $0.5$. Estimate $Q(s, a_L)$, $Q(s, a_R)$, $V(s)$, and both advantages. Which action should the gradient reinforce?
 
 ::: details Solution
-$Q(s, a_L) \approx (80 + 100 + 70)/3 = 250/3 \approx 83.3$. $Q(s, a_R) \approx (120 + 140 + 130)/3 = 390/3 = 130$. $V(s) \approx 0.5 \times 83.3 + 0.5 \times 130 \approx 106.7$. Advantages: $A(s, a_L) \approx 83.3 - 106.7 = -23.3$; $A(s, a_R) \approx 130 - 106.7 = 23.3$. The gradient should reinforce $a_R$ (positive advantage) and suppress $a_L$.
+$Q(s, a_L) \approx (80 + 100 + 70)/3 = 250/3 \approx 83.3$. $Q(s, a_R) \approx (120 + 140 + 130)/3 = 390/3 = 130$. $V(s) \approx 0.5 \times 83.3 + 0.5 \times 130 \approx 106.7$. Advantages: $A(s, a_L) \approx 250/3 - 320/3 = -70/3 \approx -23.3$; $A(s, a_R) \approx 130 - 106.7 = 23.3$. The gradient should reinforce $a_R$ (positive advantage) and suppress $a_L$.
 :::
 
 ### Exercise 7 — Coding: clipped loss on a fixed trajectory
@@ -109,7 +109,7 @@ Implement the PPO policy loss from log-probabilities and check it on two fixed t
 Hand-compute the expected loss for each batch first, then verify with code.
 
 ::: details Solution
-Ratios are new/old probabilities. Batch 1: $r = [1.2, 0.8]$, both on the clip boundary. Unclipped: $[1.2 \times 2,\ 0.8 \times (-2)] = [2.4, -1.6]$; clipped terms are identical. Loss $= -\mathrm{mean}([2.4, -1.6]) = -0.4$. Batch 2: $r = [1.8, 0.2]$. Unclipped: $[3.6, -0.4]$; clipped: $[1.2 \times 2,\ 0.8 \times (-2)] = [2.4, -1.6]$. $\min$ picks $[2.4, -1.6]$ (caps the good action's gain, keeps the bad action's recovery signal). Loss $= -\mathrm{mean}([2.4, -1.6]) = -0.4$: clipping visibly threw away $3.6 - 2.4 = 1.2$ of inflated objective on the first sample.
+Ratios are new/old probabilities. Batch 1: $r = [1.2, 0.8]$, both on the clip boundary. Unclipped: $[1.2 \times 2,\ 0.8 \times (-2)] = [2.4, -1.6]$; clipped terms are identical. Loss $= -\mathrm{mean}([2.4, -1.6]) = -0.4$. Batch 2: $r = [1.8, 0.2]$. Unclipped: $[3.6, -0.4]$; clipped: $[1.2 \times 2,\ 0.8 \times (-2)] = [2.4, -1.6]$. $\min$ picks $[2.4, -1.6]$ (caps the good action's gain above $1+\varepsilon$; for the bad action at $r = 0.2 < 1-\varepsilon$ the clipped term wins, so that sample's gradient is zero and its probability stops falling further). Loss $= -\mathrm{mean}([2.4, -1.6]) = -0.4$: clipping visibly threw away $3.6 - 2.4 = 1.2$ of inflated objective on the first sample.
 
 ```python
 import math
@@ -184,6 +184,10 @@ def eval_checkpoint(path, n_episodes=20):
     return float(np.mean(returns)), float(np.std(returns))
 
 for seed in [0, 1, 2]:
+    # Prerequisite: the chapter script saves a single seed by default
+    # (output/ppo_bipedal_walker.zip plus the _100k/_500k checkpoints).
+    # Re-run training once per seed with
+    # model.save(f"output/ppo_bipedal_walker_seed{seed}") to produce these files first.
     mean, std = eval_checkpoint(f"output/ppo_bipedal_walker_seed{seed}.zip")
     print(f"seed {seed}: {mean:.1f} +- {std:.1f}")
 ```

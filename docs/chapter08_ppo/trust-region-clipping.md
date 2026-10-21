@@ -368,7 +368,7 @@ plt.savefig("ppo_clip_visualization.png", dpi=150)
 print("Saved visualization of the clipped objective")
 ```
 
-Running this code shows: when $A > 0$, the objective becomes flat once $r_t > 1.2$ (the gradient goes to zero and the update stops); when $A < 0$, the objective becomes flat once $r_t < 0.8$. This is the core effect of PPO clipping — once the policy ratio leaves the safe interval, the gradient automatically vanishes.
+Running this code shows the same-direction clipping effect: when $A > 0$, the objective becomes flat once $r_t > 1.2$ (the gradient goes to zero and the update stops); when $A < 0$, the objective becomes flat once $r_t < 0.8$. In the opposite-direction overshoot region (e.g. $A < 0$ with $r_t > 1.2$) the objective instead follows the unclipped value with a nonzero recovery gradient, as the four-case table above shows. This is the core effect of PPO clipping — once the policy ratio leaves the safe interval in the same direction as the advantage sign, the gradient vanishes.
 
 ## Sensitivity to $\varepsilon$
 

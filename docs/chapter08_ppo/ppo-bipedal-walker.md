@@ -120,7 +120,7 @@ Policy entropy measures how "random" the action distribution output by the polic
   <em>Figure 8.1-3: Policy entropy (the negative value recorded by SB3) over training steps. Curve rising = actual entropy falling = the policy becoming more deterministic.</em>
 </div>
 
-Look at the Y axis: the values are **negative**, dropping from 0 to -5.8 and then slowly recovering to -3.5. This is the recording convention of Stable-Baselines3, which stores `entropy_loss = -H(π)` internally, the negative entropy. To read the true policy entropy, flip the sign of the Y-axis values.
+Look at the Y axis: the values are **negative**, starting around $-5.8$ and slowly rising to $-3.5$. This is the recording convention of Stable-Baselines3, which stores `entropy_loss = -H(π)` internally, the negative entropy. To read the true policy entropy, flip the sign of the Y-axis values.
 
 Translated into actual meaning:
 
@@ -298,11 +298,11 @@ The action is a 4-dimensional continuous vector, with every component in $[-1, 1
 | `action[2]`      | Leg 2 hip torque  |
 | `action[3]`      | Leg 2 knee torque |
 
-PPO handles continuous actions differently from discrete ones. In a discrete action space, the policy network outputs the probability of each action and samples from it. In a continuous action space, the policy network outputs a Gaussian distribution, with mean $\mu(s)$ and standard deviation $\sigma(s)$, and the action is sampled from $\mathcal{N}(\mu, \sigma^2)$:
+PPO handles continuous actions differently from discrete ones. In a discrete action space, the policy network outputs the probability of each action and samples from it. In a continuous action space, the policy network outputs a Gaussian distribution, with mean $\mu(s)$ and standard deviation $\sigma$, and the action is sampled from $\mathcal{N}(\mu, \sigma^2)$:
 
-$$a \sim \mathcal{N}(\mu_\theta(s), \sigma_\theta(s)^2)$$
+$$a \sim \mathcal{N}(\mu_\theta(s), \sigma_\theta^2)$$
 
-For comparison, in a discrete space the policy is a categorical distribution: the network outputs one logit per action and the sampled action needs no scale parameter at all. The Gaussian above is its continuous analogue, with $\sigma_\theta(s)$ playing the role of exploration noise. SB3 learns $\sigma$ as a separate parameter vector (one per action dimension, shared across states), so entropy falls exactly when these sigmas shrink, which is what the entropy curve in Section 8.1.2 tracks.
+For comparison, in a discrete space the policy is a categorical distribution: the network outputs one logit per action and the sampled action needs no scale parameter at all. The Gaussian above is its continuous analogue, with $\sigma_\theta$ playing the role of exploration noise. SB3's default (`use_expln=False`) learns $\sigma$ as a separate state-independent parameter vector (one per action dimension, shared across states), so entropy falls exactly when these sigmas shrink, which is what the entropy curve in Section 8.1.2 tracks.
 
 One practical subtlety: torques must stay in $[-1, 1]$, but a Gaussian sample is unbounded. SB3 simply clips out-of-range actions to the bounds when stepping the environment. Some implementations instead squash the sample through $\tanh$ and correct the log-probability for the change of variables, $\log \pi(a \mid s) = \log \mathcal{N}(u \mid s) - \sum_i \log(1 - \tanh^2(u_i))$ with $a = \tanh(u)$, so the bounded action keeps an exact density for the ratio $r_t$. Either way, the stored `old_logprobs` must use the same convention as the recomputed `new_logprobs`, or the ratio silently measures the wrong change.
 
