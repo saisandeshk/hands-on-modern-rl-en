@@ -185,7 +185,7 @@ Is there a way to do CTDE with a more stable on-policy algorithm such as PPO? Th
 
 ## 4. Stabilizing Multiple Policy Updates with MAPPO
 
-Multi-Agent PPO (MAPPO, Yu et al. 2022) extends the familiar PPO (the strong baseline we have used since Chapter 7) to the CTDE setting. This "simple" extension turned out to work remarkably well: to this day, MAPPO remains the first-choice baseline for the vast majority of cooperative multi-agent tasks.
+Multi-Agent PPO (MAPPO, Yu et al. 2022) extends the familiar PPO (the strong baseline we have used since Chapter 8) to the CTDE setting. This "simple" extension turned out to work remarkably well: to this day, MAPPO remains the first-choice baseline for the vast majority of cooperative multi-agent tasks.
 
 MAPPO's design is very direct:
 
@@ -215,7 +215,7 @@ def mappo_update(actors, critic, buffer, n_agents, clip_eps=0.2):
             # Update each agent's actor in turn
             for i in range(n_agents):
                 ratio = (new_logp_list[i] - old_logp_list[i]).exp()
-                s1 = (ratio * adv[i]).mean()
+                s1 = ratio * adv[i]
                 s2 = torch.clamp(ratio, 1 - clip_eps, 1 + clip_eps) * adv[i]
                 policy_loss = -torch.min(s1, s2).mean()
                 entropy_bonus = -new_logp_list[i].mean()
@@ -278,6 +278,10 @@ This condition guarantees that $\arg\max_{a} Q_{\text{tot}}$ can be obtained by 
 Back to carrying the table: QMIX allows the total value to combine the two robots' $Q_i$ in a more complex way (as long as monotonicity is kept), for example with an extra bonus when the two robots coordinate well. As long as monotonicity holds, that "if either party's own action value rises, the team's total value will not fall", each robot choosing its locally optimal grasp point is still the globally optimal combination.
 
 Value decomposition methods work well on some cooperative tasks, but they share one limitation: they apply only to **fully cooperative** settings (all agents share one team reward). MADDPG and MAPPO are more flexible and can handle cooperative, competitive, and mixed reward structures. Moreover, with the rise of MAPPO, on most cooperative tasks MAPPO now outperforms QMIX and is also simpler to implement.
+
+### 4.3 A Note on Privileged Information and Fair Comparisons
+
+Step back and notice what the centralized Critic really is: **privileged information**. During training it sees the global state and every agent's action, inputs the decentralized policies will never have at execution. Privileged inputs are legitimate — they only shape gradients, never decisions — but they make comparisons treacherous. An algorithm whose Critic sees the true state will beat one whose Critic sees only concatenated local observations, and the gap may come from the information, not the algorithm. When you read MARL (or exploration) papers, check that baselines share the same Critic inputs, the same global-state features, and the same observation preprocessing; otherwise the "improvement" may be an unfair information advantage rather than a better method. The same caution applies to RND-style bonuses evaluated with extra environment resets or oracle state features.
 
 ## Section Summary
 
