@@ -1283,6 +1283,10 @@ const sidebar = {
             {
               text: '20.3 Self-Play SWE-RL',
               link: '/chapter20_swe_agents/self-play-ssr-and-summary'
+            },
+            {
+              text: '20.4 Summary and Exercises',
+              link: '/chapter20_swe_agents/review'
             }
           ]
         },
