@@ -59,8 +59,10 @@ Looking at the code, you will find it is a standard GPT with slightly modified i
 ```python
 class DecisionTransformer(nn.Module):
     def __init__(self, state_dim, act_dim, hidden_dim, n_heads, n_layers,
-                 max_ep_len=4096):
+                 max_ep_len=4096, K=20):
         super().__init__()
+        self.K = K  # context length: how many recent timesteps to condition on
+        self.act_dim = act_dim
         # Three embedding layers: RTG, state, action each mapped to hidden_dim
         self.embed_rtg  = nn.Linear(1, hidden_dim)
         self.embed_state = nn.Linear(state_dim, hidden_dim)
@@ -96,14 +98,19 @@ class DecisionTransformer(nn.Module):
         return self.action_head(h_states)  # Regress to continuous actions
 
     @torch.no_grad()
-    def act(self, state, target_rtg, history, t):
-        # At inference, use the target RTG as a "prompt" and generate actions autoregressively
-        rtg_seq = torch.cat([history.rtg, target_rtg[None]], dim=0)[-self.K:]
-        s_seq   = torch.cat([history.states, state[None]], dim=0)[-self.K:]
-        a_seq   = history.actions[-self.K - 1:-1]  # Shifted by one
-        t_seq   = torch.arange(len(s_seq))
-        pred_a = self.forward(rtg_seq, s_seq, a_seq, t_seq)
-        return pred_a[-1]  # Take the prediction of the last timestep
+    def act(self, state, target_rtg, history):
+        # At inference, use the target RTG as a "prompt" and generate actions autoregressively.
+        # history stores past (rtg, state, action) rows; append the current
+        # (target_rtg, state) plus a zero placeholder action so the three
+        # sequences share one length T, then add the batch dimension back.
+        rtg = torch.cat([history.rtg, target_rtg.view(1, 1)], dim=0)[-self.K:]
+        states = torch.cat([history.states, state.view(1, -1)], dim=0)[-self.K:]
+        actions = torch.cat([history.actions,
+                             torch.zeros(1, self.act_dim)], dim=0)[-self.K:]
+        timesteps = torch.arange(states.shape[0]).unsqueeze(0)
+        pred_a = self.forward(rtg.unsqueeze(0), states.unsqueeze(0),
+                              actions.unsqueeze(0), timesteps)
+        return pred_a[0, -1]  # Take the prediction of the last timestep
 ```
 
 Note an implementation detail: each time step takes 3 tokens (R, s, a), so the position indices of the state tokens are 1, 4, 7, ..., that is, starting from 1 and taking every third one, and the line `h[:, 1::3, :]` does exactly this.
@@ -126,16 +133,18 @@ The training process is exactly like training any sequence model: cut a history 
 
 Training is this simple, so how is it used at deployment time? You will find it even simpler. DT does not need to take an argmax of Q over the action space. You only need to **specify a target RTG** (for example, check roughly what score expert trajectories in your dataset get and set the target to that number), and DT then generates actions autoregressively, like GPT generating text, trying to make the cumulative return of the whole trajectory approach the target you set.
 
-Here is the inference pseudocode:
+Here is the inference pseudocode (the buffer stores one row per step with the
+RTG fed at that step, plus the state and the action taken, so its three
+columns stay aligned):
 
 ```python
-target_return = 9000  # Roughly the expert-level score in the HalfCheetah environment
+target_return = 6000  # example value: pick from the return range in your dataset
 state = env.reset()
-history = TrajectoryBuffer()  # Stores the most recent K steps of history
+history = TrajectoryBuffer()  # columns: rtg [T,1], states [T,D], actions [T,A]
 for t in range(max_steps):
-    action = model.act(state, target_return, history, t)
+    action = model.act(state, target_return, history)
     next_state, reward, done, _ = env.step(action)
-    history.append(state, action, reward)
+    history.append(target_return, state, action)
     state = next_state
     # Key: subtract the reward actually received from the RTG at each step, as the "remaining target"
     target_return -= reward
@@ -176,7 +185,7 @@ In other words, what DT learns is nothing other than the **conditional distribut
 
 Of course, this also means it has limits: for state-action combinations not covered by the data it still cannot predict reliably, and whether it can "stitch" good segments from different trajectories together depends on the dataset and the ability of the Transformer.
 
-Even so, DT's contribution is pioneering. It spawned a whole line of research on "RL via supervised learning": RL via supervised learning (RvS) in online RL, in-context RL (Algorithm Distillation), Star-Vector, and even "language modeling is all you need for RL" type work can all trace their source to DT.
+Even so, DT's contribution is pioneering. It spawned a whole line of research on "RL via supervised learning": RvS (offline RL cast directly as goal-conditioned supervised learning), in-context RL (Algorithm Distillation), StARformer, and Trajectory Transformer–style planning work can all trace their source to DT.
 
 ### 1.5 Limitations of Decision Transformer
 
@@ -221,14 +230,14 @@ $$\min_\theta \; \mathbb{E}_{\tau, t, \epsilon}\left[\|\epsilon - \epsilon_\thet
 Let's take this training objective apart:
 
 - $\tau$: a real trajectory sampled from the dataset
-- $t$: the diffusion step (from 0 to T, where t=0 is the clean trajectory and t=T is pure noise)
+- $t$: the diffusion step (from 0 to $N_{\text{diff}}$, where $t=0$ is the clean trajectory and $t=N_{\text{diff}}$ is pure noise)
 - $\epsilon \sim \mathcal{N}(0, I)$: the Gaussian noise we actually add
 - $\tau_t$: the noisy trajectory after t steps of noise
 - $\epsilon_\theta(\tau_t, t)$: the network's prediction of "what noise was added at this step"
 
 The training objective is to make the predicted noise as close as possible to the noise actually added (an MSE loss). This is standard diffusion-model training, without any special modification.
 
-At inference we go in reverse: start from pure random noise and iterate for T steps. At each step the network predicts the noise, and this noise is subtracted from the current noisy trajectory, and in the end we obtain a clean trajectory that looks like those in the training data.
+At inference we go in reverse: start from pure random noise and iterate the reverse process over its $N_{\text{diff}}$ diffusion steps. At each step the network predicts the noise, and this noise is subtracted from the current noisy trajectory, and in the end we obtain a clean trajectory that looks like those in the training data.
 
 But wait! What we want is not just trajectories that "look like real data" but **high-return trajectories**. How do we control whether the generated trajectory is good or bad? Diffuser uses **classifier-free guidance**, a well-established technique from image diffusion. During training the conditioning information (such as reward or the starting state) is randomly dropped, so the model learns both conditional and unconditional generation. At inference the predictions of the two are combined by a weighted extrapolation:
 
