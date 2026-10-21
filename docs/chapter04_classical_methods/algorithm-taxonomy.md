@@ -110,7 +110,7 @@ $$
 \mathbb{E}_\pi[R]=\mathbb{E}_\mu\left[\rho\,R\right],\qquad \rho(s,a)=\frac{\pi(a\mid s)}{\mu(a\mid s)}.
 $$
 
-A concrete check: suppose at some state $\mu$ picks right with probability $0.5$ while $\pi$ picks right with probability $0.8$. A sampled transition $(s,\text{right},r=-1)$ gets weight $\rho=0.8/0.5=1.6$, contributing $1.6\times(-1)=-1.6$ to the corrected estimate; a left action gets $\rho=0.2/0.5=0.4$. Actions the target favors count extra, actions it dislikes count less, and the weighted average is unbiased for the target expectation.
+A concrete check: suppose at some state $\mu$ picks right with probability $0.5$ while $\pi$ picks right with probability $0.8$. A sampled transition $(s,\text{right},r=-1)$ gets weight $\rho=0.8/0.5=1.6$, contributing $1.6\times(-1)=-1.6$ to the corrected estimate; a left action gets $\rho=0.2/0.5=0.4$. Actions the target favors count extra, actions it dislikes count less, and the ordinary, ratio-weighted average $\frac1n\sum_i\rho_iG_i$ is unbiased for the target expectation.
 
 For a full trajectory the ratio multiplies per step, $\rho_{0:T}=\prod_{t}\pi(a_t\mid s_t)/\mu(a_t\mid s_t)$, which is unbiased but its variance explodes with horizon length. Per-decision IS softens this by giving each reward only the product of ratios up to its own time step, since later action choices cannot affect an earlier reward.
 
@@ -266,7 +266,7 @@ This explains why LLM-RL training can still be unstable even with PPO clipping. 
 
 ### Making Peace with Reality
 
-These papers collectively point to one conclusion: in LLM-RL engineering practice, there is no such thing as "purely" on-policy. What we can do is **keep the gap between $\mu$ and $\pi_\theta$ within an acceptable range** -- PPO's clipping is one form of control, FP16 is another, and R3 routing replay is yet another. The on/off-policy theory in the first half of the main text is a clean binary classification, while engineering reality is a **continuous spectrum** -- theoretically on-policy, but in practice always carrying a hint of off-policy flavor.
+These papers collectively point to one conclusion: in LLM-RL engineering practice, there is no such thing as "purely" on-policy. What we can do is **keep the gap between $\mu$ and $\pi_\theta$ within an acceptable range** -- PPO's clipping is one form of control, low-precision training is another, and routing replay is yet another. The on/off-policy theory in the first half of the main text is a clean binary classification, while engineering reality is a **continuous spectrum** -- theoretically on-policy, but in practice always carrying a hint of off-policy flavor.
 
 ## Summary
 

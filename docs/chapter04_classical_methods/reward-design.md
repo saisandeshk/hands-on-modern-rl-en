@@ -255,7 +255,7 @@ $$
 | $r_{\text{alive}}$   | Alive bonus per step                |
 | $r_{\text{ctrl}}$    | Joint torque penalty (control cost) |
 
-Looks reasonable, right? Encourage moving forward, reward staying alive, penalize overly violent actions: all three are wanted. But the **numerical ranges** of the three things may be completely different. $r_{\text{forward}}$ may range from 0 to 5, and $r_{\text{ctrl}}$ from -100 to 0. If they are added directly, the absolute value of the control cost may be dozens of times that of the forward speed. The result is that the agent would rather stand still (zero control cost) than dare to move a leg (moving a leg has a high control cost, while the forward reward is only a little).
+Looks reasonable, right? Encourage moving forward, reward staying alive, penalize overly violent actions: all three are wanted. But the **numerical ranges** of the three things may be completely different. As a schematic illustration (not the exact gym coefficients), suppose $r_{\text{forward}}$ ranges from 0 to 5 while $r_{\text{ctrl}}$ ranges from -100 to 0. If they are added directly, the absolute value of the control cost may be dozens of times that of the forward speed. The result is that the agent would rather stand still (zero control cost) than dare to move a leg (moving a leg has a high control cost, while the forward reward is only a little).
 
 You need to attach a weight coefficient to each term to decide which one matters more:
 
@@ -351,7 +351,7 @@ CPO uses Lagrange multipliers to adjust automatically during training: when the 
 
 Whichever method is used, every time you add a new term to the reward you introduce a new possibility of bias. Four kinds of problem recur in engineering:
 
-**Scale mismatch.** $r_{\text{forward}}$ may be in 0 to 5, and $r_{\text{ctrl}}$ in -100 to 0. The terms with large values dominate the gradient direction. This has nothing to do with the weight question of "which is more important" and is purely a matter of numerical scale. A simple remedy is to scale each sub-reward by hand to a similar range (such as [-1, 1]).
+**Scale mismatch.** Schematically, $r_{\text{forward}}$ may be in 0 to 5, and $r_{\text{ctrl}}$ in -100 to 0. The terms with large values dominate the gradient direction. This has nothing to do with the weight question of "which is more important" and is purely a matter of numerical scale. A simple remedy is to scale each sub-reward by hand to a similar range (such as [-1, 1]).
 
 **Weight sensitivity.** Changing the control penalty coefficient from 0.001 to 0.003, only a factor of three, may turn the policy from "a steady jog" into "stumbling and falling." Finding a suitable range of weights usually takes repeated trials.
 
@@ -402,7 +402,7 @@ learning is faster, since every step tells the agent "how crooked the pole is an
 
 Changing only the position coefficient from 0.5 to 2 turns the reward of the same state from "decent" to "very poor." If the position penalty is too strong, the agent may prefer to let the pole lean as long as the cart stays at the center.
 
-Pan et al. divide reward misspecification into three types:
+Pan et al. describe reward misspecification patterns including three common ones:
 
 - **Wrong weights**: the dimensions measured are right, but the proportions of importance among them are written wrongly. The choice of $c_1, c_2$ in CartPole is of this type.
 - **Wrong ontology**: the dimension measured is itself wrong. Coast Runners uses "how many green blocks are eaten" to measure "boat performance," and the dimension is fundamentally wrong.

@@ -66,7 +66,13 @@ Depth/Later/Optional items (belief-state POMDP planning, large-space approximate
 
 - Title: `4.R Summary and Exercises`, link: `/chapter04_classical_methods/review` (new page `docs/chapter04_classical_methods/review.md`; coordinator to insert after 4.3).
 
-## Commands run and results
+## Commands run and results (review-response pass)
+
+- `.venv/bin/python` re-verification: forward-order MC updates reproduce ($-3.125$, $-1.5$), backward order gives ($-5$, $-2.25$); corridor operator max-norm $1.0$, eigenvalues $0.51231/-0.31231$ — both reviewer claims confirmed.
+- `npx prettier --write` on the four chapter files + report: all unchanged (clean).
+- `npx vitepress build docs`: success (~17 s), no dead links.
+
+## Commands run and results (original pass)
 
 - `npx prettier --write` on the four chapter files: three unchanged, `review.md` reformatted; clean.
 - `npx vitepress build docs`: success (client + SSR + pages rendered, ~16 s). No dead links.
@@ -78,3 +84,20 @@ Depth/Later/Optional items (belief-state POMDP planning, large-space approximate
 - `review.md` is orphaned until the coordinator adds it to `docs/.vitepress/config.mjs` (I did not touch the sidebar per instructions).
 - The 4.2 appendix ("Reading Terminology from Paper Titles") and the training-inference-mismatch subsection are LLM-engineering material sitting in a classical-methods chapter; I softened unverifiable specifics but left placement for the coordinator to decide (possible move to Chapter 18).
 - No commits made; changes left in the working tree.
+
+## Review response
+
+- Error 1 (γ-contraction claim with γ=1 corridor): **accepted.** Re-derived: corridor uses γ=1 (dp-mc-td.md line 591, review.md Ex. 2); policy-evaluation operator has max-norm 1.0 and dominant eigenvalue 0.51231 (verified with `.venv/bin/python`). Fixed the control-section paragraph to state the γ<1 contraction theorem with its hypothesis and the γ=1 absorbing-chain case explicitly, and adjusted the value-iteration sentence, summary bullet 6, and review.md Pitfall 6 to match.
+- Error 2 (MC backward-traversal vs forward-order table): **accepted.** Re-executed both orders: forward order reproduces the printed table ($V(S)=-3.125$, $V(M)=-1.5$); backward order gives ($-5$, $-2.25$). Fixed by rewording to "returns accumulated backward, updates applied in visit order" plus a note that the constant-α final values are order-dependent.
+- Error 3 (IS "weighted average is unbiased" vs later "weighted" biased): **accepted.** Fixed to "the ordinary, ratio-weighted average $\frac1n\sum_i\rho_iG_i$ is unbiased", keeping "weighted (self-normalized)" exclusively for the biased estimator.
+- Error 4 ("R3 routing replay" leftover): **accepted.** Changed to "routing replay" (with "low-precision training" replacing "FP16"), consistent with the softened bullet.
+- Error 5 (Expected SARSA "coincides with Q-learning while still smoothing"): **accepted.** Fixed to state the greedy-π expectation is exactly Q-learning with no smoothing remaining; smoothing exists only for stochastic π.
+- Error 6 (review.md sidebar registration / "4.R" numbering): **rejected (out of scope).** Worker rules forbid editing `docs/.vitepress/config.mjs`; registration was already listed under Sidebar additions for the coordinator. The "4.R" title/H1 is what the task specification mandates ("the coordinator will renumber it"), so it is kept as-is.
+- Doubt 1 (Gao gold 6B vs 175B): **rejected, kept as written.** To my knowledge the Gao et al. synthetic setup does use a 6B reward model as the gold standard with smaller proxies trained on its labels; the reviewer's 175B recollection appears to confuse policy-model sizes. Listed under Needs external verification for an internet pass to confirm.
+- Doubt 2 (appendix arXiv IDs/venues): **no change** — already listed under Needs external verification; flagged for an internet pass.
+- Doubt 3 (Humanoid magnitudes/three terms): **partially accepted.** The text already hedges with "may range", but since the numbers are not the true gym coefficients they are now explicitly labelled schematic (two spots); the three-part formula matches the main terms and the surrounding section already discusses small extra terms via the bonus details.
+- Doubt 4 (Pan three-type taxonomy): **partially accepted.** Without internet access I could not verify exhaustiveness, so the attribution is softened to "describe ... patterns including three common ones" instead of asserting a complete three-way division; taxonomy content itself unchanged.
+- Doubt 5 (Q-learning "over-optimism" mechanism): **accepted.** Reworded to distinguish maximization bias (max over noisy estimates) from the target never charging for the exploratory step.
+- Doubt 6 (duplicated policy-improvement derivation): **declined (not an error).** The DP-section paragraph motivates improvement locally while the control section teaches it; merging would expand scope with no correctness gain.
+- Doubt 7 (page title "4.1 ..." no longer describes page): **declined.** Retitling would break the sidebar/H1 contract and exceed minimal-change scope; the current title still names the page's core methods.
+- Doubt 8 (`planning/content-review-notes.md` logging): **declined (out of scope).** That file is outside the task's editable scope; the fixes are recorded in this report instead, and the coordinator can port them.

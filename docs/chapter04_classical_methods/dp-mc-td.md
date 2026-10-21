@@ -443,7 +443,7 @@ The state transitions for each step are:
 | 4    | **$S\xrightarrow{-1}M$** | <img src="./images/three-state-corridor-highlight-s-right.svg" alt="Sampled trajectory, step 4: S go right to M" style="max-width: 260px;" />    |
 | 5    | **$M\xrightarrow{-1}G$** | <img src="./images/three-state-corridor-highlight-m-right.svg" alt="Sampled trajectory, step 5: M go right to G" style="max-width: 260px;" />    |
 
-MC updates only after the episode ends. It traverses the trajectory backward, accumulating returns from each visited position to the terminal state. With $\gamma=1$, the targets for each visit in this trajectory are:
+MC updates only after the episode ends. The returns are accumulated backward from the terminal state (each visit's target is the sum of all rewards after it), and the table below applies one update per visit in the order the visits occurred. Because the constant step size $\alpha=0.5$ does not average commutatively (unlike $\alpha=1/N$), the final values depend on this update order. With $\gamma=1$, the targets for each visit in this trajectory are:
 
 | Visit position | State | Rewards actually obtained afterward | MC target $G_t$ |
 | -------------- | ----- | ----------------------------------- | --------------- |
@@ -586,7 +586,7 @@ $$
 \max_s\left|V_{k+1}(s)-V_k(s)\right|<\theta.
 $$
 
-This residual-aware rule matters because the Bellman operators behind these sweeps are $\gamma$-contractions in the max norm: each sweep shrinks the distance to the fixed point $V^\pi$ by a factor of roughly $\gamma$. Values therefore converge geometrically, and a small residual means the table is close to $V^\pi$. A useful practical fact is that the greedy policy usually stops changing before the values have fully converged, so policy iteration can terminate early once no state changes its greedy action.
+For $\gamma<1$ this residual rule is backed by a contraction argument: the Bellman expectation and optimality operators are $\gamma$-contractions in the max norm, so each sweep shrinks the distance to the fixed point by a factor of roughly $\gamma$ and a small residual means the table is close to $V^\pi$. The corridor in this chapter uses $\gamma=1$, so the strict contraction theorem does not apply here; the sweep still converges because the induced chain is absorbing (a finite expected hitting time to $G$), with an observed error decay of about $0.51$ per sweep. A useful practical fact is that the greedy policy usually stops changing before the values have fully converged, so policy iteration can terminate early once no state changes its greedy action.
 
 Policy improvement then builds the greedy policy from the evaluated values. For the corridor, insert the converged values $V(S)=-3.375$ and $V(M)=-1.875$ with $\gamma=1$:
 
@@ -606,7 +606,7 @@ $$
 V_{k+1}(s)=\max_a\left[R(s,a)+\gamma\sum_{s'}P(s'\mid s,a)V_k(s')\right].
 $$
 
-From zeros in the corridor, the first sweep gives $V_1(S)=\max(-1,-2)=-1$ and $V_1(M)=\max(-1,-2)=-1$; the second gives $V_2(S)=\max(-1-1,-2-1)=-2$ and $V_2(M)=\max(-1,-2-1)=-1$, after which the table is already optimal. Value iteration is policy iteration with a single evaluation sweep per improvement step, and it converges to $V^*$ by the same contraction argument, since the Bellman optimality operator is also a $\gamma$-contraction with the optimal value function as its unique fixed point.
+From zeros in the corridor, the first sweep gives $V_1(S)=\max(-1,-2)=-1$ and $V_1(M)=\max(-1,-2)=-1$; the second gives $V_2(S)=\max(-1-1,-2-1)=-2$ and $V_2(M)=\max(-1,-2-1)=-1$, after which the table is already optimal. Value iteration is policy iteration with a single evaluation sweep per improvement step. For $\gamma<1$ it converges to $V^*$ because the Bellman optimality operator is a $\gamma$-contraction with the optimal value function as its unique fixed point; with the corridor's $\gamma=1$ the guarantee comes instead from the absorbing episodic structure, as above.
 
 Both are instances of generalized policy iteration (GPI): any interleaving of partial evaluation and partial improvement steps in which both processes keep pulling toward consistency. Almost every control method later in this book, including SARSA and Q-learning below, is GPI with sampled updates instead of model sweeps.
 
@@ -668,7 +668,7 @@ $$
 Q(S_t,A_t)\leftarrow Q(S_t,A_t)+\alpha\left[R_{t+1}+\gamma\max_{a'}Q(S_{t+1},a')-Q(S_t,A_t)\right].
 $$
 
-The behavior policy can explore freely (for instance $\epsilon$-greedy), while the target pretends all future actions are greedy. Q-learning therefore learns the value of the optimal policy directly and takes the shorter cliff-edge route in cliff-walk, but it pays with over-optimism during learning: the max operator propagates whatever exploratory danger the behavior policy encountered as if it never happened.
+The behavior policy can explore freely (for instance $\epsilon$-greedy), while the target pretends all future actions are greedy. Q-learning therefore learns the value of the optimal policy directly and takes the shorter cliff-edge route in cliff-walk, but it pays in two ways during learning: the max over estimated values is upward biased (maximization bias), and because the target never charges for the exploratory step actually taken, the risky optimal path looks better than the policy that must walk it.
 
 Expected SARSA sits between them. It averages over the next-action distribution instead of sampling or maximizing:
 
@@ -676,7 +676,7 @@ $$
 Q(S_t,A_t)\leftarrow Q(S_t,A_t)+\alpha\left[R_{t+1}+\gamma\sum_{a'}\pi(a'\mid S_{t+1})Q(S_{t+1},a')-Q(S_t,A_t)\right].
 $$
 
-When $\pi$ is the current $\epsilon$-greedy policy the update is on-policy like SARSA, but with lower variance because the expectation replaces a single sampled $A_{t+1}$; when $\pi$ is set to the greedy policy it coincides with Q-learning while still smoothing the target.
+When $\pi$ is the current $\epsilon$-greedy policy the update is on-policy like SARSA, but with lower variance because the expectation replaces a single sampled $A_{t+1}$; when $\pi$ is the greedy policy the expectation is over a point mass, so the update is exactly Q-learning and no smoothing remains. Smoothing exists only for a stochastic $\pi$.
 
 All three need two schedules to converge in the tabular setting. Exploration typically uses $\epsilon$-greedy behavior with $\epsilon$ decayed toward zero (GLIE: greedy in the limit with infinite exploration), so every state-action pair keeps being visited early on but behavior becomes greedy asymptotically. Step sizes must satisfy the Robbins-Monro conditions ($\sum_t\alpha_t=\infty$, $\sum_t\alpha_t^2<\infty$, for instance $\alpha_t=1/t$) in theory, while constant small $\alpha$ values are common in practice for tracking nonstationary targets.
 
@@ -932,7 +932,7 @@ This section discussed three methods of value estimation.
 3. MC does not require a model. It updates values using the full-trajectory return $G_t$. Its target is unbiased, but it must wait for episode termination and typically has higher variance.
 4. TD also does not require a model, and it can update after every step. It uses $r+\gamma V(s')$ as its target, providing more timely learning and lower variance, but because the target includes an estimate, it introduces bias.
 5. The shared core of DP, MC, and TD is the Bellman idea: the current value can be characterized by immediate reward and future value. Their differences lie in whether future value is computed exactly by the model, revealed by complete experience, or approximated by the next-state estimate.
-6. Planning becomes control by alternating evaluation with greedy improvement. Policy iteration evaluates fully then improves, value iteration improves on every sweep, and GPI is any interleaving of the two. The Bellman operators behind these sweeps are $\gamma$-contractions, so iterates converge to a unique fixed point; stop when the largest sweep change falls below $\theta$, and pin terminal values at zero.
+6. Planning becomes control by alternating evaluation with greedy improvement. Policy iteration evaluates fully then improves, value iteration improves on every sweep, and GPI is any interleaving of the two. For $\gamma<1$ the Bellman operators behind these sweeps are $\gamma$-contractions, so iterates converge geometrically to a unique fixed point (with the corridor's $\gamma=1$, convergence comes from the absorbing episodic structure instead); stop when the largest sweep change falls below $\theta$, and pin terminal values at zero.
 7. One-step TD and full MC are endpoints of a continuum. The $n$-step return mixes $n$ real rewards with a bootstrap, trading bias against variance, and TD($\lambda$) averages over all $n$ with weights $(1-\lambda)\lambda^{n-1}$. Eligibility traces implement the same average online by letting each TD error flow backward with decay $\gamma\lambda$.
 8. Tabular control estimates $Q(s,a)$ instead of $V(s)$. SARSA bootstraps from the action actually taken next (on-policy, risk-aware), Q-learning from the greedy best action (off-policy, optimal but optimistic), and Expected SARSA from the average under $\pi$ (lower variance, matching Q-learning when $\pi$ is greedy). Converge with decaying $\epsilon$-greedy exploration plus Robbins-Monro step sizes, and bootstrap through time limits (truncation) while using zero future value only at true termination.
 
