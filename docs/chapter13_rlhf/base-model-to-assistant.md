@@ -115,16 +115,18 @@ If you cannot trace which dataset, which checkpoint, and which evaluation produc
 
 ## Roadmap
 
-| Section                                                                | Core question                                                | Deliverable                            |
-| ---------------------------------------------------------------------- | ------------------------------------------------------------ | -------------------------------------- |
-| [13.1 From Base Model to Aligned Assistant](./base-model-to-assistant) | What does a base model miss?                                 | base vs SFT vs RLHF comparison         |
-| [13.2 SFT Instruction Tuning](./imitation-learning-pipeline)           | How do preferences become reward-model training signals?     | SFT data, preference data, and RM loss |
-| [13.3 AI Feedback and Safety Principles](./hhh-practice)               | How do preference labels scale from humans to AI feedback?   | a constitution and the RLAIF loop      |
-| [13.4 The RLHF Pipeline](./standard-rlhf-pipeline)                     | What are the inputs/outputs of SFT -> RM -> PPO?             | artifact checklist + flow diagram      |
-| [13.5 Large-Scale Training Engineering](./scaling-to-large-models)     | How does the same pipeline scale from small to large models? | TRL/OpenRLHF/NeMo mapping + checklist  |
-| [13.6 Evaluation](./evaluation)                                        | How do we prove we improved without cheating the RM?         | evaluation gate and badcase loop       |
-| [13.7 Extended Practice: Reward Hacking](./extended-practice)          | What does reward hacking look like in a controlled setup?    | a repeatable debugging workflow        |
-| [13.8 Hands-On: veRL + GSM8K](./verl-ppo-gsm8k)                        | How does the pipeline look in an industrial framework?       | an end-to-end PPO experiment           |
+| Section                                                               | Core question                                                | Deliverable                              |
+| --------------------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------- |
+| [13.1 Base Model to Instruction Alignment](./base-model-to-assistant) | What does a base model miss?                                 | base vs SFT vs RLHF comparison           |
+| [13.2 Supervised Fine-Tuning](./imitation-learning-pipeline)          | How do we teach the model to follow instructions?            | SFT data, masks, and preference triplets |
+| [13.3 AI Feedback and Safety Principles](./hhh-practice)              | How do preference labels scale from humans to AI feedback?   | a constitution and the RLAIF loop        |
+| [13.4 Reinforcement Learning Fine-Tuning](./standard-rlhf-pipeline)   | What are the inputs/outputs of SFT -> RM -> PPO?             | artifact checklist + flow diagram        |
+| [13.5 Large-Scale Training Engineering](./scaling-to-large-models)    | How does the same pipeline scale from small to large models? | TRL/OpenRLHF/NeMo mapping + checklist    |
+| [13.6 Alignment Evaluation](./evaluation)                             | How do we prove we improved without cheating the RM?         | evaluation gate and badcase loop         |
+| [13.7 Extended Practice: Reward Hacking](./extended-practice)         | What does reward hacking look like in a controlled setup?    | a repeatable debugging workflow          |
+| [13.8 Hands-On: veRL + GSM8K](./verl-ppo-gsm8k)                       | How does the pipeline look in an industrial framework?       | an end-to-end PPO experiment             |
+| [13.9 Supplement: The PPO-RLHF Training Loop](./ppo-rlhf-loop)        | How does one PPO update work at the token level?             | KL, advantage, and clipping mechanics    |
+| [13.R Summary and Exercises](./review)                                | What should you take away, and can you apply it?             | outcomes, equations, pitfalls, exercises |
 
 ## Why Evaluation Is Mandatory
 
@@ -138,7 +140,7 @@ This is why evaluation in this chapter is not optional — it is part of the RLH
 
 A qualified RLHF experiment cannot just report "reward went up." It must answer at least three questions: is the model more aligned with human preferences? Has existing capability noticeably regressed? Are high-scoring answers actually usable?
 
-## Boundary with Chapter 9
+## Boundary with Chapters 14-16
 
 This chapter covers the **classical RLHF standard pipeline**. Chapters 14-16 depart from this pipeline and explains why modern post-training has progressively simplified it:
 
@@ -271,6 +273,28 @@ In Chapter 2 we described RL problems with an MDP. LLM generation fits the same 
 There is a crucial difference from CartPole: the "environment transition" is almost deterministic. If you output token `reinforcement`, the next state is just the old context plus `reinforcement`.
 
 The real difficulty is that the reward usually arrives late: humans judge the full answer, not each token. This creates an extreme credit assignment problem.
+
+### Three framings: bandit, token MDP, and environment MDP
+
+The same generator can be framed at three levels of granularity. Pick the framing that matches the feedback you actually have.
+
+| Framing           | State                         | Action                                        | Feedback                                                 | When to use it                                      |
+| ----------------- | ----------------------------- | --------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------- |
+| Contextual bandit | prompt $x$                    | full completion $y$                           | one preference or score per response                     | single-turn RLHF with a sequence-level RM           |
+| Token MDP         | $(x, y_{<t})$                 | next token $y_t$                              | per-token KL plus terminal RM score                      | PPO-RLHF with token-level advantages (Section 13.9) |
+| Environment MDP   | prompt plus tool observations | token or tool call, then read the observation | intermediate verifier or tool output, then a final score | multi-turn tool use and agentic RL (Chapter 19)     |
+
+The bandit view ignores within-response credit assignment: every token in a good response is reinforced equally. The token MDP keeps the same reward but lets a critic distribute credit across positions. The environment MDP adds genuinely new observations (tool outputs, verifier verdicts) mid-episode, so later decisions condition on more than the model's own tokens. A hidden user intent, an external evaluator, or an environment state that the context does not record all break the Markov assumption, so treat the token MDP as a useful approximation rather than a complete description.
+
+### From token log-probabilities to sequence scores
+
+The policy only ever outputs per-token log-probabilities $\log \pi_\theta(y_t \mid x, y_{<t})$. Sequence-level quantities used by SFT, the RM, and KL penalties are all aggregates of these, computed only over valid response tokens (excluding prompt, padding, and anything after EOS or the truncation point):
+
+$$
+\log \pi_\theta(y \mid x) = \sum_{t=1}^{T} m_t \log \pi_\theta(y_t \mid x, y_{<t}),
+$$
+
+where $m_t \in \{0, 1\}$ is the response mask from Section 13.2. The summed score grows with length, so comparisons across responses of different lengths usually normalize it: the mean $\frac{1}{\sum_t m_t}\log \pi_\theta(y \mid x)$ or a length-normalized variant $\frac{1}{T^\alpha}\log \pi_\theta(y \mid x)$ with $\alpha \in [0, 1]$. SFT maximizes the summed log-probability of demonstrations; KL penalties compare summed log-probability differences between policy and reference; best-of-$N$ selection ranks completions by RM score rather than by any of these likelihood aggregates, which is inference-time selection, not a policy change (see Section 13.6).
 
 ## A Minimal Probe: Does the Base Model Behave Like an Assistant?
 

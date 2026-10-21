@@ -76,7 +76,7 @@ flowchart LR
 
 ## Turning an LLM Response into a Trajectory
 
-In Chapter 3, an RL trajectory looks like:
+In Chapter 2 (Section 2.2, Markov Decision Processes), an RL trajectory looks like:
 
 $$
 s_0,a_0,r_0,s_1,a_1,r_1,\ldots
@@ -363,6 +363,14 @@ You can think of $\beta$ as a dial:
 | right     | reward slowly rises, KL stays stable      | healthy updates                               |
 | too small | reward rises fast, KL goes out of control | reward hacking, garbled output, mode collapse |
 
+### KL direction, estimators, and their limits
+
+Name the direction explicitly: the RLHF penalty is $D_{KL}(\pi_\theta \,\|\, \pi_{ref}) = \mathbb{E}_{y \sim \pi_\theta}[\log \pi_\theta(y \mid x) - \log \pi_{ref}(y \mid x)]$, with the expectation taken under the **current policy**. In variational-inference vocabulary this is the "reverse" KL (approximator first, target second); what matters operationally is that it penalizes the policy for putting mass where the reference assigns little probability.
+
+In practice the expectation is estimated from the very rollouts being optimized, one term per generated token. The simplest per-token estimator $k_1 = \log \pi_\theta - \log \pi_{ref}$ is unbiased but noisy and can be negative on individual tokens; a common alternative is the squared-error form $\tfrac{1}{2}(\log \pi_\theta - \log \pi_{ref})^2$, which is always non-negative but biased. Three limits follow. First, a single rollout batch gives a noisy KL number, so gate on smoothed trends rather than single steps. Second, sequence KL is a sum over tokens and grows with response length -- compare per-token averages when responses differ in length, or length growth will masquerade as drift. Third, the estimator only sees tokens the current policy actually generates, so it cannot warn about regions neither policy visits.
+
+Fix the generation policy while you measure: temperature, top-$p$, top-$k$, and `max_new_tokens` are part of the behavior policy's identity, and changing them between runs moves reward, KL, and length as surely as any gradient step. Log them with every rollout batch. Reusing a rollout batch for too many PPO epochs then breaks the on-policy assumption twice over: the importance ratio drifts from 1 and the KL estimate no longer describes the policy being updated.
+
 ## The Role of the Critic
 
 PPO does not just ask "what score did this response get." It also asks "how much better is this response than the current average?" The Critic estimates values, which are used to compute advantages:
@@ -443,6 +451,8 @@ def update_kl_coef(beta, observed_kl, target_kl, horizon=1000):
 ```
 
 Here, bigger `beta` is not always safer. When too large, the Actor is held back by the reference and reward cannot improve. When too small, the Actor quickly explores into the RM's blind spots. In actual training, watch `reward_mean`, `kl_mean`, `response_length`, `entropy`, and the fixed regression set simultaneously, not just the reward curve.
+
+Track uncertainty at two levels. **Token-level entropy** averages the policy's per-position uncertainty and falls as the model grows confident in its next-token choices; **sequence-level diversity** (distinct-$n$ over a batch of completions) measures whether different rollouts still say different things. A healthy run shows entropy declining slowly with diversity roughly intact. Entropy collapsing toward zero while diversity also crashes is the signature of mode collapse: the policy has found one template and stopped exploring.
 
 Common failure modes can be quickly mapped to fixes:
 

@@ -1,5 +1,5 @@
 ---
-title: 13.6 Evaluation
+title: 13.6 Alignment Evaluation
 ---
 
 # 13.6 Alignment Evaluation
@@ -213,10 +213,14 @@ The output of preference evaluation can be a simple table:
 
 | Comparison  | Win | Lose | Tie | Win Rate |
 | ----------- | --- | ---- | --- | -------- |
-| RLHF vs SFT | 58  | 27   | 15  | 68.2%    |
-| SFT vs Base | 72  | 14   | 14  | 83.7%    |
+| RLHF vs SFT | 58  | 27   | 15  | 65.5%    |
+| SFT vs Base | 72  | 14   | 14  | 79.0%    |
+
+Ties count as half a win, matching the formula at the top of this section: $(58 + 0.5 \times 15)/100 = 65.5\%$ and $(72 + 0.5 \times 14)/100 = 79.0\%$.
 
 Win rate is only meaningful under the same prompt set, the same judge, and the same decoding settings. Do not compare across experiments casually.
+
+A higher win rate does not always mean the policy learned something new. Distinguish **learned policy change** (PPO moved probability mass toward better answers) from **inference-time selection** (the same policy sampled several times and an external rule picked the best): greedy decoding, temperature/top-$p$/top-$k$ sampling, best-of-$N$, rejection sampling against a verifier, and search over reasoning paths are all different inference policies over one fixed model. When you report a win rate, name the inference policy on both sides -- for example, "greedy SFT vs greedy RLHF" measures learning, while "single-sample SFT vs best-of-8 SFT" measures selection. Tag every evaluated rollout with its outcome: valid, invalid (unparseable), refused, timed-out, or truncated, and report refusal and truncation rates alongside quality so a "helpfulness" gain is not secretly a safety or completeness regression.
 
 ### Statistical significance of win rates
 
@@ -461,8 +465,10 @@ Same prompt: "Explain PPO's KL penalty in one sentence."
 
 | Response                                                                                                                                                 | Length score | Format score | Politeness score | Total | Human impression     |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ------------ | ---------------- | ----- | -------------------- |
-| "The KL penalty keeps the new policy from drifting too far from the reference policy, preventing runaway PPO updates."                                   | ~0.32        | 0.0          | 0.0              | 0.32  | concise and accurate |
-| "I'd be happy to help. Here are some important points: - **First**: PPO is important. - **Second**: KL is also important. - **Third**: Hope this helps." | ~0.75        | 1.0          | 0.6              | 2.35  | verbose and empty    |
+| "The KL penalty keeps the new policy from drifting too far from the reference policy, preventing runaway PPO updates."                                   | ~1.16        | 0.0          | 0.0              | 1.16  | concise and accurate |
+| "I'd be happy to help. Here are some important points: - **First**: PPO is important. - **Second**: KL is also important. - **Third**: Hope this helps." | ~1.50        | 1.0          | 0.9              | 3.40  | verbose and empty    |
+
+Character counts drive the length term (`len(response) / 100.0`): 116 characters score 1.16 and 150 characters score 1.50. The verbose answer matches three politeness phrases ("I'd be happy to", "Here are some", "Hope this helps") for $3 \times 0.3 = 0.9$, plus both format bonuses for $1.0$.
 
 The flawed reward strongly prefers the verbose, empty response. As long as PPO keeps optimizing, the model will produce more responses like it.
 

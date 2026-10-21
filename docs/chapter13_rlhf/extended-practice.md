@@ -15,14 +15,14 @@ title: '13.7 Extended Practice: Reward Hacking and the Data Flywheel'
 **Core formulas**
 
 $$
-R_{bad}(x,y)=0.01|y|+0.5\cdot\mathbb{1}[\text{has\_list}(y)]
-+0.3\cdot\mathbb{1}[\text{has\_polite\_phrase}(y)]
+R_{bad}(x,y)=0.01|y|+0.5\cdot\mathbb{1}[\text{list/bullet}(y)]+0.5\cdot\mathbb{1}[\text{bold}(y)]
++0.3\sum_k\mathbb{1}[\text{phrase}_k(y)]
 \quad \text{(flawed reward: mistaking "good" for "long and template-like")}
 $$
 
 $$
 R_{safe}(x,y)=
-0.4R_{helpful}+0.3R_{correct}+0.2R_{format}
+0.4R_{helpful}+0.35R_{correct}+0.15R_{format}
 -0.05R_{length}-0.05R_{repeat}
 \quad \text{(safer mixed reward: multiple dimensions counterbalance each other)}
 $$
@@ -35,7 +35,7 @@ Sections 13.1–13.6 covered the main RLHF pipeline: SFT provides the starting p
 
 ## Deliberately Creating a Bad Reward
 
-Chapter 3 explained that the reward function defines the objective in the agent's eyes. The same principle applies to LLM RLHF — except the "environment reward" here often comes from an RM, a judge, rule checks, or a mixture of these.
+Chapter 4 (Section 4.3, Reward Design) explained that the reward function defines the objective in the agent's eyes. The same principle applies to LLM RLHF — except the "environment reward" here often comes from an RM, a judge, rule checks, or a mixture of these.
 
 The most common beginner illusion is:
 
@@ -112,8 +112,10 @@ A rough calculation using `flawed_reward`:
 
 | Answer | Length score | Format score | Politeness score | Total | Human impression     |
 | ------ | ------------ | ------------ | ---------------- | ----- | -------------------- |
-| A      | ~0.32        | 0.0          | 0.0              | 0.32  | Concise and accurate |
-| B      | ~0.75        | 1.0          | 0.6              | 2.35  | Verbose and empty    |
+| A      | ~1.23        | 0.0          | 0.0              | 1.23  | Concise and accurate |
+| B      | ~1.65        | 1.0          | 0.9              | 3.55  | Verbose and empty    |
+
+Character counts drive the length term (`len(response) / 100.0`): answer A is 123 characters (1.23) and answer B is 165 characters (1.65). Answer B additionally matches three politeness phrases ("I'm happy to help", "Here are some", "Hope this helps") for $3 \times 0.3 = 0.9$ plus both format bonuses for $1.0$.
 
 The bad reward strongly prefers B. As long as PPO keeps optimizing, the model will produce more answers like B.
 

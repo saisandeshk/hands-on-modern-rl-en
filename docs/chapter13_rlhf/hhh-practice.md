@@ -1,3 +1,7 @@
+---
+title: 13.3 AI Feedback and Safety Principles
+---
+
 # 13.3 AI Feedback and Safety Principles
 
 > The previous sections [13.1 From Base Model to Instruction Alignment](./base-model-to-assistant) and [13.2 Supervised Fine-Tuning (SFT)](./imitation-learning-pipeline) have explained how to collect human preferences and transform `chosen/rejected` responses into training signals for reward models. This approach relies on a premise: **preference data comes from humans**. When a model's capability approaches or exceeds that of human annotators, human annotation faces bottlenecks in terms of cost, speed, and professional judgment. This section raises a question: **where else can training signals come from?** In 2022, Anthropic proposed Constitutional AI, which allows AI to evaluate responses, revise responses, and generate preference pairs based on clear safety principles. This also provides another source of feedback for subsequent RL fine-tuning.
@@ -45,7 +49,7 @@ flowchart LR
     style H fill:#ffebee,stroke:#c62828
     style C fill:#fff8e1,stroke:#f57f17
     style SL fill:#e3f2fd,stroke:#1565c0
-    style RL fill:#e8f5e9,style:#2e7d32
+    style RL fill:#e8f5e9,stroke:#2e7d32
 ```
 
 **SL-CAI (Supervised Learning)**: Let the model first generate an initial response $y_0$ to a red team prompt $x$; then use the Constitution $c_k$ to have the model critique itself $\text{critique}(x, y_0, c_k)$; finally, have it write a revised version $y^* = \text{revise}(x, y_0, \text{critique}, c_k)$. Use the pair $(x, y^*)$ as SFT data to train the model. The advantage of this path is that it **directly teaches the model how to write harmless responses**.
@@ -74,7 +78,7 @@ def sl_cai_generate(base_model, redteam_prompts, constitution):
             f"Please rewrite according to '{c}': "
         )
 
-        s(f"prompt": x, "response": y_star)
+        sft_pairs.append({"prompt": x, "response": y_star})
 
     return sft_pairs  # Use this data for SFT
 ```
@@ -123,14 +127,14 @@ This step is identical to that in [Chapter 8 on PPO](../chapter08_ppo/ppo-bipeda
 
 ### RLHF vs RLAIF: Fundamental Differences
 
-| Dimension               | RLHF                                      | RLAIF                                                               |
-| ----------------------- | ----------------------------------------- | ------------------------------------------------------------------- |
-| Preference Source       | Human annotators in pairwise comparisons  | AI judge scores based on Constitution                               |
-| Annotation Cost         | \$0.5-\$5 per example, requiring millions | Only inference cost, ~\$10^{-4} per example                         |
-| Annotation Speed        | Weeks to months                           | Millions of examples per day                                        |
-| Annotation Consistency  | Cohen's κ ≈ 0.4-0.6 between annotators    | Same judge scores multiple times, κ ≈ 0.7-0.9                       |
-| Suitable Capabilities   | Values, style, common sense               | Mathematics, code, long context, expertise                          |
-| Unsuitable Capabilities | Reasoning beyond annotator level          | Open-ended questions where the model itself doesn't know the answer |
+| Dimension               | RLHF                                                        | RLAIF                                                               |
+| ----------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------- |
+| Preference Source       | Human annotators in pairwise comparisons                    | AI judge scores based on Constitution                               |
+| Annotation Cost         | \$0.5-\$5 per example, requiring millions                   | Only inference cost, ~\$10^{-4} per example                         |
+| Annotation Speed        | Weeks to months                                             | Millions of examples per day                                        |
+| Annotation Consistency  | Cohen's κ ≈ 0.4-0.6 between annotators (illustrative range) | Same judge scores multiple times, κ ≈ 0.7-0.9 (illustrative range)  |
+| Suitable Capabilities   | Values, style, common sense                                 | Mathematics, code, long context, expertise                          |
+| Unsuitable Capabilities | Reasoning beyond annotator level                            | Open-ended questions where the model itself doesn't know the answer |
 
 ::: warning Limitations of RLAIF
 The quality of RLAIF is constrained by the judge model itself. During the Claude 2 phase, when Claude 2 judges itself, a **self-preference bias** emerges — the judge tends to select responses that are more stylistically similar to itself. When the model being judged exceeds the judge's capabilities, RLAIF can actually reinforce incorrect answers. This is precisely the "sycophancy" (flattery) and "reward model over-optimization" issues discussed in [Chapter 25 on Reward Hacking](../chapter25_alignment_failures/classical-failures).
@@ -162,7 +166,7 @@ It produces not a score, but a **textual critique**. This has two advantages:
 1. **Interpretability**: The critique text can be directly read by humans, making it much more transparent than a black-box scalar score.
 2. **Chain-of-Thought Effect**: By making the model first write a critique and then a revision, it is forced to first "think through where it went wrong" before "fixing" it — this is the same mechanism as [CoT prompting](../chapter16_reasoning/r1-zero-pure-rl-reasoning).
 
-Empirically, **critique followed by revision** is 10–20% better than directly having the model rewrite (Lee et al., 2023, "Star" self-correction experiment).
+Empirically, writing a critique before revising usually beats rewriting directly, because the model first localizes the fault and then fixes it -- the same mechanism as [CoT prompting](../chapter16_reasoning/r1-zero-pure-rl-reasoning). Treat any single reported percentage-point gain as illustrative rather than a transferable constant; the gap depends on the task, the judge, and how revision quality is measured.
 
 ### Self-Revision Formalization
 
@@ -175,7 +179,7 @@ $$
 The overall training objective of SL-CAI is to enable $\pi_\theta$ to learn the conditional distribution $p(y^* \mid x, y_0, c_k)$ — specifically implemented through SFT:
 
 $$
-\mathcal{L}_{\text{SL-CAI}} = -\mathbb{0}_{(x, y_0, c_k)} \big[\log \pi_\theta(y^* \mid x, y_0, c_k)\big]
+\mathcal{L}_{\text{SL-CAI}} = -\mathbb{E}_{(x, y_0, c_k)} \big[\log \pi_\theta(y^* \mid x, y_0, c_k)\big]
 $$
 
 Note there is a subtle point here: the $y^*$ in the SFT data is generated by the same model. **The model is learning "the best answer it already knows."** This seems like circular reasoning, but it effectively distills the "how to revise" capability into the model's weights, eliminating the need for explicit critique steps during deployment.
@@ -204,11 +208,11 @@ $$
 \mathcal{L}_{\text{DPO}}(\theta) = -\log \sigma\Big(\beta \log \frac{\pi_\theta(y_w \mid x)}{\pi_{\text{ref}}(y_w \mid x)} - \beta \log \frac{\pi_\theta(y_l \mid x)}{\pi_{\text{ref}}(y_l \mid x)}\Big)
 $$
 
-**Key Observation:** DPO does not require an explicit RM (as proved in Chapter 17, [DPO Theory and Family](../chapter14_dpo/dpo-theory-and-family)), so the **entire process is self-contained** — the model simultaneously acts as a generator, a judge, and a learner.
+**Key Observation:** DPO does not require an explicit RM (as proved in Chapter 14, [DPO Theory and Family](../chapter14_dpo/dpo-theory-and-family)), so the **entire process is self-contained** — the model simultaneously acts as a generator, a judge, and a learner.
 
 ### Effect of Three Iterations
 
-Meta used Llama 2-70B to perform three rounds of self-rewarding (M1 → M2 → M3), and the results were:
+Meta used Llama 2-70B to perform three rounds of self-rewarding (M1 → M2 → M3), and reported improving win rates and judge scores across rounds (see Tables 1-2 of Yuan et al. 2024 for the exact numbers; treat them as indicative of the trend, not as transferable constants):
 
 - **AlpacaEval 2 win rate:** M1 55% → M2 65% → M3 72%
 - **Judge capability (on RewardBench):** M1 75% → M2 80% → M3 83%
@@ -266,7 +270,7 @@ $$
 \text{Honest}(y \mid x) = 1 - D_{KL}\big(p_{\text{model}}(\cdot \mid x) \,\|\, p_{\text{true}}(\cdot \mid x)\big)
 $$
 
-Here, $p_{\text{true}}$ is the "objective truth distribution." In practice, we cannot access $p_{\text{true}}$, so we use **verifiable rewards** (mathematical answers, code testing, and fact retrieval) to approximate it. This is also the connection point between [RLVR](../chapter15_grpo/rlvr) and HHH — RLVR is essentially a hard verification version of the Honest principle.
+Read this as a schematic objective rather than a computable metric: $p_{\text{true}}$ is never observed, and a KL above 1 would drive the expression negative. In practice, we cannot access $p_{\text{true}}$, so we use **verifiable rewards** (mathematical answers, code testing, and fact retrieval) to approximate it. This is also the connection point between [RLVR](../chapter15_grpo/rlvr) and HHH — RLVR is essentially a hard verification version of the Honest principle.
 
 ### Joint Optimization of the Three HHH Principles
 
@@ -292,20 +296,20 @@ CAI is not just a paper experiment; it is the real training process for the full
 
 Claude 2 was the first product-level model to fully implement both SL-CAI and RL-CAI. Key technical details include:
 
-- **Constitution Size**: Approximately 40 principles, covering the three major categories of HHH.
-- **Self-Critique Length**: Each critique is limited to 200–400 tokens to avoid excessively long critiques that could slow down training.
-- **Judge Model**: A larger model than the generator is used as the judge (Claude 2 used an internal 100B+ model to judge the 50B model), to avoid self-preference bias.
-- **Data Mixing**: Approximately 70% AI feedback and 30% high-quality human feedback. Human feedback is still retained, but only for edge cases where the AI was uncertain.
+- **Constitution size**: on the order of dozens of principles, covering the three major categories of HHH.
+- **Self-critique length**: bounded to a few hundred tokens to avoid slowing down training with over-long critiques.
+- **Judge model**: preferably a model at least as capable as the generator, to limit self-preference bias.
+- **Data mixing**: a majority of AI feedback combined with a minority of high-quality human feedback reserved for edge cases where the AI judge is uncertain.
 
-Anthropic Report: Compared to a pure RLHF version, **Claude 2 reduced harmfulness by over 50% and decreased excessive avoidance by 30%**.
+Anthropic reported that the CAI-trained Claude reduced harmful outputs relative to a pure-RLHF baseline while keeping usefulness roughly flat -- read the exact percentages in the original report as study-specific results, not as guarantees that transfer to other setups.
 
 ### Claude 3 (2024): Constitution Expansion and Collective CAI
 
-The Claude 3 series expanded the Constitution from 40 to approximately 80 principles, adding new dimensions including:
+The Claude 3 series expanded the constitution with new dimensions, including:
 
-- **Collective Constitutional AI**: Anthropic collaborated with public survey institutions to have over 1,000 respondents from diverse cultural backgrounds vote on which values AI should follow. The results revealed several highly consistent principles across global respondents: honesty, not assisting in violence, and respecting privacy.
+- **Collective Constitutional AI**: Anthropic collaborated with a public survey effort asking a large respondent pool from diverse backgrounds which values AI should follow, with honesty, non-assistance to violence, and privacy emerging as broadly shared principles.
 - **Reducing Over-Avoidance**: Added the principle that "refusal of requests should be based on actual risk rather than topic sensitivity."
-- **Multilingual Alignment**: The Constitution was translated into over 20 languages, but a single English master version was retained as the ground truth, avoiding value drift introduced by translation.
+- **Multilingual Alignment**: The constitution was translated into many languages, but a single English master version was retained as the ground truth, avoiding value drift introduced by translation.
 
 Engineering-wise, Claude 3 continued the critique-revision loop of Constitutional AI (Bai et al., 2022): allowing the model to critique past responses, and using these critiques as additional SFT data. This effectively closed the deployment data loop back to training.
 
@@ -339,7 +343,7 @@ HHH provides the goal, but dozens of parallel principles may still conflict with
 
 ## From Principle Lists to Contextualized Values
 
-Anthropic released an 80-page document on the Constitution of the Claude 4 series in 2026. It advanced constitutional alignment from "listing rules" to "socialization": the model needs to understand value conflicts in specific contexts and make judgments based on higher-level goals.
+Anthropic released a long-form constitution document for the Claude 4 series. It advanced constitutional alignment from "listing rules" to "socialization": the model needs to understand value conflicts in specific contexts and make judgments based on higher-level goals. Treat the structural description below as the chapter's synthesis of that direction, not as a verbatim quotation of the document.
 
 ### From Rule Lists to Value Frameworks
 
@@ -433,6 +437,6 @@ Shifting from human feedback to AI feedback has changed the way preference data 
 - [Yuan et al. 2024 “Self-Rewarding Language Models”](https://arxiv.org/abs/2401.10020)
 - [Askell et al. 2021 “A General Language Assistant as a Laboratory for Alignment”](https://arxiv.org/abs/2112.00861)
 - [Anthropic 2024 “Collective Constitutional AI: Aligning a Language Model with Public Input”](https://www.anthropic.com/research/collective-constitutional-ai-aligning-a-language-model-with-public-input)
-- [Anthropic 2026 “Claude 4 Constitution”](https://www.anthropic.com/research/claudes-constitution)
+- [Anthropic "Claude's Constitution" document](https://www.anthropic.com/research/claudes-constitution)
 - [Sharma et al. 2023 “Towards Understanding Sycophancy in Language Models”](https://arxiv.org/abs/2310.13548)
 - [Gao et al. 2022 “Scaling Laws for Reward Model Overoptimization”](https://arxiv.org/abs/2210.10760)

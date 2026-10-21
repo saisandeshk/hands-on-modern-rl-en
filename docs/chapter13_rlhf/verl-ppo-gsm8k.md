@@ -1,3 +1,7 @@
+---
+title: '13.8 Hands-on: veRL PPO on GSM8K'
+---
+
 # 13.8 Hands-on: veRL PPO on GSM8K
 
 > **Section goal**: Run PPO on GSM8K with veRL, trace the data flow across rollout, rule rewards, advantage estimation, and model updates, then compare math accuracy before and after training.
@@ -54,7 +58,7 @@ flowchart LR
 
 ## 13.8.2 Why GSM8K
 
-[GSM8K](https://huggingface.co/datasets/openai/gsm8k) (Grade School Math 8K) is a grade-school math word-problem dataset released by OpenAI, with about 7,500 training examples and 1,319 test examples. It has become a standard benchmark for RL for LLMs for three reasons:
+[GSM8K](https://huggingface.co/datasets/openai/gsm8k) (Grade School Math 8K) is a grade-school math word-problem dataset released by OpenAI, with 7,473 training examples and 1,319 test examples. It has become a standard benchmark for RL for LLMs for three reasons:
 
 1. **It naturally supports rule-based rewards**: whether an answer is correct can be verified automatically, so you do not need to train a Reward Model. This differs from RLHF in Section 13.4, where an RM provides preference signals; for math problems, directly checking the numeric answer is sufficient.
 2. **The reasoning chain length is moderate**: typical answers are 50 to 200 tokens. This is long enough for token-level advantages to matter, but not so long that it blows up VRAM like long code generation.
@@ -481,10 +485,10 @@ For PPO-RLHF, it is not enough to see "reward goes up". As we emphasized in Sect
 
 The Volcano Engine team ran 20 epochs (580 steps) of PPO training with veRL on a VKE cluster (2 nodes × 2 × NVIDIA L20), and evaluated independently using [EvalScope](https://github.com/modelscope/evalscope):
 
-| Model                                 | Method               | GSM8K accuracy |
-| ------------------------------------- | -------------------- | -------------- |
-| Qwen2.5-0.5B-Instruct (original)      | pretraining baseline | 42.08%         |
-| Qwen2.5-0.5B-Instruct + PPO (step580) | veRL PPO training    | 54.89%         |
+| Model                                 | Method                              | GSM8K accuracy |
+| ------------------------------------- | ----------------------------------- | -------------- |
+| Qwen2.5-0.5B-Instruct (original)      | pre-RL baseline (instruction-tuned) | 42.08%         |
+| Qwen2.5-0.5B-Instruct + PPO (step580) | veRL PPO training                   | 54.89%         |
 
 From 42.08% to 54.89%, PPO improved the math reasoning accuracy of this 0.5B model by **12.8 percentage points**. The gain does not come from "learning new math"; it comes from using the reward signal to better exploit what the model already knows: more disciplined reasoning formats, fewer arithmetic mistakes, and fewer "give up" behaviors. In principle, with more training steps and more data, there is still room for improvement.
 
@@ -505,7 +509,7 @@ evalscope eval \
 When evaluating, pay attention to the following:
 
 - **Use the test split**: evaluation must be done on GSM8K's test split (1319 examples). Do not evaluate on the training split; it will inflate the score.
-- **Compare to a baseline**: evaluate the pre-RL SFT model (e.g., `Qwen/Qwen2.5-0.5B-Instruct`) as well, so you can quantify the real gain from PPO.
+- **Compare to a baseline**: evaluate the pre-RL starting checkpoint (e.g., `Qwen/Qwen2.5-0.5B-Instruct`) as well, so you can quantify the real gain from PPO.
 - **Inspect the reasoning process**: besides accuracy, sample some responses. After PPO training, the reasoning steps should be clearer and the language more concise.
 
 ### Exporting Checkpoints
@@ -768,4 +772,4 @@ This section depends on external veRL and does not copy veRL source code. This r
 
 ## Section Summary
 
-This lab connects the runnable experiment to the main idea of the section. Use the reported metrics together with replay or task-level evaluation, and keep conclusions within the conditions that were actually tested.
+PPO on GSM8K replaces the learned reward model with a verifiable correctness check but keeps the surrounding machinery: sample with the current policy, score each trajectory, estimate advantages, and update under KL and clipping constraints. The reported 42.08% to 54.89% gain holds only for the stated setup (model, data split, reward definition, and decoding settings); change any of them and re-measure rather than quoting the delta as a general PPO effect.
