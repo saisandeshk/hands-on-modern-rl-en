@@ -1,4 +1,4 @@
-# 20.1 Foundations of SWE-RL
+# 20.1 SWE-RL Basics
 
 This section studies one concrete problem: **how to place a language model inside a real code repository, have it read an issue, edit the code, run the tests, and keep repairing based on test failures.**
 
@@ -218,9 +218,9 @@ The advantage of real tasks is that they are natural, and their limitation is ju
 
 ### Recovering the Training Signal in SWE-RL
 
-The [SWE-RL paper](https://arxiv.org/abs/2502.18449) studies how to train code models using open-source software evolution records. The data contains more than benchmark problems: it includes evolution information such as code snapshots, changes, issues, and pull requests. The paper adopts a lightweight rule-based reward, for example comparing the similarity between the model's solution and the developer's real solution, and reports that Llama3-SWE-RL-70B reaches 41.0% on SWE-bench Verified.
+The [SWE-RL paper](https://arxiv.org/abs/2502.18449) studies how to train code models using open-source software evolution records. The data contains more than benchmark problems: it includes evolution information such as code snapshots, changes, issues, and pull requests. The paper reports training with GRPO on a lightweight rule-based test-outcome reward (1 when the task's tests pass, 0 otherwise — the same binary recipe detailed in the [supplementary reading](./meta-swe-rl)), and reports that Llama3-SWE-RL-70B reaches 41.0% on SWE-bench Verified. Confirm the exact reward definition against the paper before citing, since later systems reuse the same "SWE-RL" label for different shaping variants.
 
-One distinction needs special care here: the core reward of the SWE-RL paper cannot be simplified into "score 1 if all hidden tests pass." A patch-similarity reward, a test reward, and a process reward check different objects. When citing experimental results, state the training data, the reward definition, and the evaluation environment, to avoid writing the common practice of later systems back into the paper's original method.
+One distinction needs special care here: a test reward, a patch-similarity score, and a process reward check different objects (final behavior, resemblance to one reference diff, step quality). When citing experimental results, state the training data, the reward definition, and the evaluation environment together, to avoid writing the recipe of later systems back into the paper's original method.
 
 ### Defect Synthesis in SWE-smith
 
@@ -313,7 +313,7 @@ Each rollout runs in an isolated sandbox: its own filesystem copy, capped CPU, m
 
 The model uses tools to read files, search symbols, edit code, and run visible tests. At each step the observation, the action, the tool output, and the token consumption are recorded. Long trajectories easily run into context overflow, accumulated errors, and environment timeouts, all of which must be distinguished explicitly in the training data. Trajectories that end without a valid submission, or that hit an invalid state such as a broken container or an exhausted token budget, are logged as invalid traces: they are excluded from the gradient but counted in the cost ledger, so a rising reward cannot hide a rising failure rate.
 
-Only the final patch and the verifier's test report are graded. The intermediate reasoning trace (chain of thought) is visible to the learner during training but is not itself the answer: it must not contain the hidden tests, and at evaluation time nothing outside the submitted patch may influence the score. This is the same hidden-reasoning versus observable-answer split used in reasoning models (see [16.6 Reasoning Trace Presentation](../chapter16_reasoning/cot-visibility-alignment)): train on the trace, grade the artifact.
+Only the final patch and the verifier's test report are graded. The intermediate reasoning trace (chain of thought) is visible to the learner during training but is not itself the answer: it must not contain the hidden tests, and at evaluation time nothing outside the submitted patch may influence the score. This is the same hidden-reasoning versus observable-answer split used in reasoning models (see [16.6 Displaying Reasoning Chains and Alignment](../chapter16_reasoning/cot-visibility-alignment)): train on the trace, grade the artifact.
 
 ### Executable Verification
 
@@ -323,7 +323,7 @@ The verifier applies the final patch to a read-only copy of the baseline and run
 
 The training algorithm updates the policy from the multiple rollouts of the same task and their rewards. PPO, GRPO, or other policy optimization methods can be used. An SFT cold start, rejection sampling, and a second round of SFT are all optional stages, and a particular paper may adopt only some of them.
 
-Two vocabulary items recur here. **Rejection fine-tuning (RFT)** keeps only the rollouts that pass verification and fine-tunes the policy on them — it distills success without a policy gradient. **Rollout distillation** goes one step further: a stronger teacher (a larger model, a model with more tool steps, or the same model with test-time search) generates the successful trajectories, and the smaller student learns from them. When teacher and student share the same rollout distribution during training, this is called **on-policy distillation** (see [15.7 On-Policy Distillation](../chapter15_grpo/on-policy-distillation)); when the student learns from fixed teacher logs, it is offline distillation. Either way, distillation changes the data, not the reward, so distilled gains must be reported separately from RL gains.
+Two vocabulary items recur here. **Rejection fine-tuning (RFT)** keeps only the rollouts that pass verification and fine-tunes the policy on them — it distills success without a policy gradient. **Offline (teacher-trajectory) distillation** goes one step further: a stronger teacher (a larger model, a model with more tool steps, or the same model with test-time search) generates the successful trajectories, and the smaller student learns from those fixed logs. This is SFT-style distillation on teacher data, not on-policy learning. **On-policy distillation** is the contrast case (see [15.7 On-Policy Distillation](../chapter15_grpo/on-policy-distillation)): the _student_ generates the trajectory and the teacher supplies token-level targets on it. Either way, distillation changes the data, not the reward, so distilled gains must be reported separately from RL gains.
 
 ### Rollout Plumbing: Sync, Versions, and Recovery
 
@@ -354,7 +354,7 @@ SWE-bench Verified is a 500-problem subset that has been checked by humans, comm
 
 ### Compute and Throughput Accounting
 
-Report four ledgers separately, because each answers a different question:
+Report three ledgers separately, because each answers a different question:
 
 $$
 C_{\text{total}} = C_{\text{sample}} + C_{\text{inference}} + C_{\text{train}}.

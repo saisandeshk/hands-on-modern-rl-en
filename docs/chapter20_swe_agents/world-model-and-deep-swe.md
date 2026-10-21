@@ -8,7 +8,7 @@ This section separates two works that are easily conflated. **CWM** is an open-w
 
 ## 20.2.1 Code World Model (CWM)
 
-[Code World Model](https://arxiv.org/abs/2510.02387) (CWM, 2025.09) releases a 32B dense decoder-only model. It learns from observation-action trajectories in a Python interpreter and agentic Docker environments, followed by reasoning RL on verifiable code, mathematics, and multi-turn software tasks. Its “world model” is primarily the execution regularities learned in the model weights, not a separate transition model that has already replaced real tests.
+[Code World Model](https://arxiv.org/abs/2510.02387) (CWM, 2025.10) releases a 32B dense decoder-only model. It learns from observation-action trajectories in a Python interpreter and agentic Docker environments, followed by reasoning RL on verifiable code, mathematics, and multi-turn software tasks. Its “world model” is primarily the execution regularities learned in the model weights, not a separate transition model that has already replaced real tests.
 
 ### CWM's MDP Definition
 
@@ -182,46 +182,46 @@ This qualifies the lesson from [Chapter 15 on GRPO improvements](../chapter15_gr
 
 ## 20.2.3 Test-time Search Integration
 
-CWM and DeepSWE both integrate **test-time search**—using MCTS or Beam Search during inference to improve performance.
+CWM and DeepSWE can each be combined with **test-time search** — MCTS over an explicit world model or beam search with verifier reranking — as teaching extensions of the kind described below, not as disclosed parts of either published recipe.
 
-### MCTS on CWM
+### MCTS over a World Model (Teaching Sketch)
 
-CWM's world model makes MCTS efficient:
+The following sketch shows how MCTS _would_ run if a separate explicit transition model were available. It is a teaching extension of the kind described in §20.2.1, not CWM's published recipe: CWM keeps execution regularities in the model weights and still grounds training with real tests.
 
 ```python
-def cwm_mcts(issue, model, world_model, depth=10):
-    # Perform MCTS on the world model
+def world_model_mcts(issue, model, world_model, n_iter=100):
+    # Search using a learned transition model instead of real containers
     root_state = initialize_state(issue)
 
-    for _ in range(N_iter):
-        # Selection: Select the most promising child node using UCB
+    for _ in range(n_iter):
+        # Selection: most promising child by UCB
         node = select(root_state)
 
-        # Expansion: Generate action using policy, simulate next state using world model
+        # Expansion: policy proposes an action, world model predicts the next state
         action = model.policy(node.state)
         next_state = world_model.predict(node.state, action)
 
-        # Simulation: Quick rollout to termination
+        # Simulation: quick rollout to termination inside the world model
         rollout_reward = quick_rollout(next_state, world_model)
 
-        # Backprop: Update node statistics
+        # Backpropagation: update statistics
         backpropagate(node, rollout_reward)
 
-    # Return the best action from the root state
+    # Return the highest-value action from the root
     return best_action(root_state)
 ```
 
-The entire MCTS is performed on the world model—**no real-world testing is needed**, making it extremely fast.
+Each simulated step is a forward pass rather than a container boot plus a test-suite run, so the sketch runs far faster per rollout — but only to the extent the world model is accurate. Real test runs are still needed to correct model drift (Phase 3 of the CWM box), so the end-to-end speedup must be measured, not assumed.
 
-### Beam Search on DeepSWE
+### Beam Search with Verifier Reranking (Teaching Alternative)
 
-DeepSWE uses Beam Search during inference:
+A second teaching alternative scales inference with search and lets the verifier — not a learned value model — rank candidates, matching the Phase-3 box above:
 
 ```python
-def deep_swe_beam_search(issue, model, value_model, K=4):
-    beams = [{"state": init_state(issue), "score": 0}]
+def deep_swe_beam_search(issue, model, verifier, K=4, max_steps=64):
+    beams = [{"state": init_state(issue), "patches": []}]
 
-    for step in range(MAX_STEPS):
+    for _ in range(max_steps):
         candidates = []
         for beam in beams:
             # Generate K candidate actions
@@ -229,20 +229,22 @@ def deep_swe_beam_search(issue, model, value_model, K=4):
 
             for action in actions:
                 next_state = apply_action(beam["state"], action)
-                # Use value model to evaluate
-                value = value_model.estimate(next_state)
                 candidates.append({
                     "state": next_state,
-                    "score": beam["score"] + value
+                    "patches": beam["patches"] + [action],
                 })
 
-        # Select top-K
-        beams = sorted(candidates, key=lambda x: x["score"], reverse=True)[:K]
+        # Keep the top-K beams by verifier score
+        beams = sorted(
+            candidates,
+            key=lambda c: verifier.score(c["patches"]),
+            reverse=True,
+        )[:K]
 
     return beams[0]["state"]
 ```
 
-Beam Search allows DeepSWE to trade computational resources for higher accuracy during inference — consistent with [Chapter 16 on Test-time Compute Scaling](../chapter16_reasoning/test-time-scaling).
+Beam Search allows DeepSWE-style systems to trade computational resources for higher accuracy during inference — consistent with [Chapter 16 on Test-time Compute Scaling](../chapter16_reasoning/test-time-scaling). Ranking beams with a learned value model instead of the verifier is a further extension to ablate; it is not part of the disclosed pure-RL recipe.
 
 ## 20.2.4 Comparison with Industrial Practices
 

@@ -13,7 +13,7 @@ This chapter treated repository repair as a trainable trajectory: an agent reads
 - Design a verifier split (visible, held-out, adversarial hidden tests) that blocks hardcoding, deleted tests, and entry-point tampering.
 - Specify a sandbox contract: reset, deterministic replay, side-effect boundaries, and distinct status codes for tool errors, timeouts, and assertion failures.
 - Diagnose a training run with rollout plumbing concepts: synchronous versus asynchronous loops, policy versions, staleness, backpressure, and checkpoint recovery.
-- Compare CWM-style environment modeling, DeepSWE-style pure RL with test-time scaling, and SSR-style self-play on data cost, reward density, and transfer risk.
+- Compare CWM-style environment modeling, DeepSWE-style pure RL with test-time scaling, and SSR-style self-play on data cost, reward density, and transfer risk, using the route table in §20.2 and the SSR-versus-SWE-smith comparison in §20.3.
 - Account compute in three ledgers (sampling, inference, training) and report verifier throughput and update utilization alongside resolve rate.
 - Detect specification gaming and flywheel failure modes (generator–fixer imbalance, domain drift, invalid defects) before they corrupt the reward signal.
 
@@ -55,7 +55,7 @@ A rollout passes 9 of 12 tests and takes 18 tool steps. The shaped reward is $R 
 ::: details Solution
 $R_{\text{test}} = 9/12 = 0.75$. Step penalty $= 0.01 \times 18 = 0.18$. So $R = 0.75 - 0.18 = 0.57$.
 
-With coefficient $0.1$, a necessary 40-step repair pays $0.1 \times 40 = 4.0$ in penalty — far larger than the maximum test reward of $1.0$. The optimal policy then prefers immediate submission of an unchanged patch ($R \approx 0 - 0.1 \times 1 = -0.1$, or 0 with no penalty on abort) over a genuine repair ($1.0 - 4.0 = -3.0$). The agent learns to abort, and both the resolve rate and the average step count must be watched together to catch this.
+With coefficient $0.1$, a necessary 40-step repair pays $0.1 \times 40 = 4.0$ in penalty — far larger than the maximum test reward of $1.0$, so every genuine long repair scores at most $1.0 - 4.0 = -3.0$ and is dominated. The optimum shifts to short trajectories that grab whatever partial credit they can: for example, a 1-step repair passing 2 of 12 tests scores $2/12 - 0.1 \approx +0.067$, which beats both the unchanged 1-step submission ($R \approx 0 - 0.1 \times 1 = -0.1$, or 0 with no penalty on abort) and the genuine repair ($-3.0$). The agent learns to submit early partial fixes or abort outright, and both the resolve rate and the average step count must be watched together to catch this.
 :::
 
 ### Exercise 3 — Group-Relative Advantage by Hand

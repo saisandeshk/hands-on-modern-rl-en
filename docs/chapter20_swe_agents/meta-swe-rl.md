@@ -12,16 +12,16 @@ This section takes a close look at SWE-RL's data, algorithm, and engineering det
 
 The public SWE-RL recipe builds on two open-source task sources:
 
-| Data Source             | Scale                         | Purpose               |
-| ----------------------- | ----------------------------- | --------------------- |
-| SWE-bench (open-source) | 2,294 tasks                   | High-quality baseline |
-| SWE-Gym (open-source)   | Thousands of additional tasks | Extended training     |
+| Data Source             | Scale                         | Purpose                                |
+| ----------------------- | ----------------------------- | -------------------------------------- |
+| SWE-bench (open-source) | 2,294 tasks                   | Baseline tasks and held-out evaluation |
+| SWE-Gym (open-source)   | Thousands of additional tasks | Extended training                      |
 
-Together these provide an order of magnitude more training tasks than pure SWE-bench. Some labs additionally mix in internal pull-request histories at much larger scale; those extensions are proprietary, vary by codebase, and their contribution should be ablated separately rather than folded into the open-source number.
+Together these provide several times more training tasks than pure SWE-bench. Some labs additionally mix in internal pull-request histories at much larger scale; those extensions are proprietary, vary by codebase, and their contribution should be ablated separately rather than folded into the open-source number.
 
 ### Data Preprocessing
 
-The paper reports data cleaning along three axes (repository filtering, pull-request filtering, and test filtering):
+A practical cleaning recipe in this line of work filters along three axes (repository filtering, pull-request filtering, and test filtering). Verify the exact thresholds against the paper before citing them as published figures:
 
 **Step 1: Repository Filtering**
 
@@ -54,7 +54,7 @@ The paper compares GRPO against DPO-style and PPO-style baselines in its setup a
 Advantages of GRPO:
 
 - **No Critic Required**: saves GPU memory, suitable for large-scale training
-- **Group-wise Normalization**: naturally handles tasks of varying difficulty (high variance in easy tasks, low variance in hard tasks)
+- **Group-wise Normalization**: naturally handles tasks of varying difficulty (high variance for tasks of intermediate difficulty, near-zero variance for tasks that are already solved or still unsolved)
 - **Simple and Stable**: easier to implement in engineering than PPO
 
 This is consistent with the findings of [DeepSeek-R1](../chapter15_grpo/deepseek-dapo) — **GRPO is the default choice for SWE-RL**.
@@ -66,6 +66,8 @@ The reward function in SWE-RL is extremely simple:
 ```python
 def swe_rl_reward(test_results):
     """Binary reward for test pass"""
+    if len(test_results) == 0:
+        return 0.0  # No tests collected (collection error, empty suite) is never a pass
     if all(test_results):
         return 1.0  # All tests passed
     else:
@@ -177,7 +179,9 @@ def filter_prompts(prompts, model, num_rollouts=8):
     for prompt in prompts:
         rollouts = [model.generate(prompt) for _ in range(num_rollouts)]
         rewards = [compute_reward(r) for r in rollouts]
-        if max(rewards) > 0:  # At least one success
+        # Keep only groups with a learning signal: at least one success
+        # AND nonzero spread (all-fail and all-succeed groups both have zero variance)
+        if max(rewards) > 0 and len(set(rewards)) > 1:
             useful_prompts.append(prompt)
     return useful_prompts
 ```

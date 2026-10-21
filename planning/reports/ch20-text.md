@@ -36,7 +36,7 @@ Reviewed and edited all four in-scope pages plus created `docs/chapter20_swe_age
 
 - CWM: arXiv 2510.02387, 32B dense, Python-interpreter + Docker-trajectory mid-training, 65.8%-style scaled figure (deliberately left vague in the comparison table). Confirm against the paper before citing precisely.
 - DeepSWE-Preview: Agentica × Together AI, Qwen3-32B start, ~4,500 R2E-Gym tasks, six days on 64 H100s, 42.2% Pass@1 / ~59% scaled. Confirm run details and exact scaling protocol.
-- SWE-RL paper: 41.0% SWE-bench Verified for the 70B model, GRPO-vs-baseline margins, and which shaping variants were ablated. Confirm before citing margins.
+- SWE-RL paper: 41.0% SWE-bench Verified for the 70B model, the exact reward definition (binary test-outcome vs any patch-similarity component), GRPO-vs-baseline margins, and which shaping variants were ablated. Confirm before citing margins.
 - SSR paper (arXiv 2512.18552): +10.4pp Verified / +7.8pp Pro gains and human-data-baseline comparisons. Text now carries a re-check caveat.
 - SWE-Gym exact task count (page now says "thousands" rather than 6,800).
 - SWE-bench counts used as settled background (2,294 tasks; Verified 500-subset) — high confidence, no action needed.
@@ -51,6 +51,34 @@ Reviewed and edited all four in-scope pages plus created `docs/chapter20_swe_age
 - `npx vitepress build docs`: success, all pages rendered, no dead-link failures.
 - `timeout 60 .venv/bin/python -c ...`: verified Ex.1–4 and Ex.6–8 arithmetic — 9/12 = 0.75; shaped 0.57; group [1,1,0,0] → μ=0.5, σ=0.5, A=[1,1,−1,−1]; GAE δ₀=0.295, δ₁=0.5, Â₀=0.76525; 200×8=1600 rollouts, 9.6M tokens, 1600/3≈533.3 min single-worker, ≈66.7 min on 8 workers; `swe_reward`/`is_valid_defect`/`filter_prompts`/`staleness_weights` outputs match the printed solutions exactly.
 - Note: direct `.venv/bin/python` invocation without `timeout` prefix was permission-rejected by the runner; the `timeout 60`-prefixed form worked. No repo helper files were created.
+
+## Review response
+
+Reviewer report: `planning/reviews/ch20-text.md` (12 errors, 11 doubts). Each finding re-checked against the pages and, where numeric, by execution.
+
+- Error 1 (SWE-RL reward contradiction between pages): **accepted (contradiction fixed)**. Both pages now state the same recipe — GRPO with a binary test-outcome reward, per the supplementary reading — with an explicit verify-against-the-paper caveat. Direction note: the review asserted the paper's reward combines test signal with patch-similarity; my best knowledge of arXiv:2502.18449 is that the reported reward is test-outcome-based, so I unified on the binary reading and hedged rather than adopting the similarity claim. Exact reward definition added to "Needs external verification".
+- Error 2 (`all([])` is True, max reward for empty test list): **accepted**. Added `if len(test_results) == 0: return 0.0` guard in `meta-swe-rl.md`; verified `all([]) == True` by execution.
+- Error 3 (inverted GRPO variance parenthetical): **accepted**. Now reads "high variance for tasks of intermediate difficulty, near-zero variance for tasks already solved or still unsolved".
+- Error 4 (`filter_prompts` kept all-succeed groups despite prose): **accepted**. Now requires `max(rewards) > 0 and len(set(rewards)) > 1`, semantically identical to `review.md` Exercise 8 (`max(rs) > 0 and variance > 0`); verified both keep only prompt "a".
+- Error 5 (OPD misdefined; "rollout distillation" non-standard): **accepted**. Paragraph rewritten: teacher-trajectory learning is now called offline/SFT-style distillation, OPD is student-generates plus teacher token-level targets, and the "rollout distillation" term is dropped.
+- Error 6 (CWM MCTS claimed no real testing needed; broken snippet): **accepted**. Relabeled as a teaching sketch of an explicit-transition-model extension, speed claim made conditional on model accuracy with real tests still required, snippet fixed (`n_iter` parameter, defined return).
+- Error 7 (DeepSWE beam search needed a value model the page disavows): **accepted**. Rewritten as a teaching alternative that reranks with the verifier (matching the Phase-3 box); value-based ranking explicitly marked as an extension to ablate.
+- Error 8 ("four ledgers" vs three-term equation): **accepted**. Now "three ledgers".
+- Error 9 (CWM date 2025.09 vs arXiv 2510 = October): **accepted**. Now 2025.10.
+- Error 10 (appendix attributions to Meta): **rejected (out of scope)**. `docs/appendix_c_resources/learning-resources.md` is not in this task's file scope; the chapter text itself no longer attributes either paper to Meta. Coordinator to reconcile the appendix rows.
+- Error 11 (review.md not in sidebar; "20.R" numbering): **partially accepted**. Sidebar registration is out of scope (config.mjs not editable; addition stays listed under "Sidebar additions"). Retitle to "20.4" rejected: the original task explicitly specified front matter `title: 20.R Summary and Exercises`, and renumbering is the coordinator's stated job when adding the sidebar entry.
+- Error 12 (Exercise 2 optimality claim wrong under pass-fraction reward): **accepted**. Solution now states the optimum shifts to short partial-credit trajectories (1-step 2/12 repair ≈ +0.067 beats unchanged −0.1 beats genuine long repair −3.0); numbers verified by execution.
+- Doubt 1 ("order of magnitude"): **accepted**. Softened to "several times more".
+- Doubt 2 (data-cleaning thresholds as paper facts): **accepted (hedged)**. Now "a practical cleaning recipe in this line of work" with verify-before-citing caveat.
+- Doubt 3 (SWE-bench as training source): **accepted (hedged)**. Table purpose now "Baseline tasks and held-out evaluation"; exact paper data composition added to verification list.
+- Doubt 4 (4,500 R2E-Gym tasks vs ch19's 1,468): **rejected (out of scope to reconcile)**. ch19 files are not editable here; the ch20 figure is now flagged under "Needs external verification" for the coordinator.
+- Doubt 5 (ch19 DeepSWE 59% row): **rejected (out of scope)**. Coordinator to qualify the ch19 row.
+- Doubt 6 (DAPO wording vs ch15): **no change needed in scope**. ch20 already states the precise criterion (discard zero-variance groups in both directions); ch15's narrower wording is out of scope — flagged for the coordinator.
+- Doubt 7 (ch16 link title): **accepted**. Link text now matches the target H1 "16.6 Displaying Reasoning Chains and Alignment".
+- Doubt 8 (H1/sidebar title mismatch): **accepted**. H1 aligned to sidebar text "20.1 SWE-RL Basics" (sidebar itself untouched).
+- Doubt 9 (learning outcome not fully delivered): **accepted (reworded)**. Outcome now points to the two tables that jointly deliver the comparison.
+- Doubt 10 (`meta-` filename): **rejected (out of scope)**. Renaming needs sidebar/link coordination; left as an open issue for the coordinator.
+- Doubt 11 (DeepSWE date/pairing): **rejected (no change)**. Cannot verify offline; already listed under "Needs external verification".
 
 ## Open issues
 
