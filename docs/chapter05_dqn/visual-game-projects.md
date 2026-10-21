@@ -1,6 +1,5 @@
 ---
-outline:
-  level: [2, 3]
+title: '5.5 Hands-on: Visual Game Projects'
 ---
 
 # 5.5 Hands-on: Visual Game Projects
@@ -11,7 +10,7 @@ outline:
 
 > **Code and resources**: [training script](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter05_dqn/dqn_atari_sb3.py) · [curve export](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter05_dqn/export_dqn_curves.py) · [replay rendering](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter05_dqn/render_atari.py) · [dependencies](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter05_dqn/requirements.txt)
 
-The previous sections have discussed DQN's three core components separately: the Q-network estimates action values, experience replay breaks sample correlation, and the target network stabilizes TD targets. Section 5.3 placed these components into a LunarLander experiment: observing real training, evaluation returns, replay animations, training curves, Q-values, and ablation studies. By this point, low-dimensional state tasks have served their pedagogical purpose: they let us see clearly how DQN learns action values between 8 numbers and 4 discrete actions.
+The previous sections have discussed DQN's three core components separately: the Q-network estimates action values, experience replay breaks sample correlation, and the target network stabilizes TD targets. Section 5.3 placed these components into a LunarLander experiment: observing real training, evaluation returns, replay animations, and training curves. By this point, low-dimensional state tasks have served their pedagogical purpose: they let us see clearly how DQN learns action values between 8 numbers and 4 discrete actions.
 
 This section addresses the next question: when the state is no longer a clean set of numbers but raw game frames, what else does DQN need to change?
 
@@ -126,7 +125,7 @@ class CNNQNetwork(nn.Module):
         )
 
     def forward(self, x):
-        x = x / 255.0
+        # Input is already float in [0, 1]: the wrapper above uses scale_obs=True, so no /255 here.
         x = self.conv(x)
         x = x.view(x.size(0), -1)
         return self.fc(x)
@@ -228,7 +227,7 @@ pip install -r code/chapter05_dqn/requirements.txt
 python code/chapter05_dqn/dqn_atari_sb3.py \
   --env-id PongNoFrameskip-v4 \
   --total-timesteps 10000000 \
-  --buffer-size 10000 \
+  --buffer-size 100000 \
   --learning-starts 100000 \
   --exploration-fraction 0.1 \
   --exploration-final-eps 0.01 \
@@ -257,7 +256,7 @@ To render GIFs, use the same script with different checkpoints and output paths:
 python code/chapter05_dqn/render_atari.py \
   --env-id PongNoFrameskip-v4 \
   --model output/dqn_atari_long/PongNoFrameskip-v4_dqn_seed0_10m_zoo_aligned/checkpoints/dqn_atari_500000_steps.zip \
-  --output docs/chapter07_dqn/images/dqn-atari-pong-500k.gif \
+  --output docs/chapter05_dqn/images/dqn-atari-pong-500k.gif \
   --max-steps 1800 \
   --render-every 6 \
   --fps 20 \
@@ -306,18 +305,18 @@ The 5-game evaluation mean at this stage reaches `11.6`, and the rendered game b
 
 The key to Atari DQN is not any single hyperparameter, but a set of mutually coordinated training conditions. These conditions answer three questions: how to organize observations, how to accumulate samples, and how to stabilize training.
 
-| Training Condition            | Implementation Location | Purpose                                                                                                                                   |
-| ----------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `AtariWrapper`                | `make_atari_env(...)`   | Automatically applies no-op reset, max-and-skip, life-loss episode, Fire reset, 84×84 preprocessing, and reward clipping                  |
-| `VecFrameStack(..., 4)`       | `build_env`             | Combines 4 frames into one state, letting the network see motion direction                                                                |
-| `CnnPolicy`                   | `DQN("CnnPolicy", ...)` | Uses a convolutional feature extractor suitable for pixel input                                                                           |
-| `buffer_size=10000`           | DQN parameter           | Aligned with validated RL-Zoo Pong DQN pipeline, preventing early failure experiences from persisting too long in an oversized buffer     |
-| `learning_starts=100000`      | DQN parameter           | Fills the replay buffer first, preventing the network from learning prematurely from very few consecutive samples                         |
-| `exploration_fraction=0.1`    | DQN parameter           | Reduces epsilon from 1.0 to 0.01 over the first 10% of training steps, allowing thorough early exploration and gradual later exploitation |
-| `train_freq=4`                | DQN parameter           | No need to update every frame, reducing jitter from correlated samples                                                                    |
-| `target_update_interval=1000` | DQN parameter           | Prevents the TD target from changing with every online-network step                                                                       |
-| `optimize_memory_usage=True`  | DQN parameter           | Reduces Atari replay buffer memory usage, making local long training feasible                                                             |
-| `EvalCallback` and checkpoint | callbacks               | Continuously preserves evaluation results and model state during long training                                                            |
+| Training Condition            | Implementation Location                               | Purpose                                                                                                                                   |
+| ----------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `AtariWrapper`                | `make_atari_env(...)`                                 | Automatically applies no-op reset, max-and-skip, life-loss episode, Fire reset, 84×84 preprocessing, and reward clipping                  |
+| `VecFrameStack(..., 4)`       | `build_env`                                           | Combines 4 frames into one state, letting the network see motion direction                                                                |
+| `CnnPolicy`                   | `DQN("CnnPolicy", ...)`                               | Uses a convolutional feature extractor suitable for pixel input                                                                           |
+| `buffer_size=100000`          | DQN parameter                                         | Large buffer holds diverse past play so early random frames are still available once learning starts at `learning_starts=100000`          |
+| `learning_starts=100000`      | DQN parameter                                         | Fills the replay buffer first, preventing the network from learning prematurely from very few consecutive samples                         |
+| `exploration_fraction=0.1`    | DQN parameter                                         | Reduces epsilon from 1.0 to 0.01 over the first 10% of training steps, allowing thorough early exploration and gradual later exploitation |
+| `train_freq=4`                | DQN parameter                                         | No need to update every frame, reducing jitter from correlated samples                                                                    |
+| `target_update_interval=1000` | DQN parameter                                         | Prevents the TD target from changing with every online-network step                                                                       |
+| `optimize_memory_usage=True`  | DQN parameter (enabled via `--optimize-memory-usage`) | Reduces Atari replay buffer memory usage, making local long training feasible                                                             |
+| `EvalCallback` and checkpoint | callbacks                                             | Continuously preserves evaluation results and model state during long training                                                            |
 
 These processing steps fill in the training conditions omitted in the teaching snippets. `NoopReset` makes each game start differently, preventing the agent from adapting only to fixed starting positions. `EpisodicLife` treats losing a life as the end of a training episode, causing games like Pong and Breakout to expose the consequences of wrong actions more quickly. `MaxAndSkip` repeats each action for 4 frames and takes the max of adjacent frames, both reducing computation and mitigating the interference of Atari's flickering graphics on observations.[^sb3-atari]
 
@@ -361,14 +360,14 @@ MountainCar's state is even shorter — only position and velocity — but rewar
 
 ```bash
 cd code
-pip install -r chapter07_dqn/requirements.txt
+pip install -r chapter05_dqn/requirements.txt
 
-python chapter07_dqn/dqn_gym_sb3.py \
+python chapter05_dqn/dqn_gym_sb3.py \
   --env-id CartPole-v1 \
   --total-timesteps 100000 \
   --learning-starts 1000
 
-python chapter07_dqn/dqn_gym_sb3.py \
+python chapter05_dqn/dqn_gym_sb3.py \
   --env-id MountainCar-v0 \
   --total-timesteps 300000 \
   --learning-starts 5000
@@ -389,10 +388,10 @@ Training settings affect results more than network architecture itself. 84×84 g
 ::: details Experiment Entry: Atari Pong
 
 ```bash
-python chapter07_dqn/dqn_atari_sb3.py \
+python chapter05_dqn/dqn_atari_sb3.py \
   --env-id PongNoFrameskip-v4 \
   --total-timesteps 10000000 \
-  --buffer-size 10000 \
+  --buffer-size 100000 \
   --learning-starts 100000 \
   --eval-freq 250000 \
   --checkpoint-freq 500000 \
@@ -506,13 +505,13 @@ If using DQN, the network structure itself does not change: given screen state $
 
 ```bash
 cd code
-pip install -r chapter07_dqn/requirements.txt
+pip install -r chapter05_dqn/requirements.txt
 ```
 
 Prepare a legally obtained `PokemonRed.gb`; recommend starting from an existing save `start.state` (to avoid spending steps on the title menu):
 
 ```bash
-python chapter07_dqn/dqn_pokemon_red_pyboy.py \
+python chapter05_dqn/dqn_pokemon_red_pyboy.py \
   --rom /path/to/PokemonRed.gb \
   --state /path/to/start.state \
   --total-timesteps 500000 \

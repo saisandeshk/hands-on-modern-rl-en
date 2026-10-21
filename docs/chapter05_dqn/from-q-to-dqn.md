@@ -1,5 +1,5 @@
 ---
-title: 5.1 Why DQN Is Needed
+title: 5.1 From Q-Learning to DQN
 ---
 
 # 5.1 From Q-Learning to DQN
@@ -50,13 +50,13 @@ Seen from another angle, the valuable part of Q-Learning is not the table. It is
 
 This step does not succeed automatically, however. In supervised learning the labels are usually fixed, while the "reference answer" in DQN comes from the network's own estimate of the future. The sequence of states the agent has just experienced is also highly correlated, and training on it consecutively lets the gradient be pulled along by the most recent experience. What the deep Q-network really solves is therefore two problems in sequence: first the neural network handles the problem that **the Q table cannot hold everything**, and then experience replay and the target network handle the problem that **neural network training is unstable**.
 
-The main line of this chapter can thus be summarized in one sentence: **how to extend tabular Q-Learning into a deep reinforcement learning algorithm that can handle continuous states, pixel input, and an unstable training process.** We start from the limits of the Q table and then take apart the three components of DQN. After that we move to the LunarLander hands-on section, where one and the same task lets us observe training curves, the evolution of Q values, ablation experiments, and replay evaluation. Finally we reach Double DQN, Dueling DQN, Rainbow, and a complete project that migrates from LunarLander to visual games.
+The main line of this chapter can thus be summarized in one sentence: **how to extend tabular Q-Learning into a deep reinforcement learning algorithm that can handle continuous states, pixel input, and an unstable training process.** We start from the limits of the Q table and then take apart the three components of DQN. After that we move to the LunarLander hands-on section, where one and the same task lets us observe training curves, replay evaluation, and failure analysis. Finally we reach Double DQN, Dueling DQN, Rainbow, and a complete project that migrates from LunarLander to visual games.
 
 ## Chapter Layout
 
 | Section                                                             | Core question                                                                                                                       |
 | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| [Why We Need Deep Q-Networks](./from-q-to-dqn)                      | Why can the Q table not hold everything? How does a neural network replace the table?                                               |
+| [From Q-Learning to DQN](./from-q-to-dqn)                           | Why can the Q table not hold everything? How does a neural network replace the table?                                               |
 | [The Three Components of a Deep Q-Network](./dqn-components)        | What problem does each of the Q-network, experience replay, and target network solve? How do the formulas map completely onto code? |
 | [Hands-On: LunarLander](./lunar-lander)                             | How do we train, analyze, and evaluate a low-dimensional DQN control task?                                                          |
 | [The Deep Q-Network Family](./dqn-family)                           | What do improvements such as Double, Dueling, and Rainbow each solve?                                                               |
@@ -148,7 +148,7 @@ This process works because of one premise: **the table must be able to hold all 
 
 The Q table is both the memory of Q-Learning and its limitation. As long as all state-action pairs can be listed, looking up, updating, and taking the maximum are all straightforward. Once the states cannot be listed as a finite number of rows, the implementation of "storing a separate number for each entry" no longer holds.
 
-Let us first look at discrete states. Guessing a coin has 2 states, so the Q table has 4 rows. Tic-tac-toe has about $3^9 \approx 20{,}000$ positions, which can still just about be tabulated. Chess has about $10^{47}$ legal positions, already more than the total storage of all computers on Earth. Go has about $3^{361} \approx 10^{170}$ positions, while the total number of atoms in the observable universe is only about $\sim 10^{80}$.
+Let us first look at discrete states. Guessing a coin has 2 states, so the Q table has 4 rows. Tic-tac-toe has about $3^9 \approx 20{,}000$ positions, which can still just about be tabulated. Chess has about $10^{47}$ legal positions, already more than the total storage of all computers on Earth. Go has about $3^{361} \approx 1.7\times10^{172}$ board configurations (Tromp's count of legal positions is $\approx 2.1\times10^{170}$), while the total number of atoms in the observable universe is only about $\sim 10^{80}$.
 
 These examples are huge, but they are at least still discrete states: in principle every position can be named. The real dividing line appears with continuous states.
 
