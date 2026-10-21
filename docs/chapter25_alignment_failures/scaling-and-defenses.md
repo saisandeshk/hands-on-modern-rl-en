@@ -403,7 +403,7 @@ This result shows that assisted oversight deserves study, but the tasks are stil
 
 ### Debate and Weak Judges
 
-[On scalable oversight with weak LLMs judging strong LLMs](https://arxiv.org/abs/2407.04622) compared three protocols: two models debating each other, one model being questioned by a judge, and the judge answering directly.
+[Debating with More Persuasive LLMs Leads to More Truthful Answers](https://arxiv.org/abs/2407.04622) compared three protocols: two models debating each other, one model being questioned by a judge, and the judge answering directly.
 
 When a single consultant is randomly assigned to the correct or incorrect stance, debate outperforms the single-consultant protocol on the tasks the paper tested. Compared with the judge answering directly, the result depends on the task type: debate is better in information-asymmetric extractive question answering, while the results on math, code, logic, and multimodal tasks are more mixed.
 
@@ -479,6 +479,12 @@ Each version should run at least several random seeds, and report separately:
 - whether new capability degradation appears after the defenses are added.
 
 At the end of the experiment, also keep a set of failure trajectories. A valuable conclusion can be: "The permission layer prevented the real damage caused by deleting tests, but the model still frequently attempts that action." This shows that deployment risk has gone down, while the policy's wrong goal remains unsolved.
+
+### Reward Governance: Versioning, Rollback, and Stop Rules
+
+Every object the policy can adapt to must be versioned together: the preference data snapshot, the reward model checkpoint, the verifier and extractor code, the hidden and gate sets, and the scalarization weights when several reward components are combined into one number. A run record that says only "reward v3" without the data hash, code commit, and component weights cannot be audited or reproduced, because no one can tell which part of the signal the policy actually exploited.
+
+Two operational rules close the loop. First, **rollback**: keep the last known-good reward, policy, and system prompt versioned and deployable, so a sycophancy-style incident (Section 25.2.5) reverts the model rather than merely patching the prompt. Second, **collection stop rules**: decide in advance when to stop trusting the current reward — for example, when the proxy-independent gap widens for two consecutive evaluations, when adversarial completions start passing, or when output length drifts while hidden accuracy is flat — and route the run back to red-teaming instead of adding more training steps.
 
 ## 25.4.9 Summary
 

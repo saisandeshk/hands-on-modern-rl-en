@@ -67,13 +67,28 @@ The solution is to assign difficulty to the problems in advance and to report th
 
 ```python
 # Difficulty-stratified evaluation
+import numpy as np
+
+
+def verify(pred, y):
+    return pred == y  # replace with the task's real checker
+
+
+def classify_difficulty(x):  # replace with labelled or calibrated difficulty
+    # Stub cycles through bands so each bucket is exercised; replace with real labels.
+    return ["easy", "medium", "hard"][hash(repr(x)) % 3]
+
+
 def stratified_eval(model, dataset):
     results = {"easy": [], "medium": [], "hard": []}
     for x, y in dataset:
         pred = model(x)
         difficulty = classify_difficulty(x)  # use a difficulty classifier
         results[difficulty].append(verify(pred, y))
-    return {k: np.mean(v) for k, v in results.items()}
+    # Omit empty bands (returning 0.0 would confuse "no problems" with "0% accuracy").
+    return {
+        k: (float(np.mean(v)) if v else None, len(v)) for k, v in results.items()
+    }
 ```
 
 The [MATH dataset paper](https://arxiv.org/abs/2103.03874) provides difficulty labels from Level 1 to Level 5 for its problems. When evaluating on MATH, we can report accuracy directly by these five levels; for a self-built dataset, we need to state who assigned the difficulty labels and on what basis. Stratified scores describe the capability boundary better than a single total score.
@@ -93,6 +108,23 @@ Look first at Model A. It answers 60 of 100 problems correctly, $p=0.60$; under 
 - **Bootstrap**: resample by examples and estimate the score difference and its confidence interval
 
 [The uncertainty-quantification study by Blackwell et al.](https://arxiv.org/abs/2410.03492) discusses specifically how to give confidence judgments for benchmark scores and model rankings; the [lm-evaluation-harness paper](https://arxiv.org/abs/2405.14782) summarizes common sources of error from the standpoint of reproducible-evaluation engineering. The 95% normal approximation is only an introductory demonstration; when the sample is small, the accuracy is close to 0 or 1, or two models are compared on the same set of problems, the Wilson interval and paired methods should be used respectively.
+
+#### Multiple Seeds, IQM, and Stratified Bootstrap
+
+A single training run confounds the method with a lucky seed. RL training varies with the random seed (data order, sampling, environment stochasticity), and a single evaluation run varies with the sampled problems. A reliable report therefore varies **both**: train with several seeds (at least 3, ideally 5-10), evaluate each run on the same fixed task set, and report the distribution across seeds rather than the best seed.
+
+Averaging raw scores across runs is fragile: a few runs with unusually high scores — one lucky seed that finds a loophole, or one task with high across-run variance — can move the mean visibly while telling little about typical performance. The interquartile mean (IQM) guards against this by discarding the bottom and top 25% of the pooled per-run scores and averaging the middle 50%. For $M$ runs with scores $s_1 \le s_2 \le \cdots \le s_M$, let $k = \lfloor M/4 \rfloor$ and average the remaining $M - 2k$ scores:
+
+$$
+\operatorname{IQM} = \frac{1}{M - 2k}\sum_{i=k + 1}^{M - k} s_i,
+\quad k = \lfloor M/4 \rfloor,
+$$
+
+so with $M = 8$ runs ($k = 2$) the IQM averages the middle 4 scores. It is more robust than the mean and more informative than the median, and it is the recommended point estimate in the [reliable evaluation study by Agarwal et al.](https://arxiv.org/abs/2108.13264) The truncated form here is a teaching simplification; the `rliable` implementation shipped with that paper averages linearly interpolated quantiles at $(j + 0.5)/M$, which weights the boundary scores slightly differently..
+
+Worked example: 8 seeded runs score `[0.42, 0.45, 0.47, 0.48, 0.50, 0.52, 0.55, 0.91]`, where `0.91` is one lucky seed. The mean is $4.30/8 = 0.5375$; the IQM drops the lowest two and highest two and averages $(0.47 + 0.48 + 0.50 + 0.52)/4 = 0.4925$, which better reflects typical performance.
+
+Uncertainty around the IQM (or around a cross-task mean) should come from a **stratified bootstrap**: resample runs (or tasks) with replacement within each stratum — for example, resample seeds within each task, or resample tasks within each difficulty band — recompute the aggregate on each resample, and take the 2.5th and 97.5th percentiles as the 95% interval. Stratification matters because plain pooled resampling lets the task mixture fluctuate between resamples: with 60 easy and 20 hard tasks, the easy share in a pooled resample varies with standard deviation around 4-5%, which injects task-mixture variance into the interval; fixing the 60/20 composition in every resample removes that variance. Never report only the best seed, and never average a handful of seeds into a point estimate with no interval.
 
 ## 25.5.2 Data Contamination and Leakage
 
@@ -131,9 +163,21 @@ This is capability transfer and cannot be recorded directly as data contaminatio
 A 13-gram is a fragment of 13 consecutive tokens. If many 13-grams from a test problem also appear in the training text, that problem deserves further inspection. The program below first takes the 13-gram sets of the two texts and then computes what fraction of the test fragments coincide with the training text:
 
 ```python
+def _ngrams(tokens, n):
+    return {" ".join(tokens[i:i + n]) for i in range(len(tokens) - n + 1)}
+
+
+def get_ngrams(text, n):
+    # Teaching sketch: splits on whitespace (word grams), an approximation to
+    # the tokenizer-based 13-grams used in the cited study.
+    return _ngrams(text.split(), n)
+
+
 def ngram_contamination(train_text, test_text, n=13):
     train_ngrams = set(get_ngrams(train_text, n))
     test_ngrams = set(get_ngrams(test_text, n))
+    if not test_ngrams:
+        return 0.0
     overlap = train_ngrams & test_ngrams
     return len(overlap) / len(test_ngrams)
 ```
@@ -337,6 +381,17 @@ Perez et al. 2022 ([arXiv:2212.09251](https://arxiv.org/abs/2212.09251)) designe
 
 [Honesty Is the Best Policy, arXiv:2312.01350](https://arxiv.org/abs/2312.01350): measures a model's honesty on uncertain questions.
 
+### Judge Biases in Model-Based Evaluation
+
+Whenever a model grades another model — preference labels, pairwise wins, or a numeric score — the judge brings its own systematic errors. Four recur often enough to check by default:
+
+- **Position bias**: in pairwise comparison the judge favors the answer shown first (or second) regardless of content. Measure it by swapping the order of every pair and reporting the flip rate; mitigate it by scoring both orders and averaging, or by randomizing positions per comparison.
+- **Identity and style bias**: the judge rewards verbosity, confident tone, markdown formatting, or answers it believes came from a strong model, even when the facts are equal. Control for length explicitly (report win rate within length bands), strip model identities, and rerun a sample with formatting normalized.
+- **Self-preference bias**: a judge model prefers completions written in its own style or by itself. Test it by having two different judge models grade the same pairs; if the ranking reverses with the judge, the conclusion is judge-dependent, not model-dependent.
+- **Correlated error**: judge and candidate share pretraining data, failure modes, or blind spots, so the judge cannot see the candidate's characteristic mistakes. This is why a judge from the same model family needs an independent check: a rule-based verifier, a held-out human sample with inter-rater agreement, or a judge from a different family.
+
+Concretely, never report a model-judged win rate without the order-swapped agreement rate, the average length of winning versus losing answers, the judge identity and version, and a human audit on a random subset. If swapping positions changes the verdict more than the claimed margin between models, the evaluation measures the judge, not the candidates.
+
 ### Difficulties of Behavior Evaluation
 
 - **Strong subjectivity**: what counts as "sycophantic" and what counts as "polite" differs among annotators
@@ -423,12 +478,15 @@ The score variance of long-horizon tasks is very large: running the same agent o
 
 ```python
 # The number of repetitions is determined by variance and the target confidence interval
+import numpy as np
+
+
 def long_horizon_eval(agent, task, n_runs):
     scores = []
     for _ in range(n_runs):
         trajectory = agent.run(task, max_steps=1000)
         scores.append(evaluate(trajectory))
-    return np.mean(scores), np.std(scores)
+    return float(np.mean(scores)), float(np.std(scores))
 ```
 
 There is no fixed lower bound on the number of repetitions that holds for all tasks. First run a small pilot to estimate the variance, then choose the sample size according to the score difference you want to detect and the confidence interval. If the budget supports only a few repetitions, publish the result of each run and the interval, and avoid showing only the best run.
@@ -437,18 +495,11 @@ There is no fixed lower bound on the number of repetitions that holds for all ta
 
 One step beyond long-horizon coding tasks lies the automation of AI R&D. Suppose the model's task is "make a small language model train faster." It can modify data loading, batch size, compile options, and training code, and then run experiments to compare speed. If the two experiments use different CPUs, GPUs, or time limits, the final speedup measures both the model's capability and the environment difference.
 
-Tasks of this kind put code modification, tool use, repeated experiments, and resource control into the same trajectory, so they are well suited to testing whether a harness really fixes the environment. The system card of Claude Opus 4.6 gives a public case, which includes LLM training optimization, Quadruped RL, Novel Compiler, and an internal task suite.
+Tasks of this kind put code modification, tool use, repeated experiments, and resource control into the same trajectory, so they are well suited to testing whether a harness really fixes the environment. The system card of Claude Opus 4.6 gives a public case, which covers distinct tasks such as LLM training optimization, quadruped RL, a novel compiler task, and an internal task suite. Check the current card for the per-task figures and the card version before citing any number.
 
 ### The 34× Metric
 
-The `34×` in the system card refers to the **average speedup on the LLM training optimization task**, and is not an overall human-speed multiple for the three tasks LLM Training, Text-RL, and Quadruped-RL. Quadruped RL uses a separate locomotion score, and Novel Compiler uses a pass rate on complex tests; neither can be averaged directly with `34×`.
-
-The system card reports four distinct quantities:
-
-- **LLM training optimization**: the average speedup is `34×`, measuring the average speedup obtained after optimizing a small model's training pipeline.
-- **Quadruped RL**: with no preset hyperparameters, the highest locomotion score is `20.96`.
-- **Novel Compiler**: the pass rate on complex tests is `65.83%`.
-- **Internal suite 2**: the aggregate score of the internal task suite is `0.612`.
+Published commentary on that card describes an average training-pipeline speedup on the LLM training optimization task, not an overall human-speed multiple across different tasks. Quadruped RL uses a separate locomotion score, and the compiler task uses a pass rate on complex tests; none of these can be averaged directly into a single speedup figure.
 
 These evaluations are used for capability "rule-out," with the goal of judging whether the model has crossed a capability threshold that calls for further review. They do not mean that the model can already complete full AI research independently, and the time savings on all research tasks cannot be derived from one training speedup.
 
@@ -564,6 +615,7 @@ The AI R&D automation evaluation shows that models can already take part in some
 
 ## Further Reading
 
+- [Agarwal et al. 2021 "Deep Reinforcement Learning at the Edge of the Statistical Precipice"](https://arxiv.org/abs/2108.13264)
 - [Cobbe et al. 2021 "Training Verifiers to Solve Math Word Problems" (GSM8K)](https://arxiv.org/abs/2110.14168)
 - [Chen et al. 2021 "Evaluating Large Language Models Trained on Code" (HumanEval)](https://arxiv.org/abs/2107.03374)
 - [Hendrycks et al. 2021 "Measuring Massive Multitask Language Understanding" (MMLU)](https://arxiv.org/abs/2009.03300)
