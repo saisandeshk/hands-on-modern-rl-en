@@ -58,7 +58,7 @@ $$
 
 $c$ is the generation condition, $v$ is the final video, and $r_\phi$ is the video reward model. This notation can be used directly for policy gradients, but it does not tell the model in which segment the error occurred.
 
-Consider first how long the decision chain is. Generating a 5-second video usually takes about 50 denoising steps, and every step makes a decision for the latent variables of 80 frames. Multiplying roughly, one video corresponds to about four thousand model forward computations. If the teleport happens in the third second, the erroneous decisions are only a small part of these, yet the terminal reward returns only a single scalar. The model cannot tell which steps should change. This is the credit assignment problem in video generation.
+Consider first how long the decision chain is. Generating a 5-second video usually takes about 50 denoising steps, and every step updates the latents for all 80 frames in a single forward pass. Counting per-frame latent updates, one video involves roughly $50 \times 80 = 4{,}000$ frame-level decisions, but the model cost is about 50 forward passes, not four thousand. If the teleport happens in the third second, the erroneous decisions are only a small part of these, yet the terminal reward returns only a single scalar. The model cannot tell which steps should change. This is the credit assignment problem in video generation.
 
 Now let's write down the gap with two candidate videos. Candidate A has good visuals and semantics but teleports in the second half. Candidate B is mediocre on every item but has no local error. The four sub-signals score them as follows, with weights $\lambda_q=\lambda_a=\lambda_t=\lambda_p=0.25$:
 
@@ -103,7 +103,7 @@ $$
 \nabla_\theta R(x_0,c)=\sum_{t=0}^{T}\frac{\partial R(x_0,c)}{\partial x_t}\cdot\frac{\partial x_t}{\partial\theta}.
 $$
 
-Every denoising step contributes a path to the parameter update. The cost is GPU memory: backpropagating through a full chain of about 50 steps requires saving the intermediate state of every step. VADER controls the cost with **truncated backpropagation**: gradients are kept only for the last $K$ steps, and earlier steps apply stop-grad, that is, for $K<T$ the network predictions at $t>K$ are cut out of the computation graph. A small $K$ both reduces memory and lowers the risk of overfitting to the reward model.
+Every denoising step contributes a path to the parameter update. The cost is GPU memory: backpropagating through a full chain of about 50 steps requires saving the intermediate state of every step. VADER controls the cost with **truncated backpropagation**: gradients are kept only for the final $K$ denoising steps (the ones closest to the clean video $x_0$), while the earlier, noisier part of the chain is stop-gradiented. A small $K$ both reduces memory and lowers the risk of overfitting to the reward model.
 
 The reward itself can also be attached in several ways. VADER adds the per-frame image-text similarity models HPSv2 and PickScore as the alignment reward for every frame. This formulation could induce all frames to become identical, and the paper reports that the pretrained prior is enough to prevent this collapse. It also attaches a VideoMAE action classifier to the whole video, using the predicted probability of the target action class as the reward, and uses the self-supervised score of V-JEPA to measure predictability between frames as a temporal consistency signal. Such rewards can improve the stability of cross-frame representations, but they cannot by themselves prove that the model has mastered Newtonian mechanics. A video that is smooth in representation space can still make an object fall at the wrong moment.
 
@@ -135,7 +135,7 @@ $r_i^k$ is the score of the $i$-th sample on the $k$-th reward, and $\mu^k$ and 
 
 The second finding comes from the image-to-video task. The input image of SkyReels-I2V already fixes the picture content and the ceiling of text matching, so what remains to optimize in parameter space is almost only motion quality. DanceGRPO uses the VideoAlign motion score as the reward and obtains a 118% relative improvement on that dimension. This example shows that choosing which sub-signal to optimize requires first looking at how much freedom the task still leaves to the model.
 
-The paper also tested binary rewards: the continuous HPS score is discretized into 0 or 1 at a threshold of 0.28, and GRPO can still learn from this sparse feedback, consistent with the idea of rule-based rewards in language models. Ablations show that the first 30% of timesteps starting from noise contribute most to learning the basic generation patterns, yet training only this segment is not as good as covering the full range.
+The paper also tested binary rewards: the continuous HPS score is discretized into 0 or 1 at a threshold of 0.28, and GRPO can still learn from this sparse feedback, consistent with the idea of rule-based rewards in language models. The paper reports ablations over which denoising-timestep segment to train: according to the report, the early segment starting from noise contributes most to learning the basic generation patterns, yet the report finds that training only this segment is not as good as covering the full range. (This is the paper's reported result; it should be checked against arXiv:2505.07818 before being relied on, since the ranking of timestep segments can vary across diffusion-RL setups.)
 
 The cost is that one update must fully generate a group of videos for every condition, so memory and sampling time grow quickly. The reward need not be differentiable, so it is suitable for plugging in human preference models or multimodal judges. The public evidence supports "it can be used for reinforcement learning in video generation" but does not support "all mainstream video products use it". If an industrial model paper does not disclose its optimizer, the algorithm should be written as unknown.
 
@@ -218,7 +218,7 @@ The cost of attention grows quadratically with the number of tokens and is the m
 Post-training is done with GRPO plus LoRA, and the report discloses two stability changes. First, the policy loss and KL loss are reweighted per timestep, removing the dependence of gradient size on the timestep and step size. Second, the within-group standard deviation of standard GRPO is replaced by the maximum standard deviation across all groups:
 
 $$
-\hat{A}_{k,t}^{i}=\frac{R_k(x_0^i,c_j)-\mu_k}{\sigma_{\max}}.
+\hat{A}_{k}^{i}=\frac{R_k(x_0^i,c_j)-\mu_k}{\sigma_{\max}}.
 $$
 
 $\mu_k$ is the within-group mean of the $k$-th reward, and $\sigma_{\max}$ is the maximum standard deviation of that reward across all groups. In a group with too small a standard deviation, the advantage estimate may be only reward-model noise, and normalizing by the maximum standard deviation lowers the gradient weight of such groups.
@@ -239,9 +239,7 @@ The combination of multiple rewards in the policy loss is a weighted sum of each
 
 The public measurements of inference efficiency are as follows. For a 720p, 93-frame video, dense attention plus 50 sampling steps takes 1429.5 seconds, distillation to 16 steps brings it to 244.6 seconds, and adding coarse-to-fine and block-sparse attention brings it to 116.5 seconds, a speedup of 12.3 times. A 720p, 30 fps, 189-frame video takes 142 seconds, a speedup of 10.1 times.
 
-The key implication of this route is that long-video ability must be prepared in the pretraining and architecture stages, and RLHF then adjusts human preferences and multidimensional quality. The previous version of this page described LongCat as fixed five-second chunks, overlap averaging, a story-LLM reward, and two-level diffusion. None of these details appear in the core method of the public paper, so they cannot be kept as fact.
-
-LongCat-Video comes from Meituan's team and is a different work from ByteDance's Seedance. When reading industrial papers, first check the institution, the model, and the public materials, which avoids stitching projects with similar release dates into a training chain that does not exist.
+The key implication of this route is that long-video ability must be prepared in the pretraining and architecture stages, and RLHF then adjusts human preferences and multidimensional quality. LongCat-Video comes from Meituan's team and is a different work from ByteDance's Seedance. When reading industrial papers, first check the institution, the model, and the public materials, which avoids stitching projects with similar release dates into a training chain that does not exist.
 
 ## 24.5.6 When Looking at Mainstream Products, First Separate Capability Demonstrations from Training Evidence
 
@@ -339,7 +337,7 @@ Real physical simulation is still a more distant goal. Current generative models
 
 ## Summary
 
-Video generation has one more axis than image generation, the time axis. Drawing a single frame well passes only the first layer of checks. Event order, identity preservation, and physical causality must be judged along the whole video. When a decision chain on the order of four thousand steps receives only one terminal scalar, credit assignment cannot proceed, which makes per-item rewards and per-item evaluations necessary.
+Video generation has one more axis than image generation, the time axis. Drawing a single frame well passes only the first layer of checks. Event order, identity preservation, and physical causality must be judged along the whole video. When about fifty denoising steps (roughly four thousand frame-level latent updates) receive only one terminal scalar, credit assignment cannot proceed, which makes per-item rewards and per-item evaluations necessary.
 
 VADER lets the gradient of a differentiable reward flow through the last $K$ denoising steps, trading dense gradients for sample efficiency. DanceGRPO uses black-box rewards to compare a group of videos under the same condition and merges several rewards of different scales through within-group normalization. Video RLHF learns multidimensional preferences from human pairwise comparisons. The three routes use rewards in different ways, and all need independent evaluation to keep the model from merely pleasing the proxy metric. LongCat's control experiment provides direct evidence: single-reward training pushes the model toward static pictures, and only multiple rewards constraining one another suppress this hacking behavior.
 
