@@ -2,7 +2,7 @@
 
 In Chapter 16 we taught the model to think at length and to adjust the length of its thinking to the difficulty of the problem. But as soon as trajectories get longer, a problem appears in training. Let's illustrate it again with the proof that $\sqrt{2}$ is irrational.
 
-Imagine the model writes a nine-step proof. The first five steps are correct. In step six an algebraic transformation drops a square (it writes $4k^2=2q^2$ as $4k=q^2$), yet the later steps happen to circle back to the correct conclusion. The final answer, "$\sqrt{2}$ is irrational," is right, but one step in the middle is wrong.
+Imagine the model writes a nine-step proof. The first five steps are correct. In step six an algebraic transformation goes wrong: from $p=2k$ it should obtain $4k^2=2q^2$ and hence $2k^2=q^2$, but instead it writes $4k=q^2$, dropping the square on $k$ and the division by $2$. Yet the later steps happen to circle back to the correct conclusion. The final answer, "$\sqrt{2}$ is irrational," is right, but one step in the middle is wrong.
 
 If we look only at the final result and give 1 point whenever the answer is right, what happens in training? The error in step six is reinforced together with the five correct steps before it and the coincidence after it. The next time, the model may well make the same mistake. It simply got lucky this time and the result was unaffected. When it is unlucky, it ends up with a wrong answer.
 
@@ -41,7 +41,7 @@ Step 2: Squaring both sides gives 2 = p²/q², that is, p² = 2q²
 Step 3: So p² is even
 Step 4: So p is even (since the square of an even number is even and the square of an odd number is odd)
 Step 5: Let p = 2k (k is an integer)
-Step 6: Substituting gives 4k² = 2q² [the error is here], written as 4k = q² (the square on k² is dropped)
+Step 6: Substituting p = 2k gives 4k² = 2q², i.e. 2k² = q² [the error is here: written as 4k = q², dropping the square on k and skipping the division by 2]
 Step 7: So q² is even, and q is even too
 Step 8: p and q are both even, contradicting "p and q are coprime"
 Step 9: So √2 is irrational  ✓ (the conclusion is correct)
@@ -85,7 +85,7 @@ Plug in the nine-step proof, take $\gamma=0.9$, and let only the last step carry
 - **Step 5 (let $p=2k$)**
   - Steps from the end: 4
   - Return weight $\gamma^{T-t}$: $0.9^4 \approx 0.66$
-- **Step 6 (where the error is)**
+- **Step 6 (substitution: correct is $4k^2 = 2q^2$, i.e. $2k^2 = q^2$; written here as the faulty $4k = q^2$)**
   - Steps from the end: 3
   - Return weight $\gamma^{T-t}$: $0.9^3 \approx 0.73$
 - **Step 8 (the contradiction is reached)**
@@ -239,7 +239,7 @@ Treat the PRM as a classifier: the input is the problem plus the reasoning prefi
 
 ### Generative PRM
 
-Let a large model first generate a natural-language check ("This step tries to divide both sides by 2, which should give $2k^2=q^2$, but it is written as $k$"), and give a judgment at the end. The representative work is ThinkPRM. Its advantages are that it can say where the error is and needs less human annotation (it reuses the base model's knowledge). Its drawbacks are that the evaluation itself must generate tokens and is slower, and that the evaluation can also be wrong.
+Let a large model first generate a natural-language check ("Substituting $p=2k$ gives $4k^2=2q^2$, i.e. $2k^2=q^2$, but the step writes $4k=q^2$, dropping the square and skipping the division"), and give a judgment at the end. The representative work is ThinkPRM. Its advantages are that it can say where the error is and needs less human annotation (it reuses the base model's knowledge). Its drawbacks are that the evaluation itself must generate tokens and is slower, and that the evaluation can also be wrong.
 
 ### Formal Verifier
 

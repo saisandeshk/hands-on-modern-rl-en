@@ -50,8 +50,8 @@ Data collection proceeds step by step along a solution trajectory:
 ::: details How large is a workload of 800,000 step labels?
 OpenAI has not published the actual cost of PRM800K, but we can make a rough estimate. Suppose a skilled annotator spends 30 seconds per step on average (reading the context, judging, choosing a label). Then
 
-- 800K steps × 30 seconds per step = 24,000 hours
-- At 2,000 working hours per person per year, this is roughly **12 person-years** of work
+- 800K steps × 30 seconds per step = 6,667 hours
+- At 2,000 working hours per person per year, this is roughly **3.3 person-years** of work
 
 This does not yet include the management cost of training annotators, reviewing disputed samples, and spot-checking quality. In a real project, the annotation budget should go first to the steps that are most error-prone and best at separating good candidates from bad ones.
 :::
@@ -228,6 +228,18 @@ A discriminative PRM needs to split a response into "steps," and how to split is
 
 If steps are too short, the classifier cannot see a complete operation; if they are too long, one label covers several judgments and we cannot tell where exactly the error is. The splitting rule should correspond to verifiable actions in the task, and once fixed it should be treated as part of the data specification and not changed midway through training.
 
+### Calibration, Shortcuts, Shift, and Active Collection
+
+A PRM that ranks well on its training distribution can still mislead training. Four checks belong in the evaluation loop.
+
+**Calibration, margins, and disagreement slices.** Held-out ranking accuracy (does the higher-scored candidate actually succeed more often?) is the headline metric, but it hides miscalibration: a model can rank correctly while its probabilities are overconfident. Measure calibration on held-out steps, and slice results by margin $|p_{\text{good}} - p_{\text{bad}}|$ and by annotator disagreement. Small-margin and high-disagreement slices are where the next annotation budget should go, and where aggregation (mean vs. min) is most fragile.
+
+**Format, verbosity, and length shortcuts.** Step classifiers learn the easiest correlates of "looks correct": longer derivations, confident formatting, familiar notation. A fluent wrong step then outscores a terse right one. Mitigations are procedural, not architectural: length-controlled evaluation splits, style-normalized candidate sets, and adversarial completions that are verbose but wrong. If min-aggregation suddenly rejects everything after a formatting change, suspect the shortcut before suspecting the policy.
+
+**Distribution shift and overoptimization.** As the policy improves, its prefixes drift off the PRM's training distribution, and optimizing the proxy eventually regresses true task success (Goodhart's law). Track the train reward against an independent task metric and periodic human checks on samples, not just against the PRM score. Keep version lineage for the preference data, the reward model, and the verifier, with a rollback rule: if independent success falls while the proxy rises, revert the reward version and refresh labels before continuing.
+
+**Active collection and stop rules.** Because step labels are the bottleneck, collect them where the model is most uncertain: small margins, high ensemble disagreement, and steps that flip the aggregate verdict. Stop or pause collection when held-out ranking accuracy plateaus and the disagreement slice stops shrinking; more labels on already-decided regions buy little.
+
 ### How to Combine Process Scores and Outcome Scores
 
 The more reliable practices in the public literature fall into three groups:
@@ -246,7 +258,7 @@ where $r_{\text{process}}$ is the aggregated step score, $r_{\text{outcome}}$ is
 
 A discriminative PRM models "can we continue from this step?" as a classification problem: the input is the problem and the reasoning prefix, and the output is the probability of each step class. The whole data production line consists of step splitting, human or automatic labeling, classifier training, and score aggregation. If the definition at any stage changes, the final ranking and the RL reward change with it.
 
-- **Data production line**: PRM800K defines the three-way good/bad/neutral scheme with 800,000 step labels, and the input must stop at the current step to avoid hindsight bias. 800,000 steps is roughly 12 person-years of labeling, which is a hard cost.
+- **Data production line**: PRM800K defines the three-way good/bad/neutral scheme with 800,000 step labels, and the input must stop at the current step to avoid hindsight bias. 800,000 steps is roughly 3.3 person-years of labeling, which is a hard cost.
 - **Training objective**: the cross-entropy loss concentrates its gradient on correcting serious misjudgments: correcting a probability from 0.1 to 0.7 reduces the loss by more than 6 times as much as raising it from 0.7 to 0.95.
 - **Two core uses**: at inference time, reranking aggregates step scores into a total (mean, min, and product can select entirely different candidates); in RL training, the scores serve as trajectory-level or token-level rewards. Min aggregation works well in math but cannot be applied directly to open-ended tasks.
 - **Four risk points**: annotation cost, cross-domain generalization, annotation noise, and step splitting, which line up with the four stages of data production.
