@@ -1,8 +1,8 @@
 ---
-title: 24.R Summary and Exercises
+title: 24.6 Summary and Exercises
 ---
 
-# 24.R Summary and Exercises
+# 24.6 Summary and Exercises
 
 This chapter moved RL from text and game simulators into audio, bodies, and pixels. The settings differ, but the same questions return: what is the state and action, where does the reward come from, and what happens when the reward leaves something out.
 

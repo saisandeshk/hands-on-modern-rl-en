@@ -1381,6 +1381,10 @@ const sidebar = {
             {
               text: '24.5 Why Videos Contradict Themselves',
               link: '/chapter24_multimodal_frontier/video-generation-modern'
+            },
+            {
+              text: '24.6 Summary and Exercises',
+              link: '/chapter24_multimodal_frontier/review'
             }
           ]
         }
