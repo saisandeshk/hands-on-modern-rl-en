@@ -1,5 +1,5 @@
 ---
-title: 3.1 Value Functions and Bellman Equations
+title: 3.1 State Values and Bellman Expectation
 ---
 
 # 3.1 State Values and Bellman Expectation
@@ -557,9 +557,35 @@ $$
 \end{aligned}
 $$
 
-(Here $\boldsymbol{I}$ is the identity matrix.)
+(Here $\boldsymbol{I}$ is the identity matrix. When $\gamma < 1$, the matrix $(\boldsymbol{I} - \gamma \boldsymbol{P}_\pi)$ is always invertible because $\rho(\boldsymbol{P}_\pi) = 1$ for a stochastic matrix, so $\rho(\gamma \boldsymbol{P}_\pi) \le \gamma < 1$.)
 
 At this point, we have obtained the **analytic solution** of the Bellman equation under fixed policy $\pi$. This means that as long as the environment rules (rewards and transition probabilities) and policy $\pi$ are fully transparent, we can in theory directly compute the exact value of every state under that policy.
+
+### Bellman Operators, Contraction, and Fixed Points
+
+The Bellman equation can be read as an operator applied to a whole value vector. For a fixed policy $\pi$, define the Bellman expectation operator $T^\pi$ by
+
+$$
+(T^\pi \boldsymbol{v})(s) = r_\pi(s) + \gamma \sum_{s'} P_\pi(s' \mid s)\, v(s').
+$$
+
+The Bellman expectation equation is then the fixed-point condition $\boldsymbol{v} = T^\pi \boldsymbol{v}$, and its unique solution is $\boldsymbol{v}_\pi$. Similarly, the Bellman optimality operator $T^*$ is
+
+$$
+(T^* \boldsymbol{v})(s) = \max_a \left[ R(s,a) + \gamma \sum_{s'} P(s' \mid s,a)\, v(s') \right],
+$$
+
+and the Bellman optimality equation is $\boldsymbol{v} = T^* \boldsymbol{v}$, whose unique solution is $\boldsymbol{v}^*$.
+
+Both operators are $\gamma$-contractions in the max norm $\lVert \boldsymbol{u} - \boldsymbol{v} \rVert_\infty = \max_s \lvert u(s) - v(s) \rvert$ when $\gamma < 1$:
+
+$$
+\lVert T \boldsymbol{u} - T \boldsymbol{v} \rVert_\infty \le \gamma\, \lVert \boldsymbol{u} - \boldsymbol{v} \rVert_\infty.
+$$
+
+The proof is one line: averaging (or maximizing) over next-state values cannot spread two value vectors apart by more than the largest per-state gap, and the extra factor $\gamma$ shrinks it. By the Banach fixed-point theorem, each operator therefore has exactly one fixed point, and repeatedly applying it from any initial table converges to that point. That is why iterative policy evaluation ($\boldsymbol{v}_{k+1} = T^\pi \boldsymbol{v}_k$) converges to $\boldsymbol{v}_\pi$, and value iteration ($\boldsymbol{v}_{k+1} = T^* \boldsymbol{v}_k$) converges to $\boldsymbol{v}^*$.
+
+In practice this gives a residual-aware stopping rule: stop when the Bellman residual $\lVert \boldsymbol{v}_{k+1} - \boldsymbol{v}_k \rVert_\infty$ falls below a small threshold $\theta$, since the distance to the true fixed point is then bounded by $\theta / (1 - \gamma)$. Note the distinction the residual hides: value convergence (the table stops changing) implies policy convergence (the greedy policy stops changing), but the greedy policy usually settles a few sweeps before the values do, so in practice you often already know the policy while the values are still moving. Terminal states are treated as absorbing with value $0$ (no future return after termination), so their rows never need updating.
 
 **If we have a formula, why learn other algorithms?**
 
@@ -665,7 +691,7 @@ The logic of this formula is very clear. It expands in two layers:
 | State layer  | The same action may reach different next states | $\sum_{s_{t+1}} P(s_{t+1} \mid s_t, a_t)$ |
 
 ::: info Intuitive example: treasure corridor
-Imagine a five-cell corridor, with treasure on the far right. You can only keep walking right. Each step costs 1 unit of stamina, so every step has reward $-1$; after reaching the treasure, the game ends, and the terminal value is recorded as $0$.
+Imagine a five-cell corridor, with treasure on the far right. You can only keep walking right. Each step costs 1 unit of stamina, so every step has reward $-1$; after reaching the treasure, the game ends, and the terminal value is recorded as $0$. For simplicity this example uses $\gamma=1$, so no discounting is applied.
 
 Do not rush to inspect the whole path. Start from the easiest position: **cell 5 is the treasure, and the episode is already over, so its value is 0.**
 
@@ -715,7 +741,7 @@ Compared with the expectation equation, the only difference is that **summation 
 - **Expectation equation** $\sum_{a_t} \pi(a_t \mid s_t)$: weighted average according to the policy probabilities.
 - **Optimality equation** $\max_{a_t}$: discard probabilities and directly choose the action with the largest value. Once the optimality equation is solved, the optimal policy naturally follows: choose $\arg\max_{a_t} Q^*(s_t,a_t)$ each time.
 
-Look at a small two-step example. Suppose you are currently in state $s$ and have two actions: right or left. First write out the paths:
+Look at a small two-step example with $\gamma=1$ (no discounting, so each $Q$ is just immediate reward plus future value). Suppose you are currently in state $s$ and have two actions: right or left. First write out the paths:
 
 | Current action | Immediate reward | Reaches |
 | -------------- | ---------------- | ------- |
@@ -955,7 +981,7 @@ print(round(V, 6))
 ```
 
 :::output
-1.998698
+1.989692
 :::
 
 This is the basic shape of Bellman iteration: instead of computing the answer all at once, repeatedly apply the Bellman relationship so that the estimate gradually approaches the true value. Under a fixed policy $\pi$, this corresponds to iterative policy evaluation. If later we replace “averaging according to the policy” with “taking the maximum over actions,” it leads to value iteration in optimal control.

@@ -1,3 +1,7 @@
+---
+title: '3.3 Hands-on: Value Iteration and Q-Learning'
+---
+
 # 3.3 Hands-on: Value Iteration and Q-Learning
 
 > **Section goal**: Run value iteration and Q-Learning in the same 4×4 GridWorld, observe how the goal reward reaches the starting state, and compare how the two algorithms obtain information.
@@ -147,7 +151,7 @@ The following figure shows the value tables after sweeps 0, 1, 3, and 6. Begin w
 
 ### Reading a Policy from the Value Table
 
-After the sixth sweep, the value table no longer changes. The program computes one more sweep, finds that every cell retains the same value, and stops after sweep 7. This state is called **convergence**.
+After the sixth sweep, the value table no longer changes. The program computes one more sweep, finds that every cell retains the same value (max change below the $10^{-12}$ tolerance), and stops after sweep 7. This state is called **convergence**.
 
 The final result is
 
