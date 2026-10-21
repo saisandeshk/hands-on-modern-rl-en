@@ -53,6 +53,10 @@ import numpy as np
 def self_play_training_loop(env, current_model, model_pool, total_iterations, save_interval=10):
     """A typical industrial Self-Play training loop"""
 
+    # Seed the pool so the 20% historical branch never samples an empty list.
+    if not model_pool:
+        model_pool.append(current_model.copy())
+
     for i in range(total_iterations):
         # 1. 80% chance play against latest self, 20% against historical version
         if np.random.rand() < 0.8:
@@ -179,7 +183,7 @@ The solution is **Population-Based Training**: maintain an opponent pool contain
 
 $$\pi_{\text{opponent}} = \sum_{k=1}^{K} w_k \pi_k, \quad \sum_k w_k = 1$$
 
-where $w_k$ is the probability of selecting the $k$-th historical policy. Modern frameworks like **PSRO (Policy Space Response Oracles)** further introduce "regret-based policy selection" — prioritizing historical opponents that the current strategy finds most difficult, maximizing information gain per training round. AlphaZero and OpenAI Five both use similar opponent-pool mechanisms. (DeepSeek-R1's mathematics and coding RL, by contrast, is single-agent training against verifiable rewards rather than against an opponent pool.)
+where $w_k$ is the probability of selecting the $k$-th historical policy. Modern frameworks like **PSRO (Policy Space Response Oracles)** further introduce "regret-based policy selection" — prioritizing historical opponents that the current strategy finds most difficult, maximizing information gain per training round. OpenAI Five (and AlphaStar) use league training with such an opponent pool; AlphaZero itself plays each self-play game against only the most recent checkpoint of the same network, which is why later systems moved to leagues to break cycles. (DeepSeek-R1's mathematics and coding RL, by contrast, is single-agent training against verifiable rewards rather than against an opponent pool.)
 
 ### Closed Loop 2: Adaptive Curriculum — From Uniform Sampling to Difficulty Matching
 
@@ -246,7 +250,7 @@ From this perspective, the path from Chapter 15's GRPO to this chapter's self-pl
 
 ---
 
-Next we discuss [26.3 LLM Multi-Agent Reinforcement Learning](../llm-multi-agent-rl/) — from multi-agent cooperation to model-based RL, with a hands-on experiment using PettingZoo.
+Next we discuss [26.3 How Multiple LLMs Learn Together](../llm-multi-agent-rl/) — from multi-agent cooperation to model-based RL, with a hands-on experiment using PettingZoo.
 
 ---
 

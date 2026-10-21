@@ -319,7 +319,9 @@ class FreezeRotateTrainer:
                 quality = self.env.evaluate_step(step)
                 process_rewards[role] = quality
 
-            # Combined reward (outcome weight alpha = 0.6, matching the text)
+            # Combined reward (outcome weight alpha = 0.6, matching the text).
+            # Returns one shared scalar per trajectory; the per-role split
+            # of Section 26.3.2 (distinct R_i per role) is not implemented here.
             total_reward = 0.6 * outcome_reward + 0.4 * sum(
                 process_rewards.values()
             ) / max(len(process_rewards), 1)
@@ -528,7 +530,7 @@ pip install pettingzoo
 
 - **Family — `classic`**
   - Type: Game theory
-  - Representative Environments: `chess_v3`, `connect_four_v3`, `tictactoe_v3`
+  - Representative Environments: `chess`, `connect_four_v3`, `tictactoe_v3`
   - Description: Classic board games, turn-based competition
 - **Family — `butterfly`**
   - Type: Cooperative/Competitive
@@ -619,7 +621,7 @@ for agent, reward in total_rewards.items():
 env.close()
 ```
 
-The key parameter `local_ratio=0.5` controls the ratio of "global reward" to "local reward" in the total reward -- this directly reflects the multi-agent credit assignment problem.
+The key parameter `local_ratio=0.5` blends the shared team reward with each agent's local reward in the total reward (0.5 = an equal mix) -- this directly reflects the multi-agent credit assignment problem.
 
 ### Training Multi-Agent Policies
 
@@ -660,9 +662,9 @@ Multi-agent in PettingZoo means "multiple RL agents in the same environment." Ag
 - Zhang G, et al. "[The Landscape of Agentic Reinforcement Learning for LLMs: A Survey](https://arxiv.org/abs/2509.02547)." 2025. -- Agentic RL survey, including multi-agent collaboration section.
 - Tran K-T, et al. "[Multi-Agent Collaboration Mechanisms: A Survey of LLMs](https://arxiv.org/abs/2501.06322)." 2025. -- LLM multi-agent collaboration survey, covering cooperation/competition/coopetition classification, communication protocols, and evaluation methods.
 - Jin W, et al. "[A Comprehensive Survey on Multi-Agent Cooperative Decision-Making](https://arxiv.org/abs/2503.13415)." 2025. -- Panoramic survey from traditional MARL to LLM-driven multi-agent collaboration.
-- Li J, et al. "[FlexMARL: Rollout-Training Co-Design for Efficient LLM-Based Multi-Agent Reinforcement Learning](https://arxiv.org/abs/2602.09578)." 2026. -- First end-to-end framework jointly optimizing sampling, training, and orchestration for multi-agent systems.
+- Li J, et al. "[FlexMARL: Rollout-Training Co-Design for Efficient LLM-Based Multi-Agent Reinforcement Learning](https://arxiv.org/abs/2602.09578)." 2026. -- An end-to-end framework that jointly optimizes sampling, training, and orchestration for multi-agent systems.
 - Pavel M I, Hu S, Masum M A, Pratama M, Kowalczyk R, Cao Z J. "[KD-MARL: Resource-Aware Knowledge Distillation in Multi-Agent Reinforcement Learning](https://arxiv.org/abs/2604.06691)." 2026. -- Transferring centralized coordination behavior to lightweight decentralized agents through knowledge distillation.
 
-[^flexmarl]: Li J, et al. "[FlexMARL: Rollout-Training Co-Design for Efficient LLM-Based Multi-Agent Reinforcement Learning](https://arxiv.org/abs/2602.09578)." 2026. -- First end-to-end framework jointly optimizing sampling, training, and orchestration for multi-agent systems.
+[^flexmarl]: Li J, et al. "[FlexMARL: Rollout-Training Co-Design for Efficient LLM-Based Multi-Agent Reinforcement Learning](https://arxiv.org/abs/2602.09578)." 2026. -- An end-to-end framework that jointly optimizes sampling, training, and orchestration for multi-agent systems.
 
 [^kdmarl]: Pavel M I, Hu S, Masum M A, Pratama M, Kowalczyk R, Cao Z J. "[KD-MARL: Resource-Aware Knowledge Distillation in Multi-Agent Reinforcement Learning](https://arxiv.org/abs/2604.06691)." 2026. -- Transferring centralized coordination behavior to lightweight decentralized agents through knowledge distillation.

@@ -80,7 +80,7 @@ Mean: $(0.85 + 0.60 + 0.90)/3 = 2.35/3 \approx 0.78333$. Deviations: $0.06667$, 
 IQL's value loss uses $L_2^{\tau}(u) = |\tau - \mathbf{1}(u < 0)|u^2$ with $\tau = 0.8$. Data actions at one state have $Q$-values $\{2, 5, 9\}$ and the current $V = 4$. Compute each term's weight and the mean loss. Explain what raising $\tau$ toward 1 does.
 
 ::: details Solution
-Residuals $u = Q - V$: $-2$, $1$, $5$. Weights: $u < 0 \to 1 - \tau = 0.2$; $u \ge 0 \to \tau = 0.8$. Terms: $0.2 \times (-2)^2 = 0.8$, $0.8 \times 1^2 = 0.8$, $0.8 \times 5^2 = 20.0$. Mean loss $= (0.8 + 0.8 + 20.0)/3 = 21.6/3 = 7.2$. Raising $\tau$ toward 1 penalizes positive residuals less and negative residuals more weakly in relative terms, so $V$ moves further into the upper tail of the data-action values (toward the best actions seen, not toward unseen actions).
+Residuals $u = Q - V$: $-2$, $1$, $5$. Weights: $u < 0 \to 1 - \tau = 0.2$; $u \ge 0 \to \tau = 0.8$. Terms: $0.2 \times (-2)^2 = 0.8$, $0.8 \times 1^2 = 0.8$, $0.8 \times 5^2 = 20.0$. Mean loss $= (0.8 + 0.8 + 20.0)/3 = 21.6/3 = 7.2$. Raising $\tau$ weights positive residuals more (weight $\tau$) and negative residuals less (weight $1 - \tau$), so the positive-to-negative weight ratio $\tau:(1-\tau)$ grows and $V$ moves further into the upper tail of the data-action values (toward the best actions seen, not toward unseen actions).
 :::
 
 ### 6. Read the sign of the CQL penalty
@@ -111,7 +111,7 @@ print(f"best-of-N: {best_ok / trials:.4f} (theory ~0.8319)")
 print(f"majority:  {maj_ok / trials:.4f} (theory ~0.1631)")
 ```
 
-Typical output: `best-of-N: ~0.832`, `majority: ~0.163`. Theory for majority: $\sum_{k=3}^{5}\binom{5}{k}0.3^k 0.7^{5-k} = 10(0.027)(0.49) + 5(0.0081)(0.7) + 0.00243 = 0.1323 + 0.02835 + 0.00243 = 0.16308$. The gap is the verifier: best-of-$N$ needs only one correct draw, while majority needs most draws correct, which is unlikely when $p < 0.5$.
+Typical output: `best-of-N: 0.8337`, `majority: 0.1632`. Theory for majority: $\sum_{k=3}^{5}\binom{5}{k}0.3^k 0.7^{5-k} = 10(0.027)(0.49) + 5(0.0081)(0.7) + 0.00243 = 0.1323 + 0.02835 + 0.00243 = 0.16308$. The gap is the verifier: best-of-$N$ needs only one correct draw, while majority needs most draws correct, which is unlikely when $p < 0.5$.
 :::
 
 ### 8. Coding: fictitious-play opponent sampling
@@ -159,5 +159,5 @@ for it in range(12):
     print(f"  iter {it:2d}: avg={[round(x, 3) for x in avg]} row={row}")
 ```
 
-Typical output: latest-only alternates forever between `row=[1, 0], col=[0, 1]` and `row=[0, 1], col=[1, 0]` -- a pure cycle that never plays the equilibrium. With fictitious play the pool average moves `0.9 -> 0.45 -> 0.633 -> 0.475 -> ... -> 0.492`, converging toward `[0.5, 0.5]`, at which point the best response is the equilibrium mixture itself. In this toy loop "training" is an exact best response for clarity; real PPO takes a small step toward it, which damps but does not remove the cycle -- the pool is still what guarantees coverage of old strategies.
+Typical output: latest-only alternates forever between `row=[1, 0], col=[0, 1]` and `row=[0, 1], col=[1, 0]` -- a pure cycle that never plays the equilibrium. With fictitious play the pool average moves `0.9 -> 0.45 -> 0.633 -> 0.475 -> ... -> 0.492`, converging toward `[0.5, 0.5]`, at which point the best response is the equilibrium mixture itself. Note this is a one-sided teaching sketch: the row player best-responds to the empirical average of the column's past plays (the pool), while the column here best-responds to the row's current strategy -- textbook fictitious play averages on both sides. In this toy loop "training" is an exact best response for clarity; real PPO takes a small step toward it, which damps but does not remove the cycle -- the pool is still what guarantees coverage of old strategies.
 :::

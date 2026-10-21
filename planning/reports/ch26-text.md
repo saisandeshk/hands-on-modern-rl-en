@@ -57,3 +57,24 @@ Text pass over all five in-scope Chapter 26 pages plus a new `review.md`. Fixed 
 
 - Sidebar decisions for the coordinator: (1) insert review page; (2) whether to list the offline-RL supplement page.
 - The offline-RL supplement overlaps Chapters 10 (Offline RL) and 14 (DPO). I left its content intact as the hands-on complement; a coordinator may consider a dedup pointer to Chapter 10.
+
+## Review response
+
+- Error 1 (AlphaZero opponent pool): accepted. Re-ran the logic against Silver et al. 2017 (self-play against the most recent checkpoint) and the paragraph's own cycling argument; fixed `self-play-outlook/index.md` to credit league/opponent pools to OpenAI Five (and AlphaStar) and state AlphaZero plays only its latest checkpoint.
+- Error 2 (offline-RL "Typical output"): accepted. Re-ran the script (deterministic: `torch.manual_seed(2)`, `random.seed(2)`); got `naive -0.1164/0.4857`, `cql -0.0429/0.0096`, `td3bc -0.0260/0.0520` twice. My "stochasticity" rationale was wrong; updated the block to the script's actual output.
+- Error 3 (expectile mechanism inverted, review.md Ex. 5): accepted. Weight is $\tau$ for $u\ge0$, $1-\tau$ for $u<0$, so raising $\tau$ weights positive residuals more; fixed the sentence (numbers 7.2 unchanged, re-verified).
+- Error 4 (FlexMARL "First" surviving in references): accepted. Removed "First" from both the plain bullet and the `[^flexmarl]` entry in `llm-multi-agent-rl/index.md`.
+- Error 5 (`random.choice` on empty pool): accepted. Verified `random.choice([])` raises `IndexError`; seeded the pool before the loop (`if not model_pool: model_pool.append(current_model.copy())`).
+- Error 6 (review page not in sidebar, `26.R` numbering): rejected as an in-scope edit. Worker rules forbid editing `docs/.vitepress/config.mjs`; the original task explicitly specifies `title: 26.R Summary and Exercises`, matching the task instruction. Sidebar insertion/renumbering is already listed under Sidebar additions for the coordinator.
+- Error 7 (Ex. 7 `~0.832` vs deterministic `0.8337`): accepted. Re-ran the pasted code with `random.seed(0)`: `0.8337` / `0.1632`; updated the "Typical output" line (theory $0.83193$ / $0.16308$ unchanged).
+- Error 8 (26.3 cross-link still naming old title): accepted. Changed the link text to `[26.3 How Multiple LLMs Learn Together]`.
+- Error 9 (`planning/content-review-notes.md` not updated): rejected as an in-scope edit. That file is outside my scope (only the six listed files plus this report); worker rules prohibit editing out-of-scope files. The fixes are recorded here instead; coordinator may port them.
+- Doubt 1 (PRM/ORM "in the cited setup"): accepted in part. "Schematic" and "in the cited setup" contradicted each other; changed to "in such setups" (table stays schematic; exact numbers still under Needs external verification).
+- Doubt 2 (restore ChatDev Tsinghua/ModelBest attribution): rejected pending verification. No internet access, so the affiliation claim stays softened ("representative work of this architecture" with the arXiv 2307.07924 link intact); restore only with a source.
+- Doubt 3 (recent-paper 26xx claims): no change. Already listed under Needs external verification; needs a literature pass when online.
+- Doubt 4 (Titans "2M tokens"): accepted in part. Could not verify the figure offline; per no-fabrication rule, softened to "strong needle-in-a-haystack performance at very long contexts" with no token number.
+- Doubt 5 (CQL $V_{\bar\theta}$ undefined, missing $(1-d_t)$): accepted. Added a qualifier defining $V_{\bar\theta}$ as the target value network (delayed parameters, same $\bar\theta$ convention as $Q_{\bar\theta}$) and noting the termination factor is absorbed into the simplified target.
+- Doubt 6 (PettingZoo `chess_v3`, `local_ratio` direction): accepted in part. Dropped the chess version pin (`chess`) and reworded `local_ratio=0.5` as an equal blend of shared and local reward without asserting the ratio direction.
+- Doubt 7 (Ex. 8 one-sided "fictitious play"): accepted. Added a caveat that only the row player responds to the pool average while the column responds to the current strategy (textbook fictitious play averages on both sides); trace and convergence claim verified unchanged.
+- Doubt 8 (trainer comment scalar vs per-role): accepted. Extended the comment to state the code returns one shared scalar per trajectory and the per-role split is not implemented there.
+- Doubt 9 (number the remaining 26.1 sections): rejected. Stylistic renumbering of five sections exceeds the minimal-change rule and the original task's preservation constraint; left as is.

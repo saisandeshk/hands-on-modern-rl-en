@@ -125,8 +125,8 @@ Typical output:
 ```text
 behavior_policy  return=-0.0480 support_gap=0.0000
 oracle_policy    return= 0.0000 support_gap=unknown
-naive_q_actor    return=-0.1137 support_gap=0.4819
-cql_actor        return=-0.0420 support_gap=0.0112
+naive_q_actor    return=-0.1164 support_gap=0.4857
+cql_actor        return=-0.0429 support_gap=0.0096
 td3bc_actor      return=-0.0260 support_gap=0.0520
 ```
 
@@ -220,7 +220,7 @@ flowchart TD
 
 CQL (Conservative Q-Learning) directly confronts the Q-overestimation problem[^cql].
 
-The standard Bellman error, written here in a simplified form with a target value $V_{\bar{\theta}}(s')$, is:
+The standard Bellman error, written here in a simplified form with a target value $V_{\bar{\theta}}(s')$ (the target value network, with $\bar{\theta}$ the delayed target parameters also used for $Q_{\bar{\theta}}$ above; the $(1-d_t)$ termination factor from $y_t$ is absorbed into this simplified target), is:
 
 $$
 \mathcal{L}_{\text{TD}}(\theta)

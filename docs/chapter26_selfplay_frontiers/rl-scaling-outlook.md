@@ -331,7 +331,7 @@ The pattern below is schematic and setup-dependent -- exact numbers vary with th
   - MATH Accuracy: ~55%
   - Annotation Cost: Extremely high
 
-PRM's improvement is real in these studies (several percentage points over ORM on MATH in the cited setup), but so is its cost. OpenAI's PRM800K dataset required annotators to label each reasoning step -- a cost not every team can bear.
+PRM's improvement is real in these studies (several percentage points over ORM on MATH in such setups), but so is its cost. OpenAI's PRM800K dataset required annotators to label each reasoning step -- a cost not every team can bear.
 
 ### Exploring Automated PRM
 
