@@ -205,7 +205,7 @@ z
      </g>
     </g>
     <g id="text_6">
-     <!-- 训练步数 -->
+     <!-- Training steps -->
      <g transform="translate(170.471875 232.065781) scale(0.12 -0.12)">
       <defs>
        <path id="PingFangHK-Regular-8bad" d="M 4083 4787 
@@ -438,10 +438,10 @@ L 429 4000
 z
 " transform="scale(0.015625)"/>
       </defs>
-      <use xlink:href="#PingFangHK-Regular-8bad"/>
-      <use xlink:href="#PingFangHK-Regular-7ec3" transform="translate(99.999985 0)"/>
-      <use xlink:href="#PingFangHK-Regular-6b65" transform="translate(199.999969 0)"/>
-      <use xlink:href="#PingFangHK-Regular-6570" transform="translate(299.999954 0)"/>
+      <text x="200" y="0" text-anchor="middle" transform="scale(1 -1)" font-family="Inter, Helvetica, Arial, sans-serif" font-size="92">Training steps</text>
+      
+      
+      
      </g>
     </g>
    </g>
@@ -1033,7 +1033,7 @@ L 342.601875 202.144844
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_15">
-    <!-- 0.5（随机猜测水平） -->
+    <!-- 0.5 (chance level) -->
     <g style="fill: #9ca3af" transform="translate(66.575256 180.054844) scale(0.09 -0.09)">
      <defs>
       <path id="PingFangHK-Regular-ff08" d="M 5440 5293 
@@ -1403,14 +1403,14 @@ z
      <use xlink:href="#PingFangHK-Regular-30"/>
      <use xlink:href="#PingFangHK-Regular-2e" transform="translate(59.999985 0)"/>
      <use xlink:href="#PingFangHK-Regular-35" transform="translate(86.399979 0)"/>
-     <use xlink:href="#PingFangHK-Regular-ff08" transform="translate(146.399963 0)"/>
-     <use xlink:href="#PingFangHK-Regular-968f" transform="translate(246.399948 0)"/>
-     <use xlink:href="#PingFangHK-Regular-673a" transform="translate(346.399933 0)"/>
-     <use xlink:href="#PingFangHK-Regular-731c" transform="translate(446.399918 0)"/>
-     <use xlink:href="#PingFangHK-Regular-6d4b" transform="translate(546.399902 0)"/>
-     <use xlink:href="#PingFangHK-Regular-6c34" transform="translate(646.399887 0)"/>
-     <use xlink:href="#PingFangHK-Regular-5e73" transform="translate(746.399872 0)"/>
-     <use xlink:href="#PingFangHK-Regular-ff09" transform="translate(846.399857 0)"/>
+     <text x="150" y="0" transform="scale(1 -1)" font-family="Inter, Helvetica, Arial, sans-serif" font-size="100" fill="#9ca3af">(chance level)</text>
+     
+     
+     
+     
+     
+     
+     
     </g>
    </g>
    <g id="text_16">

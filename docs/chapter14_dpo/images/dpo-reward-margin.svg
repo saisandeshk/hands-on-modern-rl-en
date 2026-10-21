@@ -273,7 +273,7 @@ z
      </g>
     </g>
     <g id="text_10">
-     <!-- 训练步数 -->
+     <!-- Training steps -->
      <g transform="translate(165.649219 232.065781) scale(0.12 -0.12)">
       <defs>
        <path id="PingFangHK-Regular-8bad" d="M 4083 4787 
@@ -506,10 +506,10 @@ L 429 4000
 z
 " transform="scale(0.015625)"/>
       </defs>
-      <use xlink:href="#PingFangHK-Regular-8bad"/>
-      <use xlink:href="#PingFangHK-Regular-7ec3" transform="translate(99.999985 0)"/>
-      <use xlink:href="#PingFangHK-Regular-6b65" transform="translate(199.999969 0)"/>
-      <use xlink:href="#PingFangHK-Regular-6570" transform="translate(299.999954 0)"/>
+      <text x="200" y="0" text-anchor="middle" transform="scale(1 -1)" font-family="Inter, Helvetica, Arial, sans-serif" font-size="92">Training steps</text>
+      
+      
+      
      </g>
     </g>
    </g>
@@ -951,7 +951,7 @@ L 342.459219 202.144844
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_16">
-    <!-- margin = 0（无法区分好坏） -->
+    <!-- margin = 0 (no separation) -->
     <g style="fill: #9ca3af" transform="translate(57.71185 189.012069) scale(0.09 -0.09)">
      <defs>
       <path id="PingFangHK-Regular-6d" d="M 1843 3398 
@@ -1267,14 +1267,14 @@ z
      <use xlink:href="#PingFangHK-Regular-3d" transform="translate(351.799927 0)"/>
      <use xlink:href="#PingFangHK-Regular-20" transform="translate(412.299911 0)"/>
      <use xlink:href="#PingFangHK-Regular-30" transform="translate(445.599899 0)"/>
-     <use xlink:href="#PingFangHK-Regular-ff08" transform="translate(505.599884 0)"/>
-     <use xlink:href="#PingFangHK-Regular-65e0" transform="translate(605.599869 0)"/>
-     <use xlink:href="#PingFangHK-Regular-6cd5" transform="translate(705.599854 0)"/>
-     <use xlink:href="#PingFangHK-Regular-533a" transform="translate(805.599838 0)"/>
-     <use xlink:href="#PingFangHK-Regular-5206" transform="translate(905.599823 0)"/>
-     <use xlink:href="#PingFangHK-Regular-597d" transform="translate(1005.599808 0)"/>
-     <use xlink:href="#PingFangHK-Regular-574f" transform="translate(1105.599792 0)"/>
-     <use xlink:href="#PingFangHK-Regular-ff09" transform="translate(1205.599777 0)"/>
+     <text x="510" y="0" transform="scale(1 -1)" font-family="Inter, Helvetica, Arial, sans-serif" font-size="100" fill="#9ca3af">(no separation)</text>
+     
+     
+     
+     
+     
+     
+     
     </g>
    </g>
    <g id="text_17">
