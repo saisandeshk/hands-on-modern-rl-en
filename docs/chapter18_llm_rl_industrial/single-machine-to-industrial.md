@@ -209,7 +209,7 @@ RL training is more expensive to account for than SFT because several models per
 
 $$C_{\text{RL-step}} = C_{\text{rollout}} + C_{\text{actor-update}} + C_{\text{ref-forward}} + C_{\text{reward}}$$
 
-The four terms are the costs of generating responses, updating the Actor, running the reference model, and computing rewards. In a typical configuration with a 7B model and a batch of 512 prompts × 8 rollouts, rollout generation accounts for 50%–60% of total computation. Frameworks therefore optimize generation throughput, asynchronous scheduling, and parameter synchronization separately.
+The four terms are the costs of generating responses, updating the Actor, running the reference model, and computing rewards. In a typical configuration with a 7B model and a batch of 512 prompts × 8 rollouts, rollout generation accounts for 50%–60% of wall-clock time (its share of raw FLOPs is smaller, since autoregressive decoding runs at a far lower MFU than training matmuls). Frameworks therefore optimize generation throughput, asynchronous scheduling, and parameter synchronization separately.
 
 ### 3.3 Measuring Throughput: Tokens, Verifiers, and Update Utilization
 
@@ -223,7 +223,7 @@ Total compute then splits into three buckets that scale differently:
 
 $$C_{\text{total}} = C_{\text{sample}} + C_{\text{inference}} + C_{\text{training}}.$$
 
-$C_{\text{sample}}$ covers discarded work: prompts filtered by difficulty, all-correct/all-wrong groups, and retries after environment failure. $C_{\text{inference}}$ covers rollout generation and judge scoring. $C_{\text{training}}$ covers forward-backward updates of the Actor (and Critic, if any). Example: if 30% of generated groups carry no learning signal and each training token costs roughly three times a rollout token (forward plus backward versus forward only), cutting the zero-signal fraction from 30% to 10% saves more than a 10% faster trainer. Measure all three before buying more GPUs.
+$C_{\text{sample}}$ covers generation of rollouts that are thrown away (prompts filtered by difficulty, all-correct/all-wrong groups, retries after environment failure). $C_{\text{inference}}$ covers generation of the retained rollouts plus judge scoring. $C_{\text{training}}$ covers forward-backward updates of the Actor (and Critic, if any) plus the reference-model forward pass. So $C_{\text{total}}$ here is the same quantity as $C_{\text{RL-step}} + C_{\text{sample}}$ in §3.2, regrouped by whether the work trains the model. Example: if 30% of generated groups carry no learning signal and each training token costs roughly three times a rollout token (forward plus backward versus forward only), cutting the zero-signal fraction from 30% to 10% costs about the same as a 10% faster trainer (both save ~7.5% of the step: $100 + 90 \times 3 = 370$ versus $100 + 300 \times 0.9 = 370$), but it buys roughly 39% more useful learning signal per unit of compute, because the saved compute is the wasted training pass. Measure all three before buying more GPUs.
 
 ### 3.4 Cost-Control Strategies
 

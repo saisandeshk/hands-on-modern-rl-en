@@ -42,7 +42,7 @@ This chapter moved from single-machine RL scripts to the systems that train prod
 Name the four steps of one industrial RL training iteration, and for a 70B Actor with a separate reward model, say which device group performs each step and what data crosses the network between steps.
 
 ::: details Solution
-**Generate → score → update → synchronize parameters.** (1) Rollout GPUs generate responses from the current policy. Responses (tokens plus rollout-time log-probabilities and policy version) move to scoring. (2) Reward processes — verifier sandboxes or reward-model GPUs — consume responses and return scalar rewards and component scores. (3) Training GPUs compute advantages and gradients and update the Actor. (4) New weights broadcast back to rollout (and reference) GPUs, typically over NCCL; a LoRA adapter may be synced instead of full weights to shrink the transfer. The reward model and reference model may live on their own pools (disaggregated) or share the training pool (colocated).
+**Generate → score → update → synchronize parameters.** (1) Rollout GPUs generate responses from the current policy. Responses (tokens plus rollout-time log-probabilities and policy version) move to scoring. (2) Reward processes — verifier sandboxes or reward-model GPUs — consume responses and return scalar rewards and component scores. (3) Training GPUs compute advantages and gradients and update the Actor. (4) New weights are broadcast back to the rollout GPUs, typically over NCCL; a LoRA adapter may be synced instead of full weights to shrink the transfer. The frozen reference model needs no sync. The reward model and reference model may live on their own pools (disaggregated) or share the training pool (colocated).
 :::
 
 ### Exercise 2: GPU-Hours by Hand
@@ -105,12 +105,12 @@ def clipped_loss(old_logp, new_logp, adv, mask, eps=0.2):
     return -sum(terms) / len(terms)
 ```
 
-(a) Ratios are $[1, 1]$, both inside $[0.8, 1.2]$, so terms are $[1.0 \cdot 1.0, 1.0 \cdot (-0.5)] = [1.0, -0.5]$. Mean $= 0.25$; loss $= -0.25$. (b) Second token: $r = 1.5$ clips to $1.2$; with negative advantage, $\min(1.5 \cdot (-0.5), 1.2 \cdot (-0.5)) = \min(-0.75, -0.60) = -0.75$. Note the asymmetry: for $A < 0$, `min` keeps the _unclipped_ (more negative) term when the ratio exceeds $1 + \epsilon$ — clipping bounds the update the policy wants to make, and the loss takes the pessimistic side on each token.
+(a) Ratios are $[1, 1]$, both inside $[0.8, 1.2]$, so terms are $[1.0 \cdot 1.0, 1.0 \cdot (-0.5)] = [1.0, -0.5]$. Mean $= 0.25$; loss $= -0.25$. (b) Second token: $r = 1.5$ clips to $1.2$; with negative advantage, $\min(1.5 \cdot (-0.5), 1.2 \cdot (-0.5)) = \min(-0.75, -0.60) = -0.75$. So the terms are $[1.0, -0.75]$, the mean is $0.125$, and the loss is $-0.125$. Note the asymmetry: for $A < 0$, `min` keeps the _unclipped_ (more negative) term when the ratio exceeds $1 + \epsilon$ — clipping bounds the update the policy wants to make, and the loss takes the pessimistic side on each token.
 :::
 
 ### Exercise 8: Coding — Bounded Queue with Retry Deduplication
 
-Simulate one async step in pure Python: the rollout queue holds dicts with keys `id`, `version`, and `ok`. The trainer (at `cur_version`, with `max_staleness = 3` and `max_size = 4`) must: drop entries with `cur_version - version > max_staleness`, drop `ok == False` entries into a `failed` list (counted, not trained on), deduplicate retries by `id` (keep first), and take at most `max_size` entries. Implement `drain(queue, cur_version, max_staleness, max_size)` returning `(batch, failed, dropped_stale)`. Test it on: `ids/versions/ok = [(a,7,T),(b,2,T),(c,6,F),(a,7,T),(d,6,T),(e,5,T)]` with `cur_version = 8`.
+Simulate one async step in pure Python: the rollout queue holds dicts with keys `id` (prompt ID), `version` (policy version), `attempt` (retry count, stored separately from the dedup key), and `ok`. The trainer (at `cur_version`, with `max_staleness = 3` and `max_size = 4`) must: drop entries with `cur_version - version > max_staleness`, drop `ok == False` entries into a `failed` list (counted, not trained on), deduplicate retries by `(id, version)` (keep the first successful attempt), and take at most `max_size` entries. Implement `drain(queue, cur_version, max_staleness, max_size)` returning `(batch, failed, dropped_stale)`. Test it on: `ids/versions/attempts/ok = [(a,7,1,T),(b,2,1,T),(c,6,1,F),(a,7,2,T),(d,6,1,T),(e,5,1,T)]` with `cur_version = 8`.
 
 ::: details Solution
 
@@ -124,13 +124,13 @@ def drain(queue, cur_version, max_staleness, max_size):
         if not e["ok"]:
             failed.append(e)
             continue
-        if e["id"] in seen:
+        if (e["id"], e["version"]) in seen:
             continue
-        seen.add(e["id"])
+        seen.add((e["id"], e["version"]))
         if len(batch) < max_size:
             batch.append(e)
     return batch, failed, dropped_stale
 ```
 
-Hand trace with `cur_version = 8`, `max_staleness = 3`: (a,7): staleness 1, train. (b,2): staleness 6 > 3, stale-drop. (c,6): failed list. (a,7) again: duplicate, skipped. (d,6): train. (e,5): staleness 3, allowed, train. Batch ids $= [a, d, e]$ (3 $\le$ 4), failed $= [c]$, dropped_stale $= 1$. The trace shows all four mechanisms: staleness bound, failure accounting without training, retry dedup, and the size cap as backpressure.
+Hand trace with `cur_version = 8`, `max_staleness = 3`: (a,7): staleness 1, train. (b,2): staleness 6 > 3, stale-drop. (c,6): failed list. (a,7) again (attempt 2): same `(id, version)` key, duplicate, skipped. (d,6): train. (e,5): staleness 3, allowed, train. Batch ids $= [a, d, e]$ (3 $\le$ 4), failed $= [c]$, dropped_stale $= 1$. The trace shows all four mechanisms: staleness bound, failure accounting without training, retry dedup by `(prompt, version)` with `attempt` kept as a separate field, and the size cap as backpressure (entries beyond `max_size` are left untaken here; a production monitor would additionally count them as capacity-dropped).
 :::

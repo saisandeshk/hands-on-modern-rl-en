@@ -110,7 +110,7 @@ Choose from current scale and the existing stack: TRL for learning and prototype
 
 ### Colocated versus Disaggregated Deployment
 
-A ResourcePool can host several roles on the same GPUs (**colocated**) or give each role its own GPUs (**disaggregated**). Colocation time-shares memory: the rollout engine borrows the GPUs during generation and releases them for the update, often with weights offloaded to CPU in between. Nothing crosses the network and every GPU works in each phase, but each switch pays unload/reload cost and peak memory must hold both roles' transient states.
+A ResourcePool can host several roles on the same GPUs (**colocated**) or give each role its own GPUs (**disaggregated**). Colocation needs no separate GPU pool and no inter-pool weight broadcast, but the rollout and the update phases cannot overlap: a step costs rollout time plus update time, and each switch pays an unload/reload cost (the rollout engine borrows the GPUs during generation and releases them for the update, often with weights offloaded to CPU in between). Rollouts, tool returns, and rewards must still travel between processes — across the network whenever the cluster has more than one node — and peak memory must hold both roles' transient states.
 
 Disaggregation keeps rollout and training resident on separate GPUs and streams weights between them, typically with an NCCL broadcast after each update. Generation and training can then overlap — rollout GPUs produce batch $k+1$ while the trainer updates on batch $k$ — which suits asynchronous loops, but one side idles whenever the other is slower, and every update pays a broadcast. Synchronizing a small LoRA adapter instead of full weights shrinks that transfer by orders of magnitude.
 
@@ -169,12 +169,12 @@ ZeRO-3 all-gathers the needed parameters temporarily during forward and backward
 
 For a 70B model on 32× 80GB H100s, sharded state is about $1.12\,\text{TB} / 32 \approx 35\,\text{GB}$ per GPU, plus transient gathered parameters and activations:
 
-| Configuration                       | Per-GPU Memory             | Speed                                                    | Feasible?                          |
-| ----------------------------------- | -------------------------- | -------------------------------------------------------- | ---------------------------------- |
-| Full parameters + Adam, no sharding | ~1.12 TB                   | Baseline                                                 | No                                 |
-| ZeRO-3 training-state sharding      | ~35 GB + activations       | 10%–15% slower                                           | Yes, tight                         |
-| ZeRO-3 + gradient checkpointing     | ~35 GB + small activations | 30%–40% slower                                           | Yes, room for a larger micro-batch |
-| ZeRO-3 + checkpointing + LoRA       | ~8 GB                      | ~40% slower per step, but far fewer trainable parameters | Yes                                |
+| Configuration                       | Per-GPU Memory                                         | Speed                                                    | Feasible?                          |
+| ----------------------------------- | ------------------------------------------------------ | -------------------------------------------------------- | ---------------------------------- |
+| Full parameters + Adam, no sharding | ~1.12 TB                                               | Baseline                                                 | No                                 |
+| ZeRO-3 training-state sharding      | ~35 GB + activations (≈100 GB at the batch size above) | 10%–15% slower                                           | No without gradient checkpointing  |
+| ZeRO-3 + gradient checkpointing     | ~35 GB + small activations                             | 30%–40% slower                                           | Yes, room for a larger micro-batch |
+| ZeRO-3 + checkpointing + LoRA       | ~8 GB + activations                                    | ~40% slower per step, but far fewer trainable parameters | Yes                                |
 
 Industrial 70B RL often combines LoRA with FSDP to balance memory, speed, and training quality.
 
@@ -202,11 +202,11 @@ Reuse is a second drift source beyond staleness. PPO classically takes several g
 
 An async loop is a producer-consumer queue, and three failure modes have nothing to do with the RL objective:
 
-- **Generation batching.** Rollout workers should bucket prompts by expected length so one long sequence does not hold a whole batch hostage (the straggler row in the table below). Without bucketing, batch time equals the longest sequence every step.
+- **Generation batching.** Rollout workers should bucket prompts by expected length so one long sequence does not hold a whole batch hostage (batch completion still waits for its longest sequence, even with continuous batching refilling finished slots — see the "Stragglers" row in the "Locating Performance Bottlenecks" table). Without bucketing, batch time equals the longest sequence every step.
 - **Backpressure.** If rollout outpaces training, the queue grows without bound and staleness grows with it. Bound the queue: pause rollout or evict the oldest entries when full. Monitor queue depth and the oldest queued policy version as first-class metrics — a queue of 50 versions is not a speedup, it is off-policy training.
 - **Learner starvation.** The reverse stall: the trainer idles because scoring is slow (a serial code sandbox, a model judge). Decouple scoring from generation with an offline scoring queue and keep a ready-buffer of scored trajectories, so the trainer never waits on a sandbox.
 
-Recovery must cover four states together: model weights, optimizer state, queued rollouts with their policy versions, and sampler state (which prompts were served, difficulty statistics). Restoring weights without sampler state silently resamples already-seen prompts and skews the curriculum; restoring the queue without versions trains on data whose provenance is unknown. Every rollout therefore carries an ID of prompt, policy version, and attempt number: retries after a crash or timeout resume under the same ID so they are neither counted twice in advantages and pass rates nor mistaken for fresh samples. Failed rollouts — environment crashes, timeouts, out-of-memory generations — are labeled by cause against a failed-rollout budget and excluded from the loss, but retained for diagnosis. [18.5](./data-engineering) follows those labels into the data pipeline.
+Recovery must cover four states together: model weights, optimizer state, queued rollouts with their policy versions, and sampler state (which prompts were served, difficulty statistics). Restoring weights without sampler state silently resamples already-seen prompts and skews the curriculum; restoring the queue without versions trains on data whose provenance is unknown. Every rollout therefore carries a deduplication key of (prompt ID, policy version), with the attempt number stored as a separate field on the record: retries after a crash or timeout resume under the same key with an incremented attempt count, so only one attempt per key is counted in advantages and pass rates and retries are never mistaken for fresh samples (keep the latest successful attempt, count attempts separately). Failed rollouts — environment crashes, timeouts, out-of-memory generations — are labeled by cause against a failed-rollout budget and excluded from the loss, but retained for diagnosis. [18.5](./data-engineering) follows those labels into the data pipeline.
 
 ---
 
