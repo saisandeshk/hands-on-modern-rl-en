@@ -279,13 +279,13 @@ If the training goal is improving single-attempt usability, don't report only `p
 
 A single score per checkpoint cannot support a release decision. RL training is stochastic in seeds, data order, environment dynamics, and (for LLM agents) sampling — so the comparison itself needs a protocol. The debugging-side version of this discipline is in [A.1](./training-debugging); what follows is the evaluation-side mechanics.
 
-**Run multiple training seeds; never ship on one.** Three seeds is a common minimum for cheap control tasks and five to ten is the usual recommendation when affordable. Report the mean with a 95% confidence interval, and never report the best seed as the headline number. When aggregating across tasks, prefer the interquartile mean (IQM) — the mean of the middle 50% of runs, which resists outlier tasks better than the mean and uses data more efficiently than the median — with stratified bootstrap confidence intervals that resample runs within each task so no single task dominates the uncertainty[^rliable].
+**Run multiple training seeds; never ship on one.** Three seeds is a common minimum for cheap control tasks and five to ten is the usual recommendation when affordable (Agarwal et al. recommend ten or more runs for stable stratified bootstrap intervals[^rliable]). Report the mean with a 95% confidence interval, and never report the best seed as the headline number. When aggregating across tasks, prefer the interquartile mean (IQM) — the mean of the middle 50% of runs, which is more robust than the mean and has lower variance than the median at the same sample size — with stratified bootstrap confidence intervals that resample runs within each task so no single task dominates the uncertainty[^rliable].
 
-**Compare on matched budgets.** Two checkpoints are comparable only if they consumed the same training budget: the same number of environment steps or generated samples, and the same compute (GPU-hours, tokens processed). Record both from the training logs (see the `timing_s/*` and `perf/*` fields in [C.3](../appendix_c_resources/metrics-glossary)) and print them next to every score table. A checkpoint that trained twice as long has not "won" — it has spent more.
+**Compare on matched budgets.** Two checkpoints are comparable only if they consumed the same training budget: the same number of environment steps or generated samples, and the same compute (GPU-hours, tokens processed). Derive GPU-hours from `timing_s/step` × number of steps × GPU count (see [C.2](../appendix_c_resources/gpu-hours-estimation) for an estimation table; raw per-step fields live in [C.3](../appendix_c_resources/metrics-glossary)) and print them next to every score table. A checkpoint that trained twice as long has not "won" — it has spent more.
 
 **Separate tuning from final evaluation.** All iteration decisions — hyperparameters, prompt templates, reward weights, checkpoint selection, early stopping — belong to the dev set. The private test set is read once, at release time, on a held-out seed. Checkpoint selection counts as tuning: picking the checkpoint with the best private-set score and then reporting that same score is circular. Log which split each decision used.
 
-**Fix deterministic vs stochastic evaluation, and don't mix them.** A greedy decode (temperature 0) measures what the model knows; a sampled decode (temperature > 0) measures what a deployment with retries, reranking, or majority voting will deliver. The two can rank checkpoints differently. Write the decoding settings into the eval config above, and compare greedy against greedy, sampled against sampled. When both matter, report both — `pass@1` greedy for capability, `pass@k` / `majority@k` sampled for deployment — with the sampling parameters attached.
+**Fix deterministic vs stochastic evaluation, and don't mix them.** A greedy decode (temperature 0) measures what the model knows; a sampled decode (temperature > 0) measures what a deployment with retries, reranking, or majority voting will deliver. The two can rank checkpoints differently. Write the decoding settings into the eval config above (use a greedy profile alongside the sampled one when both matter), and compare greedy against greedy, sampled against sampled. When both matter, report both — `pass@1` greedy for capability, `pass@k` / `majority@k` sampled for deployment — with the sampling parameters attached.
 
 A minimal honest report for one comparison therefore looks like this:
 
@@ -293,12 +293,12 @@ A minimal honest report for one comparison therefore looks like this:
 comparison: grpo-step-1800 (5 seeds) vs sft (5 seeds)
 budget: 200k env steps each, 96 GPU-hours each
 eval: private test set, greedy decode (temperature 0.0), unseen by tuning
-primary: task_success IQM 46.2% [43.1, 49.0] vs 41.0% [38.2, 43.9]
+primary: task_success IQM 46.2% [43.8, 48.6] vs 40.2% [37.5, 42.8]
 cost: cost_to_success mean $1.20 vs $0.95 per task
 decision: ship only if IQM gap survives the CI and cost is within budget
 ```
 
-If the confidence intervals overlap substantially, or the budgets differ, the correct conclusion is "no evidence yet" — run more seeds or fix the budget before claiming a win.
+If the confidence intervals overlap substantially, or the budgets differ, the correct conclusion is "no evidence yet" — run more seeds or fix the budget before claiming a win. Overlap of two marginal intervals is only a rough heuristic; the formal check is whether the confidence interval of the paired per-seed difference excludes zero.
 
 ## Step Four: Bring the Agent's Full Trajectory into Evaluation
 
@@ -523,7 +523,7 @@ Suppose the output is:
 checkpoint: code-agent-rl-step-2400
 bfcl_executable_accuracy: 82.1% -> 85.6% (+3.5)
 api_bank_call_accuracy: 68.4% -> 66.9% (-1.5)
-swebench_verified_resolved: 27.0% -> 32.4% (+4.4)
+swebench_verified_resolved: 27.0% -> 32.4% (+5.4)
 avg_tool_calls_successful_tasks: 18.6 -> 27.9 (+50.0%)
 tool_error_recovery_rate: 41.2% -> 37.5% (-3.7)
 safety_violation_rate: 0.3% -> 0.9% (+0.6)
@@ -656,7 +656,7 @@ plot_paper_radar(
     agentbench_metrics,
     agentbench_series,
     OUT / "radar-code-agent-tool-bench.png",
-    "Relative-to-best scores across AgentBench environments; numbers are hypothetical.",
+    "Absolute scores across AgentBench environments; numbers are hypothetical.",
 )
 ```
 
@@ -710,15 +710,15 @@ After producing this type of figure, improvement actions in the report should di
 
 _Figure 3: Screenshot of the original figure from AgentBench paper Figure 1. Left is the 8-environment radar; right is the overall score bar chart. Source: AgentBench paper[^agentbench]._
 
-**How to produce the new figure**: raw metrics across AgentBench environments are not all on the same scale, so you can first do `relative_score = 100 * model_score / best_score_in_this_environment`, then draw the radar. Hypothetical results are used here to demonstrate an agent post-training project.
+**How to produce the new figure**: raw metrics across AgentBench environments are not all on the same scale, so check the axis ranges before plotting (if environments used incompatible scales, first normalize, e.g. `relative_score = 100 * model_score / best_score_in_this_environment`, and label the figure accordingly). The radar below plots absolute scores on a shared 0–100 axis for illustration. Hypothetical results are used here to demonstrate an agent post-training project.
 
 - **Model — Agent-SFT**
-  - OS: 28
+  - OS: 27
   - DB: 41
   - KG: 32
   - DCG: 45
   - LTP: 35
-  - HH: 22
+  - HH: 21
   - WS: 31
   - WB: 18
 - **Model — Agent-RL**
@@ -727,16 +727,16 @@ _Figure 3: Screenshot of the original figure from AgentBench paper Figure 1. Lef
   - KG: 38
   - DCG: 43
   - LTP: 42
-  - HH: 20
+  - HH: 19
   - WS: 39
-  - WB: 24
+  - WB: 23
 - **Model — Agent-RL + guard**
   - OS: 43
   - DB: 52
   - KG: 45
   - DCG: 48
   - LTP: 51
-  - HH: 29
+  - HH: 28
   - WS: 44
   - WB: 33
 

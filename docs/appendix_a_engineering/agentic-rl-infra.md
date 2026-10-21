@@ -169,7 +169,7 @@ Recall the async training mechanism from A.2: Rollout generates data and writes 
 
 TransferQueue changes this interaction to streaming: Rollout writes each sample to the queue as soon as it is generated, and the Training side begins processing as soon as it gets a sample, without waiting for the entire batch to finish generating. For Agentic RL, a sample is not just a completion — it may be an entire episode containing multiple rounds of tool results. This works with DCS (Distributed Checkpoint Service) for weight sync — every time Training updates parameters by one step, DCS broadcasts via NCCL to Rollout and other components, overlapping with the next training computation to hide most of the transfer cost.
 
-This design reduces batch-level waiting in async training to sample-level waiting, lowering wait time by an order of magnitude.
+This design reduces batch-level waiting in async training to sample-level waiting, which can cut the waiting substantially on suitable workloads (the exact factor depends on the rollout length distribution — measure it on your own cluster).
 
 ### Two Execution Modes
 
@@ -213,12 +213,12 @@ The `external` mode is noteworthy — it can leverage idle resources or preempti
 
 - **Framework — AReaL**
   - Producer: Ant Group and Tsinghua
-  - Features: fully async, reported 2.77x speedup
+  - Features: fully async, reported up to ~2.77x speedup in their experiments
   - Multimodal: no
   - Async: fully async
 - **Framework — Seer**
   - Producer: Moonshot AI (Kimi)
-  - Features: extreme synchrony, reported rollout throughput +74–97%
+  - Features: extreme synchrony, reported rollout throughput +74–97% in their experiments
   - Multimodal: no
   - Async: synchronous
 - **Framework — Agent-R1**

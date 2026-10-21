@@ -62,7 +62,7 @@ wandb.log(
 
 Do not wait until training finishes to look at results. Stop immediately if any of the following happens:
 
-1. **KL divergence exceeds a threshold** (often 0.1-0.15): the policy has drifted too far.
+1. **KL divergence exceeds a threshold** (calibrate to your setup; LLM RL target-KL values are often around 0.001–0.01, so a fixed 0.1–0.15 would rarely fire): the policy has drifted too far.
 2. **Reward decreases for N consecutive steps** (N depends on your tolerance; commonly 50-100 steps).
 3. **Entropy drops close to zero**: the policy has collapsed; continuing is unlikely to help.
 4. **Benchmark scores drop twice in a row**: the model may be regressing.

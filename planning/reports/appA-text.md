@@ -44,3 +44,21 @@ None (no new pages; requirement was to avoid creating summary/exercises pages).
 - A.4's benchmark inventory (MMLU-Pro, BFCL, tau-bench naming, Claw-family entries) may drift as benchmarks evolve; suggest a periodic link/rot check, ideally via `npm run verify:code-links`.
 - The three legacy stubs (`monitoring.md`, `parallelism.md`, `async-training.md`) still duplicate A.2 content by design (legacy-link entry points); a future worker may want to shrink them to pure redirects, but that is outside this task's scope.
 - No code tests apply to this task (no `code/` files in scope; no test names given).
+- `code/chapter01_cartpole/2-pytorch_ppo.py:262` comment ("matching SB3's approx_kl") is out of scope (no `code/` files in scope) but looks loose: SB3 computes `mean((ratio - 1) ** 2)` while the code computes Schulman k3 `mean(exp(log_ratio) - 1 - log_ratio)`. Left unchanged; coordinator may reassign.
+
+## Review response
+
+- Error 1 (A.1 KL estimators mixed log/probability ratios, wrong sign and inverted k3): accepted. Re-derived with pi_old=(0.5,0.5), pi_new=(0.7,0.3): -E[r] = 0.0872 = KL(old||new), E[e^r-1-r] = 0.0872, E[e^-r-1+r] = 0.1033 (+18.5% bias); matches repo PPO code and B.1. Rewrote bullet with explicit rho, sampling direction, and B.1 cross-reference.
+- Error 2 (A.4 SWE-bench +4.4 arithmetic): accepted. 32.4 - 27.0 = +5.4. Changed to (+5.4); rechecked all other deltas.
+- Error 3 (A.4 radar script vs bullets, 5/24 cells differ): accepted. Set bullets to script values (SFT OS 27/HH 21, RL HH 19/WB 23, guard HH 28).
+- Error 4 (A.4 radar captioned relative-to-best but plots raw values): accepted. Relabeled subtitle/caption to absolute scores and rewrote recipe to check scales / normalize only if needed with labeling.
+- Doubt 1 (A.1 bundles seed + implementation claims under Henderson): accepted. Split citations: [^drltm] for seeds, [^implementation] for implementation details.
+- Doubt 2 (A.1 clip fraction "hit the bounds" ambiguous): accepted. Changed to "fell outside [1-eps,1+eps], i.e. clipped" with Chapter 1 pointer.
+- Doubt 3 (A.4 overlapping IQM CIs presented as shippable; 5-seed CI optimism; marginal-overlap vs paired test): accepted. Made template intervals non-overlapping (46.2% [43.8,48.6] vs 40.2% [37.5,42.8]), added paired-difference CI sentence and ten-or-more-runs note in A.1/A.4.
+- Doubt 4 (A.4 GPU-hours pointer to C.3 which has no such field): accepted. Changed to derive from timing_s/step x steps x GPU count, pointing to C.2 estimation table and C.3 raw fields.
+- Doubt 5 (A.4 greedy template vs temperature-0.6 eval config): accepted. Clarified to use a greedy profile alongside the sampled one and compare like-with-like.
+- Doubt 6 (A.3 "order of magnitude" wait-time claim unsourced): accepted. Softened to workload-dependent substantial cut with measure-on-cluster guidance.
+- Doubt 7 (monitoring.md stop threshold 0.1-0.15 KL never fires vs book runs ~0.008/0.016 and LLM target_kl ~0.001-0.01): accepted. Changed to calibrate-to-setup with 0.001-0.01 typical target-KL note.
+- Doubt 8 (A.4 "median discards half the data"): accepted. Reworded in A.1 and A.4 to "median has higher variance at the same sample size".
+- Doubt 9 (AReaL 2.77x / Seer +74-97% bare multipliers): accepted. Qualified both as "in their experiments" (Seer already said "Reported results include"; AReaL "reported up to ~2.77x in their experiments") with existing retest-on-target disclaimer.
+- Doubt 10 (code comment SB3 attribution loose): no change (code/ out of scope). Math in code is correct k3 for old-policy samples; recorded under Open issues.
