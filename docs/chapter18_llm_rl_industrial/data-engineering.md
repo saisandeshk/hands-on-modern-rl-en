@@ -1,3 +1,7 @@
+---
+title: 18.5 Large-Scale RL Data Engineering
+---
+
 # 18.5 Large-Scale RL Data Engineering
 
 In a single-machine experiment, training data may be a script, a JSONL file, or one dataset. In industrial RL training, a trajectory passes through task generation, environment execution, scoring, storage, further processing, model updates, and feedback into the next round. A distributed run can generate hundreds of thousands of trajectories per hour. If any stage is poorly managed, large amounts of data are lost or erroneous trajectories repeatedly return to training.
@@ -92,6 +96,8 @@ Common data-quality checks include:
 - **Environment-consistency checks:** compare the same task across nodes. If results differ, mark the environment as unstable instead of assigning an immediate zero reward.
 
 **Rule-based filtering precedes model-based filtering.** Rules can quickly catch formatting errors, syntax errors, timeouts, and reward-service failures. Reward models or additional judge models are reserved for cases that rules cannot decide.
+
+**Masks decide what the gradient sees.** A stored trajectory is not the same as a training sample. Truncated completions must be masked or down-weighted so the model is not punished for a cutoff it did not choose; tool and environment returns (executor output, browser DOM, file contents) must be masked from the loss so the model never learns to generate observations as if they were its own tokens (the TIR masking recipe in [18.2](./industrial-post-training) is the canonical example); and terminal-reward placement must mark exactly which tokens the outcome score applies to. Store the mask alongside the tokens so that a re-scored sample keeps the same masked positions: rescoring changes the rewards, not which tokens carry gradient, and the stored mask guarantees the two stay consistent across reward versions.
 
 **Filtering does not mean deleting.** Rejected trajectories still provide useful evidence:
 

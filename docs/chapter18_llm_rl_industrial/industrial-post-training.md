@@ -1,3 +1,7 @@
+---
+title: 18.2 Industrial Post-Training Pipeline
+---
+
 # 18.2 Industrial Post-Training Pipeline
 
 > **Goal of this section**: understand why industrial post-training must form a loop; learn the six stages of target definition, data and environments, SFT, RL, evaluation, and failure feedback; and locate any public technical report within those stages.
