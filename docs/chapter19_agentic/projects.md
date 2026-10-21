@@ -392,7 +392,8 @@ def run_multi_tool_rollout(task_prompt: str, task_test: str, entry_point: str,
     prompt_ids = tokenizer.encode(prompt_text, add_special_tokens=False)
 
     real_ids = list(prompt_ids)
-    masked_ids = list(prompt_ids)  # The prompt part is identical in both streams.
+    # Prompt tokens are masked out of the loss stream: only model decision tokens train the policy.
+    masked_ids = [PAD_ID] * len(prompt_ids)
 
     submitted_code = None
     test_passed = False
@@ -1417,12 +1418,12 @@ class ResearchEnvironment:
         if action["type"] == "search":
             # Call a search API, such as Serper API or Tavily API.
             results = self._search(action["query"])
-            return state + f"\nSearch results: {results}"
+            return state + f"\nSearch results: {results}", "", False
 
         elif action["type"] == "read":
             # Extract web content, for example with the Jina Reader API.
             content = self._read_url(action["url"])
-            return state + f"\nWeb content: {content[:2000]}"
+            return state + f"\nWeb content: {content[:2000]}", "", False
 
         elif action["type"] == "answer":
             # The agent outputs the final answer.
@@ -1489,7 +1490,7 @@ Use GRPO's group sampling and relative comparison to train the agent's search st
 ```python
 import asyncio
 
-async def rollout_one(model, env, question, max_turns=10):
+async def rollout_one(model, env, question, ground_truth, max_turns=10):
     """Roll out one agent trajectory."""
     state = ""
     for turn in range(max_turns):
@@ -1519,7 +1520,7 @@ async def grpo_train_step(model, env, questions, ground_truths, group_size=4):
     for q, gt in zip(questions, ground_truths):
         trajectories = []
         for _ in range(group_size):
-            traj = await rollout_one(model, env, q)
+            traj = await rollout_one(model, env, q, gt)
             trajectories.append(traj)
 
         # Sort within the group by reward, high to low.
@@ -1586,7 +1587,7 @@ Reward design for Deep Research Agents is a synthesis of the RL methods discusse
 - **RLVR (Chapter 15)**: many Deep Research rewards are verifiable. Whether a citation URL is accessible, whether code passes tests, and whether the answer matches the gold answer are all objectively verifiable and do not require a Reward Model.
 - **GRPO (Chapter 15)**: projects such as DeepResearcher use group sampling and relative comparison for training, exactly the idea of GRPO.
 - **PPO (Chapter 8)**: some projects still use PPO as the base RL algorithm, especially when a value function is needed for step-level credit assignment.
-- **PRM vs ORM ([credit-assignment supplement](./multi-turn-rl))**: CaRR, Atom-Searcher, and Web-Shepherd are all, in essence, exploring the trade-off between ORM, which scores only the final result, and PRM, which evaluates each step, in the Deep Research setting. The research finding is that for long-horizon research tasks, dense signals from PRMs are crucial.
+- **PRM vs ORM ([credit-assignment supplement](./credit-assignment))**: CaRR, Atom-Searcher, and Web-Shepherd are all, in essence, exploring the trade-off between ORM, which scores only the final result, and PRM, which evaluates each step, in the Deep Research setting. The research finding is that for long-horizon research tasks, dense signals from PRMs are crucial.
 
 Deep Research Agent is an excellent setting that ties together all the RL knowledge in this book: from basic reward design to advanced credit assignment, from data synthesis to engineering implementation.
 
