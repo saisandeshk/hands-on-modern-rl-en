@@ -178,12 +178,12 @@ RLVR is a special case of GRPO: rewards do not come from a learned RM but from r
 
 ## Common Pitfalls
 
-| Pitfall                                 | Explanation                                                                                                   |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| GRPO advantage is within-group          | Not global normalization; only compare the $G$ completions of the **same prompt**                             |
-| GRPO has no value loss                  | No critic means no value loss — the core difference from PPO                                                  |
-| Two normalizer variants exist           | Most implementations use std (z-score); some use only `rewards - mean` (no std). Note the difference          |
-| RM must be frozen during policy updates | When training the RM, rewards are differentiable; when training the policy, the RM is usually detached/frozen |
-| KL is sequence-level                    | Typically sum token log-probs per completion first, then compute KL — not per token                           |
-| Direction of the k3 KL estimator        | `log_ratio = log(π_ref/π_θ)`, samples drawn from the current policy $\pi_\theta$                              |
-| RLVR case                               | Rewards come from a rule verifier (code execution, math answer check), not from RM                            |
+| Pitfall                                 | Explanation                                                                                                                                                                                                                                                                   |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GRPO advantage is within-group          | Not global normalization; only compare the $G$ completions of the **same prompt**                                                                                                                                                                                             |
+| GRPO has no value loss                  | No critic means no value loss — the core difference from PPO                                                                                                                                                                                                                  |
+| Two normalizer variants exist           | Most implementations use std (z-score); some use only `rewards - mean` (no std). Note the difference. Population std (divide by $G$) matches NumPy; some production recipes use the Bessel-corrected default (divide by $G-1$), which rescales advantages by $\sqrt{G/(G-1)}$ |
+| RM must be frozen during policy updates | When training the RM, rewards are differentiable; when training the policy, the RM is usually detached/frozen                                                                                                                                                                 |
+| KL is sequence-level                    | Typically sum token log-probs per completion first, then compute KL — not per token                                                                                                                                                                                           |
+| Direction of the k3 KL estimator        | `log_ratio = log(π_ref/π_θ)`, samples drawn from the current policy $\pi_\theta$                                                                                                                                                                                              |
+| RLVR case                               | Rewards come from a rule verifier (code execution, math answer check), not from RM                                                                                                                                                                                            |

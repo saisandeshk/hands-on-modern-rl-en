@@ -53,3 +53,21 @@ None (no new pages; existing B.1–B.8 links and titles already match after the 
 ## Open issues
 
 - None blocking. If the coordinator wants, a follow-up could add explicit `attention_mask` plumbing to the GRPO/DAPO PyTorch snippets (currently sequence-level means), but that would expand the snippets beyond one-page cheatsheet scope, so I left it as prose guidance in `sft-kl.md`.
+
+## Review response
+
+Reviewer report: `planning/reviews/appB-text.md` (5 errors, 6 doubts). Re-checked each claim against the page code and, where possible, by execution; fixed in the in-scope files.
+
+- Error 1 (DAPO overlong paragraph contradicts its own code): accepted. Recomputed from `soft_overlong_penalty` (`L=1500 → 0.0`, `L=1800 → −0.6`, `L=2000 → −1.0` with `max_len=2000, buffer_len=500`): the deduction ramps inside the buffer zone, not above it. Rewrote the paragraph in `dapo.md` (unpenalized only up to `max_len − buffer_len`; linear ramp to `−penalty_factor` at `max_len`, flat after).
+- Error 2 (DAPO sketch `[B, G] → [B, T]` broadcast): accepted. `[B, G]` cannot broadcast against `[B, T]`; rewrote the sketch in `dapo.md` with explicit `[B, G, T]` log-probs and `advantages.unsqueeze(-1)` (`[B, G, 1]`, constant over tokens), plus a `mask: [B, G, T]` shape note.
+- Error 3 (implicit reward "divided by β"): accepted. The DPO implicit reward is $r = \beta \log(\pi_\theta/\pi_{ref})$ (cf. Chapter 14 `dpo-objective-derivation.md` Step 3); fixed `dpo-family.md` to say the log-ratio times $\beta$ is the implicit reward, including the pseudocode comments.
+- Error 4 (KTO "same optimum" for logistic vs value form): accepted. The gradients differ ($-\sigma(-z)$ vs $-\sigma(z)(1-\sigma(z))$) and the value form saturates at $\lambda_U$ while the logistic version keeps a logarithmic penalty; rewrote the KTO paragraph in `dpo-family.md` as a logistic-style implementation with that saturation difference, sharing only the push direction.
+- Error 5 (top-k "keep exactly k"): accepted. Both implementations keep ties (`>= threshold` / `masked_fill(logits < threshold, …)`), so a saturated logit vector keeps more than k; fixed the comparison table, one-line memory, and threshold bullet in `top-k-top-p.md`.
+- Doubt 1 (DAPO KL term): accepted in the soft sense. Without the paper to hand I did not assert a new fact beyond the reviewer's verl-based recollection plus the in-repo "Zero KL for Math Tasks" trend (`grpo-family.md`); relabeled sketch step 5 in `dapo.md` as "dropped in DAPO; shown here only for comparison with GRPO" and changed the final line to `loss = policy_loss`. Flagged under Needs external verification.
+- Doubt 2 (TRL KTO attribution): accepted in the soft sense. No TRL source is vendored, so removed the unverifiable "TRL-style" attribution in `dpo-family.md` (now "a logistic-style implementation"); the `z_ref`-includes-β code convention note is kept as-is since only the loss-form attribution was disputed.
+- Doubt 3 (population vs Bessel std): accepted. Added the missing convention note to the pitfalls table in `grpo-rlvr.md` (page uses population std to match NumPy; some production recipes use the Bessel-corrected default, rescaling by $\sqrt{G/(G-1)}$).
+- Doubt 4 (dynamic-sampling mismatch with Chapter 15): accepted within scope. Chapter 15 (`deepseek-dapo.md` lines 105–129) is out of scope so left untouched; added a pointer in the `dapo.md` sketch to `[§15.2](/chapter15_grpo/deepseek-dapo)` noting it illustrates the same idea with an accuracy-threshold sketch while the operative DAPO filter is zero within-group variance.
+- Doubt 5 (SimPO `gamma` "learnable-style"): accepted. SimPO's $\gamma$ is a fixed hyperparameter; changed `dpo-family.md` to "a fixed hyperparameter (not trained)".
+- Doubt 6 (acronym capitalization): accepted. Normalized `dapo.md` to "Decoupled Clip and Dynamic Sampling Policy Optimization" to match Chapter 15.
+
+Verification: `npx prettier --write` on the four changed files (clean); `npx vitepress build docs` succeeds; overlong schedule spot-checked (L=1800 → −0.6). No sidebar changes.

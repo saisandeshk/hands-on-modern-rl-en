@@ -65,11 +65,11 @@ def sample_with_temperature(logits, temperature=1.0):
 **Core variables**:
 
 - `k`: the fixed number of tokens to keep (typical 50)
-- `threshold`: the k-th largest logit; any value below it is set to `-inf`
+- `threshold`: the k-th largest logit; any value below it is set to `-inf` (values tied with the threshold are kept, so ties can yield more than k survivors)
 
 ### One-Line Memory
 
-> Keep the top k logits, set the rest to $-\infty$, softmax re-normalizes automatically.
+> Keep the top-k logits (plus any logits tied with the k-th largest), set the rest to $-\infty$, softmax re-normalizes automatically.
 
 ### Pseudocode
 
@@ -145,11 +145,11 @@ probs = softmax(logits); sample
 
 ### Comparison
 
-|                | Top-k          | Top-p                                             |
-| -------------- | -------------- | ------------------------------------------------- |
-| Selection rule | keep exactly k | keep smallest set whose cumulative mass reaches p |
-| Adaptivity     | does not adapt | adapts to distribution sharpness                  |
-| Extremes       | k=1 -> greedy  | p=0 -> greedy, p=1 -> no restriction              |
+|                | Top-k                                             | Top-p                                             |
+| -------------- | ------------------------------------------------- | ------------------------------------------------- |
+| Selection rule | keep top-k logits (plus ties at the k-th largest) | keep smallest set whose cumulative mass reaches p |
+| Adaptivity     | does not adapt                                    | adapts to distribution sharpness                  |
+| Extremes       | k=1 -> greedy                                     | p=0 -> greedy, p=1 -> no restriction              |
 
 ### Python (NumPy) Implementation
 

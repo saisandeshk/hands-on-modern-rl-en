@@ -16,7 +16,7 @@ DPO loss is the single most frequently requested "handwritten code" question in 
 
 - `pi_chosen` / `pi_rejected`: log-probabilities of the chosen/rejected response under the current policy $\pi_\theta$
 - `ref_chosen` / `ref_rejected`: log-probabilities under the reference policy $\pi_{ref}$ (must `detach`)
-- `log_ratio_w` / `log_ratio_l`: $\log\frac{\pi_\theta}{\pi_{ref}}$, the implicit reward per response (divided by $\beta$)
+- `log_ratio_w` / `log_ratio_l`: $\log\frac{\pi_\theta}{\pi_{ref}}$, the implicit reward per response divided by $\beta$ (multiply by $\beta$ to get the implicit reward)
 - `beta` ($\beta$): temperature controlling how strongly the policy can drift from the reference; larger = more sensitive, typical 0.1–0.5
 
 ### One-Line Memory
@@ -28,8 +28,8 @@ $$\mathcal{L}_{DPO} = -\mathbb{E}\Big[\log\sigma\Big(\beta\Big(\log\frac{\pi_\th
 ### Pseudocode
 
 ```
-log_ratio_w = log_pi_theta(y_w|x) - log_pi_ref(y_w|x)   # implicit reward, chosen
-log_ratio_l = log_pi_theta(y_l|x) - log_pi_ref(y_l|x)   # implicit reward, rejected
+log_ratio_w = log_pi_theta(y_w|x) - log_pi_ref(y_w|x)   # log-ratio, chosen (x beta = implicit reward)
+log_ratio_l = log_pi_theta(y_l|x) - log_pi_ref(y_l|x)   # log-ratio, rejected (x beta = implicit reward)
 logits      = beta * (log_ratio_w - log_ratio_l)        # advantage × temperature
 loss        = -log_sigmoid(logits)                       # max advantage ↔ BT likelihood
 ```
@@ -106,7 +106,7 @@ def ipo_loss(log_ratio_w, log_ratio_l, beta=0.1):
 
 ## KTO
 
-**Core problem**: DPO/IPO require chosen-rejected pairs, but real-world feedback is often single-sample binary ("user thumbs-up / thumbs-down"). KTO borrows from prospect theory to reformulate the alignment loss as a single-sample objective — no pairing required — and up-weights undesirable examples (loss aversion). The form below is the TRL-style logistic implementation (`-log_sigmoid`); the original paper writes the same optimum with a $\lambda - \sigma(\cdot)$ value formulation.
+**Core problem**: DPO/IPO require chosen-rejected pairs, but real-world feedback is often single-sample binary ("user thumbs-up / thumbs-down"). KTO borrows from prospect theory to reformulate the alignment loss as a single-sample objective — no pairing required — and up-weights undesirable examples (loss aversion). The form below is a logistic-style implementation (`-log_sigmoid`); unlike the original paper's $\lambda - \sigma(\cdot)$ value form, which saturates at $\lambda_U$ once an undesirable sample is far below the baseline, this logistic version keeps a logarithmic penalty on hopeless samples. Only the push direction is shared.
 
 **Core variables**:
 
@@ -161,7 +161,7 @@ def kto_loss(log_ratio, is_desirable, z_ref=0.0,
 - `chosen_logps` / `rejected_logps`: log-probabilities of the chosen/rejected response under the current policy (sequence-summed)
 - `chosen_lengths` / `rejected_lengths`: token counts of the two responses
 - `beta` ($\beta$): preference-gap amplifier (SimPO typical 2.0, larger than DPO)
-- `gamma` ($\gamma$): target margin, a learnable-style threshold for "how much higher the good response must beat the bad"
+- `gamma` ($\gamma$): target margin, a fixed hyperparameter (not trained) for "how much higher the good response must beat the bad"
 
 ### One-Line Memory
 
