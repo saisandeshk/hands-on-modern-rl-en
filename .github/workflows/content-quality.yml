@@ -1,10 +1,9 @@
-name: Verify bilingual content
+name: Verify content quality
 
 on:
   pull_request:
     paths:
       - 'docs/**'
-      - 'scripts/check-bilingual-sync.mjs'
       - 'scripts/check-english-quality.mjs'
       - 'package.json'
       - 'package-lock.json'
@@ -25,9 +24,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Check bilingual page and navigation coverage
-        run: npm run verify:bilingual
 
       - name: Check English publication quality
         run: npm run verify:english

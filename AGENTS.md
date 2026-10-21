@@ -16,10 +16,19 @@
 npm install
 npm run dev:fast        # dev server, no asset optimization (~5s startup)
 npm run dev             # dev server with asset optimization
-npm run build
+npm run build           # optimize assets, regenerate sitemap, then vitepress build
 npm run preview
 npm run verify          # format, lint, English checks, code-link check, build
-npm run fix:headings    # sync heading numbers with the sidebar
+npm run verify:english  # CJK/translation-artifact scan over docs/
+npm run verify:code-links
+npm run sitemap         # regenerate docs/public/sitemap.xml
+npm run fix:headings    # sync page front-matter titles and H1 numbers with the sidebar
+npm run pdf:build       # browser-printed PDF (needs Chrome)
+npm run epub:build      # EPUB book (needs zipinfo/unzip for its test)
+npm run assets:optimize
+npm run format          # prettier --write .
+npm run format:check
+npm run lint            # eslint docs/.vitepress/theme
 ```
 
 ## Editing Rules

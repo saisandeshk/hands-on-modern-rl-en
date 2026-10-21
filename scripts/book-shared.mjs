@@ -18,26 +18,34 @@ export const logoPath = '../public/readme/readmelogo.png'
 const sanbuGithubUrl =
   process.env.PDF_SANBU_GITHUB_URL || 'https://github.com/sanbuphy'
 
+// Fork that publishes this English-only edition.
+export const forkGithubUrl =
+  'https://github.com/saisandeshk/hands-on-modern-rl-en'
+
 export const bookVersion = process.env.PDF_VERSION || '0.1.0'
 
 export const bookAuthor =
   process.env.PDF_AUTHORS ||
   process.env.PDF_AUTHOR ||
   packageJson.author ||
-  `WalkingLabs; 散步 (${sanbuGithubUrl})`
+  `WalkingLabs; sanbuphy (${sanbuGithubUrl})`
 
-export const bookTitle = '现代强化学习实战——从代码到原理'
+export const bookAdaptedBy = process.env.PDF_ADAPTED_BY || 'saisandeshk'
+
+export const bookTitle = 'Hands-On Modern RL'
+
+export const bookSubtitle = 'From Code to Principles'
 
 export const bookTagline =
-  '现代强化学习实战指南：涵盖经典控制、LLM 后训练、RLVR 与多模态智能体'
+  'A practical guide to modern reinforcement learning: classical control, LLM post-training, RLVR and multimodal agents'
 
 export const bookLicense = 'CC-BY-NC-SA-4.0'
 
 export const bookBuildDate =
   process.env.PDF_BUILD_DATE ||
-  new Intl.DateTimeFormat('zh-CN', {
+  new Intl.DateTimeFormat('en-US', {
     dateStyle: 'long',
-    timeZone: 'Asia/Shanghai'
+    timeZone: 'UTC'
   }).format(new Date())
 
 export function repositoryUrl() {
@@ -68,10 +76,14 @@ export function repositoryUrl() {
     return `https://github.com/${normalized}`
   }
 
-  return 'https://github.com/walkinglabs/hands-on-modern-rl'
+  return forkGithubUrl
 }
 
 export const bookGithubUrl = repositoryUrl()
+
+// Original project (attribution only).
+export const originalGithubUrl =
+  'https://github.com/walkinglabs/hands-on-modern-rl'
 
 // --- Utility functions ---
 
@@ -140,11 +152,7 @@ export async function loadVitePressConfig() {
 }
 
 export function loadSidebar(config) {
-  return (
-    config.locales?.zh?.themeConfig?.sidebar?.['/'] ||
-    config.themeConfig?.sidebar?.['/'] ||
-    []
-  )
+  return config.themeConfig?.sidebar?.['/'] || []
 }
 
 // --- Front matter content (structured data) ---
@@ -152,43 +160,45 @@ export function loadSidebar(config) {
 export const frontMatter = {
   cover: {
     kicker: 'Open Textbook · Modern Reinforcement Learning',
-    titleEn: 'Hands-on Modern RL',
-    titleZh: bookTitle,
-    description: `${bookTagline}。本书从可运行代码、训练曲线和失败案例出发，逐步进入 MDP、策略梯度、PPO、DPO、GRPO、RLVR、Agentic RL 与多模态强化学习。`,
-    publisher: 'WalkingLabs Open Course Series'
+    titleEn: bookTitle,
+    subtitle: bookSubtitle,
+    description: `${bookTagline}. Starting from runnable code, training curves and failure cases, the book works step by step through MDPs, policy gradients, PPO, DPO, GRPO, RLVR, agentic RL and multimodal reinforcement learning.`,
+    publisher:
+      'Original work by WalkingLabs · English edition adapted by saisandeshk'
   },
   intro: {
-    title: '本书简介',
+    title: 'About This Book',
     paragraphs: [
-      '<strong>Hands-on Modern RL</strong> 是一本面向现代强化学习实践的开放电子书。它不是把网页机械打印成 PDF，而是把课程内容整理成可离线阅读、可引用、可长期迭代的书籍版本。',
-      '本书采用"实践优先"的路径：先从一行行可运行代码、训练曲线、指标诊断和失败现象出发，让读者看到智能体如何在环境中试错、从奖励中改进行为，再回到状态、价值函数、贝尔曼方程、策略梯度、奖励建模和信用分配等核心概念。',
-      '内容从 CartPole、DQN、Actor-Critic 与 PPO 进入 LLM 后训练，继续覆盖 RLHF、DPO、GRPO、RLVR、工具调用智能体、Deep Research、VLM 强化学习、具身智能和多智能体自我博弈等现代主题。'
+      '<strong>Hands-On Modern RL</strong> is an open e-book on the practice of modern reinforcement learning. It is not a web site mechanically printed to PDF: the course content has been arranged into a book that can be read offline, cited, and iterated on over time.',
+      'The book follows a "practice first" path. It starts from runnable code, training curves, metric diagnostics and failure modes, so that readers see how an agent improves its behavior by trial and error against rewards, and only then returns to the core concepts: states, value functions, the Bellman equation, policy gradients, reward modeling and credit assignment.',
+      'The content moves from CartPole, DQN, Actor-Critic and PPO into LLM post-training, and goes on to cover RLHF, DPO, GRPO, RLVR, tool-using agents, Deep Research, VLM reinforcement learning, embodied intelligence and multi-agent self-play.'
     ],
     audience: {
-      title: '本书适合谁',
+      title: 'Who This Book Is For',
       items: [
-        '从监督学习转向强化学习的机器学习工程师；',
-        '准备阅读现代强化学习、LLM 对齐和 Agentic RL 论文的研究人员与学生；',
-        '希望理解 RLHF、DPO、GRPO、RLVR 与后训练系统的大模型从业者；',
-        '喜欢先看代码、实验和可视化，再进入公式推导的自主学习者。'
+        'Machine learning engineers moving from supervised learning to reinforcement learning;',
+        'Researchers and students preparing to read papers on modern RL, LLM alignment and agentic RL;',
+        'LLM practitioners who want to understand RLHF, DPO, GRPO, RLVR and post-training systems;',
+        'Self-directed learners who prefer to start from code, experiments and visualizations before the derivations.'
       ]
     },
     howToRead: {
-      title: '如何阅读',
+      title: 'How to Read This Book',
       paragraphs: [
-        '如果你是第一次接触强化学习，建议按章节顺序阅读；如果你已经熟悉经典 RL，可以从 PPO、DPO、GRPO 与 Agentic RL 章节开始，并在需要时回到前面的数学和算法章节补齐概念。'
+        'If you are new to reinforcement learning, read the chapters in order. If you already know classical RL, you can start from the PPO, DPO, GRPO and agentic RL chapters and return to the earlier math and algorithm chapters whenever you need to fill in a concept.'
       ]
     }
   },
   publicationNote: {
-    title: '版本说明',
+    title: 'Edition Notes',
+    attribution: `Hands-On Modern RL is an original work by WalkingLabs (${originalGithubUrl}), licensed under CC BY-NC-SA 4.0. This English-only edition is adapted by saisandeshk (${forkGithubUrl}) under the same license.`,
     iterationNote:
-      '这是一本随开源课程持续迭代的电子书。v0.1.0 版本已经包含完整目录、章节开篇页、局部参考文献、PDF 书签、封面和前置说明；后续版本会继续补齐更精细的版式、索引、术语表、练习答案与纸质书级别的排版细节。',
+      'This is an e-book that keeps evolving with the open-source course. Version v0.1.0 already contains the full table of contents, chapter opener pages, per-page references, PDF bookmarks, a cover and front matter; later versions will add finer typesetting, an index, a glossary, exercise answers and print-quality layout details.',
     disclaimer:
-      '正文中如遇到仍处在快速迭代的章节，请优先参考最新 GitHub 仓库。欢迎通过 issue、pull request 或课程讨论渠道修正错误、补充案例和完善练习。',
+      'If a chapter is still changing quickly, please refer to the latest GitHub repository. Corrections, extra examples and better exercises are welcome through issues, pull requests or the course discussion channels.',
     licenseSection: {
-      title: '授权与引用',
-      text: '本书遵循仓库中的开源协议发布，适合学习、教学和非商业传播。引用本书时，请注明书名、版本、作者与 GitHub 仓库地址。'
+      title: 'License and Citation',
+      text: 'This book is released under CC BY-NC-SA 4.0, as stated in the repository, and is suitable for study, teaching and non-commercial sharing. When citing it, please give the title, version, authors and the GitHub repository address.'
     }
   }
 }

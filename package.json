@@ -1,7 +1,7 @@
 {
   "name": "hands-on-modern-rl",
   "version": "1.0.0",
-  "description": "现代强化学习实战——从代码到原理",
+  "description": "Hands-On Modern RL: From Code to Principles (English edition, adapted from the WalkingLabs original)",
   "type": "module",
   "scripts": {
     "dev": "npm run assets:optimize && vitepress dev docs",
@@ -17,7 +17,6 @@
     "lint": "eslint docs/.vitepress/theme",
     "lint:fix": "eslint docs/.vitepress/theme --fix",
     "verify": "bash scripts/verify.sh",
-    "verify:bilingual": "node scripts/check-bilingual-sync.mjs",
     "verify:english": "node scripts/check-english-quality.mjs",
     "sitemap": "node scripts/generate-sitemap.mjs",
     "fix:headings": "node scripts/fix-heading-numbers.mjs",
@@ -35,7 +34,7 @@
   "license": "CC-BY-NC-SA-4.0",
   "repository": {
     "type": "git",
-    "url": "git@github.com:walkinglabs/hands-on-modern-rl.git"
+    "url": "git@github.com:saisandeshk/hands-on-modern-rl-en.git"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

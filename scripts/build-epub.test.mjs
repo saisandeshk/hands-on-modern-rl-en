@@ -34,7 +34,7 @@ test(
         .split('\n')
         .filter((entry) => entry.endsWith('.xhtml'))
 
-      const phrase = '给定状态直接输出动作'
+      const phrase = 'receives immediate reward'
       let targetLine = ''
       for (const entry of entries) {
         const xhtml = execFileSync('unzip', ['-p', epubPath, entry], {
@@ -47,8 +47,8 @@ test(
       }
 
       assert.ok(targetLine, `expected an XHTML line containing: ${phrase}`)
-      assert.doesNotMatch(targetLine, /\$a = \\pi\(s\)\$/)
-      assert.equal((targetLine.match(/<math\b/g) || []).length, 2)
+      assert.doesNotMatch(targetLine, /\$r = \+2\$/)
+      assert.equal((targetLine.match(/<math\b/g) || []).length, 1)
       assert.match(targetLine, /<\/math><\/li>$/)
     } finally {
       fs.rmSync(epubPath, { force: true })
