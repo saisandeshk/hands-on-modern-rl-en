@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="360" height="280" viewBox="0 0 360 280" role="img" aria-labelledby="title desc">
-  <title id="title">GridWorld 中从 (0,0) 向右走一步</title>
-  <desc id="desc">4×4 GridWorld 中，智能体从起点 (0,0) 向右移动到 (0,1)，获得奖励 -1，终点在 (3,3)。</desc>
+  <title id="title">GridWorld: one step right from (0,0)</title>
+  <desc id="desc">In a 4x4 GridWorld, the agent moves right from the start (0,0) to (0,1) and gets reward -1. The goal is at (3,3).</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
       <path d="M0 0 10 5 0 10Z" fill="#dc2626"/>
@@ -9,7 +9,7 @@
 
   <rect width="360" height="280" rx="10" fill="#fbfcfe"/>
 
-  <g transform="translate(64 24)" font-family="Arial, 'Noto Sans SC', sans-serif">
+  <g transform="translate(64 24)" font-family="Inter, Helvetica, Arial, sans-serif">
     <rect x="0" y="0" width="232" height="232" fill="#ffffff" stroke="#334155" stroke-width="1.6"/>
     <g stroke="#cbd5e1" stroke-width="1">
       <line x1="58" y1="0" x2="58" y2="232"/>

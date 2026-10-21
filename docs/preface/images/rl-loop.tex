@@ -1,8 +1,5 @@
 \documentclass[border=10pt, tikz]{standalone}
 \usepackage{tikz}
-\usepackage{fontspec}
-\setmainfont{Songti SC}
-\setsansfont{Heiti SC}
 \usetikzlibrary{arrows.meta, positioning}
 
 \begin{document}
@@ -18,12 +15,12 @@
     lbl/.style={font=\small, text=black!70, fill=white, inner sep=2pt}
 ]
 
-\node[box] (agent) at (0, 0) {智能体\\[-2pt]{\small (Agent)}};
-\node[box] (env) at (4.8, 0) {环境\\[-2pt]{\small (Environment)}};
+\node[box] (agent) at (0, 0) {Agent};
+\node[box] (env) at (4.8, 0) {Environment};
 
-\draw[arrow] ([yshift=4pt]agent.north east) -- node[above, lbl, pos=0.5] {动作 $a_t$} ([yshift=4pt]env.north west);
+\draw[arrow] ([yshift=4pt]agent.north east) -- node[above, lbl, pos=0.5] {action $a_t$} ([yshift=4pt]env.north west);
 
-\draw[arrow] ([yshift=-4pt]env.south west) -- node[below, lbl, pos=0.5] {状态 $s_{t+1}$ + 奖励 $r_{t+1}$} ([yshift=-4pt]agent.south east);
+\draw[arrow] ([yshift=-4pt]env.south west) -- node[below, lbl, pos=0.5] {state $s_{t+1}$ + reward $r_{t+1}$} ([yshift=-4pt]agent.south east);
 
 \end{tikzpicture}
 \end{document}

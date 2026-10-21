@@ -1,8 +1,5 @@
 \documentclass[border=10pt, tikz]{standalone}
 \usepackage{tikz}
-\usepackage{fontspec}
-\setmainfont{Songti SC}
-\setsansfont{Heiti SC}
 \usetikzlibrary{arrows.meta, positioning}
 
 \begin{document}
@@ -22,16 +19,16 @@
     lbl/.style={font=\small, text=black!70, fill=white, inner sep=1.5pt}
 ]
 
-\node[box] (start) at (0, 0) {起点};
-\node[box] (small) at (4.0, 1.8) {即时奖励};
-\node[box] (big) at (4.0, -1.8) {远期奖励};
-\node[box] (danger) at (7.5, -1.8) {风险};
+\node[box] (start) at (0, 0) {Start};
+\node[box, minimum width=3.2cm] (small) at (4.4, 1.8) {Immediate reward};
+\node[box, minimum width=3.2cm] (big) at (4.4, -1.8) {Distant reward};
+\node[box] (danger) at (8.0, -1.8) {Risk};
 
 \draw[arrow] (start.north east) -- node[above, lbl, pos=0.5] {$r=+1$} (small.west);
 
 \draw[arrow] (start.south east) -- node[below, lbl, pos=0.5] {$r=+10$} (big.west);
 
-\draw[dashedarrow] (big.east) -- node[above, lbl, pos=0.5] {惩罚} (danger.west);
+\draw[dashedarrow] (big.east) -- node[above, lbl, pos=0.5] {penalty} (danger.west);
 
 \end{tikzpicture}
 \end{document}
