@@ -50,7 +50,7 @@ The flywheel can also stall. The model may generate the same kind of simple defe
 
 ## An Executable Algorithm
 
-The paper was proposed by researchers at Meta FAIR and other institutions. The code below keeps the two-role presentation of the original draft to explain the inputs, outputs, and order of verification. It is a teaching simplification and is not the source code of the paper's repository.
+The paper was written by a multi-institution research team. The code below keeps the two-role presentation of the original draft to explain the inputs, outputs, and order of verification. It is a teaching simplification and is not the source code of the paper's repository.
 
 ### The Defect-Injection Role
 
@@ -105,6 +105,8 @@ def fix_bug(fixer_model, task):
 
     # 2. The fixer repairs in an agentic way
     trajectory = []
+    done = False
+    tests_passed = False
     while not done:
         action = fixer_model.act(prompt)
         trajectory.append(action)
@@ -114,6 +116,7 @@ def fix_bug(fixer_model, task):
         elif action.type == "test":
             result = run_tests()
             if result.all_passed:
+                tests_passed = True
                 done = True
 
     # 3. Compute the reward
@@ -156,9 +159,9 @@ The epoch ranges above are an illustration to aid understanding. They are not a 
 
 ## Verifying Self-Improvement
 
-The SSR paper reports relative gains: a self-improvement of **10.4 percentage points** on SWE-bench Verified and **7.8 percentage points** on SWE-Bench Pro, and it also stays ahead of baselines that use human data throughout training. The evaluation inputs are natural-language issues, while self-play training uses no such issues, so this experiment mainly checks transfer and not memorization of self-generated problems.
+The SSR paper reports relative gains: a self-improvement of **10.4 percentage points** on SWE-bench Verified and **7.8 percentage points** on SWE-Bench Pro, and it also stays ahead of baselines that use human data throughout training. These are the paper's reported figures — re-check them against the original report before citing, since absolute scores depend on the base model, scaffold, and budget. The evaluation inputs are natural-language issues, while self-play training uses no such issues, so this experiment mainly checks transfer and not memorization of self-generated problems.
 
-The original draft once placed Meta SWE-RL, DeepSWE, SSR, and "SSR + DeepSWE" in a single absolute-score leaderboard. The paper does not provide this comparison of 41.0%, 50.0%, 47.5%, and 53.2% under a unified setting, so these numbers should not be treated as an SSR experiment table. To keep this set of research questions, the measurements should be redone with the same base model, scaffold, budget, and Pass@k protocol.
+The original draft once placed SWE-RL, DeepSWE, SSR, and "SSR + DeepSWE" in a single absolute-score leaderboard. The paper does not provide this comparison of 41.0%, 50.0%, 47.5%, and 53.2% under a unified setting, so these numbers should not be treated as an SSR experiment table. To keep this set of research questions, the measurements should be redone with the same base model, scaffold, budget, and Pass@k protocol.
 
 ### Reporting Data Efficiency
 
@@ -212,7 +215,7 @@ The full training details of Devin are not public. When citing its training meth
 
 OpenAI Codex provides agent capabilities for handling code tasks in isolated environments. The specific models and evaluations change with product versions, so the text does not tie it to any particular model name:
 
-- Uses o3's reasoning ability for complex planning.
+- Uses a reasoning model for complex planning (the exact model changes by release — record it when citing a result).
 - Integrates with ChatGPT and can process several tasks in parallel.
 - A public evaluation should record the model, the date, the tool permissions, and the sampling budget.
 
@@ -230,8 +233,8 @@ Currently SWE-RL focuses mainly on Python. Directions for future expansion:
 ### Multi-Language
 
 - **JavaScript/TypeScript**: The Jest and Mocha test frameworks are mature and can be handled much as in Python.
-- **Java**: JUnit testing is mature, but the code style is strict and needs a stronger KL constraint.
-- **C/C++**: Compiled languages with slow test runs, which create a greater need for a world model.
+- **Java**: JUnit testing is mature; whether a stronger KL constraint helps preserve strict style conventions is a hypothesis to test per repository.
+- **C/C++**: Compiled languages with slow test runs, which make world-model acceleration worth testing.
 - **Go/Rust**: Modern languages with generally high test coverage, well suited to SWE-RL.
 
 ### Multi-Repository

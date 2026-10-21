@@ -168,6 +168,8 @@ A minimal implementation is:
 ```python
 def swe_reward(test_results):
     """Convert a group of boolean test results into a pass fraction."""
+    if len(test_results) == 0:
+        return 0.0
     passed = sum(test_results)
     total = len(test_results)
     return passed / total
@@ -197,6 +199,10 @@ Tests check only the behaviors that have been written into the verifier. When co
 - Modifying the test entry point so that the evaluator mistakenly believes the tests have run.
 
 The training environment therefore has to place the evaluation tests where the agent cannot modify them, and has to distinguish "the test failed" from "the environment did not start successfully." The final assessment should also inspect the patch contents, regression behavior, and infrastructure logs. Tests provide a scalable approximate signal, and the design of the tests decides how close this signal is to real software requirements.
+
+### Hidden Tests and Adversarial Checks
+
+The tests the agent sees during a rollout and the tests that decide the reward should not be the same set. A common split is **visible tests** (a small set the agent may run for debugging), **held-out regression tests** (run only by the verifier), and **adversarial hidden tests** (extra cases written or generated to catch hardcoding, deleted assertions, and changed entry points). The verifier runs all of them from a read-only copy, and any trajectory that modifies test files, skips collection, or exits before the suite finishes is marked as an environment violation rather than a partial pass. When results shift between the visible set and the held-out set, the gap itself is the diagnostic: it measures how much of the reward was specification gaming rather than real repair.
 
 ## Sources of Training Tasks
 
@@ -299,9 +305,15 @@ Policy update
 
 The trainer selects a repository snapshot and an issue and starts a clean container. Multiple trajectories of the same task must start from the same initial state, otherwise differences in reward may come from leftover environment state.
 
+### Sandbox, Reset, and Side-Effect Boundaries
+
+Each rollout runs in an isolated sandbox: its own filesystem copy, capped CPU, memory, and wall-clock time, and no network access except to a declared package mirror. The sandbox contract has four parts. **Reset** restores the exact baseline commit, installed dependencies, and environment variables before every trajectory, so two rollouts of the same task differ only in the agent's actions. **Deterministic replay** records the seed, the tool-call sequence, and the container image digest, so a surprising reward can be reproduced step by step. **Side-effect boundaries** state what the agent may touch: source files under the repository root are writable, test files and the verifier's copy are read-only, and anything outside (the host, the network, other rollouts) is unreachable. **Error semantics** keep tool outcomes machine-readable: a tool error (bad arguments), a timeout (budget exhausted), and a failed assertion (code ran, answer wrong) return different codes, because the retry policy differs — retry with fixed arguments after a tool error, back off or abort after a timeout, and replan after a failed assertion. Duplicate submissions of the identical patch are deduplicated by content hash so they do not consume fresh verifier budget.
+
 ### Agent Rollout
 
-The model uses tools to read files, search symbols, edit code, and run visible tests. At each step the observation, the action, the tool output, and the token consumption are recorded. Long trajectories easily run into context overflow, accumulated errors, and environment timeouts, all of which must be distinguished explicitly in the training data.
+The model uses tools to read files, search symbols, edit code, and run visible tests. At each step the observation, the action, the tool output, and the token consumption are recorded. Long trajectories easily run into context overflow, accumulated errors, and environment timeouts, all of which must be distinguished explicitly in the training data. Trajectories that end without a valid submission, or that hit an invalid state such as a broken container or an exhausted token budget, are logged as invalid traces: they are excluded from the gradient but counted in the cost ledger, so a rising reward cannot hide a rising failure rate.
+
+Only the final patch and the verifier's test report are graded. The intermediate reasoning trace (chain of thought) is visible to the learner during training but is not itself the answer: it must not contain the hidden tests, and at evaluation time nothing outside the submitted patch may influence the score. This is the same hidden-reasoning versus observable-answer split used in reasoning models (see [16.6 Reasoning Trace Presentation](../chapter16_reasoning/cot-visibility-alignment)): train on the trace, grade the artifact.
 
 ### Executable Verification
 
@@ -310,6 +322,12 @@ The verifier applies the final patch to a read-only copy of the baseline and run
 ### Policy Update
 
 The training algorithm updates the policy from the multiple rollouts of the same task and their rewards. PPO, GRPO, or other policy optimization methods can be used. An SFT cold start, rejection sampling, and a second round of SFT are all optional stages, and a particular paper may adopt only some of them.
+
+Two vocabulary items recur here. **Rejection fine-tuning (RFT)** keeps only the rollouts that pass verification and fine-tunes the policy on them — it distills success without a policy gradient. **Rollout distillation** goes one step further: a stronger teacher (a larger model, a model with more tool steps, or the same model with test-time search) generates the successful trajectories, and the smaller student learns from them. When teacher and student share the same rollout distribution during training, this is called **on-policy distillation** (see [15.7 On-Policy Distillation](../chapter15_grpo/on-policy-distillation)); when the student learns from fixed teacher logs, it is offline distillation. Either way, distillation changes the data, not the reward, so distilled gains must be reported separately from RL gains.
+
+### Rollout Plumbing: Sync, Versions, and Recovery
+
+Collecting hundreds of multi-step rollouts needs explicit systems design. In a **synchronous** loop the learner waits for a full batch of rollouts, then updates once — simple and on-policy, but one slow repository stalls every GPU. In an **asynchronous** loop rollout workers stream trajectories into a queue while the learner updates continuously — higher utilization, but the policy that generated a trajectory (the **behavior policy**, stamped with a version number at **broadcast** time) lags behind the current policy. That lag is **staleness**: a few versions old is usually tolerated with a clipped objective, while very stale trajectories are down-weighted or dropped. Two deployment choices follow. **Colocated** generation and training share the same GPUs and alternate between phases; **disaggregated** rollouts run on cheap inference workers while dedicated trainers update, which raises throughput but needs version tracking and **backpressure** — bounded queues that slow down sampling when the learner starves, rather than letting stale trajectories pile up. Finally, long runs must survive crashes: **checkpoints** cover the policy, the optimizer, the sampler state, and the rollout cursor together, failed rollouts are retried once with deduplication by (task, seed, policy version), and every retry is accounted as cost rather than silently discarded.
 
 To actually connect these four stages into a system, continue with [19.10 Implementing an Agentic RL Training System from Scratch](../chapter19_agentic/build-agentic-training-system).
 
@@ -334,10 +352,20 @@ After the training reward rises, we still have to confirm that the model really 
 
 SWE-bench Verified is a 500-problem subset that has been checked by humans, commonly used to reduce the ambiguity and non-reproducibility present in the original tasks. Even with the same subset, different agent scaffolds and test-time scaling strategies produce noticeable differences. Paper results are suitable for comparison only when the full setups agree, and extracting a single percentage on its own easily leads to wrong conclusions.
 
+### Compute and Throughput Accounting
+
+Report four ledgers separately, because each answers a different question:
+
+$$
+C_{\text{total}} = C_{\text{sample}} + C_{\text{inference}} + C_{\text{train}}.
+$$
+
+$C_{\text{sample}}$ is the rollout cost (environment steps $\times$ cost per step, including container time and timed-out runs). $C_{\text{inference}}$ is the test-time cost of the reported score (samples per task $\times$ tokens per sample, including the search procedure of [Section 20.2](./world-model-and-deep-swe)). $C_{\text{train}}$ is the gradient-update cost. Alongside the totals, report the three rates that diagnose bottlenecks: **rollout throughput** (tokens per second generated), **verifier throughput** (test suites completed per minute — usually the binding constraint), and **update utilization** (fraction of wall-clock time the trainer spends updating versus waiting for rollouts). A result is reproducible only when the objective, the reward definition, and every system extension (retriever, scaffold, hidden-test set) are prespecified before the run; anything tuned after seeing the held-out set belongs in the test-time budget, not the training method.
+
 ## Summary
 
 Now the whole line can be connected. Real issues or synthetic defects provide the tasks, repository snapshots provide the initial environment, the code agent generates a patch through multi-step tool calls, executable tests turn the patch into a reward, and RL then raises the probability that successful trajectories appear.
 
 SWE-bench solves "how to standardize real-repository repair and evaluate it." SWE-RL, SWE-smith, and SSR expand the training data from software evolution, defect synthesis, and self-play respectively. Tests make feedback automatable, and they also leave room for insufficient coverage and reward gaming. A trustworthy SWE-RL system therefore has to train the model and also protect the verifier, separate infrastructure failures, and report the complete inference budget.
 
-Next, you can first read the [supplementary reading: Meta SWE-RL](./meta-swe-rl) to see how GRPO and a simple reward land on real repositories. Then go on to [20.2 Code World Model and DeepSWE](./world-model-and-deep-swe) to deal with state modeling and stability in long-trajectory training.
+Next, you can first read the [supplementary reading: SWE-RL](./meta-swe-rl) to see how GRPO and a simple reward land on real repositories. Then go on to [20.2 Code World Model and DeepSWE](./world-model-and-deep-swe) to deal with state modeling and stability in long-trajectory training.
