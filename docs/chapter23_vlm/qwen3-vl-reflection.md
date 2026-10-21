@@ -1,5 +1,5 @@
 ---
-title: '23.2 Visual Reflection RL: Answering with Evidence'
+title: '23.2 Visual Reflection RL'
 ---
 
 # 23.2 Visual Reflection RL: Answering with Evidence
@@ -25,7 +25,7 @@ This concept comes from a basic insight of cognitive science: a complex human vi
 ![VLM-R1 IoU visualization](./images/ref-vlm-r1-iou.png)
 
 <div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 2: Visualization of visual grounding in VLM-R1. During reasoning the model explicitly outputs bounding-box coordinates, turning visual evidence into a verifiable trajectory. Source: <a href="https://github.com/River-Zhang/VLM-R1" target="_blank" rel="noopener noreferrer">the VLM-R1 project</a></em>
+  <em>Figure 2: IoU reward curve from the VLM-R1 training logs: the rule-based grounding reward rises during RL training. Source: <a href="https://github.com/om-ai-lab/VLM-R1" target="_blank" rel="noopener noreferrer">the VLM-R1 project</a></em>
 </div>
 
 ## Three Kinds of Objects in Visual Reasoning

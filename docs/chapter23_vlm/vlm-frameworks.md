@@ -105,7 +105,7 @@ Consider VeRL-Omni when:
 
 - **You have completed this chapter's VLM GRPO or EasyR1 experiments** and understand the basic RL post-training loop (sample → score → policy update), and are ready to move into **visual generation** RL (FlowGRPO, DanceGRPO, etc.).
 - **You need to train diffusion or omni-modality generative models**, not just optimize a VLM's text answers.
-- **You need production-grade throughput and stability**: VeRL-Omni integrates [vLLM-Omni](https://github.com/vllm-project/vllm-omni) for fast rollout, supports asynchronous multi-reward computation, FSDP2 distributed training, and more. On the reference Qwen-Image FlowGRPO setup, end-to-end throughput is roughly **~25% higher** than the diffusers-based [flow_grpo](https://github.com/yifan123/flow_grpo) implementation.
+- **You need production-grade throughput and stability**: VeRL-Omni integrates [vLLM-Omni](https://github.com/vllm-project/vllm-omni) for fast rollout, supports asynchronous multi-reward computation, FSDP2 distributed training, and more. The project reports that on its reference Qwen-Image FlowGRPO setup, end-to-end throughput is roughly **~25% higher** than the diffusers-based [flow_grpo](https://github.com/yifan123/flow_grpo) implementation (see the project's own benchmark page for the setup and numbers).
 
 VeRL-Omni is **not** a direct substitute for VisPlay or VISTA-Gym — those address research problems on the VLM **understanding** side. VeRL-Omni provides the **training stack** for turning generation-side RL algorithms (FlowGRPO, Diffusion DPO, GSPO, etc.) into reproducible experiments. If you are still iterating on VLM understanding tasks like GeoQA, prefer EasyR1 or upstream veRL.
 

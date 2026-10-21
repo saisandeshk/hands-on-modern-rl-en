@@ -1,5 +1,5 @@
 ---
-title: '23.1 Why a VLM Can Guess Right Without Looking: Visual Rewards and Hallucination'
+title: '23.1 Visual Reward Design'
 ---
 
 # 23.1 Why a VLM Can Guess Right Without Looking: Visual Rewards and Hallucination
@@ -144,21 +144,23 @@ The first route turns the output of a perception task into a verifiable structur
 
 The second route brings tool use into the trajectory. Qwen3-VL's [Thinking with Images](https://github.com/QwenLM/Qwen3-VL/tree/main/cookbooks) lets the model call an image zoom tool during reasoning, read a local region, and then continue answering. Tool calls turn "where to look again" into a recordable action log, so the process of obtaining evidence can be reviewed. The next section explains this training approach in full.
 
-![PickScore ranking](./images/ref-pickscore-ranking.png)
+![PickScore qualitative comparison](./images/ref-pickscore-ranking.png)
 
 <div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 4: Ranking of PickScore reward models. Different reward models differ significantly in their performance on visual quality assessment, showing that reward design has a large influence on the final result. Source: <a href="https://github.com/yuvalkirstain/PickScore" target="_blank" rel="noopener noreferrer">the PickScore project</a></em>
+  <em>Figure 3: Qualitative comparison of images generated with and without the PickScore preference reward. Each pair shows the same prompt rendered by the base ("Vanilla") generator and by the PickScore-guided generator; the preference reward visibly improves prompt alignment and visual quality. Source: <a href="https://github.com/yuvalkirstain/PickScore" target="_blank" rel="noopener noreferrer">the PickScore project</a></em>
 </div>
+
+The pairs in Figure 3 make the same point for generation that Visual-RFT makes for perception: the reward is not a passive scoreboard but the steering signal that decides what the policy learns to produce.
 
 How large is the influence of reward design on the final result? The ablation experiment of VISTA-R1 gives direct evidence:
 
 ![VISTA-R1 Ablation](./images/ref-vista-gym-results.png)
 
 <div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 3: The ablation experiment of VISTA-R1, in which the "Effect of reward design" subplot compares the effect of different reward combinations. Source: <a href="https://www.eigenai.com/blog/vista-gym-vista-r1" target="_blank" rel="noopener noreferrer">VISTA-Gym / VISTA-R1 Blog</a></em>
+  <em>Figure 4: The ablation experiment of VISTA-R1, in which the "Effect of reward design" subplot compares the effect of different reward combinations. Source: <a href="https://www.eigenai.com/blog/vista-gym-vista-r1" target="_blank" rel="noopener noreferrer">VISTA-Gym / VISTA-R1 Blog</a></em>
 </div>
 
-Figure 3 reports the reward ablation within the same set of VISTA-R1 experiments. It shows that changing the reward combination significantly changes the training result, especially on out-of-distribution tasks. The specific differences depend on the experimental setup in the figure and cannot be extrapolated directly to other base models and datasets. The conclusion that really transfers is that reward ablations must be reported separately from model and data ablations.
+Figure 4 reports the reward ablation within the same set of VISTA-R1 experiments. It shows that changing the reward combination significantly changes the training result, especially on out-of-distribution tasks. The specific differences depend on the experimental setup in the figure and cannot be extrapolated directly to other base models and datasets. The conclusion that really transfers is that reward ablations must be reported separately from model and data ablations.
 
 ## Visual Hallucination: The Model "Sees" Things That Do Not Exist
 
@@ -292,7 +294,7 @@ Another challenge is **latency constraints**. A vehicle traveling at 108 km/h, t
 
 Finally, let us ground the question of how the reward enters the model parameters in several architecture choices.
 
-**ViT + Transformer** is currently the most mainstream architecture. A separate ViT handles visual encoding, the visual tokens are concatenated into the language model, and the RL update scope can be full or differentiated, which suits general VLM RL. **Unified Transformer** uses a shared Transformer for visual encoding, fuses through patch embedding, and updates fully in RL, suiting resource-constrained scenarios. **Frozen ViT + lightweight decoder** uses a pretrained ViT (frozen) for visual encoding, fuses through a linear projection, and RL updates only the text decoder, suiting fast iteration. **Multiple vision encoders** use several ViTs (at different scales) for visual encoding, fuse through attention fusion, and update selectively in RL, suiting high-precision visual tasks.
+**ViT + Transformer** is currently the most mainstream architecture. A separate ViT handles visual encoding, the visual tokens are concatenated into the language model, and the RL update scope can be full or differentiated, which suits general VLM RL. **Unified Transformer** uses a shared Transformer for visual encoding, fuses through patch embedding, and updates fully in RL, suiting setups that prefer a single compact backbone over a separate large ViT (fewer total parameters and one optimizer, though full RL updates are no cheaper than full fine-tuning elsewhere). **Frozen ViT + lightweight decoder** uses a pretrained ViT (frozen) for visual encoding, fuses through a linear projection, and RL updates only the text decoder, suiting fast iteration. **Multiple vision encoders** use several ViTs (at different scales) for visual encoding, fuse through attention fusion, and update selectively in RL, suiting high-precision visual tasks.
 
 "ViT + Transformer" is currently the most mainstream architecture: the ViT encodes the image into visual tokens, the projection layer aligns the dimensions, and the visual tokens are concatenated with the text tokens and interact through self-attention within the same language model. Models like Flamingo instead use cross-attention to inject visual information into the language layers. For RL training one can choose a full update or differentiated learning rates.
 

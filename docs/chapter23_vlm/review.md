@@ -1,10 +1,10 @@
 ---
-title: '23.R Summary and Exercises'
+title: '23.5 Summary and Exercises'
 ---
 
-# 23.R Summary and Exercises
+# 23.5 Summary and Exercises
 
-> **Learning path**: [23.1 Visual Reward Design](./vlm-challenges) → [23.2 Visual Reflection RL](./qwen3-vl-reflection) → [23.3 Hands-on: Multimodal GRPO](./vlm-grpo-hands-on) → [23.4 Hands-on: GeoQA Geometric Reasoning](./easyr1-geoqa) → **23.R Summary and Exercises**
+> **Learning path**: [23.1 Visual Reward Design](./vlm-challenges) → [23.2 Visual Reflection RL](./qwen3-vl-reflection) → [23.3 Hands-on: Multimodal GRPO](./vlm-grpo-hands-on) → [23.4 Hands-on: GeoQA Geometric Reasoning](./easyr1-geoqa) → **23.5 Summary and Exercises**
 
 This chapter kept the algorithm fixed and changed the input. The policy optimizer is still GRPO: sample a group of responses, normalize rewards within the group, and update toward the relatively better ones. What changes when an image enters the prompt is the reward design problem. A scalar outcome reward can no longer tell whether the vision encoder misread the image or the language model miscalculated, it cannot tell a genuine observation from a lucky guess, and it cannot see whether the model looked at the image at all. Every technique in this chapter -- process rewards, grounding checks, counterfactual controls, differentiated learning rates, visual reflection, tool-augmented re-observation -- is an answer to that one attribution problem.
 
@@ -12,7 +12,7 @@ This chapter kept the algorithm fixed and changed the input. The policy optimize
 
 1. Explain why a correct VLM answer is weaker evidence of learning than a correct text-only answer, using the "guess without looking" scenario.
 2. Write the GRPO within-group advantage formula and compute it by hand for a small reward group.
-3. Design a three-part rule reward (accuracy + format + grounding) for a visual counting or detection task, with justified weights.
+3. Design a three-part rule reward (correctness + reasoning quality + format, as in Section 23.3) for a visual counting task, plus a grounding or counterfactual check that separates seeing from guessing, with justified weights.
 4. Decide whether to freeze, fully update, or differentially update the vision encoder for a given task, and predict the failure mode of each choice.
 5. Implement an image-sensitivity (counterfactual) check that detects answers produced from language priors rather than pixels.
 6. Read a VLM RL training curve (accuracy, format reward, grounding reward, no-image control, KL) and diagnose hallucination, encoder degradation, or length hacking.
@@ -21,7 +21,7 @@ This chapter kept the algorithm fixed and changed the input. The policy optimize
 
 ## Key Equations
 
-Group-relative advantage (the GRPO core used in Sections 23.3 and 23.4):
+Group-relative advantage (the GRPO core used in Sections 23.3 and 23.4, with the population standard deviation, ddof = 0, as in DeepSeekMath -- the same convention as the `unbiased=False` in the Section 23.3 snippet and the `numpy.std()` in `code/chapter23_vlm/vlm_grpo_train.py`):
 
 $$
 A_i = \frac{R_i - \mathrm{mean}(R_1, \dots, R_G)}{\mathrm{std}(R_1, \dots, R_G)}
@@ -82,7 +82,7 @@ Reading: safety is a budget constraint on cumulative cost, not just another rewa
 1. **Trusting outcome accuracy alone.** A rising task curve with a flat or rising no-image control curve means the model learned to guess, not to see. Always report both.
 2. **Unfreezing the vision encoder with a text-sized learning rate.** Full-rate RL gradients can destroy pretrained visual features; the model keeps talking but goes effectively blind. Use a ~10:1 text-to-vision ratio or freeze first.
 3. **Rewarding reasoning length instead of evidence use.** If the reward model prefers detailed answers, the policy adds steps and adjectives. Track tokens per correct answer and evidence-hit rate alongside accuracy.
-4. **Letting format reward dominate or die silently.** Too much weight and the model writes beautiful empty reasoning; a mismatched tag regex (as in the original `<thinkutan>` versus `</think\s*>` mismatch) zeroes the signal without any error. Log each reward component separately.
+4. **Letting format reward dominate or die silently.** Too much weight and the model writes beautiful empty reasoning; a tag/regex mismatch (as in §23.4's upstream `<think>`-regex versus `<thinkutan>`-prompt mismatch) zeroes the signal without any error. Log each reward component separately.
 5. **Evaluating tools by call success instead of answer revision.** A valid zoom call that never updates the conclusion is theater. Save call arguments, returned observations, and the final answer together.
 6. **Skipping the general visual probe.** Task accuracy can climb while general perception degrades. Keep a held-out general-VQA set and a blank-image control from before training starts.
 
@@ -159,29 +159,34 @@ Freezing sets $\phi$ outside the optimizer's parameter groups, so no update $\ph
 During GeoQA training you observe: `reward/format` rises to 0.9 by step 30 and stays there, `reward/accuracy` stays near 0.1, KL grows steadily, and a no-image control scores nearly the same as the with-image validation. Give the diagnosis in the order of the Section 23.1 checklist, and name two interventions.
 
 ::: details Solution
-Diagnosis: Phase 1 (format learned) completed but Phase 2 (content) never started, and the no-image control matching validation means the policy scores from language priors without using the image -- a visual shortcut, possibly early hallucination reinforcement. KL growth without accuracy gain means the policy is drifting (exploring phrasing) without finding visually grounded solutions.
+Following the Section 23.1 checklist in order: (1) **task accuracy** stalls near 0.1 -- the reward is not producing learning; (2) **no-image control** matches with-image validation -- the policy scores from language priors without using the image, i.e. a visual shortcut (possibly hallucination reinforcement); (3) **general visual probe** was not reported -- run it to check whether the vision encoder degraded; (4) **answer length** is not reported as inflating, so length hacking is not the leading suspect; (5) **format reward** is saturated at 0.9 -- format is learned and may now dominate the composite reward; (6) **IoU/grounding reward** does not exist in this setup -- nothing pays the model for looking; (7) **KL** grows while accuracy does not -- the policy drifts (explores phrasing) without finding visually grounded solutions.
 
-Interventions (any two well-justified): (1) add an image-sensitivity penalty or counterfactual control to the reward so prior-guessing is taxed; (2) add a grounding/process reward (describe-then-answer, IoU or evidence-hit term) so looking is paid; (3) lower the vision learning rate or briefly freeze the encoder to check whether RL gradients damaged perception (compare the general visual probe before/after); (4) audit the format/accuracy weight -- with $w = 0.5$ the model may satisfice on format; try $w = 0.1$--$0.2$ so accuracy dominates once format is learned. Also verify the format regex actually matches the template tags, or the format signal may be silently dead.
+Interventions (any two well-justified): (1) add a counterfactual image-sensitivity penalty (Section 23.1) and/or a grounding/process reward (describe-then-answer, evidence-hit term) so looking is paid and prior-guessing is taxed; (2) rebalance the composite weight -- with $w = 0.5$ the model can satisfice on format, so try $w = 0.1$--$0.2$ once format is learned, and verify the format regex actually matches the template tags or the signal may be silently dead; (3) lower the vision learning rate or briefly freeze the encoder and compare the general visual probe before/after, to test whether RL gradients damaged perception.
 :::
 
 ### Exercise 7 (coding): Harden the multimodal reward
 
-Using `code/chapter23_vlm/multi_modal_reward.py` as a base: (a) add an `image_sensitivity` term that subtracts 0.3 when the same response text would score as correct on a swapped image's ground truth (simulating prior-guessing), and (b) add a length guard that subtracts 0.1 when the response exceeds 300 characters without containing any step keyword. Run the built-in test cases and report which cases change score and by how much. The theoretical maximum stays 2.0; penalties can push totals below 0 -- clamp at 0 and justify the clamp in one sentence.
+Using `code/chapter23_vlm/multi_modal_reward.py` as a base: (a) add an `image_sensitivity` term implementing Section 23.1's counterfactual check -- extract the response's counts once, and subtract 0.3 when they match the original ground truth _and_ also match a swapped ground truth (two shapes' counts exchanged), i.e. the answer would not change if the image were swapped (simulating prior-guessing); (b) add a length guard that subtracts 0.1 when the response exceeds 50 characters without containing any step keyword. (The keyword list below is Chinese because this chapter's teaching code -- prompts, patterns, and test cases in `code/chapter23_vlm/` -- is Chinese-only.) Run the built-in test cases and report which cases change score and by how much. The theoretical maximum stays 2.0; penalties can push totals below 0 -- clamp at 0 and justify the clamp in one sentence.
 
 ::: details Solution
 Sketch (adapting the file's style):
 
 ```python
+# Chinese step markers -- they match the Chinese-only prompts and reward
+# patterns in code/chapter23_vlm/ ('first', 'then', 'next', 'finally',
+# 'analyze', 'observe', 'because', 'therefore').
 STEP_KEYWORDS = ['首先', '然后', '接着', '最后', '分析', '观察', '因为', '所以']
 
-def reward_image_sensitivity(response, swapped_ground_truth):
+def reward_image_sensitivity(response, ground_truth, swapped_ground_truth):
     from multi_modal_reward import reward_correctness
+    if reward_correctness(response, ground_truth) != 1.0:
+        return 0.0  # check applies only to responses correct on the original
     if reward_correctness(response, swapped_ground_truth) == 1.0:
-        return -0.3  # correct on swapped labels: likely a prior guess
+        return -0.3  # unchanged across the swap: likely a prior guess
     return 0.0
 
 def reward_length_guard(response):
-    if len(response) > 300 and not any(kw in response for kw in STEP_KEYWORDS):
+    if len(response) > 50 and not any(kw in response for kw in STEP_KEYWORDS):
         return -0.1
     return 0.0
 
@@ -189,7 +194,7 @@ total = compute_total_reward(...)['total'] + reward_image_sensitivity(...) + rew
 total = max(0.0, min(total, 2.0))
 ```
 
-Expected behavior on the file's 8 cases: the perfect, short-correct, and reasoning-wrong cases are long-with-keywords or short, so the length guard does not fire; the sensitivity term fires only when you deliberately pass a swapped ground truth under which the response still extracts as correct (construct one by swapping two shapes' counts to match the response's numbers -- then the total drops by exactly 0.3). Clamping at 0 is justified because GRPO normalizes within the group, so negative outliers would distort sibling advantages; the penalty's job is ranking, not unbounded punishment. Report the per-case delta table from your run; the key check is that deltas are exactly $-0.3$ / $-0.1$ / $0.0$ as designed.
+Measured behavior on the file's 8 cases (lengths 174, 17, 115, 27, 57, 41, 72, 108 characters): with swapped ground truths built by exchanging two shapes' counts in each case's original labels, the sensitivity term fires on **none** of the shipped cases -- the three cases correct on the original (1, 2, 8) extract counts that differ from every such swap, and the other five are wrong on the original so the check does not apply. That null result is the point: a grounded correct answer is _supposed_ to survive this check. To see the penalty fire, construct the degenerate swapped ground truth equal to the response's own numbers (e.g. case 2's (3, 1, 2)): the response is then "correct" under both label sets, the total drops by exactly 0.3 (case 2: 1.30 → 1.00). The length guard fires on exactly one shipped case: case 5 (57 characters, no step keyword), whose total drops 0.55 → 0.45; every other case is either short (≤50 characters) or contains a step keyword. (A 300-character threshold would be inert -- the longest shipped response is 174 characters -- which is why the exercise uses 50.) Clamping at 0 keeps the reward inside the designed $[0, 2]$ range and keeps the penalty small relative to the correctness signal; note the caveat that if a penalty pushed _every_ member of a group to 0, the group would have zero within-group std and all its advantages would be 0/0, destroying exactly the ranking signal GRPO needs -- so penalty magnitudes must stay well below the typical within-group reward spread. Report the per-case delta table from your run; the key check is that deltas are exactly $-0.3$ / $-0.1$ / $0.0$ as designed.
 :::
 
 ### Exercise 8 (coding): Group size and advantage stability
@@ -207,5 +212,5 @@ for g in (2, 4, 16):
     print(g, [round(v, 3) for v in h['avg_advantage_std']])
 ```
 
-(a) With $G = 2$ the std is estimated from two points, so any reward gap becomes an advantage of $\pm 1$ regardless of its size ($|(r_1-r_2)/2| / (|r_1-r_2|/2) = 1$); magnitude information is destroyed and noise dominates. Larger $G$ estimates spread better and preserves ranking gradations. (b) As quality rises, group members are mostly correct responses with similar rewards (correctness 1.0 plus similar bonuses), so the within-group spread -- and hence the std -- falls; the annotation in `plot_training_curves` says the same. Late-training advantages shrink, which is why real runs raise the group size or sharpen rewards to keep learning signal. (c) This is the trade-off behind `rollout.n=5` in Section 23.4: larger $n$ stabilizes the advantage estimate but costs linear rollout memory and time; 5 is the starter value, 8--16 when affordable. Note the script simulates quality improvement rather than real gradient updates, so the trend demonstrates the statistics, not VLM learning.
+(a) With $G = 2$ the std is estimated from two points, so any reward gap becomes an advantage of $\pm 1$ regardless of its size ($|(r_1-r_2)/2| / (|r_1-r_2|/2) = 1$); magnitude information is destroyed and noise dominates. Larger $G$ estimates spread better and preserves ranking gradations. (b) The curve is not monotone: with the default seed the within-group reward std first rises or wobbles (epoch 1 → 2: G=4: 0.494 → 0.586, G=16: 0.542 → 0.611; G=2 dips 0.297 → 0.267 then rises to 0.331 at epoch 3) because early groups mix correct responses (rewards ≈1.1-1.5) with incorrect ones (≈0-0.5), a larger spread than the late homogeneous groups -- and it collapses only in the last epochs (epoch 5: 0.070 / 0.108 / 0.185 for G=2/4/16) once the policy is good enough that nearly every group member is the same correct template. A shrinking std therefore signals group homogeneity, not necessarily a shrinking advantage signal; a fully homogeneous group (std → 0) carries no ranking information at all, which is why real runs raise the group size or sharpen rewards to keep learning signal. (The hard-coded annotation in `plot_training_curves` describes only this late-phase trend, not the early rise.) (c) This is the trade-off behind `rollout.n=5` in Section 23.4: larger $n$ stabilizes the advantage estimate but costs linear rollout memory and time; 5 is the starter value, 8--16 when affordable. Note the script simulates quality improvement rather than real gradient updates, so the trend demonstrates the statistics, not VLM learning.
 :::
