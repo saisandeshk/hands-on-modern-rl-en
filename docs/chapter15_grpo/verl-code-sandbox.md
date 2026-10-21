@@ -508,7 +508,7 @@ This section and [19.8](../chapter19_agentic/rllm-deepcoder-lab) are both about 
 | 15.8 This Section | veRL      | Integrating a code verifier into the PPO/GRPO training framework  |
 | 19.8              | rLLM      | Running complete Agentic experiments using the DeepCoder cookbook |
 
-If you want to run through an end-to-end example first, prioritize reading 10.5. If you are already familiar with veRL and want to extend the mathematical RLVR to code tasks, follow the data, reward, and trainer interfaces outlined in this section to complete the implementation.
+If you want to run through an end-to-end example first, start with [Section 19.8](../chapter19_agentic/rllm-deepcoder-lab). If you are already familiar with veRL and want to extend the mathematical RLVR to code tasks, follow the data, reward, and trainer interfaces outlined in this section to complete the implementation.
 
 ## 15.8.11 Experiment Checklist
 

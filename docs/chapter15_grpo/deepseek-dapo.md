@@ -79,7 +79,7 @@ The final released DeepSeek-R1 therefore adopted a multi-stage compromise:
 
 ## DAPO
 
-GRPO proved that RL can work without a Critic, but it still has engineering pain points. DAPO (Decoupled Clip and Dynamic Sampling Policy Optimization) addresses them directly and was accepted as a NeurIPS 2025 poster.
+GRPO proved that RL can work without a Critic, but it still has engineering pain points. DAPO (Decoupled Clip and Dynamic Sampling Policy Optimization) addresses them directly. Proposed in 2025, it combines four engineering improvements on top of GRPO.
 
 ### DAPO's Four Improvements
 

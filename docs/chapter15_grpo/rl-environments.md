@@ -10,7 +10,9 @@ This changes where most of the engineering effort goes. An environment must be r
 
 To see why, return to the PPO/GRPO objective from [Chapter 15](./grpo-family):
 
-$$\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\left[\sum_t A(s_t, a_t) \cdot \nabla_\theta \log \pi_\theta(a_t \mid s_{<t}, a_{<t})\right]$$
+$$\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\left[\sum_t A(s_t, a_t) \cdot \nabla_\theta \log \pi_\theta(a_t \mid s_t)\right]$$
+
+Here $s_t$ is the full interaction history up to step $t$ (prompt plus all previous actions and observations), $a_t$ is the next tool action or token, and $A(s_t, a_t)$ is its advantage.
 
 This gradient requires trajectories $\tau$ sampled from the current policy. For a mathematics problem, $\tau = (\text{prompt}, \text{answer})$ is short, mostly deterministic, and easy to score. For an agent task, $\tau = (\text{prompt}, \text{action}_1, \text{obs}_1, \text{action}_2, \ldots, \text{action}_T, \text{final\_obs})$ may contain hundreds or thousands of steps. Each step can require a real tool call—executing code, opening a browser, or invoking an API—and a verifier must judge the final state.
 
@@ -28,7 +30,7 @@ Each rollout represents interaction with the real environment, and the **wall-cl
 
 $$\text{Throughput} = \frac{N_{\text{parallel\_sandboxes}}}{T_{\text{rollout}}}$$
 
-Either increase the number of parallel sandboxes (expensive but simple), or shorten the time per rollout (difficult but with an upper bound), or decouple rollouts from training (asynchronous RL, see 22.6). The entire Chapter 23 revolves around these two numbers in engineering.
+Either increase the number of parallel sandboxes (expensive but simple), or shorten the time per rollout (difficult but with an upper bound), or decouple rollouts from training (asynchronous RL; see [Section 18.4](../chapter18_llm_rl_industrial/distributed-sync)). The engineering chapters return to these two numbers repeatedly.
 
 ## Equivalence between Evals and RL Environments
 
@@ -384,9 +386,9 @@ This pattern ensures that the agent's progress is not undone, promoting a contin
 
 **Test ratchet** forces the agent **not to break existing functionality** — this is widely used in code tasks such as SWE-bench and Terminal-Bench.
 
-### Karpathy's "5-6 agents" Pattern
+### The "5–6 agents" Pattern
 
-Karpathy proposed a practical pattern in 2025: **for long-range tasks, launch 5–6 agent instances in parallel to tackle the problem simultaneously**, and select the first one to complete as the answer.
+A widely shared practitioner pattern for long-range tasks is: **launch 5–6 agent instances in parallel to tackle the problem simultaneously**, and select the trajectory with the highest verifier score as the answer.
 
 Formally, run $N$ independent agent instances $\pi_\theta^{(1)},\ldots,\pi_\theta^{(N)}$ and select the trajectory with the highest verifier score:
 
@@ -394,7 +396,7 @@ $$
 \tau^* = \arg\max_{\tau^{(i)}, i=1..N} \mathcal{V}(\tau^{(i)})
 $$
 
-This is an extension of **best-of-N sampling** to agent tasks. When the verifier is reliable and the computational budget is sufficient, running 5–6 parallel agents can improve success rates by 2–3 times compared to a single sequential agent. This is the standard technique used by models such as Sonnet 3.5 / Claude 4 / GPT-5 to achieve top performance on SWE-bench.
+This is an extension of **best-of-N sampling** to agent tasks. When the verifier is reliable and the computational budget is sufficient, running several parallel agents can substantially raise success rates over a single sequential agent, because different instances explore different solution paths. The gain depends on verifier quality: with a weak verifier, parallel sampling mostly produces more ways to be wrong.
 
 ```mermaid
 flowchart LR
@@ -471,7 +473,7 @@ The key technical challenge in asynchronous mode is **staleness** — the rollou
 
 ### Acceleration Effects
 
-The AReaL paper reports the results of training Llama-3-8B on agentic tasks:
+The AReaL paper reports the results of training Llama-3-8B on agentic tasks (numbers below are the paper's reported figures, not independently reproduced here):
 
 | Mode                 | GPU Utilization | Wall-clock / Step | Speedup   |
 | -------------------- | --------------- | ----------------- | --------- |
@@ -493,6 +495,16 @@ Asynchronous training introduces **off-policy bias**. If the staleness $N$ is to
   :::
 
 More detailed engineering details are provided in [Appendix A.2: RL Training System](../appendix_a_engineering/rl-infrastructure).
+
+## Failed Rollouts, Retries, and Recovery
+
+Agent rollouts fail for reasons that have nothing to do with policy quality: the sandbox times out, a tool API returns a 500, the container runs out of memory, or the network blips. If these events are scored as reward 0, the policy learns to avoid whatever harmless action preceded the infrastructure failure. Three mechanisms keep infrastructure noise out of the gradient.
+
+**Failed-rollout accounting.** Every rollout should end with a status, not just a reward: `success` (verifier judged the trajectory), `invalid` (the policy produced something unscorable, such as unparseable output — a genuine 0), or `infra_error` (the environment broke before judgment was possible). Only the first two enter the GRPO group statistics; `infra_error` rollouts are retried or dropped, and the retry rate is logged as its own metric. A sudden rise in `infra_error` means the sandbox fleet is unhealthy, not that the policy regressed.
+
+**Retry deduplication.** On timeout or tool error, the naive fix is to retry the same prompt several times. But blind retries distort the group: a prompt retried five times contributes more rollouts than a prompt that succeeded once, and transient tool errors get averaged into the advantage as if they were policy behavior. Deduplicate by attempt: keep at most one judged trajectory per (prompt, environment seed) per update, and cap retries (for example, one retry for timeouts, zero for deterministic verifier failures). Duplicate tool calls with identical arguments inside a single trajectory should likewise be short-circuited by the harness and returned from cache, so the policy is not charged wall-clock time — or reward variance — for hammering the same endpoint.
+
+**Recovery.** Long RL runs checkpoint four things together: model weights, optimizer state, the rollout sampler's position in the prompt curriculum, and the data loader's random state. Restoring only the weights silently reshuffles which prompts the policy sees next and can produce a visible discontinuity in the reward curve. A related failure mode is learner starvation in asynchronous setups: if generation batching lets a few very long rollouts occupy every sandbox (no backpressure limit on concurrent long-horizon tasks), the trainer waits with an empty queue while GPUs idle. Cap concurrent rollouts per worker, bound queue depth so backpressure propagates to the sampler, and monitor rollout tokens per second and verifier throughput separately — when verifier throughput falls below rollout production, the fix is more verifier replicas, not a larger policy batch.
 
 ## Evaluation Benchmarks
 
@@ -653,7 +665,7 @@ Poor quality of RL environments can lead to a series of alignment failures—suc
 3. **Four Principles of Verifiers**—correctness, efficiency, anti-cheating, and formal priority. A bad verifier can lead the policy to learn hacking techniques.
 4. **Sandbox Engineering**—Docker/Firecracker isolation, network white-listing, and Ray parallel scheduling form the infrastructure for agent RL.
 5. **Long-Horizon Harness**—progress file, feature list, test ratchet, and the 5–6 agents mode determine the upper limit of success for agents on tasks with over 100 steps.
-6. **Synchronous vs. Asynchronous**—synchronous methods are simple but have low GPU utilization; asynchronous methods (AReaL/AgentRL/SLIME/ROLL/LlamaRL) can achieve 2.77× speedup, at the cost of off-policy bias.
+6. **Synchronous vs. Asynchronous**—synchronous methods are simple but have low GPU utilization; asynchronous methods (AReaL/AgentRL/SLIME/ROLL/LlamaRL) report substantial speedups in the papers cited above, at the cost of off-policy bias.
 7. **Benchmark Ecosystem**—benchmarks such as SWE-bench, τ-bench, WebArena, Vending-Bench, and CyberGym cover different capability dimensions, and their combined use avoids overfitting.
 8. **Training-Evaluation Loop**—Eval-driven training, incremental evaluation, pollution detection, and Pareto checkpoint selection are standard in industrial-scale RL engineering.
 

@@ -387,6 +387,8 @@ The metrics answer different questions:
 
 The AWS financial tool-calling example reports similar improvements: after GRPO/RLVR, Qwen3-1.7B improves exact match from about `0.62` to `0.96`, response validity from about `0.78` to `0.99`, and schema match from about `0.90` to `0.95`[^aws-financial-tool-grpo]. The important point is that small models can learn enterprise API calling when correctness is made explicit and optimizable.
 
+Two controls keep such comparisons honest. First, match the compute: compare GRPO against SFT and rejection-sampling baselines trained with the same number of generated tool calls, verifier executions, and gradient updates — otherwise a "GRPO wins" result may only show that more sampling was used. Second, log training traces beyond mean reward: KL against the reference policy, response entropy, mean completion length, and the fraction of valid JSON. If exact match rises while KL spikes or validity falls, the policy is trading format stability for lucky guesses rather than genuinely learning the schema.
+
 ## 15.6.6 Difference from SFT
 
 Why not just use SFT and show the model the gold JSON?

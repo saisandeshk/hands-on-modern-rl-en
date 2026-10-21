@@ -579,6 +579,8 @@ Within-group normalization works for three reasons:
 
 **Variance is lower.** Answers in the same group share the same prompt. The only difference is the randomness of model generation. This controlled-variable comparison is more stable than absolute scoring across unrelated samples.
 
+One boundary to keep in mind: within-prompt normalization deliberately discards cross-prompt information. A prompt where every answer scores 1.5 and a prompt where every answer scores 0.0 both produce zero advantage, even though the first prompt represents a solved capability and the second a missing one. Batch-level whitening (normalizing rewards across the whole batch) would preserve that difference, but it reintroduces difficulty bias — easy prompts would dominate the gradient again. GRPO accepts this trade-off: the update learns _which answer is better per prompt_, while prompt selection and curricula (Section 15.2, dynamic sampling) decide _which prompts deserve training time_.
+
 In one sentence: **GRPO = PPO's clipping mechanism + replacing the Critic with within-group ranking**.
 
 "PPO's clipping mechanism" is still `ratio`, `clamp`, and `min` in the code; the difference is that `advantages` now comes from within-group comparison.
@@ -657,6 +659,21 @@ The training loss is the negative expectation of this objective. DeepSeekMath us
 <GrpoCodeFocus focus="kl" />
 
 `completion_mask` excludes the prompt and padding after EOS. The implementation first combines the token-wise clipped objective and KL, then performs $\frac{1}{T_{j,i}}\sum_t$, matching the paper's order of operations.
+
+### Which KL estimator? k1 versus k3
+
+The penalty above uses one specific KL estimator, and it is worth naming the choice, because reference implementations differ. For a single token with $\Delta = \ell^{\text{ref}} - \ell^{\theta}$ (reference log-prob minus current-policy log-prob), the two common per-token estimators of $D_{\text{KL}}(\pi_\theta \| \pi_{\text{ref}})$ are:
+
+- **k1 (log-ratio):** $\hat D^{\text{k1}} = -\Delta = \ell^{\theta} - \ell^{\text{ref}}$. Unbiased, but a single sample can be negative.
+- **k3 (squared / exponential):** $\hat D^{\text{k3}} = \exp(\Delta) - \Delta - 1$. Also unbiased, since $\mathbb{E}_{\pi_\theta}[\exp(\Delta)] = \sum \pi_{\text{ref}} = 1$ and $\mathbb{E}_{\pi_\theta}[\Delta] = -D_{\text{KL}}$. Non-negative for every token because $e^x \ge 1 + x$.
+
+A one-number example shows why DeepSeekMath chose k3. Suppose at some token $\ell^{\text{ref}} = -2.0$ and $\ell^{\theta} = -2.1$, so $\Delta = 0.1$:
+
+$$
+\hat D^{\text{k1}} = -0.1, \qquad \hat D^{\text{k3}} = e^{0.1} - 0.1 - 1 \approx 1.10517 - 1.1 \approx 0.0052.
+$$
+
+The k1 estimate is negative even though the two distributions genuinely differ there; averaged over many tokens it is still correct in expectation, but per-token penalties and logging become hard to read. The k3 estimate is always $\ge 0$ and equals 0 only when the policies agree, which is why it is the safer default inside a token-wise penalty. When comparing implementations or tuning $\beta$, always check which estimator the code uses — switching estimators without rescaling $\beta$ silently changes the effective KL weight.
 
 Putting all steps together, one GRPO training iteration is:
 
