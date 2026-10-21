@@ -1257,6 +1257,10 @@ const sidebar = {
             {
               text: '19.10 Hands-on: Building an Agentic RL Training System from Scratch',
               link: '/chapter19_agentic/build-agentic-training-system'
+            },
+            {
+              text: '19.11 Summary and Exercises',
+              link: '/chapter19_agentic/review'
             }
           ]
         },

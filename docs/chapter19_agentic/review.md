@@ -1,8 +1,8 @@
 ---
-title: 19.R Summary and Exercises
+title: 19.11 Summary and Exercises
 ---
 
-# 19.R Summary and Exercises
+# 19.11 Summary and Exercises
 
 This chapter moved the training objective from a single response to a complete interaction trajectory: the model acts, the environment responds, and learning happens over the whole loop. The pages below distill what that change requires — formalization, credit assignment, trajectory data, tool-use policy learning, and the rollout infrastructure that makes training run.
 
