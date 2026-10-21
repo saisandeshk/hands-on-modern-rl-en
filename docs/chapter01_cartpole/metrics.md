@@ -240,7 +240,12 @@ The script repeats this process 40 times:
 
 ```python
 for iteration in range(40):
-    transitions, obs = collect_rollout(model, env, obs, 2048)
+    # Simplified: the real collect_rollout also threads the ongoing-episode
+    # reward/length counters through each call; here we keep the
+    # completed-episode lists and ignore the carryover with *_.
+    transitions, obs, ep_rewards, ep_lengths, *_ = collect_rollout(
+        model, env, obs, device, num_steps=2048
+    )
     advantages, returns = compute_gae(transitions)
     metrics = ppo_update(
         model,
@@ -248,6 +253,7 @@ for iteration in range(40):
         transitions,
         advantages,
         returns,
+        device,
     )
 ```
 
@@ -278,14 +284,14 @@ python 2-pytorch_ppo.py \
   --iterations 40 \
   --steps-per-rollout 2048 \
   --swanlab-mode disabled \
-  --log-csv output/training_metrics_seed42.csv
+  --log-csv output/training_metrics_rerun.csv
 
 python plot_curves.py \
-  --input output/training_metrics_seed42.csv \
+  --input output/training_metrics_rerun.csv \
   --output-dir output
 ```
 
-Below is an excerpt of six iterations from the training log. Every number can be found in the raw CSV. This record was generated before the 100-episode rolling average was added, so the mean reward in the log is the average over the episodes that ended in that iteration, which corresponds to the current `mean_episode_reward_rollout`.
+Below is an excerpt of six iterations from the training log. Every number can be found in the raw CSV. This record was generated before the 100-episode rolling average was added, so the mean reward in the log is the average over the episodes that ended in that iteration, which corresponds to the current `mean_episode_reward_rollout`. The commands above write a rerun to a new file so the archived CSV behind the figures is not overwritten; note that a freshly generated CSV stores the rolling 100-episode average in `mean_episode_reward`, unlike the archived file.
 
 ```text
 Iteration  1/40 | episodes:  91 | mean reward:   21.4 | KL: 0.0087 | clip%: 14.5%
@@ -301,11 +307,11 @@ Training complete! 20-episode evaluation: 500.0 +/- 0.0
 
 Once we have the records, the first thing we look at is the episode reward. The episode reward equals the number of steps survived, and the higher it is, the longer the policy keeps the pole upright.
 
-The training script collects 2048 steps per iteration. An episode that spans the boundary between two sampling iterations keeps accumulating until the environment actually ends it. The console, the CSV's `mean_episode_reward`, and SwanLab's `rollout/ep_rew_mean` take the rolling average over the most recent 100 complete episodes, the same statistics window as SB3's default, and the x-axis in SwanLab is the cumulative number of environment steps. The average over only the episodes that ended in the current iteration is recorded separately as `mean_episode_reward_rollout` and `rollout/ep_rew_mean_rollout`.
+The training script collects 2048 steps per iteration. An episode that spans the boundary between two sampling iterations keeps accumulating until the environment actually ends it. The current script records two averages: `mean_episode_reward` (SwanLab `rollout/ep_rew_mean`) is the rolling average over the most recent 100 complete episodes, the same statistics window as SB3's default, while `mean_episode_reward_rollout` (SwanLab `rollout/ep_rew_mean_rollout`) averages only the episodes that ended in the current iteration. The x-axis in SwanLab is the cumulative number of environment steps. The CSV saved in the repository was written by an earlier version of the script that kept only one column, `mean_episode_reward`, holding the per-iteration average, so every point in the saved file corresponds to the current `mean_episode_reward_rollout`.
 
 ![Measured reward curve for seed=42](./images/cartpole_reward_seed42.png)
 
-<div class="figure-caption">Figure 1-3: The raw training reward for seed=42, with data from the CSV saved in the repository. Each point is the average reward of the complete episodes that ended in that iteration, that is, the current <code>mean_episode_reward_rollout</code>. The curve is not smoothed, and the dashed line marks the 500-step limit for a single episode.</div>
+<div class="figure-caption">Figure 1-3: The raw training reward for seed=42, plotted from the CSV's <code>mean_episode_reward</code> column. In this saved file that column holds the per-iteration average, i.e. the current <code>mean_episode_reward_rollout</code>. The curve is not smoothed, and the dashed line marks the 500-step limit for a single episode.</div>
 
 Iteration 1 ended 91 episodes, with an average reward of 21.35. The policy is close to random, so most episodes end quickly.
 
@@ -348,7 +354,7 @@ $$
 \ln 2\approx 0.693.
 $$
 
-In this run the policy entropy falls from 0.685 to 0.421. This shows that the action probabilities gradually spread apart, but the policy still gives different results in different states.
+In this run the policy entropy falls from 0.685 to 0.421. This shows that the action distribution gradually concentrates on one action, but the policy still gives different results in different states.
 
 A drop in entropy only means the policy has become more decisive. If the reward does not rise at the same time, the policy may simply be choosing a wrong action more decisively.
 
@@ -363,7 +369,7 @@ $$
 
 $B$ denotes a training mini-batch. The larger the gap between prediction and target, the larger the value loss.
 
-In this run the value loss fluctuates between 41.8 and 64.1 early on and finally falls to 0.00014. The rise in the middle of training means the policy reached a new state distribution, and the Critic needed to readjust its predictions.
+In this run the value loss stays between 41.8 and 64.1 over the first five iterations and finally falls to 0.00014. The rise in the middle of training partly reflects the policy reaching a new state distribution, which forces the Critic to readjust its predictions, and partly the growing scale of the regression targets themselves as episodes get longer.
 
 A small value loss only shows that the Critic is closer to the current target. Whether the policy completes the task still has to be judged by the episode reward and the independent evaluation.
 
@@ -382,7 +388,7 @@ $$
 \mathbf 1\left[|r_i(\theta)-1|>\epsilon\right].
 $$
 
-In this run it is 14.48% in the first iteration and 0% in the last three. Later the learning rate gradually decays to 0, and the policy change shrinks with it.
+In this run it is 14.48% in the first iteration and 0% in the last three. Later the learning rate decays linearly toward zero (from $3\times 10^{-4}$ to $7.5\times 10^{-6}$ at iteration 40), and the policy change shrinks with it.
 
 The clip fraction must be read together with the approximate KL, the learning rate, and the reward. A single high or low value alone cannot show that training succeeded or failed.
 
