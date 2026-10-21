@@ -1,5 +1,5 @@
 ---
-title: 'Supplement: Offline Reinforcement Learning'
+title: 'Supplement: Offline Reinforcement Learning from Historical Data'
 ---
 
 # Supplement: Offline Reinforcement Learning from Historical Data
@@ -117,7 +117,7 @@ This environment is not a full MDP but a contextual bandit. It is small enough y
 Run:
 
 ```bash
-python docs/chapter32_selfplay/offline-rl/snippets/minimal_offline_rl_contextual_bandit.py
+python docs/chapter26_selfplay_frontiers/offline-rl/snippets/minimal_offline_rl_contextual_bandit.py
 ```
 
 Typical output:
@@ -220,7 +220,7 @@ flowchart TD
 
 CQL (Conservative Q-Learning) directly confronts the Q-overestimation problem[^cql].
 
-The standard Bellman error is:
+The standard Bellman error, written here in a simplified form with a target value $V_{\bar{\theta}}(s')$, is:
 
 $$
 \mathcal{L}_{\text{TD}}(\theta)
@@ -548,7 +548,7 @@ The commonality is: both update policies on fixed data, and both must prevent th
 | Concept from Previous Chapters                                    | Correspondence in Offline RL                                                                             |
 | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | DQN experience replay (Chapter 5)                                 | Offline RL's dataset = "a replay buffer that no longer grows"                                            |
-| PPO's KL constraint (Chapter 8)                                   | Offline RL's behavior constraints (BCQ/TD3+BC) are essentially "don't stray too far from the old policy" |
+| PPO's trust-region / clipping stabilizer (Chapter 8)              | Offline RL's behavior constraints (BCQ/TD3+BC) are essentially "don't stray too far from the old policy" |
 | DPO's reference model (Chapter 14)                                | The reference model plays the same role as the behavior constraint in BCQ/TD3+BC                         |
 | GRPO's within-group advantage (Chapter 15)                        | IQL's advantage-weighted BC shares the same philosophy as GRPO's advantage computation                   |
 | RLVR's rule verification (Chapter 15)                             | Offline RL's reward signal can only come from existing data; no online verification                      |

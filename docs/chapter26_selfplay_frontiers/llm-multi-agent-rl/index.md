@@ -1,8 +1,8 @@
 ---
-title: '26.3 How Multiple LLMs Learn Together: Credit Assignment and Stable Training'
+title: '26.3 How Multiple LLMs Learn Together'
 ---
 
-# 26.3 Multi-Agent Collaborative Learning
+# 26.3 How Multiple LLMs Learn Together
 
 Consider a three-agent coding team. A planner decomposes the task, a coder edits the repository, and a reviewer runs tests. The final program passes, so the team receives reward 1. We still do not know which action deserves credit: the plan may have been wrong, the coder may have repaired it, or the reviewer may have exposed the decisive bug.
 
@@ -82,7 +82,7 @@ Let us now break down the core problems, typical architectures, and frontier adv
 
 ### Architecture 1: Role-Playing Collaboration
 
-This is the most intuitive architecture -- multiple LLM Agents play different roles, each responsible for sub-tasks they excel at, collaborating to complete a complex goal. **ChatDev**, jointly proposed by Tsinghua University and Tsinghua-affiliated startup ModelBest, is a representative work of this architecture.
+This is the most intuitive architecture -- multiple LLM Agents play different roles, each responsible for sub-tasks they excel at, collaborating to complete a complex goal. **ChatDev** is a representative work of this architecture.
 
 ![ChatDev Architecture](./images/chatdev.png)
 
@@ -106,9 +106,9 @@ This architecture is consistent with the CTDE approach mentioned above, but has 
 
 $$R_i = \alpha \cdot R^{\text{outcome}} + (1-\alpha) \cdot R_i^{\text{process}}$$
 
-where $R^{\text{outcome}}$ is the shared task outcome reward (did the tests pass? was the issue fixed?), and $R_i^{\text{process}}$ is the process reward for role $i$ (code quality score, review accuracy, etc.). $\alpha$ is typically 0.5-0.7, placing more weight on measurable outcomes. This directly corresponds to the ORM vs. PRM credit assignment discussed in Chapter 19 -- only extended from single-agent multi-turn interaction to multi-agent collaboration.
+where $R^{\text{outcome}}$ is the shared task outcome reward (did the tests pass? was the issue fixed?), and $R_i^{\text{process}}$ is the process reward for role $i$ (code quality score, review accuracy, etc.). $\alpha$ is typically 0.5-0.7, placing more weight on measurable outcomes. This directly corresponds to the outcome vs. process reward (ORM vs. PRM) credit assignment discussed in Chapter 17 -- only extended from single-agent multi-turn interaction to multi-agent collaboration.
 
-Another representative work, **MetaGPT**, encodes Standardized Operating Procedures (SOPs) into system prompts. From an RL perspective, SOPs act as a **strong prior constraint** -- restricting the policy space, greatly reducing search difficulty and improving training stability, similar to the KL constraint from the reference model in PPO (Chapter 8).
+Another representative work, **MetaGPT**, encodes Standardized Operating Procedures (SOPs) into system prompts. From an RL perspective, SOPs act as a **strong prior constraint** -- restricting the policy space, greatly reducing search difficulty and improving training stability, similar to the KL constraint to the reference model in RLHF (Chapter 13).
 
 ![MetaGPT Pipeline](./images/metagpt.png)
 
@@ -177,7 +177,7 @@ This is consistent with CTDE's global Critic approach -- a "God's-eye view" that
 
 **Practical approach**: Combine process rewards and outcome rewards. Process rewards evaluate each role's intermediate output quality (e.g., code quality score, review accuracy), and outcome rewards check whether the final task was completed. The weighted combination:
 
-$$R_i = \alpha \cdot R_i^{\text{process}} + (1 - \alpha) \cdot R^{\text{outcome}}$$
+$$R_i = \alpha \cdot R^{\text{outcome}} + (1 - \alpha) \cdot R_i^{\text{process}}$$
 
 where $R_i^{\text{process}}$ is the process reward for role $i$, and $R^{\text{outcome}}$ is the shared outcome reward.
 
@@ -232,18 +232,18 @@ MARTI [^marti] improves reasoning quality through multi-agent debate. The core i
 
 ## Connections to Previous Chapters
 
-- **Previous Chapter — CTDE global Critic:** Theoretical foundation for cross-role credit assignment
-- **Previous Chapter — [Self-play Generator-Judge (Section 26.1)](../self-play-outlook/):** Direct predecessor of debate/competition architecture
-- **Previous Chapter — Multi-turn credit assignment ORM/PRM (Section 19.3):** Methodological foundation for cross-role credit assignment
-- **Previous Chapter — GRPO within-group comparison (Chapter 15):** M-GRPO extends within-group comparison to multi-agent
-- **Previous Chapter — DQN experience replay (Chapter 5):** Memory mechanisms: from raw reuse to preference distillation
-- **Previous Chapter — PPO (Chapter 8):** Foundation algorithm for multi-agent policy optimization
-- **Previous Chapter — Training stability (Chapter 8):** Amplified non-stationarity requires stronger stability controls
-- **Previous Chapter — Bespoke Labs KL=0.001 (Section 19.6):** KL constraints are equally critical in multi-agent scenarios
+- **Connection — CTDE global Critic:** Theoretical foundation for cross-role credit assignment
+- **Connection — [Self-play Generator-Judge (Section 26.1)](../self-play-outlook/):** Direct predecessor of debate/competition architecture
+- **Connection — Multi-turn credit assignment, outcome vs. process rewards (Section 17.1):** Methodological foundation for cross-role credit assignment
+- **Connection — GRPO within-group comparison (Chapter 15):** M-GRPO extends within-group comparison to multi-agent
+- **Connection — DQN experience replay (Chapter 5):** Memory mechanisms: from raw reuse to preference distillation
+- **Connection — PPO (Chapter 8):** Foundation algorithm for multi-agent policy optimization
+- **Connection — Training stability (Chapter 8):** Amplified non-stationarity requires stronger stability controls
+- **Connection — KL / reference-model constraints (Chapters 8 and 13):** KL constraints are equally critical in multi-agent scenarios
 
-The deepest connection may be: **LLM multi-agent RL is the "highest-difficulty comprehensive application" of all core concepts in this book**. It requires simultaneously handling multi-turn credit assignment (Section 19.3), policy gradient optimization (Chapters 6-8), training stability (Chapter 8), reward design (Section 19.6) -- only extended from single-agent to multi-agent, where each problem's difficulty increases by an order of magnitude.
+The deepest connection may be: **LLM multi-agent RL is the "highest-difficulty comprehensive application" of all core concepts in this book**. It requires simultaneously handling multi-turn credit assignment (Section 17.1, applied in the agentic setting of Section 19.3), policy gradient optimization (Chapters 6-8), training stability (Chapter 8), reward design (Chapters 4 and 13) -- only extended from single-agent to multi-agent, where each problem's difficulty increases by an order of magnitude.
 
-## 26.3.5 Start by Freezing One Role, Then Move Toward Joint Training
+## 26.3.4 Start by Freezing One Role, Then Move Toward Joint Training
 
 We discussed three architectures and three core challenges above. Now let us look at how to actually train a multi-agent RL system in practice.
 
@@ -319,7 +319,7 @@ class FreezeRotateTrainer:
                 quality = self.env.evaluate_step(step)
                 process_rewards[role] = quality
 
-            # Combined reward
+            # Combined reward (outcome weight alpha = 0.6, matching the text)
             total_reward = 0.6 * outcome_reward + 0.4 * sum(
                 process_rewards.values()
             ) / max(len(process_rewards), 1)
@@ -374,9 +374,9 @@ Multi-agent self-play does not require manually designing role divisions -- let 
 
 **Proposer vs Solver**: The Proposer generates problems, and the Solver tries to solve them. A good Proposer should generate problems that are "just beyond the Solver's current capability" -- too hard and the Solver learns nothing; too easy and there is no challenge. This "difficulty-adaptive" capability is also learned through RL.
 
-The core challenge of self-play is **avoiding mode collapse** -- two models may converge to a fixed strategy equilibrium and stop evolving. A mitigation is maintaining a **strategy pool** (Population): instead of two models playing against each other, randomly pair from a pool containing 10-20 historical strategies. FlexMARL [^flexmarl] is the first end-to-end framework that jointly optimizes sampling, training, and orchestration for multi-agent systems, solving such parallel scheduling problems at the engineering level.
+The core challenge of self-play is **avoiding mode collapse** -- two models may converge to a fixed strategy equilibrium and stop evolving. A mitigation is maintaining a **strategy pool** (Population): instead of two models playing against each other, randomly pair from a pool containing 10-20 historical strategies. FlexMARL [^flexmarl] is an end-to-end framework that jointly optimizes sampling, training, and orchestration for multi-agent systems, addressing such parallel scheduling problems at the engineering level.
 
-## Engineering Practice: Multi-Agent RL Infrastructure
+## 26.3.5 Multi-Agent RL Infrastructure
 
 Multi-agent RL must coordinate inference for several roles, interactions across environments, and communication protocols. FlexMARL [^flexmarl] and KD-MARL [^kdmarl] study infrastructure and decentralized deployment questions, respectively.
 
@@ -430,7 +430,7 @@ Key design principles:
 
 **Communication protocol standardization.** The message format passed between roles needs to be unified -- even if roles' internal models differ, message formats should be consistent. A common approach is to define message formats with JSON Schema, similar to the tool-calling format in Section 19.4.
 
-## 26.3.7 Model-Based RL: Predict Before Planning
+## 26.3.6 Model-Based RL: Predict Before Planning
 
 Return to the coding team. Before the coder edits a dependency, it can predict two consequences: whether the build will break and what evidence the reviewer will request. If those predictions are explicit and tested against later observations, the team has added a model of its environment rather than relying only on completed rollouts.
 

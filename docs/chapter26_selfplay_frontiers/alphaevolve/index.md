@@ -1,4 +1,8 @@
-# 26.4 LLM-Driven Algorithm Search
+---
+title: 26.4 How LLMs Search for New Algorithms
+---
+
+# 26.4 How LLMs Search for New Algorithms
 
 Suppose we want to speed up a matrix multiplication routine that is called over and over. Low-level routines like this are often called "kernels." Each call saves only a little time, but in large-model training a kernel is invoked billions of times, and the savings add up to a considerable total difference.
 
@@ -22,7 +26,7 @@ flowchart LR
 
 This diagram gives the main thread of the whole section. The generative model enlarges the candidate space, the evaluator turns candidates into comparable results, and the program database decides which experience enters the next round. None of the three components can be dropped: generation alone yields many unverified ideas, evaluation alone does not explore new schemes on its own, and without a history database the loop keeps trying similar modifications.
 
-This loop has a structure similar to the RL of the previous sections. A candidate program plays the role of an action, the automatic evaluator provides feedback, and the history program database stores search experience. The difference is that AlphaEvolve mainly uses population-based evolutionary search and does not update Gemini's parameters through policy gradients. The purpose of putting it in the same article as Genie 3, Titans, M-GRPO, and recursive self-improvement is precisely to tell apart several mechanisms by which "a system keeps improving."
+This loop has a structure similar to the RL of the previous sections. A candidate program plays the role of an action, the automatic evaluator provides feedback, and the history program database stores search experience. The difference is that AlphaEvolve mainly uses population-based evolutionary search and does not update Gemini's parameters through policy gradients. The purpose of putting it in the same section as Genie 3, Titans, M-GRPO, and recursive self-improvement is precisely to tell apart several mechanisms by which "a system keeps improving."
 
 What these systems actually change differs from one to the next:
 

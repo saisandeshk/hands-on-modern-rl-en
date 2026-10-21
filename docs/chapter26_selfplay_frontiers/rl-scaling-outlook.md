@@ -1,8 +1,8 @@
 ---
-title: 26.2 Where Should Additional Compute Go? RL and Test-Time Scaling
+title: 26.2 Where Additional Compute Should Go
 ---
 
-# 26.2 Scaling at Training Time and Test Time
+# 26.2 Where Additional Compute Should Go
 
 Assume a reasoning model answers one problem correctly with probability 0.30. If we sample independently five times and keep a correct answer whenever a verifier finds one, the probability of at least one success is
 
@@ -84,7 +84,7 @@ print("  Limited compute? → Iterative DPO (semi-online)")
 print("  Pursuing maximum performance? → DAPO (dynamic sampling + token-level loss)")
 ```
 
-## RLMT: Moving "Thinking" from Math to General Chat
+## 26.2.2 RLMT: Moving "Thinking" from Math to General Chat
 
 The three paradigms discussed above (DPO/GRPO/DAPO) and this chapter's RLVR all focus on one question: **how to make models reason better on math and code**. But a natural follow-up is — can this "think before answering" capability also be applied to general chat, creative writing, and other open-ended scenarios?
 
@@ -200,10 +200,10 @@ print("  Base model can be directly aligned with RLMT, overturning traditional t
 
 RLMT stands at the intersection of Chapter 15 RLVR and Chapter 13 RLHF:
 
-- **Concept Source — RLVR's long chain of thought (Ch8):** Retain the "think before answering" output structure
-- **Concept Source — RLHF's preference reward (Ch7):** Replace rule verification with preference RM
-- **Concept Source — GRPO's within-group comparison (Ch8):** The most effective online training method for RLMT
-- **Concept Source — DeepSeek-R1-Zero (Ch8):** Direct inspiration for RLMT-Zero
+- **Concept Source — RLVR's long chain of thought (Chapter 15):** Retain the "think before answering" output structure
+- **Concept Source — RLHF's preference reward (Chapter 13):** Replace rule verification with preference RM
+- **Concept Source — GRPO's within-group comparison (Chapter 15):** The most effective online training method for RLMT
+- **Concept Source — DeepSeek-R1-Zero (Chapters 15-16):** Direct inspiration for RLMT-Zero
 
 The significance of RLMT is: **it proves that "thinking" is not exclusive to mathematical reasoning; general chat also benefits from deep thinking.** This opens a new direction for RL training — instead of having the model think only on math problems, have it "think carefully before speaking" in all scenarios.
 
@@ -218,7 +218,7 @@ This also explains why reward model quality is critical: if the preference RM it
 
 </details>
 
-## RL Scaling: More Compute for Stronger Reasoning
+## 26.2.3 RL Scaling: More Compute for Stronger Reasoning
 
 One of the most exciting discoveries of 2025: **RL training returns have not yet saturated**. DeepSeek-R1's experiments show that for mathematical reasoning, RL training's scaling curve is steeper than SFT's. Continuing to increase training steps, the model's pass@1 continues to improve without clear saturation.
 
@@ -267,7 +267,7 @@ The key prerequisite is sufficiently diverse prompt data. If the training data t
 
 The three dimensions above focus on standard RL scaling. In agentic settings, the policy can also generate and execute code while solving a problem. [Agent RL Scaling Law](https://arxiv.org/abs/2505.07773) studies how training progress, code-use behavior, and mathematical accuracy change together under its ZeroTIR setup. Code-execution frequency is a useful logged variable in that experiment, but it is not a universal early-stopping rule; it must be checked against held-out task accuracy and total execution cost.
 
-## Test-time Scaling: More Compute at Inference Time Too
+## 26.2.4 Test-time Scaling: More Compute at Inference Time Too
 
 Complementary to RL Scaling (investing more compute at training time) is another approach: **also let the model "think more" at inference time**.
 
@@ -298,7 +298,7 @@ An open frontier debate is: **Does RLVR only improve test-time search efficiency
 - Skeptics argue: A base model without RL training, given enough sampling attempts (N → ∞), could theoretically achieve similar results — RL only makes the model "search more efficiently."
 - The reality is: In practice, the efficiency improvement from RL training is enormous — enabling the model to produce high-quality answers with minimal sampling. Even if RL's essence is "improving search efficiency," this efficiency improvement is extremely valuable in engineering.
 
-## PRM vs ORM: Process Supervision vs. Outcome Supervision
+## 26.2.5 PRM vs ORM: Process Supervision vs. Outcome Supervision
 
 In reasoning scenarios, the credit assignment problem takes a concrete form: **should we only look at the final outcome (whether the answer is correct), or evaluate each reasoning step (whether intermediate steps are correct)?** This is the distinction between PRM (Process Reward Model) and ORM (Outcome Reward Model).
 
@@ -311,6 +311,8 @@ ORM only looks at the final outcome: correct answer gets positive reward, incorr
 PRM evaluates each reasoning step: is step 1 correct? Is step 2 correct? ... Each step has feedback. The advantage is dense learning signals that can precisely guide the improvement direction of each step. The disadvantage is extremely high annotation cost — requiring human experts to judge the correctness of each reasoning step.
 
 ### PRM's Practical Effect
+
+The pattern below is schematic and setup-dependent -- exact numbers vary with the base model, the sampling budget, and the verifier. It summarizes the qualitative trade-off reported across process-supervision studies: process supervision helps, but its annotation cost is high, while outcome supervision plus RL already captures much of the gain at low cost.
 
 - **Method — ORM only**
   - GSM8K Accuracy: ~82%
@@ -329,7 +331,7 @@ PRM evaluates each reasoning step: is step 1 correct? Is step 2 correct? ... Eac
   - MATH Accuracy: ~55%
   - Annotation Cost: Extremely high
 
-PRM's improvement is real (5 percentage points higher than ORM on MATH), but so is its cost. OpenAI's PRM800K dataset required math experts to annotate each reasoning step — a cost not every team can bear.
+PRM's improvement is real in these studies (several percentage points over ORM on MATH in the cited setup), but so is its cost. OpenAI's PRM800K dataset required annotators to label each reasoning step -- a cost not every team can bear.
 
 ### Exploring Automated PRM
 
@@ -388,7 +390,7 @@ Record accuracy together with generated tokens, valid-sample rate, KL, entropy, 
 
 ## Section Summary
 
-In Chapter 8, we completed a full evolution path of RL training:
+In Chapters 8 and 13-15, we completed a full evolution path of RL training:
 
 ```mermaid
 flowchart TD
