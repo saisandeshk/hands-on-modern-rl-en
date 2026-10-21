@@ -8,7 +8,7 @@ This section separates two works that are easily conflated. **CWM** is an open-w
 
 ## 20.2.1 Code World Model (CWM)
 
-[Code World Model](https://arxiv.org/abs/2510.02387) (CWM, 2025.09) releases a 32B dense decoder-only model. It learns from observation-action trajectories in a Python interpreter and agentic Docker environments, followed by reasoning RL on verifiable code, mathematics, and multi-turn software tasks. Its “world model” is primarily the execution regularities learned in the model weights, not a separate transition model that has already replaced real tests.
+[Code World Model](https://arxiv.org/abs/2510.02387) (CWM, 2025.10) releases a 32B dense decoder-only model. It learns from observation-action trajectories in a Python interpreter and agentic Docker environments, followed by reasoning RL on verifiable code, mathematics, and multi-turn software tasks. Its “world model” is primarily the execution regularities learned in the model weights, not a separate transition model that has already replaced real tests.
 
 ### CWM's MDP Definition
 
@@ -60,7 +60,7 @@ Training data:
 
 **Advantage 1: Speed**
 
-A world model is an LLM forward—taking a few milliseconds. Real-world testing takes several seconds to several minutes. **CWM accelerates training by 100–1000 times**.
+A world-model query is a single forward pass — typically far cheaper than spinning up a container and running a test suite. The end-to-end speedup depends on rollout length, batch size, and how often ground-truth tests still run for correction, so report measured tokens-per-second and suites-per-minute rather than a fixed multiplier.
 
 **Advantage 2: Ability to Simulate Failures**
 
@@ -100,11 +100,11 @@ Reference: [Chapter 8: Model Planning in Long-Horizon Tasks](../chapter08_ppo/rl
 
 [DeepSWE-Preview](https://www.together.ai/blog/deepswe), trained by Agentica and Together AI, starts from Qwen3-32B and runs pure RL for six days on 64 H100 GPUs across roughly 4,500 R2E-Gym software-engineering tasks. The published SWE-bench Verified result is 42.2% Pass@1 and about 59% with test-time scaling.
 
-The public material shows that stable environments, rollout infrastructure, and verifiable outcomes can produce a strong long-horizon coding agent with pure RL. It also discusses system support for trajectory-level and step-level GRPO/PPO and verifiers for test-time scaling. The three techniques below—step shaping, a value model, and hierarchy—are useful teaching alternatives for credit assignment; they are not DeepSWE's disclosed architecture.
+The public material shows that stable environments, rollout infrastructure, and verifiable outcomes can produce a strong long-horizon coding agent with pure RL. It also discusses system support for trajectory-level and step-level optimization and verifiers for test-time scaling. The three techniques below are useful teaching alternatives for credit assignment; they are not DeepSWE's disclosed recipe, and adding any of them is a hypothesis to test, not an automatic upgrade.
 
-**Technique One: Step-level Reward Shaping**
+**Teaching Alternative One: Step-level Reward Shaping**
 
-Instead of only the final reward, DeepSWE gives a shaping reward to each step:
+Instead of only the final reward, add a shaping reward to each step:
 
 ```python
 def deep_swe_reward(trajectory, final_test_result):
@@ -124,17 +124,17 @@ def deep_swe_reward(trajectory, final_test_result):
 
 This shaping allows the model to receive feedback at each step, avoiding the difficulty of credit assignment.
 
-**Technique Two: Value Model**
+**Teaching Alternative Two: Value Model**
 
-DeepSWE reintroduces the value model (consistent with the VAPO approach) — [see Chapter 15 on VAPO](../chapter15_grpo/grpo-family).
+A second teaching alternative reintroduces the value model (the VAPO-style approach) — [see Chapter 15 on VAPO](../chapter15_grpo/grpo-family).
 
 The value model $V_\phi(s_t)$ estimates the "expected future reward" of the current state. This allows RL to use GAE for credit assignment:
 
-$$\hat{A}_t = \delta_t + (\gamma\lambda)\delta_{t+1} + \ldots$$
+$$\hat{A}_t = \sum_{l=0}^{\infty}(\gamma\lambda)^l\,\delta_{t+l},$$
 
 where $\delta_t = r_t + \gamma V_\phi(s_{t+1}) - V_\phi(s_t)$.
 
-**Technique Three: Hierarchical RL**
+**Teaching Alternative Three: Hierarchical RL**
 
 Breaking long trajectories into layers:
 
@@ -147,87 +147,81 @@ The high-level policy uses sparse reward (final test), while the low-level polic
 
 ```text
 ┌──────────────────────────────────────────────────────────┐
-│ Phase 1: Data Collection                                │
-│   - Rollout with the SFT model on SWE-bench             │
-│   - Collect trajectories of 32–64 steps                │
+│ Phase 1: Rollout Infrastructure                         │
+│   - Stable R2E-Gym environments for software tasks      │
+│   - Collect trajectories of 32–64 steps                 │
 ├──────────────────────────────────────────────────────────┤
-│ Phase 2: World Model Training (similar to CWM)          │
-│   - Accelerate subsequent RL                           │
+│ Phase 2: Pure RL with Verifiable Outcomes               │
+│   - Policy optimization on verifiable outcomes only         │
+│   - No distillation from a stronger teacher             │
 ├──────────────────────────────────────────────────────────┤
-│ Phase 3: Value Model Training                           │
-│   - Train $ V_\phi $ using collected trajectories      │
-├──────────────────────────────────────────────────────────┤
-│ Phase 4: Hierarchical RL                                │
-│   - High-level policy: PPO + sparse reward             │
-│   - Low-level policy: GRPO + dense reward              │
-├──────────────────────────────────────────────────────────┤
-│ Phase 5: Test-time search                              │
-│   - Use MCTS or Beam Search during inference           │
-│   - Leverage the value model to evaluate intermediate states │
+│ Phase 3: Test-time Scaling                              │
+│   - Search or repeated sampling during inference        │
+│   - Verifiers rerank candidate patches                  │
 └──────────────────────────────────────────────────────────┘
 ```
 
+Value models, hierarchical decompositions, and world-model acceleration (as in CWM) are compatible extensions to test on top of this recipe — they are not part of the disclosed pure-RL result, so each needs its own ablation.
+
 ### Achievements of DeepSWE
 
-Performance of DeepSWE on SWE-bench Verified:
+Performance reported for DeepSWE-Preview on SWE-bench Verified:
 
-| Model                   | SWE-bench Verified |
-| ----------------------- | ------------------ |
-| Meta SWE-RL             | 41.0%              |
-| **DeepSWE (ByteDance)** | **50.0%**          |
-| SWE-Lancer (OpenAI)     | 45.0%              |
-| Claude Opus 4.5 + Tools | 60%+               |
+| Model               | SWE-bench Verified                                 |
+| ------------------- | -------------------------------------------------- |
+| SWE-RL (70B)        | 41.0% Pass@1 (reported)                            |
+| **DeepSWE-Preview** | **42.2% Pass@1; about 59% with test-time scaling** |
 
-DeepSWE achieves 50% on open-source models — demonstrating the feasibility of long-horizon reinforcement learning training.
+Both figures are Pass@1-style single-model results unless the scaling procedure is stated. The scaled figure spends extra test-time compute (more samples or search per task), so it must be compared only against equally budgeted baselines, and both numbers should be re-checked against the original report and the official leaderboard before citing.
 
-### Relationship Between DeepSWE and VAPO
+### DeepSWE and the Case for Critics
 
-The design of DeepSWE is highly similar to [ByteDance's VAPO](../chapter15_grpo/grpo-family) — both replace the "no critic" approach of GRPO with a value model. This reflects the consensus within ByteDance Seed that **"long-horizon tasks require critics."**
+The long-horizon difficulty motivates the VAPO-style argument — [see Chapter 15](../chapter15_grpo/grpo-family) — that tasks with sparse terminal rewards and tens of tool steps benefit from a learned value model. Whether a critic is necessary depends on horizon length, reward density, and compute budget: it is an engineering trade-off, not an algorithmic necessity. Critic-free methods save memory and complexity; value models buy finer credit assignment.
 
-This also validates the conclusion from [Chapter 15 on GRPO improvements](../chapter15_grpo/grpo-family) — **critic-free is an engineering compromise, not an algorithmic necessity.** On long-horizon tasks (long CoT reasoning, long SWE trajectories), value models have once again proven their value.
+This qualifies the lesson from [Chapter 15 on GRPO improvements](../chapter15_grpo/grpo-family): **critic-free training is an engineering choice whose cost grows with horizon length.** On long-horizon tasks (long chain-of-thought reasoning, long SWE trajectories), value models are a hypothesis worth testing with ablations.
 
 ## 20.2.3 Test-time Search Integration
 
-CWM and DeepSWE both integrate **test-time search**—using MCTS or Beam Search during inference to improve performance.
+CWM and DeepSWE can each be combined with **test-time search** — MCTS over an explicit world model or beam search with verifier reranking — as teaching extensions of the kind described below, not as disclosed parts of either published recipe.
 
-### MCTS on CWM
+### MCTS over a World Model (Teaching Sketch)
 
-CWM's world model makes MCTS efficient:
+The following sketch shows how MCTS _would_ run if a separate explicit transition model were available. It is a teaching extension of the kind described in §20.2.1, not CWM's published recipe: CWM keeps execution regularities in the model weights and still grounds training with real tests.
 
 ```python
-def cwm_mcts(issue, model, world_model, depth=10):
-    # Perform MCTS on the world model
+def world_model_mcts(issue, model, world_model, n_iter=100):
+    # Search using a learned transition model instead of real containers
     root_state = initialize_state(issue)
 
-    for _ in range(N_iter):
-        # Selection: Select the most promising child node using UCB
+    for _ in range(n_iter):
+        # Selection: most promising child by UCB
         node = select(root_state)
 
-        # Expansion: Generate action using policy, simulate next state using world model
+        # Expansion: policy proposes an action, world model predicts the next state
         action = model.policy(node.state)
         next_state = world_model.predict(node.state, action)
 
-        # Simulation: Quick rollout to termination
+        # Simulation: quick rollout to termination inside the world model
         rollout_reward = quick_rollout(next_state, world_model)
 
-        # Backprop: Update node statistics
+        # Backpropagation: update statistics
         backpropagate(node, rollout_reward)
 
-    # Return the best action from the root state
+    # Return the highest-value action from the root
     return best_action(root_state)
 ```
 
-The entire MCTS is performed on the world model—**no real-world testing is needed**, making it extremely fast.
+Each simulated step is a forward pass rather than a container boot plus a test-suite run, so the sketch runs far faster per rollout — but only to the extent the world model is accurate. Real test runs are still needed to correct model drift (Phase 3 of the CWM box), so the end-to-end speedup must be measured, not assumed.
 
-### Beam Search on DeepSWE
+### Beam Search with Verifier Reranking (Teaching Alternative)
 
-DeepSWE uses Beam Search during inference:
+A second teaching alternative scales inference with search and lets the verifier — not a learned value model — rank candidates, matching the Phase-3 box above:
 
 ```python
-def deep_swe_beam_search(issue, model, value_model, K=4):
-    beams = [{"state": init_state(issue), "score": 0}]
+def deep_swe_beam_search(issue, model, verifier, K=4, max_steps=64):
+    beams = [{"state": init_state(issue), "patches": []}]
 
-    for step in range(MAX_STEPS):
+    for _ in range(max_steps):
         candidates = []
         for beam in beams:
             # Generate K candidate actions
@@ -235,31 +229,33 @@ def deep_swe_beam_search(issue, model, value_model, K=4):
 
             for action in actions:
                 next_state = apply_action(beam["state"], action)
-                # Use value model to evaluate
-                value = value_model.estimate(next_state)
                 candidates.append({
                     "state": next_state,
-                    "score": beam["score"] + value
+                    "patches": beam["patches"] + [action],
                 })
 
-        # Select top-K
-        beams = sorted(candidates, key=lambda x: x["score"], reverse=True)[:K]
+        # Keep the top-K beams by verifier score
+        beams = sorted(
+            candidates,
+            key=lambda c: verifier.score(c["patches"]),
+            reverse=True,
+        )[:K]
 
     return beams[0]["state"]
 ```
 
-Beam Search allows DeepSWE to trade computational resources for higher accuracy during inference — consistent with [Chapter 16 on Test-time Compute Scaling](../chapter16_reasoning/test-time-scaling).
+Beam Search allows DeepSWE-style systems to trade computational resources for higher accuracy during inference — consistent with [Chapter 16 on Test-time Compute Scaling](../chapter16_reasoning/test-time-scaling). Ranking beams with a learned value model instead of the verifier is a further extension to ablate; it is not part of the disclosed pure-RL recipe.
 
 ## 20.2.4 Comparison with Industrial Practices
 
 By mid-2026, mainstream SWE-RL industrial solutions include:
 
-| Route                           | Representative           | Publicly Supported Description                       | SWE-bench Verified                       |
-| ------------------------------- | ------------------------ | ---------------------------------------------------- | ---------------------------------------- |
-| Simple GRPO                     | Meta SWE-RL              | Open-source and simple                               | 41.0% Pass@1                             |
-| Environment-trajectory modeling | Code World Model         | Mid-training on environment traces plus multitask RL | 65.8% with test-time scaling             |
-| Long-horizon pure RL and search | DeepSWE                  | R2E-Gym training plus test-time scaling              | 42.2% Pass@1; about 59% scaled           |
-| Multi-agent workflows           | Commercial coding agents | Training and orchestration often undisclosed         | Record by exact model and evaluation log |
+| Route                           | Representative           | Publicly Supported Description                       | SWE-bench Verified                                  |
+| ------------------------------- | ------------------------ | ---------------------------------------------------- | --------------------------------------------------- |
+| Simple GRPO                     | SWE-RL                   | Open-source and simple                               | 41.0% Pass@1 (reported)                             |
+| Environment-trajectory modeling | Code World Model         | Mid-training on environment traces plus multitask RL | Check the paper's table for the exact scaling setup |
+| Long-horizon pure RL and search | DeepSWE-Preview          | R2E-Gym training plus test-time scaling              | 42.2% Pass@1; about 59% scaled (reported)           |
+| Multi-agent workflows           | Commercial coding agents | Training and orchestration often undisclosed         | Record by exact model and evaluation log            |
 
 These values use different scaffolds and test-time budgets and do not form one monotonic score ladder. A fair comparison records the environment, sampling budget, verifier, and aggregation procedure.
 

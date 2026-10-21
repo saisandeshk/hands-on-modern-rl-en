@@ -1,28 +1,27 @@
-# Supplementary Reading: Meta SWE-RL and Open-Source SOTA
+# Supplementary Reading: SWE-RL and Open-Source SOTA
 
-[Meta SWE-RL](https://arxiv.org/abs/2502.18449) (2025.02) is a representative work of open-source SWE-RL. Its core contributions are:
+The [SWE-RL paper](https://arxiv.org/abs/2502.18449) (2025.02) is a representative work of open-source SWE-RL. Its core contributions are:
 
-- Trained using open-source data (SWE-bench + SWE-gym)
-- Utilized the simplest GRPO + test reward
-- Achieved 41.0% on SWE-bench Verified (open-source SOTA)
+- Training using open-source software-evolution data (SWE-bench style tasks plus SWE-Gym)
+- Utilizing GRPO with a simple test-based reward
+- Reporting 41.0% on SWE-bench Verified with a 70B model (a strong open-source result at the time)
 
-This section provides a detailed look at Meta SWE-RL's data, algorithm, and engineering details.
+This section takes a close look at SWE-RL's data, algorithm, and engineering details. Numbers below are the paper's reported figures; verify current standings against the [official SWE-bench leaderboard](https://www.swebench.com/) with matching model, scaffold, and sampling budget.
 
 ## 20.1.1 Data Scale and Composition
 
-The training data sources for Meta SWE-RL are as follows:
+The public SWE-RL recipe builds on two open-source task sources:
 
-| Data Source             | Scale         | Purpose               |
-| ----------------------- | ------------- | --------------------- |
-| SWE-bench (open-source) | 2,294 items   | High-quality baseline |
-| SWE-gym (open-source)   | 6,800 items   | Extended training     |
-| Internal PR Data (Meta) | 80,000+ items | Large-scale RL        |
+| Data Source             | Scale                         | Purpose                                |
+| ----------------------- | ----------------------------- | -------------------------------------- |
+| SWE-bench (open-source) | 2,294 tasks                   | Baseline tasks and held-out evaluation |
+| SWE-Gym (open-source)   | Thousands of additional tasks | Extended training                      |
 
-**Total of approximately 90,000 SWE tasks** — 40 times larger than pure SWE-bench.
+Together these provide several times more training tasks than pure SWE-bench. Some labs additionally mix in internal pull-request histories at much larger scale; those extensions are proprietary, vary by codebase, and their contribution should be ablated separately rather than folded into the open-source number.
 
 ### Data Preprocessing
 
-Meta reported several key steps in data cleaning:
+A practical cleaning recipe in this line of work filters along three axes (repository filtering, pull-request filtering, and test filtering). Verify the exact thresholds against the paper before citing them as published figures:
 
 **Step 1: Repository Filtering**
 
@@ -42,50 +41,46 @@ Meta reported several key steps in data cleaning:
 - Exclude: PRs with tests that cannot be run independently
 - Exclude: PRs with tests that depend on external services (e.g., databases, API keys)
 
-These filters significantly improved the final data quality. Meta reported that training performance was poor before filtering, but improved substantially after filtering — **data quality > data quantity**.
+These filters significantly improved the final data quality. The reported lesson is that filtering for reproducible, well-tested tasks mattered more than raw task count — **data quality > data quantity**.
 
 ## 20.1.2 Algorithm: GRPO + Simple Reward
 
-Meta SWE-RL's algorithm choice is extremely simple — **GRPO + test binary reward**.
+The SWE-RL algorithm choice is deliberately minimal — **GRPO + binary test reward**.
 
 ### Why Use GRPO?
 
-Meta's team compared PPO, GRPO, and DPO in the [SWE-RL paper](https://arxiv.org/abs/2502.18449):
-
-| Algorithm      | SWE-bench Verified |
-| -------------- | ------------------ |
-| DPO (baseline) | 24.3%              |
-| PPO            | 33.2%              |
-| **GRPO**       | **41.0%**          |
+The paper compares GRPO against DPO-style and PPO-style baselines in its setup and reports GRPO ahead (culminating in the 41.0% SWE-bench Verified figure for the 70B model). Treat the exact margins as setup-dependent rather than universal, but the qualitative argument travels:
 
 Advantages of GRPO:
 
 - **No Critic Required**: saves GPU memory, suitable for large-scale training
-- **Group-wise Normalization**: naturally handles tasks of varying difficulty (high variance in easy tasks, low variance in hard tasks)
+- **Group-wise Normalization**: naturally handles tasks of varying difficulty (high variance for tasks of intermediate difficulty, near-zero variance for tasks that are already solved or still unsolved)
 - **Simple and Stable**: easier to implement in engineering than PPO
 
 This is consistent with the findings of [DeepSeek-R1](../chapter15_grpo/deepseek-dapo) — **GRPO is the default choice for SWE-RL**.
 
 ### Reward Function
 
-The reward function in Meta SWE-RL is extremely simple:
+The reward function in SWE-RL is extremely simple:
 
 ```python
 def swe_rl_reward(test_results):
     """Binary reward for test pass"""
+    if len(test_results) == 0:
+        return 0.0  # No tests collected (collection error, empty suite) is never a pass
     if all(test_results):
         return 1.0  # All tests passed
     else:
         return 0.0  # Any test failed
 ```
 
-Meta reported several attempts at reward shaping, all of which were **worse than the simple binary reward**:
+The paper reports that shaped variants tried in its setup underperformed the simple binary reward:
 
-- **Continuous reward (passed/total)**: The model tends to "fix half" to get partial reward, and fails to learn full fixes
-- **Length penalty**: The model learns to "complete the task in fewer steps but without fixing bugs" — directly abort the task to get 0 steps
-- **Complex shaping**: Reward hacking becomes severe
+- **Continuous reward (passed/total)**: the model can chase partial passes instead of full fixes.
+- **Length penalty**: an over-strong penalty can teach early abort rather than efficient repair.
+- **Complex shaping**: each added term opens a new gaming surface.
 
-This confirms the finding of R1-Zero: **Simple reward + large-scale RL is the best combination**.
+This matches the R1-Zero lesson discussed in [Chapter 15](../chapter15_grpo/deepseek-dapo): start from a **simple reward + large-scale RL**, and add shaping terms only with ablations. (The exact ablation margins are setup-dependent; treat them as reported observations, not universal constants.)
 
 ## 20.1.3 Engineering Details: Context Management
 
@@ -137,9 +132,7 @@ This agentic approach allows the model to explore the codebase itself, **reading
 
 ### Long-context Model
 
-Use models that support 128K / 1M context (e.g., Claude 3.5 Sonnet, Gemini 1.5 Pro, Qwen3-1M) to directly read through the entire repository.
-
-Meta SWE-RL uses **Llama-3-70B + RoPE scaling**—extending to 128K context. However, long context brings the following challenges:
+Use models with large context windows (128K-class) to fit more of the repository directly. Longer context brings trade-offs:
 
 - Increased training cost (attention is O(n²))
 - Slower inference speed
@@ -164,7 +157,7 @@ def build_context(issue, repo):
 
 RAG is the most commonly used method in industry—simple, efficient, and compatible with existing models.
 
-Meta SWE-RL uses a **combination of method one and method three**—using RAG as the base context, and allowing the model to further explore through tool calls.
+A common production recipe combines retrieval for the base context with tool calls for follow-up exploration.
 
 ## 20.1.4 Techniques for Training Stability
 
@@ -174,7 +167,7 @@ SWE-RL training is more challenging than mathematical RL — because:
 - Reward is extremely sparse (only the final test pass yields a reward)
 - Most trajectories are failures (reward = 0)
 
-Meta reported several techniques for training stability:
+The paper reports several techniques for training stability:
 
 ### Success Rate Filtering
 
@@ -186,12 +179,14 @@ def filter_prompts(prompts, model, num_rollouts=8):
     for prompt in prompts:
         rollouts = [model.generate(prompt) for _ in range(num_rollouts)]
         rewards = [compute_reward(r) for r in rollouts]
-        if max(rewards) > 0:  # At least one success
+        # Keep only groups with a learning signal: at least one success
+        # AND nonzero spread (all-fail and all-succeed groups both have zero variance)
+        if max(rewards) > 0 and len(set(rewards)) > 1:
             useful_prompts.append(prompt)
     return useful_prompts
 ```
 
-This aligns with the idea of [DAPO's Dynamic Sampling](../chapter15_grpo/deepseek-dapo) — filtering out "easy problems".
+This aligns with the idea of [DAPO's Dynamic Sampling](../chapter15_grpo/deepseek-dapo) — discarding prompts whose rollouts carry no learning signal (all fail, or all succeed trivially).
 
 ### Curriculum Learning
 
@@ -206,37 +201,23 @@ def curriculum_order(prompts):
 
 ### KL Constraint
 
-During the later stages of SWE-RL training, it is common for the model to "forget how to write code"—the RL optimization may overfit to passing tests, thereby harming the code style. Meta uses a KL constraint:
+During the later stages of SWE-RL training, it is common for the model to overfit to passing tests at the expense of code style. A standard guard is a KL constraint against the pre-RL checkpoint:
 
 $$\mathcal{L} = \mathcal{L}_{\text{RL}} + \beta \cdot \text{KL}(\pi_\theta || \pi_{\text{ref}})$$
 
-Here, $\pi_{\text{ref}}$ is the model before RL (the version after SFT), and $\beta$ is the constraint strength.
-
-This contrasts with the "zero KL" approach in DeepSeek V3.2 for mathematical tasks—**SWE requires preserving code style, hence the need for KL**; mathematics is purely logical and does not require KL.
+Here, $\pi_{\text{ref}}$ is the model before RL (the version after SFT), and $\beta$ is the constraint strength. The KL weight trades reward optimization against staying close to readable, conventional code: math-reasoning setups sometimes run with little or no KL, while code setups often keep a small KL term because style and interface conventions matter to human reviewers. Tune $\beta$ by watching patch readability alongside the resolve rate.
 
 ## 20.1.5 SWE-bench Verified 41.0%
 
-Meta SWE-RL's final performance on SWE-bench Verified:
+The SWE-RL paper reports 41.0% on SWE-bench Verified for its 70B model — a strong open-source result at the time of publication. SWE-bench Verified is the human-checked 500-problem subset, so this number already controls for some of the noise in the full set. Even so, it is comparable only to results with the same scaffold, tool permissions, step budget, and sampling budget (Pass@1 versus scaled inference). For current standings, check the [official SWE-bench leaderboard](https://www.swebench.com/) and record the model version, the scaffold, the evaluation set, and the run settings together.
 
-| Model                           | SWE-bench Verified                           |
-| ------------------------------- | -------------------------------------------- |
-| GPT-4 (zero-shot)               | 1.96%                                        |
-| Claude 3 Opus                   | 3.21%                                        |
-| SWE-agent (GPT-4)               | 12.5%                                        |
-| SWE-Gym (open source)           | 19.0%                                        |
-| **Meta SWE-RL (open source)**   | **41.0%**                                    |
-| Cognition Devin (closed source) | 13.95% (note: different evaluation criteria) |
-| Claude 3.5 Sonnet + Tools       | 49.0% (closed source)                        |
+## 20.1.6 Limitations of SWE-RL
 
-Meta SWE-RL is the state-of-the-art among open-source models—demonstrating that **using open-source data + GRPO + simple reward functions can achieve performance close to closed-source models**.
+However, SWE-RL as a public recipe also has several limitations:
 
-## 20.1.6 Limitations of Meta SWE-RL
+### Primarily Python
 
-However, Meta SWE-RL also has several limitations:
-
-### Only Supports Python
-
-All training data of Meta SWE-RL is in Python. There is no corresponding data for other languages such as JavaScript, Java, C++, and Go.
+The public training data and evaluation are concentrated in Python. Extending the same loop to other languages means rebuilding the sandbox, the test harness, and the defect distribution for each ecosystem.
 
 ### Relies on Test Suites
 
@@ -244,19 +225,19 @@ Repositories without tests cannot be trained. This is a significant issue in ind
 
 ### Unstable Training for Long Horizons
 
-Training trajectories longer than 16 steps are unstable — credit assignment in RL is difficult. Meta reported that performance significantly drops for trajectories longer than 32 steps.
+Training on trajectories of tens of steps is unstable — credit assignment in RL is difficult, and performance degrades as trajectories lengthen. Success-rate filtering and curricula (Sections 20.1.4) mitigate this but do not remove it.
 
 ### Data Diversity
 
-Although 90K data samples are a considerable amount, they are all from GitHub PRs — the distribution is biased toward the open-source ecosystem. The characteristics of industrial code (such as enterprise internal Java systems) are not covered.
+The open-source tasks come from GitHub pull requests — the distribution is biased toward the open-source ecosystem. The characteristics of industrial code (such as enterprise internal systems in other languages) are not covered.
 
 ## Summary
 
-Meta SWE-RL is a representative work of open-source SWE-RL. Its core contributions are:
+SWE-RL is a representative work of open-source SWE-RL. Its core contributions are:
 
-- **Data**: Open-sourced 90K SWE tasks, covering over 100 repositories
+- **Data**: open-source software-evolution tasks (SWE-bench style tasks plus SWE-Gym), with quality filtering doing most of the work
 - **Algorithm**: GRPO + simple binary reward, sharing the same origin as R1-Zero
-- **Engineering**: Context management, training stability techniques
-- **Results**: Achieved 41.0% on SWE-bench Verified (open-source SOTA)
+- **Engineering**: context management, success-rate filtering, curricula, and KL regularization
+- **Results**: a reported 41.0% on SWE-bench Verified for the 70B model
 
-Meta SWE-RL demonstrates the feasibility of RLVR in the domain of software engineering. However, its limitations — such as only supporting Python, instability for long horizons, and dependency on tests — also lead to [20.2 Code World Model and DeepSWE](./world-model-and-deep-swe): How to use world models to let models simulate code execution, reducing the reliance on real tests.
+SWE-RL demonstrates the feasibility of RLVR in the domain of software engineering. Its limitations — concentration in Python, instability for long horizons, and dependency on tests — lead to [20.2 Code World Model and DeepSWE](./world-model-and-deep-swe): how to model software execution and scale long-horizon training with reliable environments.
