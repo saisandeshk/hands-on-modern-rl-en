@@ -1319,6 +1319,10 @@ const sidebar = {
             {
               text: '22.2 Prompt Injection and Instruction Hierarchy',
               link: '/chapter22_computer_use/safety-swarm'
+            },
+            {
+              text: '22.3 Summary and Exercises',
+              link: '/chapter22_computer_use/review'
             }
           ]
         }
