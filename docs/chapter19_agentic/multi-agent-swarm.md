@@ -46,7 +46,7 @@ where $w_t \in \{1, \ldots, K\}$ is the worker to which the $t$-th step is assig
 
 ### Debate Mode
 
-Multiple agents **debate with each other** to converge on a more reliable answer. The theoretical foundation of this paradigm is AI Safety via Debate by Anthropic (Irving et al., 2018); DeepMind's 2024 Scaling Inference paper validates the effectiveness of LLM Debate on math problems.
+Multiple agents **debate with each other** to converge on a more reliable answer. The theoretical foundation of this paradigm is the AI Safety via Debate proposal (Irving et al., 2018); DeepMind's 2024 work on scaling inference-time debate validates the effectiveness of LLM debate on math problems.
 
 The MDP for Debate:
 
@@ -63,7 +63,7 @@ The training objective for Debate is **truth convergence**: making the honest ag
 Key differences of Swarm:
 
 - **Agent pool** rather than a fixed set of workers: the meta-controller dynamically selects agents from the pool based on the task
-- **A2A communication protocol**: agents communicate through structured protocols (e.g., Anthropic A2A, OpenAI Function Calls)
+- **A2A communication protocol**: agents communicate through structured agent-to-agent protocols (for example, Google's open A2A protocol, or function-call style structured messages)
 - **Credit assignment across agents**: which agent contributed the most? Requires SHAP or attention attribution
 
 Formalization:
@@ -268,7 +268,7 @@ To reproduce multi-agent RL training, the following open-source tools are availa
 
 However, these frameworks are mostly **inference-time** tools—they define how agents converse, but do not involve RL training. **Very few open-source frameworks are capable of training multi-agent systems using RL**, mainly including:
 
-- **OpenRLHF** (ByteDance): Supports multi-agent PPO/GRPO with customizable reward allocation
+- **OpenRLHF** (open-source community): Supports multi-agent PPO/GRPO with customizable reward allocation
 - **verl** (ByteDance): A distributed RL framework supporting joint training of heterogeneous agents
 - **OpenResearcher**: Specialized for Deep Research, includes a simple Orchestrator-Worker
 

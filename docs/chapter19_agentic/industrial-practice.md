@@ -117,9 +117,9 @@ To encourage the model to complete tasks in fewer steps, we can introduce a rewa
 
 > **Moonshot** proposed **Gamma-decay Reward**. When the model completes a task correctly, the reward value decays exponentially with the number of steps used:
 >
-> $$r_i = r \times \gamma^{T-i}, \quad \gamma < 1$$
+> $$R = r \times \gamma^{T}, \quad \gamma < 1$$
 >
-> Here, $T$ is the total number of steps and $i$ is the current step. This means that when completing the same task, using fewer steps yields a higher reward, guiding the model to execute tasks more efficiently [\[Reference\]](https://moonshotai.github.io/Kimi-Researcher/).
+> Here, $r$ is the binary task reward (1 on success) and $T$ is the number of steps the trajectory used. A successful trajectory that finishes in fewer steps keeps more of the reward (for example, with $\gamma = 0.95$, $T = 5$ gives $0.77$ while $T = 20$ gives $0.36$), which guides the model to execute tasks more efficiently [\[Reference\]](https://moonshotai.github.io/Kimi-Researcher/). Credit for individual turns then follows the standard discounted-return decomposition $G_t = \sum_{k \geq t} \gamma^{k-t} r_k$ from [19.3 Trajectory Credit Assignment](./credit-assignment).
 
 ---
 

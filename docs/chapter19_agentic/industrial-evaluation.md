@@ -121,9 +121,9 @@ To encourage the model to finish a task in fewer steps, one can introduce a rewa
 
 > **Moonshot** proposed the **Gamma-decay Reward**. When the model completes the task correctly, the reward decays exponentially with the number of steps used:
 >
-> $$r_i = r \times \gamma^{T-i}, \quad \gamma < 1$$
+> $$R = r \times \gamma^{T}, \quad \gamma < 1$$
 >
-> Here $T$ is the total number of steps and $i$ is the current step. This means that, for the same task, using fewer steps earns a higher reward, which guides the model to execute tasks more efficiently [\[Reference\]](https://moonshotai.github.io/Kimi-Researcher/).
+> Here $r$ is the binary task reward (1 on success) and $T$ is the number of steps the trajectory used. A successful trajectory that finishes in fewer steps keeps more of the reward (for example, with $\gamma = 0.95$, $T = 5$ gives $0.77$ while $T = 20$ gives $0.36$), which guides the model to execute tasks more efficiently [\[Reference\]](https://moonshotai.github.io/Kimi-Researcher/). Credit for individual turns then follows the standard discounted-return decomposition $G_t = \sum_{k \geq t} \gamma^{k-t} r_k$ from [19.3 Trajectory Credit Assignment](./credit-assignment).
 
 ---
 
@@ -454,6 +454,8 @@ Agent evaluation has to examine two layers together.
 **Process evaluation** checks whether each decision the agent makes while completing the task is reasonable: whether the tool choice is appropriate, whether the search strategy is efficient, and whether the agent changes direction correctly when it meets obstacles. Web-Shepherd (discussed in detail in [Project: Deep Research Agent](../chapter21_deep_research/browser-rl-harness)) is a typical process evaluation. It scores each of the agent's operations on a web page independently.
 
 Process evaluation is more than a nice-to-have. Research from Berkeley RDI found that nearly every mainstream agentic benchmark can be "gamed" to near-perfect scores without actually completing the task [^benchmark-exploit]. SWE-bench, WebArena, and GAIA are no exception. Without process evaluation, you may be measuring only the model's ability to exploit loopholes.
+
+Two evaluation-design practices guard against this. First, **held-out environment shifts**: keep an evaluation slice whose environment differs from training — different sites, reworded APIs, a fresh search-index snapshot. A model whose score collapses under the shift learned environment-specific tricks, not the task. Second, **adversarial hidden tests**: for code and tool tasks, verify with tests the agent never saw during training, including edge cases and mutated variants, since visible tests invite hardcoding. SWE-bench's FAIL_TO_PASS / PASS_TO_PASS split follows the same idea: the tests that decide success are fixed and hidden from the agent at rollout time.
 
 #### Breaking "Quality" into Quantifiable Dimensions
 
@@ -876,7 +878,8 @@ def frontend_process_stats(trajectory):
             if s.tool_name == "browser_preview"
         ),
         "plan_exists": any(
-            s.content contains "plan" or "structure" or "layout"
+            ("plan" in s.content or "structure" in s.content
+             or "layout" in s.content)
             for s in trajectory.steps[:2]  # is there a plan in the first two steps
         ),
     }
