@@ -1,14 +1,25 @@
 /**
- * Write section numbers back into Markdown from the VitePress sidebar (config.mjs), keeping the two in sync.
+ * Write section numbers back into Markdown from the single English VitePress
+ * sidebar (docs/.vitepress/config.mjs), keeping the two in sync.
  *
- * - mismatch: replace the old section number in the body with the sidebar's, and update every heading line
- *   starting with #+ oldMajor.oldMinor (e.g. ### 1.3.1 → ### 1.1.1), so sub-headings don't keep the old number.
- * - missing: rewrite the body's first H1 as `# X.Y` + the sidebar title (matching the text after the number in `text`).
+ * Each numbered sidebar entry (`text: '1.1 Title'` + `link: '...'`, including
+ * appendix numbers such as `A.1` or `D.1.1`) is compared against the linked
+ * page's front-matter `title:` and first `# H1`:
+ *
+ * - front-matter mismatch: replace the old number prefix in the `title:` line
+ *   with the sidebar's number.
+ * - front-matter missing: prepend the sidebar's number to the `title:` value.
+ * - H1 mismatch: replace the old section number in the body with the
+ *   sidebar's, and update every heading line starting with the old number
+ *   (e.g. `### 1.3.1` → `### 1.1.1`), so sub-headings don't keep the old
+ *   number.
+ * - H1 missing: rewrite the body's first H1 as `# X.Y` + the sidebar title
+ *   (matching the text after the number in `text`).
  *
  * Usage:
  *   npm run fix:headings
- *   node scripts/fix-heading-numbers.mjs --dry-run
- * Optional re-check: node scripts/check-heading-numbers.mjs
+ *   node scripts/fix-heading-numbers.mjs --dry-run   # check mode, writes nothing
+ *   node scripts/fix-heading-numbers.mjs --check      # same as --dry-run
  */
 import fs from 'fs'
 import path from 'path'
@@ -19,12 +30,17 @@ const repoRoot = path.resolve(__dirname, '..')
 const configPath = path.join(repoRoot, 'docs', '.vitepress', 'config.mjs')
 const docsRoot = path.join(repoRoot, 'docs')
 
-const dryRun = process.argv.includes('--dry-run')
+const dryRun =
+  process.argv.includes('--dry-run') || process.argv.includes('--check')
 
+// Numbered entries of the single English sidebar, e.g.
+//   text: '1.1 Run CartPole', / text: 'A.1 Training Debugging Guide',
+//   text: 'D.1.1 Vectors and Matrices' — each followed by its link line.
 const pairRe =
-  /text:\s*'(\d+)\.(\d+)\s([^']*)'\s*,\s*\r?\n\s*link:\s*'([^']+)'/g
+  /text:\s*'((?:[A-Z]\.)?\d+(?:\.\d+)*)\s+([^']+)'\s*,\s*\r?\n\s*link:\s*'([^']+)'/g
 
-const h1NumRe = /^#\s*(\d+)\.(\d+)\b/
+const numRe = /^(?:[A-Z]\.)?\d+(?:\.\d+)*\b/
+const h1NumRe = /^#\s*((?:[A-Z]\.)?\d+(?:\.\d+)*)\b/
 const h1LineRe = /^#\s+/
 
 const src = fs.readFileSync(configPath, 'utf8')
@@ -59,6 +75,44 @@ function frontmatterSplit(lines) {
   }
 }
 
+function frontmatterTitleInfo(beforeLines) {
+  const index = beforeLines.findIndex((line) => /^\s*title:\s*/.test(line))
+  if (index === -1) return { line: null, index: -1, number: null }
+  const raw = beforeLines[index].replace(/^\s*title:\s*/, '').trim()
+  const unquoted =
+    raw.length >= 2 &&
+    ((raw.startsWith("'") && raw.endsWith("'")) ||
+      (raw.startsWith('"') && raw.endsWith('"')))
+      ? raw.slice(1, -1).trim()
+      : raw
+  const match = unquoted.match(numRe)
+  return {
+    line: beforeLines[index],
+    index,
+    number: match ? match[0] : null,
+    quoted: unquoted !== raw
+  }
+}
+
+function applyFrontmatterFix(beforeLines, info, newNum) {
+  const next = beforeLines.slice()
+  const prefix = info.line.slice(0, info.line.indexOf('title:') + 6)
+  let rest = info.line.slice(info.line.indexOf('title:') + 6).trim()
+  let quote = ''
+  if (
+    rest.length >= 2 &&
+    ((rest.startsWith("'") && rest.endsWith("'")) ||
+      (rest.startsWith('"') && rest.endsWith('"')))
+  ) {
+    quote = rest[0]
+    rest = rest.slice(1, -1).trim()
+  }
+  rest = rest.replace(numRe, '').trim()
+  const value = rest ? `${newNum} ${rest}` : newNum
+  next[info.index] = `${prefix} ${quote}${value}${quote}`
+  return next
+}
+
 function firstNumberedH1InBody(bodyLines) {
   const idx = bodyLines.findIndex((line) => h1NumRe.test(line))
   if (idx === -1) return { line: null, index: -1 }
@@ -71,20 +125,22 @@ function firstH1InBody(bodyLines) {
   return { line: bodyLines[idx], index: idx }
 }
 
-function remapHeadingLine(line, oldM, oldMin, newM, newMin) {
-  const re = new RegExp(`^(#{1,6}\\s+)${oldM}\\.${oldMin}(?=\\.|\\s|$)`)
-  return line.replace(re, `$1${newM}.${newMin}`)
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-function applyMismatchFix(bodyLines, oldM, oldMin, newM, newMin) {
-  return bodyLines.map((line) =>
-    remapHeadingLine(line, oldM, oldMin, newM, newMin)
-  )
+function remapHeadingLine(line, oldNum, newNum) {
+  const re = new RegExp(`^(#{1,6}\\s+)${escapeRegExp(oldNum)}(?=\\.|\\s|$)`)
+  return line.replace(re, `$1${newNum}`)
 }
 
-function applyMissingFix(bodyLines, newM, newMin, sidebarTitleRest) {
+function applyMismatchFix(bodyLines, oldNum, newNum) {
+  return bodyLines.map((line) => remapHeadingLine(line, oldNum, newNum))
+}
+
+function applyMissingFix(bodyLines, newNum, sidebarTitleRest) {
   const h1 = firstH1InBody(bodyLines)
-  const newLine = `# ${newM}.${newMin} ${sidebarTitleRest.trim()}`
+  const newLine = `# ${newNum} ${sidebarTitleRest.trim()}`
   if (h1.index === -1) {
     if (
       bodyLines.length === 0 ||
@@ -108,10 +164,9 @@ const entries = []
 let m
 while ((m = pairRe.exec(src)) !== null) {
   entries.push({
-    major: m[1],
-    minor: m[2],
-    titleRest: m[3],
-    link: m[4].replace(/^\//, '')
+    number: m[1],
+    titleRest: m[2],
+    link: m[3].replace(/^\//, '')
   })
 }
 
@@ -130,28 +185,39 @@ for (const ent of entries) {
   const lines = raw.split(/\r?\n/)
   const { before, body } = frontmatterSplit(lines)
 
-  const numH1 = firstNumberedH1InBody(body)
-  const expect = `${ent.major}.${ent.minor}`
-
-  let newBody = null
-  let reason = ''
-
-  if (numH1.line) {
-    const hm = numH1.line.match(h1NumRe)
-    const got = `${hm[1]}.${hm[2]}`
-    if (got !== expect) {
-      newBody = applyMismatchFix(body, hm[1], hm[2], ent.major, ent.minor)
-      reason = `mismatch ${got} → ${expect}`
+  let newBefore = null
+  let fmReason = ''
+  const fm = frontmatterTitleInfo(before)
+  if (fm.line) {
+    if (fm.number !== ent.number) {
+      newBefore = applyFrontmatterFix(before, fm, ent.number)
+      fmReason =
+        fm.number == null
+          ? `front-matter title missing number, set to ${ent.number}`
+          : `front-matter title ${fm.number} → ${ent.number}`
     }
-  } else {
-    newBody = applyMissingFix(body, ent.major, ent.minor, ent.titleRest)
-    reason = `missing # X.Y, set to ${expect}`
   }
 
-  if (!newBody) continue
+  let newBody = null
+  let bodyReason = ''
+  const numH1 = firstNumberedH1InBody(body)
+  if (numH1.line) {
+    const got = numH1.line.match(h1NumRe)[1]
+    if (got !== ent.number) {
+      newBody = applyMismatchFix(body, got, ent.number)
+      bodyReason = `H1 mismatch ${got} → ${ent.number}`
+    }
+  } else {
+    newBody = applyMissingFix(body, ent.number, ent.titleRest)
+    bodyReason = `missing # X.Y, set to ${ent.number}`
+  }
 
+  if (!newBefore && !newBody) continue
+
+  const mergedBefore = newBefore || before
+  const mergedBody = newBody || body
   const newRaw = joinWithEol(
-    before.length ? [...before, ...newBody] : newBody,
+    mergedBefore.length ? [...mergedBefore, ...mergedBody] : mergedBody,
     eol
   )
 
@@ -159,6 +225,7 @@ for (const ent of entries) {
     changedFiles += 1
     totalEdits += 1
     const rel = path.relative(repoRoot, mdPath)
+    const reason = [fmReason, bodyReason].filter(Boolean).join('; ')
     console.log(`${dryRun ? '[dry-run] ' : ''}${reason}: ${rel}`)
     if (!dryRun) {
       fs.writeFileSync(mdPath, newRaw, 'utf8')
@@ -167,7 +234,7 @@ for (const ent of entries) {
 }
 
 console.log(
-  `\n${dryRun ? '(not written)' : 'wrote '} ${changedFiles} file(s) (sidebar entries with X.Y: ${entries.length})`
+  `\n${dryRun ? '(not written) ' : 'wrote '} ${changedFiles} file(s) (sidebar entries with numbers: ${entries.length})`
 )
 
 // dry-run only prints the plan and exits 0, for local preview

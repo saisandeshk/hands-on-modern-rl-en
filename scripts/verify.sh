@@ -7,9 +7,6 @@ npm run format:check
 echo "Checking lint..."
 npm run lint
 
-echo "Checking bilingual coverage..."
-npm run verify:bilingual
-
 echo "Checking English publication quality..."
 npm run verify:english
 

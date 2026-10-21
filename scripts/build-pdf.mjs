@@ -12,6 +12,8 @@ import {
   bookAuthor,
   bookBuildDate,
   bookGithubUrl,
+  bookAdaptedBy,
+  originalGithubUrl,
   logoPath as pdfLogoPath,
   escapeHtml,
   stripFrontmatter,
@@ -155,16 +157,14 @@ function localizeFootnotes(markdown) {
 
   let insertIndex = -1
   for (let index = withRefs.length - 1; index >= 0; index -= 1) {
-    if (
-      /^#{2,4}\s+(参考文献|参考资料|延伸阅读与参考资料)/.test(withRefs[index])
-    ) {
+    if (/^#{2,4}\s+(References|Further Reading)\b/i.test(withRefs[index])) {
       insertIndex = index + 1
       break
     }
   }
 
   if (insertIndex === -1) {
-    withRefs.push('', '## 参考文献')
+    withRefs.push('', '## References')
     insertIndex = withRefs.length
   }
 
@@ -410,7 +410,7 @@ function chapterMetaForItem(item) {
   const chapter = text.match(/^(\d+)\.(?!\d)\s*(.+)$/)
   if (chapter) {
     return {
-      label: `第 ${chapter[1]} 章`,
+      label: `Chapter ${chapter[1]}`,
       title: chapter[2].trim(),
       kind: 'chapter'
     }
@@ -419,7 +419,7 @@ function chapterMetaForItem(item) {
   const appendix = text.match(/^([A-Z])\.\s+(.+)$/)
   if (appendix) {
     return {
-      label: `附录 ${appendix[1]}`,
+      label: `Appendix ${appendix[1]}`,
       title: appendix[2].trim(),
       kind: 'appendix'
     }
@@ -495,7 +495,7 @@ function collectPdfStructure(sidebar) {
 
   for (const section of sidebar || []) {
     const tocSection = {
-      title: section.text || '未命名部分',
+      title: section.text || 'Untitled Section',
       children: []
     }
 
@@ -533,10 +533,10 @@ function renderTocItems(items, level = 0) {
 function renderToc(tocSections) {
   const sections = [
     {
-      title: '前置页',
+      title: 'Front Matter',
       children: [
-        { title: '本书简介', href: '#pdf-book-intro', children: [] },
-        { title: '版本说明', href: '#pdf-publication-note', children: [] }
+        { title: 'About This Book', href: '#pdf-book-intro', children: [] },
+        { title: 'Edition Notes', href: '#pdf-publication-note', children: [] }
       ]
     },
     ...tocSections
@@ -545,7 +545,7 @@ function renderToc(tocSections) {
   return [
     '<section id="pdf-toc" class="pdf-export-toc">',
     '<p class="pdf-section-eyebrow">Table of Contents</p>',
-    '<h1>目录</h1>',
+    '<h1>Contents</h1>',
     ...sections.map((section) =>
       [
         '<div class="pdf-toc-section">',
@@ -567,13 +567,14 @@ function renderBookCover(pageCount) {
     `    <img class="pdf-cover-logo" src="${escapeAttribute(pdfLogoPath)}" alt="Hands-On Modern RL Logo">`,
     `    <p class="pdf-cover-kicker">${escapeHtml(cover.kicker)}</p>`,
     `    <h1>${escapeHtml(cover.titleEn)}</h1>`,
-    `    <p class="pdf-cover-title-zh">${escapeHtml(cover.titleZh)}</p>`,
+    `    <p class="pdf-cover-subtitle">${escapeHtml(cover.subtitle)}</p>`,
     `    <p class="pdf-cover-description">${escapeHtml(cover.description)}</p>`,
     '  </div>',
     '  <div class="pdf-cover-bottom">',
     '    <div class="pdf-cover-meta-grid">',
     `      <p><span>Version</span><strong>${escapeHtml(pdfVersion)}</strong></p>`,
     `      <p><span>Authors</span><strong>${escapeHtml(pdfAuthor)}</strong></p>`,
+    `      <p><span>Adapted by</span><strong>${escapeHtml(bookAdaptedBy)}</strong></p>`,
     `      <p><span>Repository</span><strong>${escapeHtml(pdfGithubUrl)}</strong></p>`,
     `      <p><span>Build</span><strong>${escapeHtml(pdfBuildDate)} · ${pageCount} course pages</strong></p>`,
     '    </div>',
@@ -587,8 +588,8 @@ function renderBookIntro(pageCount) {
   const { intro } = frontMatter
 
   return [
-    '<section id=”pdf-book-intro” class=”pdf-book-frontmatter”>',
-    '<p class=”pdf-section-eyebrow”>About This Book</p>',
+    '<section id="pdf-book-intro" class="pdf-book-frontmatter">',
+    '<p class="pdf-section-eyebrow">About This Book</p>',
     `<h1>${escapeHtml(intro.title)}</h1>`,
     ...intro.paragraphs.map((p) => `<p>${p}</p>`),
     `<h2>${escapeHtml(intro.audience.title)}</h2>`,
@@ -597,7 +598,7 @@ function renderBookIntro(pageCount) {
     '</ul>',
     `<h2>${escapeHtml(intro.howToRead.title)}</h2>`,
     ...intro.howToRead.paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`),
-    `<p>本 PDF 共汇编 ${pageCount} 个课程页面，并保留章节开篇页、目录、页眉页脚、参考文献和侧边书签，目标是让它更像一本可持续更新的课本。</p>`,
+    `<p>This PDF compiles ${pageCount} course pages and keeps chapter opener pages, a table of contents, running headers and footers, references and sidebar bookmarks, so that it reads more like a textbook that can be updated over time.</p>`,
     '</section>'
   ].join('\n')
 }
@@ -609,9 +610,11 @@ function renderPublicationNote() {
     '<section id="pdf-publication-note" class="pdf-book-frontmatter">',
     '<p class="pdf-section-eyebrow">Edition Notes</p>',
     `<h1>${escapeHtml(publicationNote.title)}</h1>`,
-    `<p><strong>版本：</strong>${escapeHtml(pdfVersion)}，构建日期：${escapeHtml(pdfBuildDate)}。</p>`,
-    `<p><strong>作者：</strong>${escapeHtml(pdfAuthor)}。</p>`,
-    `<p><strong>项目地址：</strong><a href="${escapeAttribute(pdfGithubUrl)}">${escapeHtml(pdfGithubUrl)}</a>。</p>`,
+    `<p><strong>Version:</strong> ${escapeHtml(pdfVersion)}. <strong>Build date:</strong> ${escapeHtml(pdfBuildDate)}.</p>`,
+    `<p><strong>Authors:</strong> ${escapeHtml(pdfAuthor)}.</p>`,
+    `<p><strong>Adapted by:</strong> ${escapeHtml(bookAdaptedBy)}.</p>`,
+    `<p><strong>Repository:</strong> <a href="${escapeAttribute(pdfGithubUrl)}">${escapeHtml(pdfGithubUrl)}</a>. <strong>Original project:</strong> <a href="${escapeAttribute(originalGithubUrl)}">${escapeHtml(originalGithubUrl)}</a>.</p>`,
+    `<p>${escapeHtml(publicationNote.attribution)}</p>`,
     `<p>${escapeHtml(publicationNote.iterationNote)}</p>`,
     `<p>${escapeHtml(publicationNote.disclaimer)}</p>`,
     `<h2>${escapeHtml(publicationNote.licenseSection.title)}</h2>`,
@@ -632,7 +635,7 @@ function renderChapterOpener(chapter) {
     `<p class="pdf-section-eyebrow">${escapeHtml(chapter.kind === 'appendix' ? 'Appendix' : 'Chapter')}</p>`,
     `<p class="pdf-chapter-label">${escapeHtml(chapter.label)}</p>`,
     `<h1>${escapeHtml(chapter.title)}</h1>`,
-    `<p class="pdf-chapter-summary">本章包含 ${chapter.pages.length} 个小节，建议先扫目录，再进入正文和代码。</p>`,
+    `<p class="pdf-chapter-summary">This ${chapter.kind === 'appendix' ? 'appendix' : 'chapter'} has ${chapter.pages.length} ${chapter.pages.length === 1 ? 'section' : 'sections'}. Skim the contents first, then move on to the text and code.</p>`,
     pageList ? `<ul>${pageList}</ul>` : '',
     '</div>',
     '</section>'
@@ -696,7 +699,7 @@ async function generatePdfSource() {
     [
       '---',
       'title: Hands-on Modern RL PDF',
-      'description: 现代强化学习实战 PDF 导出',
+      'description: Hands-On Modern RL PDF export',
       'sidebar: false',
       'aside: false',
       'editLink: false',
@@ -731,7 +734,7 @@ async function generatePdfSource() {
       '.pdf-cover-logo { width: 132mm; max-width: 100%; max-height: 54mm; margin: 0 0 18mm; object-fit: contain; object-position: left center; }',
       '.pdf-cover-kicker { margin: 0 0 8px; color: #0f4c81; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }',
       '.pdf-export-cover h1 { margin: 0; color: #102033; font-size: 46px; line-height: 1.06; letter-spacing: 0; }',
-      '.pdf-cover-title-zh { margin: 8px 0 0; color: #344054; font-size: 24px; font-weight: 700; line-height: 1.28; }',
+      '.pdf-cover-subtitle { margin: 8px 0 0; color: #344054; font-size: 24px; font-weight: 700; line-height: 1.28; }',
       '.pdf-cover-description { max-width: 620px; margin: 18px 0 0; padding-top: 12px; border-top: 2px solid #f59e0b; color: #344054; font-size: 13px; line-height: 1.68; }',
       '.pdf-cover-bottom { margin-top: 20mm; }',
       '.pdf-cover-meta-grid { display: grid; grid-template-columns: 1fr 1.35fr; gap: 8px 18px; padding: 12px 0; border-top: 1px solid var(--vp-c-divider); border-bottom: 1px solid var(--vp-c-divider); }',

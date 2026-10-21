@@ -5,7 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 const __filename = fileURLToPath(import.meta.url)
 const rootDir = path.resolve(path.dirname(__filename), '..')
 const mermaidFontFamily =
-  '"Noto Sans CJK SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Arial Unicode MS", sans-serif'
+  '"Helvetica Neue", Helvetica, Arial, "DejaVu Sans", sans-serif'
 
 function findBrowserExecutable() {
   const candidates = [

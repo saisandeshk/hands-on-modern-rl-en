@@ -3,12 +3,15 @@ import path from 'node:path'
 import process from 'node:process'
 
 const root = process.cwd()
-const englishRoot = path.join(root, 'docs', 'en')
+const docsRoot = path.join(root, 'docs')
+const ignoredDirectories = new Set(['.vitepress', 'public', 'node_modules'])
 
 function collectMarkdown(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const absolute = path.join(directory, entry.name)
-    if (entry.isDirectory()) return collectMarkdown(absolute)
+    if (entry.isDirectory()) {
+      return ignoredDirectories.has(entry.name) ? [] : collectMarkdown(absolute)
+    }
     if (!entry.isFile() || !entry.name.endsWith('.md')) return []
     if (entry.name.startsWith('_archive')) return []
     return [absolute]
@@ -68,8 +71,8 @@ const checks = [
 ]
 
 const findings = new Map(checks.map(({ label }) => [label, []]))
-for (const file of collectMarkdown(englishRoot)) {
-  const route = path.relative(englishRoot, file).split(path.sep).join('/')
+for (const file of collectMarkdown(docsRoot)) {
+  const route = path.relative(docsRoot, file).split(path.sep).join('/')
   if (ignoredRoutes.has(route)) continue
   const source = proseOnly(fs.readFileSync(file, 'utf8'))
   for (const { label, pattern } of checks) {

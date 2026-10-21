@@ -40,7 +40,7 @@ function parseRepository() {
     }
   }
 
-  return { owner: 'walkinglabs', repo: packageJson.name || 'course-template' }
+  return { owner: 'saisandeshk', repo: packageJson.name || 'course-template' }
 }
 
 function getSiteUrl() {
@@ -112,18 +112,8 @@ function getLastModified(relativePath) {
 }
 
 function getPriority(relativePath) {
-  if (
-    relativePath === 'index.md' ||
-    /^(zh|en)\/index\.md$/.test(relativePath)
-  ) {
-    return '1.0'
-  }
-  if (
-    relativePath.startsWith('guide/') ||
-    /^(zh|en)\/guide\//.test(relativePath)
-  ) {
-    return '0.8'
-  }
+  if (relativePath === 'index.md') return '1.0'
+  if (relativePath.startsWith('guide/')) return '0.8'
   return '0.6'
 }
 

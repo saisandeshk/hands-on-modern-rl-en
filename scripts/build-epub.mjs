@@ -16,6 +16,8 @@ import {
   bookTagline,
   bookBuildDate,
   bookGithubUrl,
+  bookAdaptedBy,
+  originalGithubUrl,
   bookLicense,
   logoPath as pdfLogoPath,
   escapeHtml,
@@ -44,7 +46,7 @@ const epubFileName =
   process.env.EPUB_FILE_NAME ||
   `${packageJson.name}-open-textbook-v${bookVersion}.epub`
 const epubOutputPath = path.join(distDir, epubFileName)
-const epubLang = 'zh-CN'
+const epubLang = 'en'
 const epubBookId = 'hands-on-modern-rl-epub'
 
 // --- Markdown-it setup (mirrors VitePress config) ---
@@ -312,7 +314,7 @@ async function renderCoverToPng() {
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
   width: 1600px; height: 2560px;
-  font-family: "Noto Serif CJK SC", "Source Han Serif SC", "Songti SC", Georgia, serif;
+  font-family: Georgia, "Times New Roman", serif;
   background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
   display: flex; flex-direction: column; justify-content: space-between;
   padding: 160px 120px 120px;
@@ -321,7 +323,7 @@ body {
 .logo { max-width: 900px; max-height: 280px; margin-bottom: 80px; object-fit: contain; }
 .kicker { color: #0f4c81; font-size: 32px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 24px; }
 h1 { color: #102033; font-size: 120px; line-height: 1.08; margin-bottom: 24px; }
-.title-zh { color: #344054; font-size: 64px; font-weight: 700; margin-bottom: 48px; }
+.subtitle { color: #344054; font-size: 64px; font-weight: 700; margin-bottom: 48px; }
 .description { color: #344054; font-size: 36px; line-height: 1.7; max-width: 1200px; padding-top: 32px; border-top: 4px solid #f59e0b; }
 .bottom { padding-top: 60px; border-top: 2px solid #cbd5e1; }
 .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 60px; margin-bottom: 40px; }
@@ -335,13 +337,14 @@ h1 { color: #102033; font-size: 120px; line-height: 1.08; margin-bottom: 24px; }
   <img class="logo" src="${logoPath}" />
   <p class="kicker">${escapeHtml(cover.kicker)}</p>
   <h1>${escapeHtml(cover.titleEn)}</h1>
-  <p class="title-zh">${escapeHtml(cover.titleZh)}</p>
+  <p class="subtitle">${escapeHtml(cover.subtitle)}</p>
   <p class="description">${escapeHtml(cover.description)}</p>
 </div>
 <div class="bottom">
   <div class="meta">
     <p><span>Version</span>${escapeHtml(bookVersion)}</p>
     <p><span>Authors</span>${escapeHtml(bookAuthor)}</p>
+    <p><span>Adapted by</span>${escapeHtml(bookAdaptedBy)}</p>
     <p><span>Repository</span>${escapeHtml(bookGithubUrl)}</p>
     <p><span>Build</span>${escapeHtml(bookBuildDate)}</p>
   </div>
@@ -497,7 +500,7 @@ function createMarkdownRenderer(imageMap) {
   md.use(markdownItContainer, 'output', {
     render(tokens, idx) {
       if (tokens[idx].nesting === 1) {
-        const title = tokens[idx].info.trim().slice(6).trim() || '运行结果'
+        const title = tokens[idx].info.trim().slice(6).trim() || 'Output'
         return `<div class="output-block"><p class="output-title">${escapeXml(title)}</p>\n`
       }
       return '</div>\n'
@@ -520,7 +523,7 @@ function createMarkdownRenderer(imageMap) {
         return `<div class="mermaid-diagram"><img src="../images/${imageId}" alt="Mermaid diagram" /></div>\n`
       }
       const escaped = escapeXml(token.content)
-      return `<div class="mermaid-placeholder"><p class="mermaid-label">[图表]</p><pre>${escaped}</pre></div>\n`
+      return `<div class="mermaid-placeholder"><p class="mermaid-label">[Diagram]</p><pre>${escaped}</pre></div>\n`
     }
     return defaultFence(tokens, idx, options, env, self)
   }
@@ -633,7 +636,7 @@ function mediaTypeForExt(ext) {
 function collectTocSections(sidebar) {
   const sections = []
   for (const section of sidebar || []) {
-    const entry = { title: section.text || '未命名', items: [] }
+    const entry = { title: section.text || 'Untitled', items: [] }
     flattenSidebar(section.items || [], entry.items)
     if (section.link) {
       entry.items.unshift({ title: section.text, link: section.link })
@@ -652,8 +655,8 @@ function collectAndRewriteImages(html, sourcePagePath, imageMap) {
 
     if (src.startsWith('http://') || src.startsWith('https://')) {
       const altMatch = match.match(/alt=["']([^"']*)["']/)
-      const alt = altMatch ? altMatch[1] : '外部图片'
-      return `<span class="external-image-placeholder">[在线图片: ${escapeXml(alt)}]</span>`
+      const alt = altMatch ? altMatch[1] : 'External image'
+      return `<span class="external-image-placeholder">[Online image: ${escapeXml(alt)}]</span>`
     }
 
     const sourceDir = path.dirname(sourcePagePath)
@@ -815,11 +818,11 @@ ${spineItems.join('\n')}
 
 function generateNavXhtml(tocSections) {
   const navItems = [
-    '      <li><span>前置页</span>',
+    '      <li><span>Front Matter</span>',
     '        <ol>',
-    '          <li><a href="chapters/cover.xhtml">封面</a></li>',
-    '          <li><a href="chapters/intro.xhtml">本书简介</a></li>',
-    '          <li><a href="chapters/publication-note.xhtml">版本说明</a></li>',
+    '          <li><a href="chapters/cover.xhtml">Cover</a></li>',
+    '          <li><a href="chapters/intro.xhtml">About This Book</a></li>',
+    '          <li><a href="chapters/publication-note.xhtml">Edition Notes</a></li>',
     '        </ol>',
     '      </li>'
   ]
@@ -845,12 +848,12 @@ function generateNavXhtml(tocSections) {
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="${epubLang}" xml:lang="${epubLang}">
 <head>
   <meta charset="UTF-8"/>
-  <title>目录</title>
+  <title>Contents</title>
   <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
   <nav epub:type="toc" id="toc">
-    <h1>目录</h1>
+    <h1>Contents</h1>
     <ol>
 ${navItems.join('\n')}
     </ol>
@@ -863,7 +866,7 @@ function generateStyleCss() {
   return `@charset "UTF-8";
 
 body {
-  font-family: "Noto Serif CJK SC", "Source Han Serif SC", "Songti SC", Georgia, serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 1em;
   line-height: 1.7;
   color: #1a1a1a;
@@ -1043,7 +1046,7 @@ sup { font-size: 0.75em; }
   color: #102033;
 }
 
-.cover-title-zh {
+.cover-subtitle {
   font-size: 1.4em;
   font-weight: bold;
   color: #344054;
@@ -1110,7 +1113,7 @@ function generateCoverXhtml() {
 <html xmlns="http://www.w3.org/1999/xhtml" lang="${epubLang}" xml:lang="${epubLang}">
 <head>
   <meta charset="UTF-8"/>
-  <title>封面</title>
+  <title>Cover</title>
   <link rel="stylesheet" href="../style.css"/>
 </head>
 <body class="cover-page">
@@ -1118,13 +1121,14 @@ function generateCoverXhtml() {
     <img src="../images/cover-logo.png" alt="Hands-On Modern RL Logo" class="cover-logo" />
     <p class="cover-kicker">${escapeXml(cover.kicker)}</p>
     <h1>${escapeXml(cover.titleEn)}</h1>
-    <p class="cover-title-zh">${escapeXml(cover.titleZh)}</p>
+    <p class="cover-subtitle">${escapeXml(cover.subtitle)}</p>
     <p class="cover-description">${escapeXml(cover.description)}</p>
   </div>
   <div class="cover-bottom">
     <table class="cover-meta">
       <tr><td class="meta-label">Version</td><td class="meta-value">${escapeXml(bookVersion)}</td></tr>
       <tr><td class="meta-label">Authors</td><td class="meta-value">${escapeXml(bookAuthor)}</td></tr>
+      <tr><td class="meta-label">Adapted by</td><td class="meta-value">${escapeHtml(bookAdaptedBy)}</td></tr>
       <tr><td class="meta-label">Repository</td><td class="meta-value">${escapeXml(bookGithubUrl)}</td></tr>
       <tr><td class="meta-label">Build</td><td class="meta-value">${escapeXml(bookBuildDate)}</td></tr>
     </table>
@@ -1161,7 +1165,7 @@ ${audienceItems}
   </ul>
   <h2>${escapeXml(intro.howToRead.title)}</h2>
 ${howToRead}
-  <p>本书共汇编 ${pageCount} 个课程页面，目标是让它更像一本可持续更新的课本。</p>
+  <p>This book compiles ${pageCount} course pages, with the aim of reading more like a textbook that can be updated over time.</p>
 </body>
 </html>`
 }
@@ -1178,9 +1182,11 @@ function generatePublicationNoteXhtml() {
 </head>
 <body>
   <h1>${escapeXml(publicationNote.title)}</h1>
-  <p><strong>版本：</strong>${escapeXml(bookVersion)}，构建日期：${escapeXml(bookBuildDate)}。</p>
-  <p><strong>作者：</strong>${escapeXml(bookAuthor)}。</p>
-  <p><strong>项目地址：</strong><a href="${escapeXml(bookGithubUrl)}">${escapeXml(bookGithubUrl)}</a>。</p>
+  <p><strong>Version:</strong> ${escapeXml(bookVersion)}. <strong>Build date:</strong> ${escapeXml(bookBuildDate)}.</p>
+  <p><strong>Authors:</strong> ${escapeXml(bookAuthor)}.</p>
+  <p><strong>Adapted by:</strong> ${escapeHtml(bookAdaptedBy)}.</p>
+  <p><strong>Repository:</strong> <a href="${escapeXml(bookGithubUrl)}">${escapeXml(bookGithubUrl)}</a>. <strong>Original project:</strong> <a href="${escapeXml(originalGithubUrl)}">${escapeXml(originalGithubUrl)}</a>.</p>
+  <p>${escapeXml(publicationNote.attribution)}</p>
   <p>${escapeXml(publicationNote.iterationNote)}</p>
   <p>${escapeXml(publicationNote.disclaimer)}</p>
   <h2>${escapeXml(publicationNote.licenseSection.title)}</h2>
