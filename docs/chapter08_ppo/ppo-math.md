@@ -58,24 +58,6 @@ Training an agent that makes decisions means answering six questions in order. T
 
 <PpoCodeFocus focus="overview" />
 
-### Overview of the Implementation Structure
-
-Training an agent that makes decisions means answering six questions in order. The implementation structure below follows this order.
-
-**First, what makes the decisions?** We need a neural network: the policy network outputs action probabilities, and the value network outputs a score for how good the current state is. This is what `[A] forward` does.
-
-**Second, how does the agent interact with the environment?** Choose an action from the action probability distribution and record the probability (log_prob) of the chosen action. This is what `[B] act / evaluate` does.
-
-**Third, what is recorded during interaction?** The state, action, and reward of every step must be stored. The old policy's probability at that moment must also be stored separately, because the policy changes once the parameters are updated and the old probability is needed for comparison. This is what `[C] collect_rollout` does.
-
-**Fourth, how is each action judged good or bad?** Looking at whether the reward is high is not enough. What matters is how much better the action is than the "normal level" of the current policy. This relative judgment is the advantage. This is what `[D] compute_gae` does.
-
-**Fifth, once we know good from bad, how do we change the policy safely?** Strengthen good actions and weaken bad ones, but keep the update small. Otherwise the policy drifts off and the old data is no longer accurate. `actor_loss_fn` controls the size of the policy update with the ratio and clip, and `critic_loss_fn` trains the value network at the same time. This is what `[E]` does.
-
-**Sixth, how is this process repeated?** Learn from the same batch of experience for several rounds (clip keeps the learning from going astray), then collect new experience and loop. This is what `[F]` does.
-
-<PpoCodeFocus focus="overview" />
-
 These six questions make up the complete implementation logic of PPO, and the mathematical derivation below maps each part back to specific code.
 
 ## Limitations of the Vanilla Policy Gradient
@@ -272,7 +254,7 @@ PPO-Clip actually does two things:
 
 `torch.min(surr1, surr2)` is how the second thing is carried out, and it accomplishes two tasks:
 
-- **Gradient control**: when the ratio leaves the clipping interval, the clipped term becomes a constant, $\min$ picks the clipped term, and the gradient automatically drops to zero
+- **Gradient control**: when the ratio leaves the clipping interval in the same direction as the advantage sign (overshooting toward higher objective value), the clipped term becomes a constant, $\min$ picks the clipped term, and the gradient drops to zero
 - **Distance penalty**: the closer the ratio is to the clipping boundary, the closer surr1 and surr2 are, with no penalty. The farther the ratio is from the boundary, the larger the gap and the larger the penalty in the loss
 
 A concrete example shows how `torch.min` works. Suppose a sample has advantage $A_t = 2$ (a good action) and $\varepsilon = 0.2$, so the clipping interval is $[0.8, 1.2]$:
@@ -287,17 +269,17 @@ A concrete example shows how `torch.min` works. Suppose a sample has advantage $
 
 For a bad action with $A_t = -2$:
 
-| ratio   | surr1 = ratio × (-2) | surr2 = clipped × (-2) | Which one torch.min takes | Meaning                                          |
-| ------- | -------------------- | ---------------------- | ------------------------- | ------------------------------------------------ |
-| 0.7     | -1.4                 | -1.6                   | surr2                     | Below the lower bound, take the clipped term     |
-| 1.0     | -2.0                 | -2.0                   | Equal                     | ratio = 1, the old and new policies agree        |
-| 1.1     | -2.2                 | -2.2                   | Equal                     | Inside the clipping interval, optimize normally  |
-| **1.3** | **-2.6**             | **-2.4**               | **surr2**                 | **Above the upper bound, take the clipped term** |
-| 2.0     | -4.0                 | -2.4                   | surr2                     | Far above, the clipped term caps the value       |
+| ratio   | surr1 = ratio × (-2) | surr2 = clipped × (-2) | Which one torch.min takes | Meaning                                                             |
+| ------- | -------------------- | ---------------------- | ------------------------- | ------------------------------------------------------------------- |
+| 0.7     | -1.4                 | -1.6                   | surr2                     | Below the lower bound, take the clipped term                        |
+| 1.0     | -2.0                 | -2.0                   | Equal                     | ratio = 1, the old and new policies agree                           |
+| 1.1     | -2.2                 | -2.2                   | Equal                     | Inside the clipping interval, optimize normally                     |
+| **1.3** | **-2.6**             | **-2.4**               | **surr1**                 | **Above the upper bound, unclipped term pulls the ratio back down** |
+| 2.0     | -4.0                 | -2.4                   | surr1                     | Far above, the unclipped term keeps a nonzero recovery gradient     |
 
-In both cases `torch.min` **lets surr1 dominate inside the safe interval and lets the clipped term dominate outside it**.
+In the $A_t > 0$ case `torch.min` picks the clipped term only above $1+\varepsilon$ (same-direction overshoot, gradient zero); below $1-\varepsilon$ it picks the unclipped term, whose nonzero gradient pulls the ratio back up. The $A_t < 0$ case is the mirror image: the clipped term wins below $1-\varepsilon$ (gradient zero), the unclipped term above $1+\varepsilon$ (nonzero recovery gradient pulling the ratio back down). The full case analysis is in [the clipping section](./trust-region-clipping).
 
-So far, Step 3, `torch.min(surr1, surr2)`, has produced the value of the **PPO-Clip surrogate objective**: inside the safe interval it equals surr1 (the original objective), and outside it equals surr2 (the clipped constant).
+So far, Step 3, `torch.min(surr1, surr2)`, has produced the value of the **PPO-Clip surrogate objective**: inside the safe interval it equals surr1 (the original objective); outside it equals the clipped constant in the same-direction overshoot region, and the unclipped value (with a recovery gradient) in the opposite-direction overshoot region.
 
 This value cannot be used for optimization directly, though. It is an "objective to maximize", while a PyTorch optimizer works by "minimizing a loss". Step 4 is therefore needed to turn the maximization objective into a minimization loss.
 
@@ -526,6 +508,14 @@ flowchart TD
 | $T$           | Rollout length         | 2048          | How many steps of data to collect each time               | `steps`        |
 | $K$           | Number of epochs       | 10            | How many rounds to update on the same batch               | `epochs`       |
 
+### Advantage Normalization (Implementation Detail)
+
+Raw advantages carry the reward scale with them: in one rollout the advantages may span $\pm 0.1$, in another $\pm 100$. The same learning rate then means very different step sizes. A common practice (used by this chapter's code, CleanRL, and modern LLM-RL stacks such as TRL/veRL) is therefore to standardize the advantages once per rollout, before the $K$ epochs begin:
+
+$$\hat{A}_t \leftarrow \frac{\hat{A}_t - \mathrm{mean}(\hat{A})}{\mathrm{std}(\hat{A}) + 10^{-8}}$$
+
+Centering removes a constant offset (which the baseline should already have removed, up to estimation error) and scaling puts the policy gradient on a predictable scale, so one learning rate works across tasks. Two cautions. First, normalize once over the whole rollout batch, not separately inside each minibatch: per-minibatch statistics are noisy estimates of the batch statistics and re-centering every minibatch distorts the update direction (a mild form of minibatch leakage). (Note: Stable-Baselines3, used in Section 8.1, leaves this off by default with `normalize_advantage=False`, and the original OpenAI baselines PPO2 normalized per minibatch — the once-per-batch form here is the recommended modern practice, not a universal default.) Second, normalize the advantages but never the value targets $V_t^{\mathrm{targ}}$: the Critic must predict returns on their true scale, and standardizing its labels would silently change the regression problem.
+
 ## The Complete Algorithm
 
 Assembling all the components, the PPO training loop is as follows:
@@ -598,7 +588,7 @@ $\varepsilon = 0$ freezes the policy almost entirely near the old policy: whethe
 <details>
 <summary><strong>Question 2: Can PPO's clipping mechanism fully replace a KL constraint?</strong></summary>
 
-Clipping constrains only the policy ratio $r_t$ of each **individual** action. It does not directly constrain the overall KL divergence between the two policy distributions. In the extreme case where every action is pushed to the clipping boundary, the change in the overall distribution can far exceed a KL constraint of $\delta = 0.01$. This rarely happens in practice, but in settings such as LLM alignment that need strict control over policy change, the KL divergence is usually monitored as an extra safety indicator. The RLHF training in Chapter 8 records both `clip_fraction` and `approx_kl`.
+Clipping constrains only the policy ratio $r_t$ of each **individual** action. It does not directly constrain the overall KL divergence between the two policy distributions. In the extreme case where every action is pushed to the clipping boundary, the change in the overall distribution can far exceed a KL constraint of $\delta = 0.01$. This rarely happens in practice, but in settings such as LLM alignment that need strict control over policy change, the KL divergence is usually monitored as an extra safety indicator. The SB3 PPO run in Section 8.1 logs both `clip_fraction` and `approx_kl` for exactly this reason.
 
 </details>
 
@@ -740,6 +730,8 @@ $$
 \nabla_\theta J(\theta) = \mathbb{E}_{\tau\sim\pi_\theta}\left[\sum_{t=0}^{T-1}\nabla_\theta \log \pi_\theta(a_t\mid s_t)G_t\right]
 $$
 
+A causality refinement cuts variance further at no cost in bias. The action $a_t$ cannot influence rewards earned before step $t$, so weighting $\log \pi_\theta(a_t \mid s_t)$ by the full trajectory return $G_{0:T}$ only adds noise. Dropping the past rewards gives the reward-to-go $G_t$ already used above, and the gradient becomes $\mathbb{E}[\sum_t \nabla_\theta \log \pi_\theta(a_t\mid s_t)\,G_{t:}]$. Every later technique in this chapter (baselines, GAE) builds on this causally trimmed form: credit flows only forward in time.
+
 In an implementation, write an equivalent loss and let automatic differentiation compute the gradient:
 
 ```python {1-2}
@@ -831,11 +823,11 @@ $$
 The action advantages can then be computed:
 
 $$
-A^\pi(s_t,a_L) \approx 83.3-106.7=-22.4
+A^\pi(s_t,a_L) \approx \frac{250}{3}-\frac{320}{3}=-23.3\ldots
 $$
 
 $$
-A^\pi(s_t,a_R) \approx 130-106.7=22.3
+A^\pi(s_t,a_R) \approx 130-106.7=23.3
 $$
 
 This shows that in this state, $a_R$ is better than the average level of the current policy and $a_L$ is worse. The average level here comes from return estimates over many sampled trajectories.

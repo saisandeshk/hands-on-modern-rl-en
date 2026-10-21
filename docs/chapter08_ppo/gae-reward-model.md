@@ -120,7 +120,7 @@ For the same 5-step episode, TD gives the early steps an advantage of only 0.1, 
 
 ## The Bias-Variance Tradeoff
 
-In 2016, Schulman again proposed GAE (Generalized Advantage Estimation), which uses a single parameter $\lambda$ to interpolate between TD and MC by exponential weighting:
+Schulman et al. proposed GAE (arXiv 2015, ICML 2016), which uses a single parameter $\lambda$ to interpolate between TD and MC by exponential weighting:
 
 $$\hat{A}_t^{\text{GAE}(\gamma, \lambda)} = \sum_{k=0}^{\infty} (\gamma \lambda)^k \delta_{t+k}$$
 
@@ -273,11 +273,11 @@ print("Target returns:", returns)
 Output ($\gamma = 0.99$, $\lambda = 0.95$, slightly different from the $\gamma = 1$ tables in the main text):
 
 ```
-Advantage estimates: [0.6203 0.4951 0.4159 0.3222 0.2   ]
-Target returns: [0.7203 0.6951 0.7159 0.8222 1.0   ]
+Advantage estimates: [0.7611 0.7051 0.6465 0.4801 0.2   ]
+Target returns: [0.8611 0.9051 0.9465 0.9801 1.    ]
 ```
 
-Note that the advantage $0.62$ at $t = 0$ is larger than the $0.20$ at $t = 4$. The terminal reward $r_4 = 1$ propagates all the way back to the start through the exponential decay of GAE, while $t = 4$ sees only its own step, $\delta_4 = 1 - 0.8 = 0.2$. This is the key difference between GAE and pure TD: **tokens early in the sequence also receive a nonzero advantage signal.** With $\lambda = 0$, the whole column of advantages reduces to $[0.1, 0.1, 0.2, 0.3, 0.2]$ (the TD column above), and the start has almost no signal. The `returns` column adds the advantage back to $V(s_t)$ and serves as the regression target for the Critic. It rebuilds the "future return", so that the baseline $V(s_t)$ of the next $\delta$ becomes more accurate.
+Note that the advantage $0.76$ at $t = 0$ is larger than the $0.20$ at $t = 4$. The terminal reward $r_4 = 1$ propagates all the way back to the start through the exponential decay of GAE, while $t = 4$ sees only its own step, $\delta_4 = 1 - 0.8 = 0.2$. This is the key difference between GAE and pure TD: **tokens early in the sequence also receive a nonzero advantage signal.** With $\lambda = 0$, the whole column of advantages reduces to the one-step TD errors $[0.098, 0.097, 0.195, 0.292, 0.2]$ (the TD column above, minus a touch of $\gamma = 0.99$ discounting), and the start has almost no signal. The `returns` column adds the advantage back to $V(s_t)$ and serves as the regression target for the Critic. It rebuilds the "future return", so that the baseline $V(s_t)$ of the next $\delta$ becomes more accurate.
 
 ## Reward Models
 
