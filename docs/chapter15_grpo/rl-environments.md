@@ -8,7 +8,7 @@ Modern models can reason, write code, and call tools. Training them on long-hori
 
 This changes where most of the engineering effort goes. An environment must be reproducible enough for training, realistic enough for useful behavior to transfer, and strict enough that the model cannot earn reward through a shortcut. The verifier must then distinguish genuine task completion from outputs that merely look plausible.
 
-To see why, return to the PPO/GRPO objective from [Chapter 15](./grpo-family):
+To see why, return to the PPO/GRPO objective from [Section 15.1](./grpo-practice-and-mechanism):
 
 $$\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\left[\sum_t A(s_t, a_t) \cdot \nabla_\theta \log \pi_\theta(a_t \mid s_t)\right]$$
 
@@ -473,7 +473,7 @@ The key technical challenge in asynchronous mode is **staleness** — the rollou
 
 ### Acceleration Effects
 
-The AReaL paper reports the results of training Llama-3-8B on agentic tasks (numbers below are the paper's reported figures, not independently reproduced here):
+The AReaL paper reports a headline speedup of about **2.77×** for asynchronous over synchronous rollout-training (numbers below are the paper's reported figures, not independently reproduced here; see Section 18.4 for the distributed-training setup behind this figure):
 
 | Mode                 | GPU Utilization | Wall-clock / Step | Speedup   |
 | -------------------- | --------------- | ----------------- | --------- |
@@ -502,7 +502,7 @@ Agent rollouts fail for reasons that have nothing to do with policy quality: the
 
 **Failed-rollout accounting.** Every rollout should end with a status, not just a reward: `success` (verifier judged the trajectory), `invalid` (the policy produced something unscorable, such as unparseable output — a genuine 0), or `infra_error` (the environment broke before judgment was possible). Only the first two enter the GRPO group statistics; `infra_error` rollouts are retried or dropped, and the retry rate is logged as its own metric. A sudden rise in `infra_error` means the sandbox fleet is unhealthy, not that the policy regressed.
 
-**Retry deduplication.** On timeout or tool error, the naive fix is to retry the same prompt several times. But blind retries distort the group: a prompt retried five times contributes more rollouts than a prompt that succeeded once, and transient tool errors get averaged into the advantage as if they were policy behavior. Deduplicate by attempt: keep at most one judged trajectory per (prompt, environment seed) per update, and cap retries (for example, one retry for timeouts, zero for deterministic verifier failures). Duplicate tool calls with identical arguments inside a single trajectory should likewise be short-circuited by the harness and returned from cache, so the policy is not charged wall-clock time — or reward variance — for hammering the same endpoint.
+**Retry deduplication.** On timeout or tool error, the naive fix is to retry the same prompt several times. But blind retries distort the group: a prompt retried five times contributes more rollouts than a prompt that succeeded once, and transient tool errors get averaged into the advantage as if they were policy behavior. Deduplicate by attempt: keep at most one judged trajectory per (prompt, attempt id) per update — a prompt needs $G$ distinct attempts to form its group, so re-sample the missing members instead of padding the group with retries — and cap retries (for example, one retry for timeouts, zero for deterministic verifier failures). Duplicate tool calls with identical arguments inside a single trajectory should likewise be short-circuited by the harness and returned from cache, so the policy is not charged wall-clock time — or reward variance — for hammering the same endpoint.
 
 **Recovery.** Long RL runs checkpoint four things together: model weights, optimizer state, the rollout sampler's position in the prompt curriculum, and the data loader's random state. Restoring only the weights silently reshuffles which prompts the policy sees next and can produce a visible discontinuity in the reward curve. A related failure mode is learner starvation in asynchronous setups: if generation batching lets a few very long rollouts occupy every sandbox (no backpressure limit on concurrent long-horizon tasks), the trainer waits with an empty queue while GPUs idle. Cap concurrent rollouts per worker, bound queue depth so backpressure propagates to the sampler, and monitor rollout tokens per second and verifier throughput separately — when verifier throughput falls below rollout production, the fix is more verifier replicas, not a larger policy batch.
 

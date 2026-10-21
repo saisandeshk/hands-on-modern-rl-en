@@ -62,10 +62,10 @@ The baseline's job is variance reduction: subtracting a reward predictor that do
 
 ### Exercise 2 — Compute group advantages by hand
 
-Four answers to one prompt receive rewards $[2.0, 1.0, 1.0, 0.0]$. Using population standard deviation (divide by $G$), compute the mean, the standard deviation, and the four advantages. Verify that the advantages sum to zero.
+Four answers to one prompt receive rewards $[2.0, 1.0, 1.0, 0.0]$. Using the sample standard deviation (divide by $G - 1$, the convention of Section 15.1), compute the mean, the standard deviation, and the four advantages. Verify that the advantages sum to zero.
 
 ::: details Solution
-Mean: $\bar r = (2 + 1 + 1 + 0)/4 = 1.0$. Deviations: $[1, 0, 0, -1]$. Population variance: $(1 + 0 + 0 + 1)/4 = 0.5$, so $s = \sqrt{0.5} \approx 0.7071$. Advantages: $[1/0.7071, 0, 0, -1/0.7071] \approx [+1.4142, 0, 0, -1.4142]$. Sum: $1.4142 + 0 + 0 - 1.4142 = 0$, as required — the positive and negative pressures inside one group always balance.
+Mean: $\bar r = (2 + 1 + 1 + 0)/4 = 1.0$. Deviations: $[1, 0, 0, -1]$. Sample variance: $(1 + 0 + 0 + 1)/3 = 2/3$, so $s = \sqrt{2/3} \approx 0.8165$. Advantages: $[1/0.8165, 0, 0, -1/0.8165] \approx [+1.2247, 0, 0, -1.2247]$. Sum: $1.2247 + 0 + 0 - 1.2247 = 0$, as required — the positive and negative pressures inside one group always balance.
 :::
 
 ### Exercise 3 — Clipped token objective on paper
@@ -89,12 +89,12 @@ $\Delta = -2.0 - (-2.1) = 0.1$. k1: $-0.1$. k3: $e^{0.1} - 0.1 - 1 \approx 1.105
 Using the same token ratios $[1.1, 0.9, 1.5]$ with response length $|y| = 3$, compute the GSPO sequence ratio $s = (\prod_t \rho_t)^{1/3}$. With $\epsilon = 0.2$, does clipping bind for the sequence ratio? Contrast with the raw product.
 
 ::: details Solution
-Product: $1.1 \times 0.9 \times 1.5 = 1.485$. Sequence ratio: $1.485^{1/3} \approx 1.141$ (check: $\ln 1.485 \approx 0.3958$, divided by $3$ is $0.1319$, $\exp(0.1319) \approx 1.141$). With $\epsilon = 0.2$ the allowed band is $[0.8, 1.2]$: $1.141$ lies inside, so clipping does not bind. The raw product $1.485$ would bind at $1.2$ — without the $1/|y|$ normalization, longer responses produce more extreme ratios and need different clipping ranges per length, which is exactly the length dependence GSPO removes.
+Product: $1.1 \times 0.9 \times 1.5 = 1.485$. Sequence ratio: $1.485^{1/3} \approx 1.141$ (check: $\ln 1.485 \approx 0.3954$, divided by $3$ is $0.1318$, $\exp(0.1318) \approx 1.1409$). With $\epsilon = 0.2$ the allowed band is $[0.8, 1.2]$: $1.141$ lies inside, so clipping does not bind. The raw product $1.485$ would bind at $1.2$ — without the $1/|y|$ normalization, longer responses produce more extreme ratios and need different clipping ranges per length, which is exactly the length dependence GSPO removes.
 :::
 
 ### Exercise 6 — Code the advantage function with a zero-std guard
 
-Write `grpo_group_normalize(rewards)` following `code/chapter15_grpo/grpo_mechanism.py`: return zeros when the standard deviation is below a small threshold, else the standardized rewards. Test it on `[1.5, 1.5, 1.5, 1.5]` and on `[1.5, 0.0, 1.5, 0.0, 1.0, 1.5, 0.5, 1.5]`, and confirm the second case reproduces mean $0.9375$ and advantages starting $[0.887, -1.478, \dots]$.
+Write `grpo_group_normalize(rewards)` following the NumPy snippet in Section 15.1: return zeros when the standard deviation is below a small threshold, else the standardized rewards. Test it on `[1.5, 1.5, 1.5, 1.5]` and on `[1.5, 0.0, 1.5, 0.0, 1.0, 1.5, 0.5, 1.5]`, and confirm the second case reproduces mean $0.9375$ and advantages starting $[0.830, -1.383, \dots]$.
 
 ::: details Solution
 
@@ -103,7 +103,7 @@ import numpy as np
 
 def grpo_group_normalize(rewards, eps=1e-8):
     rewards = np.asarray(rewards, dtype=float)
-    std = rewards.std()  # population std, matches the chapter's convention
+    std = rewards.std(ddof=1)  # sample std, matches the Section 15.1 convention
     if std < eps:
         return np.zeros_like(rewards)
     return (rewards - rewards.mean()) / std
@@ -111,10 +111,10 @@ def grpo_group_normalize(rewards, eps=1e-8):
 print(grpo_group_normalize([1.5, 1.5, 1.5, 1.5]))
 # [0. 0. 0. 0.]
 adv = grpo_group_normalize([1.5, 0.0, 1.5, 0.0, 1.0, 1.5, 0.5, 1.5])
-print(adv)  # [0.8868 -1.4780 0.8868 -1.4780 0.0985 0.8868 -0.6897 0.8868]
+print(adv)  # [0.8295 -1.3825 0.8295 -1.3825 0.0922 0.8295 -0.6452 0.8295]
 ```
 
-The uniform group has std $0 < \epsilon$, so it returns zeros (no gradient signal — the "graduated" case). The mixed group has mean $7.5/8 = 0.9375$ and std $\approx 0.6343$; $(1.5 - 0.9375)/0.6343 \approx 0.8868$ and $(0 - 0.9375)/0.6343 \approx -1.4780$, matching the chapter's worked example.
+The uniform group has std $0 < \epsilon$, so it returns zeros (no gradient signal — the "graduated" case). The mixed group has mean $7.5/8 = 0.9375$ and sample std $\approx 0.6781$; $(1.5 - 0.9375)/0.6781 \approx 0.8295$ and $(0 - 0.9375)/0.6781 \approx -1.3825$, matching the Section 15.1 worked example.
 :::
 
 ### Exercise 7 — Harden a math verifier
@@ -157,5 +157,5 @@ assert not grade_answer("", "")
 A GRPO run on math problems shows: mean reward flat at $0.85$, entropy falling $4.2 \to 1.1$, mean length rising $400 \to 1400$ tokens, KL against the reference flat. Name the most likely failure, explain the mechanism in two sentences, and give two concrete fixes drawn from this chapter.
 
 ::: details Solution
-Most likely failure: verbosity-driven entropy collapse — the policy has converged onto one long template that reliably harvests format/partial credit without solving more problems (reward flat, entropy collapsing, length tripling, KL flat because the drift is gradual, not a single large step). Mechanism: with sparse terminal reward, longer answers get more chances to contain a correct-looking span, so selection pressure favors the longest reproducible template and the distribution sharpens around it. Fixes from this chapter: (1) enforce per-response length normalization (`loss_type="grpo"` averaging) plus an overlong shaping penalty in the DAPO style so extra tokens cost rather than pay; (2) filter the data with dynamic sampling so batches keep discriminative groups, and gate on external quality (held-out accuracy with an independent parser) rather than training reward — if length rises while held-out accuracy is flat, stop and regularize.
+Most likely failure: verbosity-driven entropy collapse — the policy has converged onto one long template that reliably harvests format/partial credit without solving more problems (reward flat, entropy collapsing, length tripling). Note the KL trace needs care: per-token KL against the reference can stay flat while the policy sharpens around one template, because the drift is gradual rather than a single large step — so gate on external quality, not on KL alone. Mechanism: with sparse terminal reward, longer answers get more chances to contain a correct-looking span, so selection pressure favors the longest reproducible template and the distribution sharpens around it; the flat training reward together with flat held-out accuracy shows the extra length is not buying correctness. Fixes from this chapter: (1) enforce per-response length normalization (`loss_type="grpo"` averaging) plus an overlong shaping penalty in the DAPO style so extra tokens cost rather than pay; (2) filter the data with dynamic sampling so batches keep discriminative groups, and gate on external quality (held-out accuracy with an independent parser) rather than training reward — if length rises while held-out accuracy is flat, stop and regularize.
 :::

@@ -483,7 +483,7 @@ $$
 s_j=\operatorname{std}(r_{j,1},\ldots,r_{j,G}).
 $$
 
-DeepSeekMath writes `std` without specifying whether the denominator is $G$ or $G-1$. The example follows the [default definition of PyTorch `torch.std`](https://pytorch.org/docs/stable/generated/torch.std.html) and uses Bessel's correction. With a fixed group size, this changes the overall advantage scale but not the sign or ordering of answers inside a group.
+DeepSeekMath writes `std` without specifying whether the denominator is $G$ or $G-1$. This book uses the sample standard deviation with Bessel's correction (divide by $G-1$), following the [default definition of PyTorch `torch.std`](https://pytorch.org/docs/stable/generated/torch.std.html); the NumPy teaching snippet below therefore uses `rewards.std(ddof=1)` to match. With a fixed group size, this changes the overall advantage scale but not the sign or ordering of answers inside a group.
 
 Here:
 
@@ -665,7 +665,7 @@ The training loss is the negative expectation of this objective. DeepSeekMath us
 The penalty above uses one specific KL estimator, and it is worth naming the choice, because reference implementations differ. For a single token with $\Delta = \ell^{\text{ref}} - \ell^{\theta}$ (reference log-prob minus current-policy log-prob), the two common per-token estimators of $D_{\text{KL}}(\pi_\theta \| \pi_{\text{ref}})$ are:
 
 - **k1 (log-ratio):** $\hat D^{\text{k1}} = -\Delta = \ell^{\theta} - \ell^{\text{ref}}$. Unbiased, but a single sample can be negative.
-- **k3 (squared / exponential):** $\hat D^{\text{k3}} = \exp(\Delta) - \Delta - 1$. Also unbiased, since $\mathbb{E}_{\pi_\theta}[\exp(\Delta)] = \sum \pi_{\text{ref}} = 1$ and $\mathbb{E}_{\pi_\theta}[\Delta] = -D_{\text{KL}}$. Non-negative for every token because $e^x \ge 1 + x$.
+- **k3 (exponential):** $\hat D^{\text{k3}} = \exp(\Delta) - \Delta - 1$. Also unbiased, since $\mathbb{E}_{\pi_\theta}[\exp(\Delta)] = \sum \pi_{\text{ref}} = 1$ and $\mathbb{E}_{\pi_\theta}[\Delta] = -D_{\text{KL}}$. Non-negative for every token because $e^x \ge 1 + x$.
 
 A one-number example shows why DeepSeekMath chose k3. Suppose at some token $\ell^{\text{ref}} = -2.0$ and $\ell^{\theta} = -2.1$, so $\Delta = 0.1$:
 
@@ -673,7 +673,7 @@ $$
 \hat D^{\text{k1}} = -0.1, \qquad \hat D^{\text{k3}} = e^{0.1} - 0.1 - 1 \approx 1.10517 - 1.1 \approx 0.0052.
 $$
 
-The k1 estimate is negative even though the two distributions genuinely differ there; averaged over many tokens it is still correct in expectation, but per-token penalties and logging become hard to read. The k3 estimate is always $\ge 0$ and equals 0 only when the policies agree, which is why it is the safer default inside a token-wise penalty. When comparing implementations or tuning $\beta$, always check which estimator the code uses — switching estimators without rescaling $\beta$ silently changes the effective KL weight.
+The k1 estimate is negative even though the two distributions genuinely differ there; averaged over many tokens it is still correct in expectation, but per-token penalties and logging become hard to read. The k3 estimate is always $\ge 0$ and equals 0 only when the policies agree, which is why it is the safer default inside a token-wise penalty. Note the orientation: here $\Delta = \ell^{\text{ref}} - \ell^{\theta}$, matching veRL's `low_var_kl` ("k3"); some libraries define the log-ratio with the opposite sign, so when comparing implementations or tuning $\beta$, always check which estimator — and which sign convention — the code uses. Switching estimators without rescaling $\beta$ silently changes the effective KL weight.
 
 Putting all steps together, one GRPO training iteration is:
 
@@ -739,7 +739,7 @@ import numpy as np
 
 def grpo_group_normalize(rewards: list[float]) -> list[float]:
     rewards = np.array(rewards, dtype=float)
-    mean, std = rewards.mean(), rewards.std()
+    mean, std = rewards.mean(), rewards.std(ddof=1)  # sample std, Bessel's correction
     if std < 1e-8:
         return np.zeros_like(rewards)
     return (rewards - mean) / std
@@ -747,8 +747,8 @@ def grpo_group_normalize(rewards: list[float]) -> list[float]:
 # Example: rewards from 8 answers
 rewards = [1.5, 0.0, 1.5, 0.0, 1.0, 1.5, 0.5, 1.5]
 advantages = grpo_group_normalize(rewards)
-# Normalized advantages: [ 0.89 -1.48  0.89 -1.48  0.10  0.89 -0.69  0.89]
-# Mean: 0.9375, standard deviation: 0.634
+# Normalized advantages: [ 0.83 -1.38  0.83 -1.38  0.09  0.83 -0.65  0.83]
+# Mean: 0.9375, standard deviation (ddof=1): 0.678
 ```
 
 <details>

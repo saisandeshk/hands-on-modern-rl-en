@@ -69,3 +69,38 @@ Read all eight pages in `docs/chapter15_grpo/` end to end, recomputed every nume
 
 Coverage (RL.11): on-policy sampling, sequence PG, sparse terminal reward, token-space REINFORCE, critic/PPO-RLHF contrast, grouped sampling, group advantages, GRPO objective/trade-offs, all-equal-group behavior, old/current logprobs, per-token ratios, clipping + aggregation, masks/truncation, length/verbosity control, group-size cost, curricula, DAPO/GSPO variants — covered. RLOO, within-vs-batch normalization, KL estimators, multi-step drift/freshness, collapse signals, invalid/verifier-failure groups, matched-compute controls, full trace logging — were partial/missing, now covered by the inserts and review page. Frontier-scale convergence — Later, skipped.
 Coverage (RL.12): RLVR, math/code/structured-output envs, sandbox isolation, outcome rewards, rejection fine-tuning/distillation, teacher-student vocabulary, length/budget control, multi-turn state/actions, transitions/terminal conditions, trajectory credit, roles, sync/async, broadcast/staleness, curriculum/filtering, benchmark suites, hacking defenses — covered. Process rewards — intentionally Ch.17 territory (referenced). Retry dedup, failed-rollout accounting, recovery, batching/backpressure, throughput accounting — were missing, now covered by the new subsection. Self-play/multimodal — Depth/Later, skipped.
+
+## Review response
+
+One line per reviewer finding (E = error, D = doubt). Fixes verified by re-reading the edited passages; numeric changes rechecked with `.venv/bin/python` (sample-std advantages, ln 1.485 intermediates).
+
+- E1 (sidebar missing review page / 15.R label): rejected — `docs/.vitepress/config.mjs` is outside my scope and the task explicitly orders front matter `title: 15.R Summary and Exercises` with H1 `# 15.R Summary and Exercises`; the page is listed under "Sidebar additions" for the coordinator, as the task requires.
+- E2 (Clip-Higher described backwards): accepted — rewrote the `deepseek-dapo.md` paragraph around the upper bound (0.01 → 0.012 under [0.8, 1.2], → 0.0128 under 1.28) and fixed the table cell.
+- E3 (token-level loss mischaracterized as per-token credit): accepted — rewrote the paragraph/table cell as a reduction change (batch-token average vs per-response average removing the long-answer penalty); advantage stays sequence-level.
+- E4 (population vs sample std contradiction): accepted — declared sample std (Bessel, `ddof=1`) once in 15.1, fixed the NumPy snippet to `rewards.std(ddof=1)` with corrected outputs (std 0.6781, advantages [0.8295, −1.3825, …]), and updated Exercises 2 (answer ±1.2247) and 6 to the same convention.
+- E5 (AReaL 2.77× contradicts Ch.18): accepted — dropped the "Llama-3-8B on agentic tasks" attribution in 15.5; the paragraph now reports the paper's headline figure and defers to Section 18.4 for the setup. Ch.18 itself is outside my scope.
+- E6 (policy-gradient objective linked to 15.4): accepted — link now points to `./grpo-practice-and-mechanism` (Section 15.1).
+- E7 (k3 labelled "squared"): accepted — now "**k3 (exponential)**"; derivation untouched (verified correct).
+- E8 (ln 1.485 intermediate 0.3958): accepted — now 0.3954 / 0.1318 / exp ≈ 1.1409; final 1.141 unchanged.
+- E9 (`grpo_group_normalize` not in `code/chapter15_grpo/grpo_mechanism.py`): accepted within scope — Exercise 6 now cites the Section 15.1 snippet instead of the code file; `code/` is outside my scope so the file itself (and its stale "Chapter 9" docstring) is left for its owner, noted below.
+- E10 (`isinstance(x, type(gold_value))` too strict): accepted — `schema_ok` now treats int/float as one numeric class (120 vs 120.0 both pass) and excludes bool explicitly.
+- E11 (four vs five directions): accepted — now "five directions" including pre-training integration.
+- E12 (fixes not recorded in `planning/content-review-notes.md`): rejected (out of scope) — that file is not in my editable scope; the four fixed items (mHC sampler, VAPO-vs-R1-Zero ordering, DAPO NeurIPS venue, 1-shot-RLVR/RLVR-critique venues) are recorded in this report's Technical fixes; coordinator to copy them over.
+- E13 (front-matter title vs sidebar label): rejected — the slight heading/sidebar wording difference follows this chapter's existing pattern (15.1, 15.3 do the same) and the sidebar is coordinator-owned; renaming risks churn for no factual gain.
+- D1 (mHC = Manifold-Constrained Hyper-Connections): rejected pending verification — no network access to check the V3.2 report; reintroducing a differently-expanded claim would trade one unverifiable statement for another. Flagged under Needs external verification.
+- D2 (VAPO expansion "Value-based Augmented PPO"): accepted (softened) — expansion dropped, paper cited by title/arXiv id only.
+- D3 ("mainstream in 2024"): accepted — now "around 2025".
+- D4 (GSPO 10,000-card / "all Qwen3" claims): accepted (softened) — replaced with a mechanism-only statement marked not independently verified.
+- D5 (AReaL model/task attribution probably wrong): accepted — attribution removed per E5; exact paper table still needs an online check.
+- D6 (Exercise 8 KL-flat explanation): accepted — solution now notes per-token KL can stay flat under gradual drift and gates the diagnosis on held-out accuracy, not KL alone.
+- D7 (KL orientation vs TRL): accepted — added the Δ-orientation sentence and the opposite-sign warning.
+- D8 ("roughly a third" clipped-fraction cut-off): accepted — now "a rising clipped fraction" with no invented threshold.
+- D9 (retry-dedup wording vs GRPO groups): accepted — now "one judged trajectory per (prompt, attempt id); re-sample missing group members".
+- D10 ("trading format stability for lucky guesses"): accepted — sentence rewritten so falling validity reads as its own red flag.
+
+Follow-up for coordinator/owners (not actionable in my scope): add `15.R Summary and Exercises → /chapter15_grpo/review` (or renumbered `15.9`) to the sidebar; reconcile the AReaL 2.77× setup wording with Chapter 18.4; copy the four factual-fix records into `planning/content-review-notes.md`; consider adding `grpo_group_normalize` with a zero-std guard to `code/chapter15_grpo/grpo_mechanism.py` and fixing its stale "Chapter 9" docstring.
+
+## Commands run (review round)
+
+- `.venv/bin/python -c` (sample-std advantages for both reward vectors; ln(1.485)/3/exp check): `[0.8295, −1.3825, …, 0.0922, …, −0.6452]`, mean 0.9375 sample-std 0.6781; Ex.2 sample-std 0.8165 → ±1.2247; ln 1.485 ≈ 0.395415 → /3 ≈ 0.131805 → exp ≈ 1.140886.
+- `npx prettier --write` on all touched files (see below); `npx vitepress build docs` — success (build complete, all pages rendered).

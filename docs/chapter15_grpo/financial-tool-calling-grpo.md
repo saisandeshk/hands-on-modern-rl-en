@@ -211,6 +211,11 @@ def parse_call(text: str) -> dict | None:
         return None
 
 
+def _is_number(x) -> bool:
+    # bool is a subclass of int in Python; exclude it so True never passes as 120.
+    return isinstance(x, (int, float)) and not isinstance(x, bool)
+
+
 def schema_ok(call: dict, gold: dict) -> bool:
     if call.get("name") != gold.get("name"):
         return False
@@ -219,7 +224,13 @@ def schema_ok(call: dict, gold: dict) -> bool:
     for key, gold_value in gold["arguments"].items():
         if key not in call["arguments"]:
             return False
-        if not isinstance(call["arguments"][key], type(gold_value)):
+        actual = call["arguments"][key]
+        if isinstance(gold_value, bool) or isinstance(actual, bool):
+            if type(actual) is not type(gold_value):
+                return False
+        elif isinstance(gold_value, (int, float)) and isinstance(actual, (int, float)):
+            continue  # numeric arguments compare by value: 120 and 120.0 both pass
+        elif not isinstance(actual, type(gold_value)):
             return False
     return True
 
@@ -387,7 +398,7 @@ The metrics answer different questions:
 
 The AWS financial tool-calling example reports similar improvements: after GRPO/RLVR, Qwen3-1.7B improves exact match from about `0.62` to `0.96`, response validity from about `0.78` to `0.99`, and schema match from about `0.90` to `0.95`[^aws-financial-tool-grpo]. The important point is that small models can learn enterprise API calling when correctness is made explicit and optimizable.
 
-Two controls keep such comparisons honest. First, match the compute: compare GRPO against SFT and rejection-sampling baselines trained with the same number of generated tool calls, verifier executions, and gradient updates — otherwise a "GRPO wins" result may only show that more sampling was used. Second, log training traces beyond mean reward: KL against the reference policy, response entropy, mean completion length, and the fraction of valid JSON. If exact match rises while KL spikes or validity falls, the policy is trading format stability for lucky guesses rather than genuinely learning the schema.
+Two controls keep such comparisons honest. First, match the compute: compare GRPO against SFT and rejection-sampling baselines trained with the same number of generated tool calls, verifier executions, and gradient updates — otherwise a "GRPO wins" result may only show that more sampling was used. Second, log training traces beyond mean reward: KL against the reference policy, response entropy, mean completion length, and the fraction of valid JSON. If exact match rises while KL spikes or response validity falls, the gain is coming from lucky guesses on a subset of prompts, not from a more reliable policy — falling validity is itself a red flag, not evidence of format learning.
 
 ## 15.6.6 Difference from SFT
 
