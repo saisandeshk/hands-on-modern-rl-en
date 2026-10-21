@@ -41,7 +41,7 @@ This is why [Section 16.1](./emergence-and-o1) distinguishes "RL creates ability
 
 For math problems, the final answer can be extracted and compared with the reference answer; for code problems, unit tests can be run; for logic problems, rules can check the answer format. The verifier $v(x,y)$ must satisfy this: if the answer is correct, it almost surely judges it correct; if the answer is wrong, it almost surely judges it wrong. When the verifier itself has loopholes, the model may learn to "fool the verifier" instead of truly solving problems.
 
-Two engineering practices keep the verifier honest. First, **hold out hidden tests**: grade training rollouts on one set of tests and evaluate on a disjoint, undisclosed set, so memorizing or gaming the visible tests earns no reward. Second, **isolate execution**: run generated code in a sandbox with fixed time, memory, and network limits, so a rollout cannot alter its own grading environment. (The sandbox tooling is developed with the [code-generation setup in Chapter 15](../chapter15_grpo/verl-code-sandbox); [Chapter 19](../chapter19_agentic/overview) extends the same idea to tool-calling agents.)
+Two engineering practices keep the verifier honest. First, **hold out hidden tests**: grade training rollouts on the public tests, and evaluate on a disjoint, undisclosed set. The hidden set does not change the training reward, but it makes the evaluation an unbiased estimate of generalization and exposes models that have overfit to (or gamed) the visible tests. Second, **isolate execution**: run generated code in a sandbox with fixed time, memory, and network limits, so a rollout cannot alter its own grading environment. (The subprocess-isolated reward pipeline is wired up in the [code-generation setup in Chapter 15](../chapter15_grpo/verl-code-sandbox) — a subprocess isolates interpreter state only and does not replace a security sandbox; a real sandbox with permission checks and resource limits, and the full industrial-level code agent setup, are covered in [Chapter 19](../chapter19_agentic/overview).)
 
 ### A Sampled Group Needs Both Right and Wrong Answers
 
@@ -84,7 +84,7 @@ $$
 r_i = r_{\text{acc}}(x,y_i) + \lambda_{\text{fmt}} \cdot r_{\text{fmt}}(x,y_i),
 $$
 
-where $r_{\text{fmt}}$ is the format term and $\lambda_{\text{fmt}}$ is the weight of the format reward. Correctness dominates the direction and format secures the parsing boundary, and the specific weights are set by the training configuration. In real training the weight of the correctness reward is usually much larger than that of the format reward, to keep the model from producing answers that are "nicely formatted but wrong."
+where $r_{\text{fmt}}$ is the format term and $\lambda_{\text{fmt}}$ is the weight of the format reward. Correctness dominates the direction and format secures the parsing boundary, and the specific weights are set by the training configuration. In real training the weight of the correctness reward is usually larger than that of the format reward, to keep the model from producing answers that are "nicely formatted but wrong."
 
 ## The Within-Group Comparison Mechanism of GRPO
 

@@ -30,7 +30,7 @@ Early language models "generated one short answer at a time," so inference compu
 
 In 2024, Snell et al. answered this question systematically in the paper [Scaling LLM Test-Time Compute Optimally](https://arxiv.org/abs/2408.03314). They ran a clean set of controlled experiments:
 
-**Setup**: fix one base model (Llama-3-8B-Instruct), and compare two ways of improving on math problems of different difficulty:
+**Setup**: fix one base model (Llama-3.1-8B-Instruct), and compare two ways of improving on math problems of different difficulty:
 
 - **Path A**: keep the model but increase inference compute: have the model generate $N$ candidate solutions and then use a verifier to pick the best (best-of-N).
 - **Path B**: add no inference compute, but switch to a model with more parameters and stronger ability.

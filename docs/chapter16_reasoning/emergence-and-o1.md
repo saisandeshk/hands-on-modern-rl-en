@@ -41,7 +41,7 @@ When o1 was released it clearly surpassed GPT-4o on several reasoning benchmarks
 
 - **AIME 2024**
   - Evaluation method: single answer
-  - GPT-4o: about 12%
+  - GPT-4o: on the order of 10% (single-digit to low-teens depending on the harness)
   - o1: about 74%
 - **AIME 2024**
   - Evaluation method: consensus of 64
@@ -58,7 +58,7 @@ When o1 was released it clearly surpassed GPT-4o on several reasoning benchmarks
 
 The Codeforces Elo of 1673 places o1 at the 89th percentile of the human contestants evaluated.
 
-The second set of numbers is the easiest to misread. GPT-4o scores about 12% on a single attempt, and after drawing 64 answers and aggregating them (for example by majority vote) its score rises substantially — but that part of the difference comes from investing more compute at evaluation time. o1 reaches about 74% with a single attempt, already well above what sampling-based aggregation achieves for GPT-4o, and given a 64-sample consensus o1 reaches about 83%. The exact consensus figure depends on the aggregation rule (majority vote, best-of-N with a verifier, or reranking), so only numbers produced by the same protocol can be compared. Single answers, majority selection, and reranking use different amounts of inference compute, so the evaluation method must be kept when reporting a metric.
+The second set of numbers is the easiest to misread. GPT-4o scores on the order of 10% on a single attempt (the exact figure varies by harness; OpenAI's report gives a single-digit pass@1 and a low-teens consensus@64), and after drawing 64 answers and aggregating them (for example by majority vote) its score rises substantially — but that part of the difference comes from investing more compute at evaluation time. o1 reaches about 74% with a single attempt, already well above what sampling-based aggregation achieves for GPT-4o, and given a 64-sample consensus o1 reaches about 83%. The exact consensus figure depends on the aggregation rule (majority vote, best-of-N with a verifier, or reranking), so only numbers produced by the same protocol can be compared. Single answers, majority selection, and reranking use different amounts of inference compute, so the evaluation method must be kept when reporting a metric.
 
 A concrete number shows the gap: if the single-attempt accuracy of a model is $p=0.12$, the probability that at least one of 64 samples is correct is $1-(1-0.12)^{64}\approx 99.97\%$. However, "a correct answer appears among the candidates" and "the system can pick out the correct answer" are two different problems, and majority voting is still affected by correlated errors and by how answers are merged. The 74% for o1's single attempt shows that one pass of internal reasoning has already raised the solve rate significantly, and we cannot infer further from these results that every attempt went through the same checking steps.
 

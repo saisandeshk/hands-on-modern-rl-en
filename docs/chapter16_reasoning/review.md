@@ -14,7 +14,7 @@ After working through Sections 16.1–16.6, you should be able to:
 4. Explain how an **outcome-only reward** can indirectly reinforce checking, verification, and method-switching without ever rewarding those behaviors directly.
 5. Choose between **one long chain** and **several short answers** under a fixed token budget, and set a thinking budget that reserves room for the final answer.
 6. Keep **internal reasoning**, **execution trace**, and **user-facing explanation** apart, and state what process alignment must check beyond final-answer correctness.
-7. Use the distillation vocabulary correctly: **teacher vs student**, **off-policy vs on-policy (rollout) distillation**, and **rejection fine-tuning**.
+7. Use the distillation vocabulary correctly: **teacher vs student**, **off-policy distillation and rejection fine-tuning**, and how they differ from **on-policy distillation** (student rollouts scored token-by-token by a teacher; see Section 15.7).
 
 ## Key Equations
 
@@ -24,7 +24,7 @@ After working through Sections 16.1–16.6, you should be able to:
 - **R1-Zero total reward**: $r_i = r_{\text{acc}}(x,y_i) + \lambda_{\text{fmt}}\cdot r_{\text{fmt}}(x,y_i)$. _Reading: correctness sets the direction, formatting only secures the parsing boundary._
 - **Cost-sensitive adaptive reward**: $r_{\text{total}} = r_{\text{task}} - \lambda C$. _Reading: one unit of cost $C$ trades against $\lambda$ units of task reward; $\lambda$ sets the easy/hard dividing line._
 - **Within-group length reward (Kimi k1.5)**: $\lambda_i = 0.5 - \dfrac{\operatorname{len}(i)-l_{\min}}{l_{\max}-l_{\min}}$. _Reading: among answers to the same problem, the shortest gets $+0.5$ and the longest $-0.5$ — compress length only relative to same-problem peers._
-- **Distillation loss**: $\mathcal{L}_{\text{distill}}(\theta)=-\mathbb{E}_{(x,y)\sim\mathcal{D}_{\text{kept}}}\sum_{t=1}^{|y|}\log\pi_\theta(y_t\mid x,y_{<t})$. _Reading: maximize the student's likelihood of each kept (verified, possibly short) teacher trace, token by token._
+- **Off-policy distillation / rejection fine-tuning loss**: $\mathcal{L}_{\text{distill}}(\theta)=-\mathbb{E}_{(x,y)\sim\mathcal{D}_{\text{kept}}}\sum_{t=1}^{|y|}\log\pi_\theta(y_t\mid x,y_{<t})$. _Reading: maximize the student's likelihood of each kept (verified, possibly short) teacher trace, token by token. This is the SFT/SeqKD objective on filtered data — distinct from the token-level teacher-scored OPD objective in Section 15.7._
 
 ## Common Pitfalls
 
