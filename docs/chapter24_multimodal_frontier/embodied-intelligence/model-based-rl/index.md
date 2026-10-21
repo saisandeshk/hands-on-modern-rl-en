@@ -630,7 +630,7 @@ The core risk of MBRL is **model bias**: if the world model is wrong, planning w
 
 ## Why MBRL Is Mentioned Less Often in Large-Model RL
 
-Chapters 8 to 10 of this book discussed DPO, PPO, GRPO, and Agentic RL, but rarely emphasized MBRL separately. This is not because MBRL is unimportant, but because **the language model itself already behaves like a language world model**.
+Chapters 8 to 10 covered PPO, continuous control and offline RL; DPO (Ch. 14), GRPO (Ch. 15) and agentic RL (Ch. 19) added preference and tool-use objectives, but none of them emphasized MBRL separately. This is not because MBRL is unimportant, but because **the language model itself already behaves like a language world model**.
 
 When an LLM performs mathematical reasoning or multi-step tool use, it predicts subsequent text, tool results, and intermediate states in token space. Chain of thought can be seen as a kind of internal planning, while search and self-correction can also be seen as "trying a few steps ahead" in language space. Therefore, the LLM field more often says test-time search, self-play, or process reward, rather than dynamics model in the traditional robotics sense.
 
@@ -838,7 +838,7 @@ Read this formula as follows: first, the target encoder $E_{\bar{\theta}}$ encod
   <em>Figure 9: Video-JEPA's joint-embedding predictive architecture predicts target video-segment embeddings in representation space. Source: Bardes et al., "Revisiting Feature Prediction for Learning Visual Representations from Video", Fig. 2[^vjepa].</em>
 </div>
 
-Here, $x$ is the visible context, $y$ is the masked or future target, $c$ may contain position, time, or action conditions, $\mathrm{sg}$ denotes stop-gradient, and $\Omega$ is a regularizer that prevents representation collapse. Compared with pixel generation, it does not require the model to recover every texture detail. Compared with traditional MBRL, it also does not necessarily output reward directly. The 2026 LeWorldModel further trains JEPA from raw pixels into an end-to-end world model usable for control, which is a recent example of this route moving closer to embodied control[^lewm].
+Here, $x$ is the visible context, $y$ is the masked or future target, $c$ may contain position, time, or action conditions, $\mathrm{sg}$ denotes stop-gradient, and $\Omega$ is a regularizer that prevents representation collapse. Compared with pixel generation, it does not require the model to recover every texture detail. Compared with traditional MBRL, it also does not necessarily output reward directly. As one reported example of this route moving closer to embodied control, the 2026 LeWorldModel paper presents JEPA trained from raw pixels as an end-to-end world model for autonomous driving[^lewm]; the extent to which it supports closed-loop control should be checked against what that report actually demonstrates.
 
 In one sentence: **MBRL world models lean toward "control engineering," while LeCun's world model leans toward "general intelligence architecture"; the former asks how the world changes after an action, while the latter asks how an agent can learn abstract world representations that are predictable and plannable.**
 
@@ -929,9 +929,9 @@ critic_optimizer.step()
 Now look at model-based. The code adds a model-training step, plus a planning or imagination step that predicts the future with the model:
 
 ```python
-# Model-Based: first train the world model
+# Model-Based: first train the world model (delta_state + reward, no termination head)
 state, action, reward, next_state, done = replay.sample()
-target = torch.cat([next_state - state, reward, done], dim=-1)
+target = torch.cat([next_state - state, reward.unsqueeze(-1)], dim=-1)
 
 mu, logvar = world_model(state, action)
 model_loss = gaussian_nll(mu, logvar, target)
@@ -946,10 +946,10 @@ discount = 1.0
 for h in range(horizon):
     imagined_action = actor(imagined_state)
     pred = world_model.sample(imagined_state, imagined_action)
-    delta_state, imagined_reward, imagined_done = split_prediction(pred)
+    delta_state, imagined_reward = split_prediction(pred)
 
     imagined_return += discount * imagined_reward
-    discount *= gamma * (1.0 - imagined_done)
+    discount *= gamma
     imagined_state = imagined_state + delta_state
 
 actor_loss = -imagined_return.mean()

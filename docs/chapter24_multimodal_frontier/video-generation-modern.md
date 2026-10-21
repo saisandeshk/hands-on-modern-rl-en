@@ -103,7 +103,7 @@ $$
 \nabla_\theta R(x_0,c)=\sum_{t=0}^{T}\frac{\partial R(x_0,c)}{\partial x_t}\cdot\frac{\partial x_t}{\partial\theta}.
 $$
 
-Every denoising step contributes a path to the parameter update. The cost is GPU memory: backpropagating through a full chain of about 50 steps requires saving the intermediate state of every step. VADER controls the cost with **truncated backpropagation**: gradients are kept only for the last $K$ steps, and earlier steps apply stop-grad, that is, for $K<T$ the network predictions at $t>K$ are cut out of the computation graph. A small $K$ both reduces memory and lowers the risk of overfitting to the reward model.
+Every denoising step contributes a path to the parameter update. The cost is GPU memory: backpropagating through a full chain of about 50 steps requires saving the intermediate state of every step. VADER controls the cost with **truncated backpropagation**: gradients are kept only for the final $K$ denoising steps (the ones closest to the clean video $x_0$), while the earlier, noisier part of the chain is stop-gradiented. A small $K$ both reduces memory and lowers the risk of overfitting to the reward model.
 
 The reward itself can also be attached in several ways. VADER adds the per-frame image-text similarity models HPSv2 and PickScore as the alignment reward for every frame. This formulation could induce all frames to become identical, and the paper reports that the pretrained prior is enough to prevent this collapse. It also attaches a VideoMAE action classifier to the whole video, using the predicted probability of the target action class as the reward, and uses the self-supervised score of V-JEPA to measure predictability between frames as a temporal consistency signal. Such rewards can improve the stability of cross-frame representations, but they cannot by themselves prove that the model has mastered Newtonian mechanics. A video that is smooth in representation space can still make an object fall at the wrong moment.
 
@@ -135,7 +135,7 @@ $r_i^k$ is the score of the $i$-th sample on the $k$-th reward, and $\mu^k$ and 
 
 The second finding comes from the image-to-video task. The input image of SkyReels-I2V already fixes the picture content and the ceiling of text matching, so what remains to optimize in parameter space is almost only motion quality. DanceGRPO uses the VideoAlign motion score as the reward and obtains a 118% relative improvement on that dimension. This example shows that choosing which sub-signal to optimize requires first looking at how much freedom the task still leaves to the model.
 
-The paper also tested binary rewards: the continuous HPS score is discretized into 0 or 1 at a threshold of 0.28, and GRPO can still learn from this sparse feedback, consistent with the idea of rule-based rewards in language models. Ablations show that the first 30% of timesteps starting from noise contribute most to learning the basic generation patterns, yet training only this segment is not as good as covering the full range.
+The paper also tested binary rewards: the continuous HPS score is discretized into 0 or 1 at a threshold of 0.28, and GRPO can still learn from this sparse feedback, consistent with the idea of rule-based rewards in language models. The paper reports ablations over which denoising-timestep segment to train: according to the report, the early segment starting from noise contributes most to learning the basic generation patterns, yet the report finds that training only this segment is not as good as covering the full range. (This is the paper's reported result; it should be checked against arXiv:2505.07818 before being relied on, since the ranking of timestep segments can vary across diffusion-RL setups.)
 
 The cost is that one update must fully generate a group of videos for every condition, so memory and sampling time grow quickly. The reward need not be differentiable, so it is suitable for plugging in human preference models or multimodal judges. The public evidence supports "it can be used for reinforcement learning in video generation" but does not support "all mainstream video products use it". If an industrial model paper does not disclose its optimizer, the algorithm should be written as unknown.
 
@@ -218,7 +218,7 @@ The cost of attention grows quadratically with the number of tokens and is the m
 Post-training is done with GRPO plus LoRA, and the report discloses two stability changes. First, the policy loss and KL loss are reweighted per timestep, removing the dependence of gradient size on the timestep and step size. Second, the within-group standard deviation of standard GRPO is replaced by the maximum standard deviation across all groups:
 
 $$
-\hat{A}_{k,t}^{i}=\frac{R_k(x_0^i,c_j)-\mu_k}{\sigma_{\max}}.
+\hat{A}_{k}^{i}=\frac{R_k(x_0^i,c_j)-\mu_k}{\sigma_{\max}}.
 $$
 
 $\mu_k$ is the within-group mean of the $k$-th reward, and $\sigma_{\max}$ is the maximum standard deviation of that reward across all groups. In a group with too small a standard deviation, the advantage estimate may be only reward-model noise, and normalizing by the maximum standard deviation lowers the gradient weight of such groups.

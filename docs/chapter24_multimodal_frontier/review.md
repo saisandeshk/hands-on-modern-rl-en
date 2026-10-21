@@ -38,7 +38,7 @@ This chapter moved RL from text and game simulators into audio, bodies, and pixe
 - Treating fifty denoising steps over eighty frames as four thousand forward passes. There are roughly $50\times80$ frame-level latent updates, but the DiT processes all frames jointly, so the cost is about fifty forward passes.
 - Optimizing a single easy reward. Correctness-only audio RL flattens prosody; HPS-only video training drifts toward static images; aesthetic-only image training breaks counts and positions.
 - Adding raw rewards with different scales. The larger-numbered reward dominates unless each reward is normalized within its group first.
-- Freezing nothing or everything. A common embodied pattern is to freeze the audio or vision encoder while RL changes the policy; updating perception without need wastes data, while never adapting the policy leaves actuator errors uncorrected.
+- Freezing nothing or everything. A common embodied pattern in this chapter is to freeze the audio encoder while RL changes the policy (Section 24.2 freezes `self.audio_encoder`); updating perception without need wastes data, while never adapting the policy leaves actuator errors uncorrected. (Freezing a vision encoder while tuning a policy is the analogous general practice in the wider VLA literature.)
 - Trusting long model rollouts. One-step error $\epsilon$ compounds along the horizon; PETS replans every step, MBPO branches short rollouts from real states, and Dreamer imagines in compressed latent space for the same reason.
 - Reporting only the training reward. A rising proxy with no held-out prompts, no per-item scores, and no blind human check is how reward hacking hides.
 
@@ -49,7 +49,7 @@ This chapter moved RL from text and game simulators into audio, bodies, and pixe
 A voice agent answers factual questions correctly, but users complain that every reply sounds flat and the agent often talks over them. Name the three reward layers from Section 24.1, state which layer is failing in each complaint, and propose one weight change to $R_{\mathrm{total}}=w_cR_{\mathrm{content}}+w_pR_{\mathrm{prosody}}+w_lR_{\mathrm{latency}}$ plus one architectural fix for the interruption problem.
 
 ::: details Solution
-The three layers are content correctness, prosody naturalness, and real-time behavior (first-packet latency and interruptibility). Flat delivery is a prosody failure; talking over the user is a real-time behavior failure; factual accuracy (content) is fine. A minimal change is to lower $w_c$ slightly and raise $w_p$ and $w_l$, for example from $(0.8,0.1,0.1)$ toward $(0.5,0.3,0.2)$, then re-tune on interaction data. Weights alone do not add interruption handling, so add full-duplex turn-taking: stream input while generating, stop synthesis on new speech, and train the take-the-floor decision with trajectory or preference feedback rather than a single correctness label.
+The three layers are content correctness, prosody naturalness, and real-time behavior (first-packet latency and interruptibility). Flat delivery is a prosody failure; talking over the user is a real-time behavior failure; factual accuracy (content) is fine. A minimal change is to shift weight from content toward prosody and latency, for example from a content-heavy weighting toward $(0.5,0.3,0.2)$, then re-tune on interaction data. Weights alone do not add interruption handling, so add full-duplex turn-taking: stream input while generating, stop synthesis on new speech, and train the take-the-floor decision with trajectory or preference feedback rather than a single correctness label.
 :::
 
 ### Exercise 2: Count audio tokens by hand
@@ -78,10 +78,10 @@ Pull out the trajectory-independent baseline: $\mathbb{E}_\tau[b(c)\nabla_\theta
 
 ### Exercise 5: Read a video reward table
 
-Two candidate videos have $(\lambda_q=\lambda_a=\lambda_t=\lambda_p=0.25)$ scores A $=(0.9,0.8,0.3,0.35)$ and B $=(0.6,0.55,0.6,0.65)$. Recompute both weighted totals. The terminal reward prefers B by $0.01$. Explain why the per-item signals recommend different fixes for A and B, and correct the "four thousand forward passes" claim for a 50-step, 80-frame run.
+Two candidate videos have $(\lambda_q=\lambda_a=\lambda_t=\lambda_p=0.25)$ scores A $=(0.9,0.8,0.3,0.35)$ and B $=(0.6,0.55,0.6,0.65)$. Recompute both weighted totals. The terminal reward prefers B by $0.0125$ ($0.60$ versus $0.5875$, about $0.01$ after rounding to two decimals). Explain why the per-item signals recommend different fixes for A and B, and correct the "four thousand forward passes" claim for a 50-step, 80-frame run.
 
 ::: details Solution
-A: $(0.9+0.8+0.3+0.35)/4=2.35/4=0.5875\approx0.59$. B: $(0.6+0.55+0.6+0.65)/4=2.40/4=0.60$. A fails on temporal consistency and physics while quality and alignment are strong, so the fix targets late-generation decisions (motion and contact order). B is mediocre everywhere, so it needs broad improvement. On compute: $50\times80=4{,}000$ is the count of frame-level latent updates, but each denoising step processes all frames in one forward pass, so the run costs about 50 forward passes. A $12.3\times$ speedup claim is consistent with $1429.5/116.5\approx12.27$.
+A: $(0.9+0.8+0.3+0.35)/4=2.35/4=0.5875\approx0.59$. B: $(0.6+0.55+0.6+0.65)/4=2.40/4=0.60$. The gap is $0.60-0.5875=0.0125$. A fails on temporal consistency and physics while quality and alignment are strong, so the fix targets late-generation decisions (motion and contact order). B is mediocre everywhere, so it needs broad improvement. On compute: $50\times80=4{,}000$ is the count of frame-level latent updates, but each denoising step processes all frames in one forward pass, so the run costs about 50 forward passes.
 :::
 
 ### Exercise 6: Compute a PD torque and an asymmetric update

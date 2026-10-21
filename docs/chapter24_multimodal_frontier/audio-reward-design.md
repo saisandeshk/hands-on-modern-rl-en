@@ -46,7 +46,7 @@ Real-time speech dialogue must be **full duplex**: listening, reasoning, and spe
 2. **Streaming decoding:** the system must emit chunks instead of waiting for a complete sentence.
 3. **Interruptibility:** when the user speaks again, generation must stop and listening must resume immediately.
 
-[Moshi](https://arxiv.org/abs/2410.00037) jointly models multiple audio and text streams. Production real-time systems do not disclose every internal detail, but all must stream input and output. Later we will see how Step-Audio-R1 Realtime pipelines formulation and articulation to achieve sub-second first-packet latency.
+[Moshi](https://arxiv.org/abs/2410.00037) jointly models multiple audio and text streams. Production real-time systems do not disclose every internal detail, but all must stream input and output. Later we will see how Step-Audio-R1 Realtime pairs formulation with articulation to achieve sub-second first-packet latency.
 
 ## Three Dimensions of Audio Reward
 
@@ -238,7 +238,7 @@ The RL dataset contains only 5,000 examples and is tightly filtered. The previou
 
 ![Effect of data selection on reasoning length](./images/data-selection-tokens.png)
 
-All-failure questions end with rewards around 0.45–0.70 and reasoning lengths around 1,800 tokens. Medium-difficulty questions reach roughly 0.75–0.80 while maintaining 2,300–2,800 tokens. Expanding to 200K unfiltered examples, ten times more data, does not improve the result. Here, data quality matters more than data volume.
+All-failure questions end with rewards around 0.45–0.70 and reasoning lengths around 1,800 tokens. Medium-difficulty questions reach roughly 0.75–0.80 while maintaining 2,300–2,800 tokens. Expanding to 200K unfiltered examples, forty times more data, does not improve the result. Here, data quality matters more than data volume.
 :::
 
 ### Results and Real-Time Reasoning

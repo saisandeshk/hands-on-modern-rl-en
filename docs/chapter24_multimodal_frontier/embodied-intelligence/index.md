@@ -372,7 +372,7 @@ In practice, the two are often combined: domain randomization as a base policy c
 
 ### Diffusion Policy
 
-In Chapter 8 we learned PPO's deterministic policy output -- given a state, the network outputs an action vector. But many manipulation tasks have multimodal action distributions: for the same goal, there may be multiple valid grasping approaches.
+In Chapter 8 we learned PPO's clipped policy-gradient update -- given a state, the network outputs a distribution over actions (a Gaussian mean and standard deviation in continuous control). But many manipulation tasks have multimodal action distributions: for the same goal, there may be multiple valid grasping approaches.
 
 [Diffusion Policy](https://diffusion-policy.cs.columbia.edu/) models action generation as a **denoising diffusion process** -- starting from random noise, progressively denoising to generate the final action. This is the same idea as image diffusion models, except the generated object changes from "images" to "action sequences." Diffusion policy naturally supports multimodal action distributions and performs excellently on dexterous manipulation tasks.
 
