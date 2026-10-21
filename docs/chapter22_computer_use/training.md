@@ -16,7 +16,7 @@ Each action changes the next screenshot, and a verifier judges whether the task 
 
 ## Step 1: Treat the GUI as an Interactive Environment
 
-The tools in [Chapter 19: Tool Use and Trajectory](../chapter19_agentic/tool-use-and-trajectory) are **structured APIs** — `def search(query): return results`, with input and output as strings. However, in the real world, many software applications have only one interface: the **GUI**. Browsers, Excel, enterprise internal OA systems, Photoshop, and games — none of them expose public APIs; they only provide screens and mouse and keyboard events.
+The tools in [Chapter 19: Tool Use and Trajectory Generation](../chapter19_agentic/tool-use-and-trajectory) are **structured APIs** — `def search(query): return results`, with input and output as strings. However, in the real world, many software applications have only one interface: the **GUI**. Browsers, Excel, enterprise internal OA systems, Photoshop, and games — none of them expose public APIs; they only provide screens and mouse and keyboard events.
 
 The **Computer Use** paradigm treats the entire operating system as the agent's environment:
 
@@ -83,8 +83,10 @@ Yang et al. 2023 propose the **Set-of-Mark (SoM)** prompting approach: first, us
 ```
 [Screen shot + Box 1: Input field "Username", Box 2: Input field "Password", Box 3: Button "Login"]
 
-Agent: type("alice") → click(Box 1) → type("***") → click(Box 2) → click(Box 3)
+Agent: click(Box 1) → type("alice") → click(Box 2) → type("***") → click(Box 3)
 ```
+
+The agent first selects the field and then types into it.
 
 This transforms the problem of continuous coordinate prediction into a **discrete selection** problem. However, the cost is the reliance on external detectors, and the agent is helpless when the detector misses elements.
 
@@ -106,7 +108,7 @@ However, pure supervision has a problem: the model might output **empty space**.
 
 ### Joint RL for Grounding and Decision Making
 
-We combine grounding and action selection into a single PPO objective:
+We combine grounding and action selection into a single joint RL-plus-supervision objective (a teaching form, not the PPO clipped surrogate itself):
 
 $$\mathcal{J}(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\left[\sum_{t=0}^T \gamma^t r_t\right] - \beta \cdot \mathcal{L}_{\text{ground}}(\theta)$$
 
@@ -216,10 +218,10 @@ A minimal decomposition is
 
 $$
 r=r_{\text{task}}+\alpha r_{\text{format}}
-  +\beta r_{\text{recovery}}-\gamma r_{\text{invalid}}.
+  +\beta r_{\text{recovery}}-\delta r_{\text{invalid}}.
 $$
 
-The terms check task completion, parseable actions, successful recovery, and illegal actions. Values such as $\alpha=0.1$, $\beta=0.3$, and $\gamma=2.0$ are starting points for a classroom ablation, not UI-TARS-2's disclosed fixed weights. Each environment needs new calibration, especially because a large illegal-action penalty may make the policy overly conservative.
+The terms check task completion, parseable actions, successful recovery, and illegal actions. Values such as $\alpha=0.1$, $\beta=0.3$, and $\delta=2.0$ are starting points for a classroom ablation, not UI-TARS-2's disclosed fixed weights. (The penalty weight is written $\delta$ here because $\gamma$ already denotes the discount factor in Section Step 1.) Each environment needs new calibration, especially because a large illegal-action penalty may make the policy overly conservative.
 
 ## Step 5: Use AutoGLM to Separate Planning, Grounding, and Device Interfaces
 
@@ -392,6 +394,12 @@ Use them only as a measurement template. A reproduction should run all configura
 
 Higher resolution increases visual encoding and cross-modal fusion cost. Compare configurations only on the same hardware, task set, maximum step budget, and decoding setup. Report visual-token count, per-step latency, and task success together; otherwise a faster setting may simply be doing less work.
 
+### Test-Time Compute and Invalid Traces
+
+Training improves the first guess; deployment can also spend compute after the screenshot arrives. Because grounding is the dominant failure mode, a cheap test-time pattern is to sample $K$ candidate clicks, keep the ones that fall inside the target element's bounding box (or carry high grounding confidence), and execute their average — the GUI analogue of answer aggregation in [Chapter 17](../chapter17_prm_search/parallel-reasoning-and-summary). It trades $K$ forward passes for fewer irreversible wrong clicks. A second pattern is verify-then-act: draft a short plan, ground each step, and re-observe before any state-changing action.
+
+Budget control matters because every extra step risks a new error. Fix a maximum step budget $B$ per task, stop early on `done` with verifier success, and count an over-budget trajectory as a failure even if it later succeeds. Invalid traces — unparsable actions, coordinates outside $[0,1]^2$, or schema-violating tool calls — should be filtered out of rejection fine-tuning data and counted separately in evaluation, since a rising invalid rate signals a formatting regression rather than a planning regression.
+
 ## Step 9: Diagnose What a Failed Trajectory Needs
 
 A falling task-success curve does not locate the defect. Save the task, every screenshot, raw model output, parsed action, environment return, and verifier result, then separate four cases.
@@ -405,6 +413,14 @@ A falling task-success curve does not locate the defect. Save the task, every sc
 **Verifier failure:** a success message earns reward even though the wrong record changed in the backend. Prefer structured application state and verify parameters, target objects, and side effects instead of matching one piece of text.
 
 [OSWorld](https://arxiv.org/abs/2404.07972) shows why GUI evaluation must combine grounding, software knowledge, and cross-application workflows. Report success rate, mean actions, invalid-action rate, environment-error rate, and per-step latency separately so that environment failures do not become indistinguishable from policy failures.
+
+### Isolate the Verifier and Account for Rollouts
+
+A GUI verifier must read application state, not pixels: check that the order record changed to `{status}`, the file bytes on disk, or the settings value — never just the success banner. Run each check in an isolated copy of the environment (fresh snapshot, test account, temporary mailbox) so training rollouts cannot pollute the grading state or leak data between tasks. Keep a set of hidden tests with held-out applications, OS versions, themes, and screen scales, and report them separately from the development task set. A policy that memorizes button positions in one theme should fail the hidden slice, not the headline number.
+
+Failed rollouts need accounting, not silent retries. Deduplicate trajectories by (task, snapshot id, seed) so a retried timeout is not counted as fresh evidence, log timeouts and duplicate-action loops as environment errors distinct from policy errors, and filter them out of rejection fine-tuning: only verifier-passing trajectories with valid action schemas become SFT data, that is $\mathcal{D}_{\text{RFT}} = \{\tau : \text{verifier}(\tau) = 1,\ \text{valid}(\tau)\}$. This is rollout distillation in its simplest form — the student imitates only the teacher policy's successful, well-formed rollouts.
+
+Rollout throughput dominates cost. Track three numbers per experiment: rollout tokens per second (vision plus thought plus action tokens generated), verifier decisions per second (program checks are usually cheaper than LLM judges), and GPU utilization (time the learner updates versus waits for desktops). If utilization is low, add parallel environments before adding GPUs — the bottleneck is application latency, not FLOPs. The actor (policy), rollout workers (VM pool), verifier (program checks plus an optional LLM judge), and learner (PPO/GRPO update) can run synchronously (collect, then update, with no staleness) or asynchronously (streaming rollouts tagged with a policy version, updating from slightly stale data). Either way, log the rollout policy version with every trajectory so staleness is measurable, checkpoint environment snapshots alongside model weights, and reproduce from a prespecified task list, verifier revision, and seed.
 
 ## Step 10: Move Training Results to Real Desktops
 
@@ -430,7 +446,7 @@ GUI Agents can perform destructive actions — delete files, transfer money, sen
 - **Double-Confirmation**: Pop-up confirmation is required for high-risk operations.
 - **Audit Logs**: All operations are logged and traceable.
 
-See [22.2 Prompt Injection and Instruction-Level](./safety-swarm).
+See [22.2 Prompt Injection and Instruction Hierarchy](./safety-swarm).
 
 ## Summary
 

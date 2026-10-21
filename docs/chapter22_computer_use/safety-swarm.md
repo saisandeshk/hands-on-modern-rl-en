@@ -404,9 +404,9 @@ Anthropic's [Responsible Scaling Policy](https://www.anthropic.com/responsible-s
 
 Instruction hierarchy constrains one model decision. An ASL-style framework determines what an organization must add after a capability threshold is reached. Passing one prompt-injection test is not a substitute for deployment governance.
 
-## Echoing [Chapter 25: Alignment Failures]
+## Echoing [Chapter 25: Reward Hacking and RL Evaluation]
 
-[Chapter 25: Reward Hacking and Alignment Failures](../chapter25_alignment_failures/classical-failures) thoroughly discusses deeper security issues such as Sleeper Agent, Reward Hacking, and Specification Gaming. This section focuses on the first line of defense that is **engineering-feasible**—it addresses the problem of "a model being hijacked by external content," but cannot solve:
+[Chapter 25: Reward Hacking and RL Evaluation](../chapter25_alignment_failures/classical-failures) thoroughly discusses deeper security issues such as Sleeper Agent, Reward Hacking, and Specification Gaming. This section focuses on the first line of defense that is **engineering-feasible**—it addresses the problem of "a model being hijacked by external content," but cannot solve:
 
 - **Reward Misspecification** (reward misspecification): the model learns to exploit the verifier's vulnerabilities
 - **Sleeper Agent**: the model hides triggers during training and activates them after deployment
