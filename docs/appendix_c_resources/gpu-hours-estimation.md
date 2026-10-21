@@ -1,4 +1,8 @@
-# C.2 GPU Hour Estimation Table
+---
+title: C.2 GPU Hours Estimation Table
+---
+
+# C.2 GPU Hours Estimation Table
 
 > In engineering practice, the most frequently asked question is: "How many GPU hours and how much money will it cost to train this model?" — This is not a question from a compute company's sales team, but rather a core constraint in assessing the feasibility of a research plan. This appendix compiles the pre-training and fine-tuning costs from publicly available tech reports (DeepSeek, Qwen, Kimi, Llama, Claude) into a searchable table, and provides three tiers of self-training budget planning.
 
@@ -12,25 +16,25 @@ $$\text{GPU hours} \approx \frac{6 \cdot N \cdot D}{\text{Hardware Compute Utili
 
 Where $N$ is the number of model parameters, $D$ is the number of training tokens, and MFU (Model FLOPs Utilization) typically ranges from 30% to 55%. The following table summarizes the training token counts and corresponding GPU hours from publicly available tech reports.
 
-| Model           | Parameters | Training Tokens | GPU Type   | GPU Hours   | Data Source                 |
-| --------------- | ---------- | --------------- | ---------- | ----------- | --------------------------- |
-| Llama 2 7B      | 7B         | 2.0T            | A100-80G   | 184,320     | Meta 2023                   |
-| Llama 2 13B     | 13B        | 2.0T            | A100-80G   | 432,000     | Meta 2023                   |
-| Llama 2 70B     | 70B        | 1.7T            | A100-80G   | 1,700,000   | Meta 2023                   |
-| Llama 3 8B      | 8B         | 15T             | H100-80G   | 130,000     | Meta 2024                   |
-| Llama 3 70B     | 70B        | 15T             | H100-80G   | 6,400,000   | Meta 2024                   |
-| Llama 3.1 405B  | 405B       | 15T             | H100-80G   | 30,000,000  | Meta 2024 (16K GPU Cluster) |
-| DeepSeek-V2     | 236B-A21B  | 8.1T            | H800-80G   | 2,800,000   | DeepSeek 2024               |
-| DeepSeek-V3     | 671B-A37B  | 14.8T           | H800-80G   | 2,664,000   | DeepSeek 2024               |
-| Qwen2.5 7B      | 7B         | 18T             | Not Public | ~1,000,000  | Qwen 2024 (Estimate)        |
-| Qwen2.5 72B     | 72B        | 18T             | Not Public | ~5,000,000  | Qwen 2024 (Estimate)        |
-| Qwen3 235B-A22B | 235B-A22B  | 36T             | Not Public | ~14,000,000 | Qwen 2025 (Estimate)        |
-| Kimi K2         | 1T-A32B    | 15.5T           | H800-80G   | ~9,000,000  | Kimi 2025 (Estimate)        |
+| Model           | Parameters | Training Tokens | GPU Type   | GPU Hours   | Data Source                                                  |
+| --------------- | ---------- | --------------- | ---------- | ----------- | ------------------------------------------------------------ |
+| Llama 2 7B      | 7B         | 2.0T            | A100-80G   | 184,320     | Meta 2023                                                    |
+| Llama 2 13B     | 13B        | 2.0T            | A100-80G   | 432,000     | Meta 2023                                                    |
+| Llama 2 70B     | 70B        | 1.7T            | A100-80G   | 1,700,000   | Meta 2023                                                    |
+| Llama 3 8B      | 8B         | 15T             | H100-80G   | ~500,000    | Meta 2024 (15T tokens); hours estimated from 6ND at ~35% MFU |
+| Llama 3 70B     | 70B        | 15T             | H100-80G   | 6,400,000   | Meta 2024                                                    |
+| Llama 3.1 405B  | 405B       | 15T             | H100-80G   | 30,000,000  | Meta 2024 (16K GPU Cluster)                                  |
+| DeepSeek-V2     | 236B-A21B  | 8.1T            | H800-80G   | 2,800,000   | DeepSeek 2024                                                |
+| DeepSeek-V3     | 671B-A37B  | 14.8T           | H800-80G   | 2,664,000   | DeepSeek 2024                                                |
+| Qwen2.5 7B      | 7B         | 18T             | Not Public | ~1,000,000  | Qwen 2024 (Estimate)                                         |
+| Qwen2.5 72B     | 72B        | 18T             | Not Public | ~5,000,000  | Qwen 2024 (Estimate)                                         |
+| Qwen3 235B-A22B | 235B-A22B  | 36T             | Not Public | ~14,000,000 | Qwen 2025 (Estimate)                                         |
+| Kimi K2         | 1T-A32B    | 15.5T           | H800-80G   | ~9,000,000  | Kimi 2025 (Estimate)                                         |
 
 ::: tip Two Key Takeaways from This Table
 
 1. **MoE Dramatically Reduces Activation Computation**: DeepSeek-V3 has a total parameter count of 671B, but its activation count is only 37B, which is equivalent to a dense model with 60B–70B parameters. However, it still requires 2.66M GPU hours.
-2. **Token Count is the Determining Factor**: Llama 3 70B and Llama 2 70B have the same number of parameters, but the token count increased from 1.7T to 15T, leading to a fourfold increase in GPU hours. **All mainstream models trained in 2024 and onwards have training token counts exceeding 10T**, surpassing the Chinchilla ratio ($D \approx 20N$).
+2. **Token Count is the Determining Factor**: Llama 3 70B and Llama 2 70B have the same number of parameters, but the token count increased from 1.7T to 15T, leading to roughly a fourfold increase in raw GPU hours (note the GPU generation also changed from A100 to H100, so the FLOP increase is larger). **All mainstream models trained in 2024 and onwards have training token counts exceeding 10T**, surpassing the Chinchilla ratio ($D \approx 20N$).
    :::
 
 ### Cost Estimation (Based on Public Cloud Pricing)
@@ -115,11 +119,10 @@ The following table summarizes the **public tech report training data** up to 20
 | DeepSeek-Prover-V2              | Not disclosed, estimated ~50K–80K GPU hours  | DeepSeek-Prover-V2 tech report |
 
 ::: details Decomposition of DeepSeek-V3 Cost
-The reported $5.576M for DeepSeek-V3 includes:
+The reported $5.576M for DeepSeek-V3 corresponds to about 2.788M H800 hours at $2/h, broken down as:
 
-- Pretraining: 2.664M GPU hours × $2/h = $5.33M
-- Post-training (SFT + RL): Approximately 12K GPU hours
-- Validation and ablation: Approximately 8K GPU hours
+- Pretraining: 2.664M GPU hours × $2/h = $5.328M
+- Post-training (SFT + RL), validation, and ablations: the remaining ~124K GPU hours ≈ $0.248M
 
 Reestimated at the H800 market rate of $3/h, the actual cost is approximately $8M.
 :::
@@ -140,12 +143,12 @@ The Qwen3 tech report describes a complex 4-stage post-training process (includi
 
 ### Kimi Series
 
-| Project               | Data                                     | Source                                 |
-| --------------------- | ---------------------------------------- | -------------------------------------- |
-| Kimi K2 Pretraining   | 15.5T tokens (1T MoE)                    | Kimi K2 tech report (arXiv:2507.20534) |
-| Kimi K2 Training Cost | ~$25M (MoE training + fine-tuning)       | Kimi K2 tech report                    |
-| Kimi K2 RL Phase      | Not disclosed, estimated 1M–2M GPU hours | Estimation                             |
-| Kimi K2.5             | Not disclosed (next generation)          | Kimi K5 tech report (arXiv:2602.02276) |
+| Project               | Data                                     | Source                                   |
+| --------------------- | ---------------------------------------- | ---------------------------------------- |
+| Kimi K2 Pretraining   | 15.5T tokens (1T MoE)                    | Kimi K2 tech report (arXiv:2507.20534)   |
+| Kimi K2 Training Cost | ~$25M (MoE training + fine-tuning)       | Kimi K2 tech report                      |
+| Kimi K2 RL Phase      | Not disclosed, estimated 1M–2M GPU hours | Estimation                               |
+| Kimi K2.5             | Not disclosed (next generation)          | Kimi K2.5 tech report (arXiv:2602.02276) |
 
 ### Llama Series
 
@@ -266,7 +269,7 @@ Regardless of the scale, the following techniques can significantly reduce costs
 ### Pre-training Phase
 
 1. **Use MoE instead of dense**: DeepSeek-V3 achieves performance close to 70B dense models using 671B-A37B, while maintaining a computational cost comparable to 37B.
-2. B**F16 + FP8 mixed precision training**: Used in DeepSeek-V3, this reduces memory and computation by 30%–50%.
+2. **BF16 + FP8 mixed precision training**: Used in DeepSeek-V3, this reduces memory and computation by 30%–50%.
 3. **Sequence packing**: Combine multiple short samples into a single long sequence, reducing padding waste from 30% to 5%.
 4. **Curriculum learning**: Start with easy data and gradually introduce harder data, reducing the training of invalid tokens.
 
@@ -280,9 +283,9 @@ Regardless of the scale, the following techniques can significantly reduce costs
 
 ### Evaluation and Experimentation
 
-1. **Small Model Ablation**: Conduct hyperparameter search on a 1B model, then transfer the findings to larger models. 2.**
-   Early Stopping**: Use reward shaping's KL divergence or reward stagnation as stopping signals.
-2. **Shared Checkpoint**: Multiple experiments start from the same SFT checkpoint, saving SFT costs.
+1. **Small Model Ablation**: Conduct hyperparameter search on a 1B model, then transfer the findings to larger models.
+2. **Early Stopping**: Use reward shaping's KL divergence or reward stagnation as stopping signals.
+3. **Shared Checkpoint**: Multiple experiments start from the same SFT checkpoint, saving SFT costs.
 
 ::: tip GPU Selection for Cloud
 
