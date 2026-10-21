@@ -34,7 +34,7 @@ This MDP is entirely different from traditional RL benchmarks. CartPole has a 4-
 
 ### Core Action Space
 
-The primitive actions for Anthropic Computer Use are defined as follows (similar to OpenAI Operator and Google Mariner):
+The primitive actions for a simplified action space modeled on Anthropic Computer Use, OpenAI Operator, and Google Mariner are defined as follows:
 
 ```python
 ACTIONS = {
@@ -218,10 +218,10 @@ A minimal decomposition is
 
 $$
 r=r_{\text{task}}+\alpha r_{\text{format}}
-  +\beta r_{\text{recovery}}-\delta r_{\text{invalid}}.
+  +\rho r_{\text{recovery}}-\delta r_{\text{invalid}}.
 $$
 
-The terms check task completion, parseable actions, successful recovery, and illegal actions. Values such as $\alpha=0.1$, $\beta=0.3$, and $\delta=2.0$ are starting points for a classroom ablation, not UI-TARS-2's disclosed fixed weights. (The penalty weight is written $\delta$ here because $\gamma$ already denotes the discount factor in Section Step 1.) Each environment needs new calibration, especially because a large illegal-action penalty may make the policy overly conservative.
+The terms check task completion, parseable actions, successful recovery, and illegal actions. Values such as $\alpha=0.1$, $\rho=0.3$, and $\delta=2.0$ are starting points for a classroom ablation, not UI-TARS-2's disclosed fixed weights. (The penalty weight is written $\delta$ here because $\gamma$ already denotes the discount factor in Section Step 1; the recovery weight is written $\rho$ to distinguish it from the grounding-loss weight $\beta$ in Step 2.) Each environment needs new calibration, especially because a large illegal-action penalty may make the policy overly conservative.
 
 ## Step 5: Use AutoGLM to Separate Planning, Grounding, and Device Interfaces
 
@@ -270,9 +270,9 @@ Exact commands and model identifiers depend on the repository revision.
 
 ### A Simplified Curriculum Constraint
 
-MobileRL adapts replay and filtering from training feedback. To isolate the intuition, sample tasks that are possible but not yet mastered:
+MobileRL adapts replay and filtering from training feedback. To isolate the intuition, sample tasks that are possible but not yet mastered. Let the curriculum be the set of tasks with an intermediate success rate, sampled with probability proportional to difficulty:
 
-$$\text{Curriculum}(\pi_\theta) = \arg\max_{\text{task } \tau} \; \text{Difficulty}(\tau) \quad \text{s.t.} \quad 0.3 \leq P_\theta(\text{success} \mid \tau) \leq 0.7$$
+$$\text{Curriculum}(\pi_\theta) = \{\tau : 0.3 \leq P_\theta(\text{success} \mid \tau) \leq 0.7\}, \quad \Pr(\tau) \propto \text{Difficulty}(\tau).$$
 
 This concentrates sampling on tasks with an intermediate success rate. The 30%–70% interval is an experimental teaching setting, not a threshold prescribed by the MobileRL paper.
 
@@ -355,7 +355,7 @@ def compute_progress_reward(s_t, s_{t+1}, task):
     State before: {describe(s_t)}
     State after: {describe(s_{t+1})}
     Question: did the agent make progress toward the task?
-    Answer with a score in [0, 1]:
+    Answer with a score in [-1, 1]:
     - 1.0: significant progress (e.g., filled a required field)
     - 0.5: minor progress (e.g., navigated closer)
     - 0.0: no progress (e.g., clicked irrelevant element)
@@ -364,7 +364,7 @@ def compute_progress_reward(s_t, s_{t+1}, task):
     return float(llm_judge(prompt))
 ```
 
-This LLM-as-judge approach for intermediate rewards is similar to the idea in [Chapter 17: Process Reward Model](../chapter17_prm_search/inference-time-search), where LLMs are used to evaluate the quality of intermediate steps.
+This LLM-as-judge approach for intermediate rewards is similar to the idea in [Chapter 17: Discriminative PRM](../chapter17_prm_search/discriminative-prm), where LLMs are used to evaluate the quality of intermediate steps.
 
 ### Comparison with Forward Curriculum
 
@@ -396,7 +396,7 @@ Higher resolution increases visual encoding and cross-modal fusion cost. Compare
 
 ### Test-Time Compute and Invalid Traces
 
-Training improves the first guess; deployment can also spend compute after the screenshot arrives. Because grounding is the dominant failure mode, a cheap test-time pattern is to sample $K$ candidate clicks, keep the ones that fall inside the target element's bounding box (or carry high grounding confidence), and execute their average — the GUI analogue of answer aggregation in [Chapter 17](../chapter17_prm_search/parallel-reasoning-and-summary). It trades $K$ forward passes for fewer irreversible wrong clicks. A second pattern is verify-then-act: draft a short plan, ground each step, and re-observe before any state-changing action.
+Training improves the first guess; deployment can also spend compute after the screenshot arrives. Because grounding is the failure mode this chapter's pipeline targets, a cheap test-time pattern is to sample $K$ candidate clicks and aggregate them by self-consistency: keep the modal cluster of the $K$ coordinates (or the ones carrying high grounding confidence) and execute their average — the GUI analogue of answer aggregation in [Chapter 17](../chapter17_prm_search/parallel-reasoning-and-summary). It trades $K$ forward passes for fewer irreversible wrong clicks. When an external Set-of-Mark detector already supplies the target element's bounding box, clicking the box center is the cheaper baseline this vote must beat; the vote itself cannot be computed from that box without the detector, since predicting the box is exactly the grounding head's job, and averaging in-box samples can still land on dead pixels if the box is a container region rather than the widget. A second pattern is verify-then-act: draft a short plan, ground each step, and re-observe before any state-changing action.
 
 Budget control matters because every extra step risks a new error. Fix a maximum step budget $B$ per task, stop early on `done` with verifier success, and count an over-budget trajectory as a failure even if it later succeeds. Invalid traces — unparsable actions, coordinates outside $[0,1]^2$, or schema-violating tool calls — should be filtered out of rejection fine-tuning data and counted separately in evaluation, since a rising invalid rate signals a formatting regression rather than a planning regression.
 
@@ -418,7 +418,7 @@ A falling task-success curve does not locate the defect. Save the task, every sc
 
 A GUI verifier must read application state, not pixels: check that the order record changed to `{status}`, the file bytes on disk, or the settings value — never just the success banner. Run each check in an isolated copy of the environment (fresh snapshot, test account, temporary mailbox) so training rollouts cannot pollute the grading state or leak data between tasks. Keep a set of hidden tests with held-out applications, OS versions, themes, and screen scales, and report them separately from the development task set. A policy that memorizes button positions in one theme should fail the hidden slice, not the headline number.
 
-Failed rollouts need accounting, not silent retries. Deduplicate trajectories by (task, snapshot id, seed) so a retried timeout is not counted as fresh evidence, log timeouts and duplicate-action loops as environment errors distinct from policy errors, and filter them out of rejection fine-tuning: only verifier-passing trajectories with valid action schemas become SFT data, that is $\mathcal{D}_{\text{RFT}} = \{\tau : \text{verifier}(\tau) = 1,\ \text{valid}(\tau)\}$. This is rollout distillation in its simplest form — the student imitates only the teacher policy's successful, well-formed rollouts.
+Failed rollouts need accounting, not silent retries. Deduplicate trajectories by (task, snapshot id, seed, rollout id with policy version) so a retried timeout is not counted as fresh evidence, log timeouts and duplicate-action loops as environment errors distinct from policy errors, and filter them out of rejection fine-tuning: only verifier-passing trajectories with valid action schemas become SFT data, that is $\mathcal{D}_{\text{RFT}} = \{\tau : \text{verifier}(\tau) = 1,\ \text{valid}(\tau)\}$. This is rejection-sampling fine-tuning — the policy imitates only successful, well-formed rollouts; when those rollouts come from the current policy itself this is on-policy self-distillation, and when they come from a separate stronger policy it is off-policy (teacher-student) distillation (see Chapter 15).
 
 Rollout throughput dominates cost. Track three numbers per experiment: rollout tokens per second (vision plus thought plus action tokens generated), verifier decisions per second (program checks are usually cheaper than LLM judges), and GPU utilization (time the learner updates versus waits for desktops). If utilization is low, add parallel environments before adding GPUs — the bottleneck is application latency, not FLOPs. The actor (policy), rollout workers (VM pool), verifier (program checks plus an optional LLM judge), and learner (PPO/GRPO update) can run synchronously (collect, then update, with no staleness) or asynchronously (streaming rollouts tagged with a policy version, updating from slightly stale data). Either way, log the rollout policy version with every trajectory so staleness is measurable, checkpoint environment snapshots alongside model weights, and reproduce from a prespecified task list, verifier revision, and seed.
 

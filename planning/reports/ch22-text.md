@@ -29,11 +29,31 @@ No other confident errors found: grounding MSE, DPO loss, curriculum-band math, 
 
 - Title: `22.R Summary and Exercises`, link: `/chapter22_computer_use/review`. (No other new pages.)
 
+## Review response
+
+Error 1 (sidebar registration): rejected — out of scope. Worker rules forbid editing `docs/.vitepress/config.mjs`; the task instructs new pages to be listed under "Sidebar additions" for the coordinator. The report's entry is the required action, not a factual error about the branch; no file change made.
+Error 2 (22.R vs 22.3 numbering): rejected — the task explicitly prescribes front matter `title: 22.R Summary and Exercises` and H1 `# 22.R Summary and Exercises`, with the coordinator to renumber on sidebar insertion. Renaming to 22.3 would violate the task spec; no file change made.
+Error 3 (circular K-click box filter): accepted — rewrote `training.md` test-time paragraph to aggregate by modal cluster / grounding confidence, noting the SoM-detector box-center baseline and dead-pixel caveat; reframed `review.md` Exercise 8 box as detector-supplied with a baseline-vs-vote note. Numbers unchanged.
+Error 4 ([0,1] prompt vs −0.5 anchor): accepted — changed `training.md` judge prompt to "Answer with a score in [-1, 1]", keeping all four anchors. Exercise 5 scores remain valid non-negative instances.
+Error 5 (argmax vs weighted-sampling curriculum): accepted — replaced the `argmax` display with the set-plus-proportional-sampling form matching the sampler code and Exercise 3.
+Error 6 (Ch.17 PRM link target): accepted — retargeted to `../chapter17_prm_search/discriminative-prm` with label "Chapter 17: Discriminative PRM" (verified §17.2 exists; inference-time-search is §17.5).
+Error 7 (β grounding/recovery collision): accepted — renamed the Step 4 recovery weight to $\rho$ ($\rho=0.3$) with an explicit distinct-from-$\beta$ note in `training.md`; updated `review.md` key-equations line to match.
+Error 8 (content-review-notes.md entry): rejected — out of scope. The task scope lists only the two chapter pages, `review.md`, and this report; `planning/content-review-notes.md` is not editable on this branch. Flagging for coordinator instead; no file change made.
+Doubt 1 (RMSE "5.4% of width" gloss): accepted — changed `review.md` Exercise 2 solution to "about 5% of the screen width and 2% of the screen height"; arithmetic (0.0029/0.0539/96px/21.6px/gradient) unchanged.
+Doubt 2 (Anthropic action-space attribution): accepted — softened to "a simplified action space modeled on Anthropic Computer Use, OpenAI Operator, and Google Mariner".
+Doubt 3 ("dominant failure mode"): accepted — softened to "the failure mode this chapter's pipeline targets".
+Doubt 4 (rollout-distillation vocabulary): accepted — rewrote as rejection-sampling fine-tuning with the on-policy self-distillation vs off-policy teacher-student distinction and Ch. 15 pointer, in both `training.md` and `review.md`.
+Doubt 5 (InjecAgent 24% figure): rejected — cannot verify offline; the sentence is already scoped to "its ReAct setting" and the figure stays listed under "Needs external verification". No file change made.
+Doubt 6 (EVA "attention region" mechanism): rejected — cannot verify offline; left as-is and already listed under "Needs external verification". No file change made.
+Doubt 7 (dedup key missing rollout id/version): accepted — extended the key to "(task, snapshot id, seed, rollout id with policy version)" in `training.md` and `review.md` Exercise 4; Exercise 4 arithmetic (190 unique, 26.3% vs 25.0%, RFT 46) unchanged.
+
 ## Commands run and results
 
 - `.venv/bin/python -c …` (recomputed Ex. 2/3/5/8 numbers): all match the written solutions — $(0.455, 0.625)$, $[1,2,3]$ / $[1/6,1/3,1/2]$, $1.521$, $0.0539$.
 - `npx prettier --write` on the three files: clean (unchanged).
 - `npx vitepress build docs`: success, no dead links.
+
+Review round: `npx prettier --write` on the three files (clean), `npx vitepress build docs` (success, 17.4s, no dead links). Exercise numerics re-verified unchanged by reviewer and re-checked after edits (Ex. 4/5/8 arithmetic untouched by wording fixes).
 
 ## Open issues
 

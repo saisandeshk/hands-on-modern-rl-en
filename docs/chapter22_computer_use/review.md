@@ -21,11 +21,11 @@ After working through Sections 22.1–22.2, you should be able to:
 - History-conditioned GUI policy: $\pi_\theta(a_t \mid q, o_{1:t}, a_{1:t-1})$ — the action depends on the task prompt plus the full screenshot and action history, because one screenshot is not the full state.
 - Grounding loss: $\mathcal{L}_{\text{ground}} = \frac{1}{N}\sum_i \|\hat{p}_\theta(o_i) - p_i\|_2^2$ — supervised regression toward labeled element centers; teaches where things are, not whether to act.
 - Joint RL-plus-grounding objective: $\mathcal{J}(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}[\sum_t \gamma^t r_t] - \beta \cdot \mathcal{L}_{\text{ground}}(\theta)$ — terminal success pulls the policy forward while the grounding term keeps coordinates honest.
-- Teaching reward decomposition: $r = r_{\text{task}} + \alpha r_{\text{format}} + \beta r_{\text{recovery}} - \delta r_{\text{invalid}}$ — completion plus parseable, recovery, and illegal-action terms; every weight needs per-environment calibration.
+- Teaching reward decomposition: $r = r_{\text{task}} + \alpha r_{\text{format}} + \rho r_{\text{recovery}} - \delta r_{\text{invalid}}$ — completion plus parseable, recovery, and illegal-action terms; every weight needs per-environment calibration.
 - Progress-shaped reward: $r_t = r_{\text{task}}(t=T) + \lambda \cdot r_{\text{progress}}(s_t, s_{t+1})$ — a dense LLM-judge signal shortens the distance between an action and terminal feedback.
 - Curriculum band: sample $\tau$ with $0.3 \le P_\theta(\text{success} \mid \tau) \le 0.7$ — train on tasks that are possible but not yet mastered.
 - Hierarchy conflict rule: $I_l \text{ conflicts with } C_h \Rightarrow a_t \in \mathcal{A}(C_h)$ — lower-authority content may supply facts but cannot expand the action set granted by higher-authority constraints.
-- Rejection fine-tuning set: $\mathcal{D}_{\text{RFT}} = \{\tau : \text{verifier}(\tau) = 1,\ \text{valid}(\tau)\}$ — distill only successful, well-formed rollouts back into the student.
+- Rejection fine-tuning set: $\mathcal{D}_{\text{RFT}} = \{\tau : \text{verifier}(\tau) = 1,\ \text{valid}(\tau)\}$ — distill only successful, well-formed rollouts back into training (self-distillation when they come from the current policy, teacher-student distillation when they come from a stronger policy).
 
 ## Common Pitfalls
 
@@ -50,7 +50,7 @@ Two mechanisms: (1) unobserved changes between screenshots — loading, animatio
 A grounding head predicts $(\hat{x}, \hat{y}) = (0.50, 0.60)$ for a button whose labeled center is $(0.45, 0.62)$. Compute the single-sample squared-error loss, its RMSE in normalized units, the pixel displacement on a $1920 \times 1080$ screen, and the gradient of the loss with respect to the prediction.
 
 ::: details Solution
-Differences: $dx = 0.50 - 0.45 = 0.05$, $dy = 0.60 - 0.62 = -0.02$. Squared: $0.05^2 = 0.0025$, $(-0.02)^2 = 0.0004$. Loss $= 0.0025 + 0.0004 = 0.0029$. RMSE $= \sqrt{0.0029} \approx 0.0539$, about $5.4\%$ of the screen width. Pixel displacement: $0.05 \times 1920 = 96$ px horizontally, $0.02 \times 1080 = 21.6$ px vertically — easily enough to land on a neighboring field. For $L = \|\hat{p} - p\|_2^2$, $\nabla_{\hat{p}} L = 2(\hat{p} - p) = (0.10, -0.04)$, pointing away from the target along each axis.
+Differences: $dx = 0.50 - 0.45 = 0.05$, $dy = 0.60 - 0.62 = -0.02$. Squared: $0.05^2 = 0.0025$, $(-0.02)^2 = 0.0004$. Loss $= 0.0025 + 0.0004 = 0.0029$. RMSE $= \sqrt{0.0029} \approx 0.0539$ in normalized units — about $5\%$ of the screen width and $2\%$ of the screen height. Pixel displacement: $0.05 \times 1920 = 96$ px horizontally, $0.02 \times 1080 = 21.6$ px vertically — easily enough to land on a neighboring field. For $L = \|\hat{p} - p\|_2^2$, $\nabla_{\hat{p}} L = 2(\hat{p} - p) = (0.10, -0.04)$, pointing away from the target along each axis.
 :::
 
 ### Exercise 3 (numeric): Who Gets Sampled
@@ -63,7 +63,7 @@ Five tasks have estimated success rates $[0.05, 0.35, 0.50, 0.65, 0.95]$ under t
 
 ### Exercise 4 (numeric): Rollout Accounting
 
-An experiment runs $200$ rollouts: $50$ pass the verifier, $30$ end in timeouts (of which $10$ are retries of an already-logged (task, snapshot, seed) key), and $120$ are clean failures. Of the $50$ passes, $4$ have unparsable action schemas. Compute (a) the number of unique rollouts, (b) the naive versus deduplicated success rates, and (c) the size of the rejection fine-tuning set.
+An experiment runs $200$ rollouts: $50$ pass the verifier, $30$ end in timeouts (of which $10$ are retries of an already-logged (task, snapshot, seed, rollout id / policy version) key), and $120$ are clean failures. Of the $50$ passes, $4$ have unparsable action schemas. Compute (a) the number of unique rollouts, (b) the naive versus deduplicated success rates, and (c) the size of the rejection fine-tuning set.
 
 ::: details Solution
 (a) The $10$ retried timeouts are duplicates: $200 - 10 = 190$ unique rollouts. (b) Naive: $50/200 = 25.0\%$. Deduplicated: $50/190 \approx 26.3\%$. The naive rate understates success by counting retried infrastructure failures as fresh policy failures. (c) $\mathcal{D}_{\text{RFT}}$ keeps verifier passes with valid schemas: $50 - 4 = 46$ trajectories. Timeouts and invalid traces are excluded from both the rate's numerator and the distillation set.
@@ -113,7 +113,7 @@ The mask keeps tasks 2–4; weights $[10, 20, 30]$ normalize to $[1/6, 1/3, 1/2]
 
 ### Exercise 8 (coding): Majority-Vote Grounding
 
-Five sampled clicks (normalized coordinates) target a button with bounding box $x \in [0.40, 0.50]$, $y \in [0.60, 0.70]$: $[(0.45, 0.62), (0.46, 0.63), (0.90, 0.10), (0.44, 0.61), (0.47, 0.64)]$. Write a function that keeps the clicks inside the box and returns their mean, then compute it by hand and confirm the code agrees.
+Five sampled clicks (normalized coordinates) target a button whose bounding box $x \in [0.40, 0.50]$, $y \in [0.60, 0.70]$ has been supplied by an external Set-of-Mark detector (not by the grounding head itself): $[(0.45, 0.62), (0.46, 0.63), (0.90, 0.10), (0.44, 0.61), (0.47, 0.64)]$. Write a function that keeps the clicks inside the box and returns their mean, then compute it by hand and confirm the code agrees.
 
 ::: details Solution
 
@@ -132,5 +132,5 @@ clicks = [(0.45, 0.62), (0.46, 0.63), (0.90, 0.10), (0.44, 0.61), (0.47, 0.64)]
 print(majority_vote(clicks, box))  # (0.455, 0.625)
 ```
 
-By hand: $(0.90, 0.10)$ falls outside, leaving four clicks. Mean $x = (0.45 + 0.46 + 0.44 + 0.47)/4 = 1.82/4 = 0.455$; mean $y = (0.62 + 0.63 + 0.61 + 0.64)/4 = 2.50/4 = 0.625$. If no click lands inside the box, the function receives an empty array — the correct response is to abstain and re-observe, not to average outliers into a confident wrong click.
+By hand: $(0.90, 0.10)$ falls outside, leaving four clicks. Mean $x = (0.45 + 0.46 + 0.44 + 0.47)/4 = 1.82/4 = 0.455$; mean $y = (0.62 + 0.63 + 0.61 + 0.64)/4 = 2.50/4 = 0.625$. If no click lands inside the box, the function receives an empty array — the correct response is to abstain and re-observe, not to average outliers into a confident wrong click. Note the box here comes from the external detector: with such a detector, clicking the box center is the cheaper baseline this vote must beat, and without a detector the honest self-consistency alternative is to average the modal cluster of the $K$ samples (or weight by grounding confidence) rather than filtering on a box the policy cannot compute itself.
 :::
