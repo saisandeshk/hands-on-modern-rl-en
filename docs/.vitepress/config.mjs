@@ -715,6 +715,10 @@ const sidebar = {
             {
               text: '2.3 Policy, Value and Return',
               link: '/chapter02_rl_basics/policy-value'
+            },
+            {
+              text: '2.4 Summary and Exercises',
+              link: '/chapter02_rl_basics/review'
             }
           ]
         },

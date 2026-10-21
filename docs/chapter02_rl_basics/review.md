@@ -1,8 +1,8 @@
 ---
-title: 2.R Summary and Exercises
+title: 2.4 Summary and Exercises
 ---
 
-# 2.R Summary and Exercises
+# 2.4 Summary and Exercises
 
 This chapter built the modeling language of reinforcement learning. Section 2.1 used the multi-armed bandit to isolate trial-and-error learning and the exploration-exploitation trade-off. Section 2.2 introduced the Markov decision process tuple, the discounted return, and policies. Section 2.3 turned policies into trajectories, trajectories into returns, and returns into value functions that evaluate states and actions before the future unfolds.
 
