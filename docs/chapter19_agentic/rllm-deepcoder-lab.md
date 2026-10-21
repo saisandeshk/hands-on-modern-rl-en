@@ -860,7 +860,7 @@ Also an rLLM cookbook, FinQA (financial analysis agent) uses a completely differ
 | Cost                | Local execution and sandbox resources | ~$0.01-0.05 per evaluation                            |
 | Use case            | Code, math (verifiable tasks)         | Finance, research (tasks needing subjective judgment) |
 
-Code tasks need only the simplest RLVR; tasks requiring semantic understanding need more complex reward design (see [Section 19.3](./multi-turn-rl) for the ORM-versus-PRM discussion).
+Code tasks need only the simplest RLVR; tasks requiring semantic understanding need more complex reward design (see [Section 19.3](./credit-assignment) for the ORM-versus-PRM discussion).
 :::
 
 ## 19.8.11 What to Explore from DeepCoder

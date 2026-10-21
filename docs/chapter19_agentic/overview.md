@@ -94,12 +94,12 @@ After reading this chapter, you should be able to:
 The following concepts appear throughout the chapter. Review them first if needed:
 
 - [GRPO and RLVR](../chapter15_grpo/rlvr) introduces verifiable rewards, a natural reward source for agentic tasks.
-- [PPO and Reward Models](../chapter08_ppo/ppo-bipedal-walker) develops the policy-optimization framework used here.
+- [PPO](../chapter08_ppo/ppo-bipedal-walker) develops the policy-optimization framework used here.
 - [The MDP Five-Tuple](../chapter02_rl_basics/mdp) provides the starting point for formalizing multi-turn interaction.
 
 We now begin with the overall structure of an agentic RL system.
 
-The previous sections provided the formal framework of Agentic RL, including trajectories, POMDPs, and credit assignment. This section brings these concepts down to the specific engineering landscape: how an Agent operates in a real-world environment, why training it is more challenging than training a single-turn LLM, and which frameworks are currently used in the industry for training.
+The formulas above set up the formal framework of Agentic RL, including trajectories, POMDPs, and credit assignment. This section brings these concepts down to the specific engineering landscape: how an Agent operates in a real-world environment, why training it is more challenging than training a single-turn LLM, and which frameworks are currently used in the industry for training.
 
 After reading this section, you should be able to build a complete mental model of an "Agentic RL Training System," understanding where each subsequent section dives deeper into specific aspects.
 
@@ -171,7 +171,7 @@ A complete loop is referred to as a **rollout**; the full interaction record gen
 
 ## Four System-Level Challenges (from RAGEN)
 
-The paper by RAGEN et al. reminds us that Agentic RL is not merely "applying GRPO to tool calls," but requires the simultaneous design of environment, sampling, reward, stable training, and evaluation.
+The RAGEN project reminds us that Agentic RL is not merely "applying GRPO to tool calls," but requires the simultaneous design of environment, sampling, reward, stable training, and evaluation.
 
 [XiaoRed5's Introduction Materials](https://github.com/XiaoRed5/Agentic-RL-Most-Detailed-Intro)
 

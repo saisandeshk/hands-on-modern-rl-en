@@ -227,7 +227,7 @@ def filter_trajectories(trajectories, quality_threshold=0.7):
     return filtered
 ```
 
-## How Trajectory Synthesis Connects to Chapter 9
+## How Trajectory Synthesis Connects to Chapter 15
 
 You may have noticed that many ideas in trajectory synthesis are closely related to RLVR from Chapter 15. The core of RLVR is "use a verifiable result as the reward". Trajectory synthesis pushes this idea one step earlier: it uses verification results not only as rewards, but also to **filter and generate better training data**.
 
@@ -239,7 +239,7 @@ More concretely, RLVR has three data-level uses in Agentic RL.
 
 This also explains why Agentic RL is considered more suitable for trajectory synthesis than RLHF. RLHF requires human-labeled preferences, which are costly and hard to scale. In Agentic RL, reward can be obtained automatically through environmental interaction: whether code passes tests, whether search results contain the target information, and so on. These signals can be automatically verified.
 
-It is also worth noting that trajectory synthesis can do more than refine "existing data"; it can also use "search" to generate higher-quality trajectories. TSR, Trajectory-Search Rollouts[^tsr], moves test-time search techniques that will be discussed in Chapter 12, such as beam search and best-of-N, into rollouts during training. When generating trajectories, it does not rely on random sampling alone. Instead, it uses a search strategy to explore multiple paths and selects the highest-quality trajectories as training data. Experiments show that combining TSR with PPO or GRPO can improve performance by up to 15%. In essence, TSR gives training-time data generation the ability to "think", rather than merely explore at random.
+It is also worth noting that trajectory synthesis can do more than refine "existing data"; it can also use "search" to generate higher-quality trajectories. TSR, Trajectory-Search Rollouts[^tsr], moves test-time search techniques from Chapter 16, such as beam search and best-of-N, into rollouts during training. When generating trajectories, it does not rely on random sampling alone. Instead, it uses a search strategy to explore multiple paths and selects the highest-quality trajectories as training data. Experiments show that combining TSR with PPO or GRPO can improve performance by up to 15%. In essence, TSR gives training-time data generation the ability to "think", rather than merely explore at random.
 
 <details>
 <summary>Reflection Question: Are "successful trajectories" produced by rejection sampling always good training data?</summary>

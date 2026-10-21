@@ -93,7 +93,7 @@ $$R_{\text{total}} = R_{\text{task}} - \lambda_{\text{efficiency}} \cdot T - \la
 Here, $R_{\text{task}}$ is the task completion reward (0 or 1), $T$ is the number of interaction turns used, $\lambda_{\text{efficiency}}$ is the efficiency penalty coefficient, and $\lambda_{\text{format}}$ is the format-error penalty. This formula unifies "complete the task successfully" and "complete the task efficiently" into one reward signal.
 
 ```python
-def compute_agent_reward(task_success, num_turns, max_turns=10):
+def compute_agent_reward(task_success, num_turns, max_turns=10, has_format_error=False):
     """Compute the combined reward for agentic RL."""
     # Base reward for task completion
     success_reward = 1.0 if task_success else 0.0
@@ -184,7 +184,7 @@ One key finding in Code Agent RL comes from ICML 2025 research: **single-step re
 
 If the earlier discussion was about theoretical feasibility, rStar2-Agent is one of the strongest practical demonstrations. This 14B-parameter model trained by Microsoft used **only 510 RL training steps** on 64 AMD MI300X GPUs and reached 80.6% accuracy on the AIME24 math competition, surpassing the 671B-parameter DeepSeek-R1.
 
-The core innovation of rStar2-Agent is **GRPO-RoC** (Group Relative Policy Optimization with Resampling on Correct). Standard GRPO samples a group and compares samples once. GRPO-RoC **resamples correct trajectories**: if the model succeeds on a trajectory, it continues exploring from that successful trajectory to see whether it can find an even better path. This provides a finer learning signal than simple within-group comparison.
+The core innovation of rStar2-Agent is **GRPO-RoC** (Group Relative Policy Optimization with Resampling on Correct). After group sampling, it resamples among the correct trajectories, keeping concise successes with few tool errors. This provides a finer learning signal than a single within-group comparison.
 
 This result contains two important insights. First, **the training efficiency of agentic RL is much higher than expected**: 510 RL steps can outperform a model 40 times larger, suggesting that RL data efficiency can be very high for large models. Second, **small model + RL can beat large model + SFT**. The key is that RL teaches the model how to use tools and reasoning strategies effectively, rather than merely imitating expert behavior.
 
@@ -712,7 +712,7 @@ The core principle is: **reward design should follow an iterative principle of "
 
 ## Chapter Summary
 
-Let us review the core takeaways from Chapter 9:
+Let us review the core takeaways from Chapter 19:
 
 **1. Agentic RL = multi-turn RL + tool use.** Moving from "generating text" to "acting in an environment" is the key leap from conversational models to autonomous agents.
 
