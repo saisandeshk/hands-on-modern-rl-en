@@ -1351,6 +1351,10 @@ const sidebar = {
             {
               text: '23.4 Hands-on: GeoQA Geometric Reasoning',
               link: '/chapter23_vlm/easyr1-geoqa'
+            },
+            {
+              text: '23.5 Summary and Exercises',
+              link: '/chapter23_vlm/review'
             }
           ]
         },

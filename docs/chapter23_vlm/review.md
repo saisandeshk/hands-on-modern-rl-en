@@ -1,5 +1,5 @@
 ---
-title: '23.5 Summary and Exercises'
+title: 23.5 Summary and Exercises
 ---
 
 # 23.5 Summary and Exercises
