@@ -149,8 +149,6 @@ _Figure: Deep Research Agent multiple technical path comparison (Source: [Tongyi
 2. **Iterative Research: Iterative research for long-horizon tasks**
    - When the task goes from "find one answer" to "write a credible research report," simple ReAct is no longer enough.
 
-   ![Tongyi DeepResearch iterative research paradigm](./images/tongyi_iter_research.webp)
-   _Figure: Tongyi DeepResearch iterative research paradigm (Source: [Tongyi DeepResearch](https://tongyi-agent.github.io/blog/introducing-tongyi-deep-research/))_
    - The model needs to repeatedly execute the cycle of "retrieve → read → compare sources → revise hypothesis → retrieve again."
    - The key at this level is no longer just tool calling itself, but long-horizon planning, cross-validation, and context compression.
 
@@ -185,7 +183,7 @@ This shows RL's value in agent training is not just "optimizing known strategies
 
 ### Tongyi DeepResearch: Agentic Mid-training + Post-training
 
-Alibaba Tongyi Lab's Tongyi DeepResearch is one of the strongest open-source Deep Research models [^tongyi_dr]. It surpasses OpenAI o3, DeepSeek-V3.1 (671B), and other much larger models on multiple benchmarks, with only 30.5B total parameters — the key is the MoE (Mixture of Experts) architecture, which activates only 3.3B parameters per inference, achieving extreme parameter efficiency.
+Alibaba Tongyi Lab's Tongyi DeepResearch is one of the strongest open-source Deep Research models [^tongyi_dr]. The technical report presents it as a mid-scale mixture-of-experts model that is reported as competitive with much larger dense models on the authors' benchmark suite — the headline claim is parameter efficiency rather than raw scale.
 
 ![Tongyi DeepResearch asynchronous RL training architecture](./images/tongyi_rl_arch.webp)
 _Figure: Tongyi DeepResearch asynchronous RL training architecture (Source: [Tongyi DeepResearch](https://tongyi-agent.github.io/blog/introducing-tongyi-deep-research/))_
@@ -296,7 +294,7 @@ Each time standards tighten, the model's previously learned "shortcuts" no longe
 2. **Case retrieval**: For new questions, retrieve the most similar successful cases from memory
 3. **Strategy guidance**: Provide retrieved cases as context to the model, guiding it to adopt similar successful strategies
 
-**Why is this important?** Memento ranked first on the GAIA validation set (87.88% Pass@3), surpassing many models that underwent extensive RL training. It powerfully demonstrates: **sometimes "better retrieval" is more effective than "better training."** This also reminds us that RL is not the only path to improving Agent capabilities — external memory and inference-time strategies are equally worthwhile directions. For resource-constrained teams, Memento's approach may offer far better cost-effectiveness than full RL training.
+**Why is this important?** Memento reported strong results on the GAIA validation set, rivaling models that underwent extensive RL training. It powerfully demonstrates: **sometimes "better retrieval" is more effective than "better training."** This also reminds us that RL is not the only path to improving Agent capabilities — external memory and inference-time strategies are equally worthwhile directions. For resource-constrained teams, Memento's approach may offer far better cost-effectiveness than full RL training.
 
 ### Step-Level Process Reward: Web-Shepherd
 
@@ -442,12 +440,12 @@ reward = (
 
 ## Selected Open-Source Resources
 
-| Resource     | Type                | Core Value                                                                                                 |
-| ------------ | ------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Awesome-GRPO | Resource repository | Tracking GRPO and other frontier RL algorithm variants                                                     |
-| LLM-Explorer | Plugin tool         | Produced by Tsinghua; enhances RL algorithm exploration capability, average 37.27% performance improvement |
-| WebSailor-V2 | Open-source project | Bridges the gap between open-source and closed-source Agents through synthetic data and scalable RL        |
-| ReLook       | Research work       | Multi-modal LLM web encoding RL, using visual feedback as reward signals                                   |
+| Resource     | Type                | Core Value                                                                                                   |
+| ------------ | ------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Awesome-GRPO | Resource repository | Tracking GRPO and other frontier RL algorithm variants                                                       |
+| LLM-Explorer | Plugin tool         | From Tsinghua; augments RL exploration of agent rollouts; the authors report improved exploration efficiency |
+| WebSailor-V2 | Open-source project | Bridges the gap between open-source and closed-source Agents through synthetic data and scalable RL          |
+| ReLook       | Research work       | Multi-modal LLM web encoding RL, using visual feedback as reward signals                                     |
 
 ## Practice Suggestions
 
@@ -602,7 +600,7 @@ With the RM, RL training can begin. Using GRPO as an example (no separate Critic
 
 ```python
 async def search_agent_grpo_step(model, rm, queries, group_size=4, max_turns=10):
-    """Search Agent GRPO training step"""
+    """Search Agent GRPO training step with group-relative advantages."""
     all_groups = []
 
     for query in queries:
@@ -618,20 +616,18 @@ async def search_agent_grpo_step(model, rm, queries, group_size=4, max_turns=10)
             reward -= 0.3 * hallucination_penalty(result)  # Hallucination penalty
             trajectories.append((result, reward))
 
-        # In-group ranking
-        trajectories.sort(key=lambda x: x[1], reverse=True)
-        all_groups.append(trajectories)
+        # Group-relative advantages: mean-zero, unit-variance within the group
+        rewards = [r for _, r in trajectories]
+        mean_r = sum(rewards) / len(rewards)
+        var_r = sum((r - mean_r) ** 2 for r in rewards) / len(rewards)
+        std_r = var_r**0.5 + 1e-8
+        advantages = [(r - mean_r) / std_r for r in rewards]
+        all_groups.append((trajectories, advantages))
 
-    # GRPO update
-    for group in all_groups:
-        best, worst = group[0], group[-1]
-        if best[1] > worst[1]:
-            await model.grpo_update(
-                prompt=best[0].prompt,
-                chosen=best[0].trajectory,
-                rejected=worst[0].trajectory,
-                advantage=best[1] - worst[1]
-            )
+    # Clipped policy update over all group members (see Chapter 15):
+    # only model-generated tokens carry gradients; retrieved
+    # <information> tokens are masked out of the loss.
+    await model.grpo_update(all_groups, mask_env_tokens=True)
 
     return all_groups
 ```
@@ -930,7 +926,7 @@ _Figure: LLaMA3.2-3B-Base performance comparison before and after RL training (S
 
 ::: details Note: Reproduction Variance
 
-Search-R1++ (arXiv 2602.19526) found in independent reproduction that due to minor differences in training configuration (prompt templates, reward function details, retriever version, etc.), exactly matching paper numbers may require tuning. It is recommended to first reproduce **consistent trends** (RL scores do increase), then gradually align specific values.
+Independent reproductions have reported that due to minor differences in training configuration (prompt templates, reward function details, retriever version, etc.), exactly matching paper numbers may require tuning. It is recommended to first reproduce **consistent trends** (RL scores do increase), then gradually align specific values.
 :::
 
 ### Key Code Explanation
@@ -1210,19 +1206,19 @@ The log identifies where a failed trajectory diverged. Successful trajectories c
 A single browser trajectory may require 60–150 seconds. Rollouts must therefore execute concurrently:
 
 ```python
-async def parallel_rollout(agent, prompts, num_parallel=256):
+async def parallel_rollout(agent, prompts, num_parallel=256, max_steps=30):
     semaphore = asyncio.Semaphore(num_parallel)
 
     async def rollout_one(prompt):
         async with semaphore:
             env = BrowserEnv(mode="playwright")
-            observation = await env.reset(prompt)
+            observation = env.reset(prompt)
             trajectory = []
-            for _ in range(MAX_STEPS):
+            for _ in range(max_steps):
                 action = await agent.act(observation)
-                next_observation, reward, done, info = await env.step(action)
+                next_observation, reward, done, truncated = env.step(action)
                 trajectory.append((observation, action, reward))
-                if done:
+                if done or truncated:
                     break
                 observation = next_observation
             return trajectory
@@ -1249,6 +1245,28 @@ prompt groups
 ```
 
 The policy update is the same group-normalized, clipped update introduced in [Chapter 15](../chapter15_grpo/grpo-practice-and-mechanism). What changes is the environment and the verifier. A financial tool-use experiment can therefore become a deep-research experiment by replacing those two modules while retaining the rollout buffer and optimizer.
+
+## Rollout Scheduling, Versioning, and Recovery
+
+The five modules above describe one trajectory. A training system adds four roles around them: the **actor** (the policy being trained), **rollout workers** (which execute browser trajectories), the **verifier** (which scores them), and the **learner** (which applies gradient updates). How these roles are scheduled and versioned determines whether training is stable.
+
+### Synchronous versus asynchronous rollout–update loops
+
+In a **synchronous** loop, the learner broadcasts the current policy, workers collect a fixed batch of trajectories, and the learner updates once the batch is complete. Every trajectory is on-policy, which keeps the math clean, but one slow browser (a hanging page, a rate-limited search API) stalls the whole batch.
+
+In an **asynchronous** loop, rollout workers stream trajectories into a buffer while the learner updates continuously. Throughput is higher, but the learner trains on trajectories generated by an older policy version. If $v_\ell$ is the learner's version and $v_r$ is the version that produced a trajectory, the **staleness** $v_\ell - v_r$ measures how off-policy it is. Practical systems cap staleness (for example, discarding trajectories more than one or two versions old) because the clipped GRPO update only tolerates small policy drift.
+
+Two deployment choices interact with this decision. **Colocated** generation and training share the same GPUs, alternating between rollout and update phases; this is simple and suits synchronous loops on one or two nodes. **Disaggregated** serving places inference on dedicated rollout GPUs and gradients on trainer GPUs, so neither waits for the other; this suits asynchronous loops but requires explicit **policy broadcast** (pushing fresh weights to rollout workers) and **generation batching** (grouping concurrent decode requests). When batching is misconfigured, the failure has a characteristic signature: rollout workers idle while the inference server drains a long queue (**backpressure**), or the learner idles while waiting for slow browser trajectories (**learner starvation**). Monitor both queue lengths, not just GPU utilization.
+
+### Fault tolerance and exactly-once accounting
+
+A 90-second browser trajectory can fail in ways a math rollout cannot: the search API returns a 500 error, the page load times out, the browser process crashes. The harness must convert each of these into a typed observation the agent can react to — `timeout`, `rate_limited`, `page_unreachable` — rather than a bare exception, and it must define **retry semantics** per tool: retry a timed-out search with backoff, but never blindly re-issue a state-changing action. Give every tool call an **idempotency key** so that a retried request returns the cached observation instead of executing twice, and treat a repeated identical action (same query, same URL) as a **duplicate action** the policy should learn to avoid rather than a new environment event.
+
+Checkpoint all four kinds of state: the policy and optimizer (learner), the sampler configuration and random seeds, and the rollout cursor (which prompts are done, pending, or failed). On recovery, **retry deduplication** replays the cursor without double-counting: each trajectory is accounted exactly once. Keep **failed-rollout accounting** separate from policy failures — a trajectory that ended in an environment error must be labeled as such and excluded from (or down-weighted in) the update, never silently scored as a zero-reward policy failure. Side effects need explicit boundaries: run browsing in a **sandbox** with an allowlist of network domains, reset browser profile state between tasks, and record the retrieval-index hash or page snapshot so a trajectory can be **deterministically replayed** during debugging.
+
+### Throughput and compute accounting
+
+Report four rates alongside accuracy: **rollout tokens per second** (how fast workers generate experience), **verifier throughput** (trajectories scored per second — an LLM-judge verifier is often the bottleneck), **update utilization** (the fraction of generated tokens that actually enter a gradient step after filtering), and total cost split into **sample, inference, training, and verifier compute**. A worked example: 256 rollout workers averaging 90 seconds per trajectory produce $256/90 \approx 2.8$ trajectories per second. A verifier pool scoring one trajectory in 2 seconds with 16-way parallelism sustains $16/2 = 8$ trajectories per second, so verification is not the bottleneck here — but if the judge model grew 4× slower, it would be, and rollout workers would idle. Finally, the prompt distribution is itself a training decision: filter out tasks the current policy always (or never) solves, since they carry no learning signal, and re-introduce harder slices as competence grows. This **prompt curriculum** is the data-side twin of the evolving rubrics in Step 4 — both keep the task distribution at the frontier of what the policy can just barely do.
 
 ## Summary
 
