@@ -1,5 +1,5 @@
 ---
-title: '23.4 Hands-On: Train GeoQA Geometry Reasoning with EasyR1'
+title: '23.4 Hands-on: GeoQA Geometric Reasoning'
 ---
 
 # 23.4 Hands-on: GeoQA Geometric Reasoning
@@ -16,7 +16,7 @@ The handwritten loop helps you understand the principles; EasyR1 helps you run r
 
 ## 23.4.1 EasyR1 Overview
 
-[EasyR1](https://github.com/hiyouga/EasyR1) (4900+ stars) is developed by [hiyouga](https://github.com/hiyouga) and built on top of veRL. Compared to using veRL directly, EasyR1's core value-adds:
+[EasyR1](https://github.com/hiyouga/EasyR1) (about 5k stars) is developed by [hiyouga](https://github.com/hiyouga) and built on top of veRL. Compared to using veRL directly, EasyR1's core value-adds:
 
 | Feature         | Original veRL                            | EasyR1                                                             |
 | --------------- | ---------------------------------------- | ------------------------------------------------------------------ |
@@ -103,7 +103,7 @@ cd EasyR1
 pip install -e ".[vllm]"
 ```
 
-After installation, EasyR1's training entry point is `python3 -m verl.tainer.main`. You do not need an additional `pip install easyr1` -- it runs directly as a Python module.
+After installation, EasyR1's training entry point is `python3 -m verl.trainer.main`. You do not need an additional `pip install easyr1` -- it runs directly as a Python module.
 
 ### Dataset
 
@@ -172,12 +172,12 @@ The final answer MUST BE put in <answer> </answer> tags.
 ```
 
 ::: details Why is the template simplified here?
-The original EasyR1 r1v.jinja uses `<thinkutan>` / `</thinkutan>` as reasoning tags -- this is the original design from the R1-V paper, using an uncommon tag name to avoid conflicts with the model's pretrained knowledge. However, the original r1v.py's `format_reward` regex `</think\s*>` cannot match `</thinkutan>` (because the Chinese character is not whitespace), so the format reward is always effectively 0. This section uses a simplified template to keep the tags and regex consistent. If you run the official EasyR1 scripts directly, you will see the original `<thinkutan>` tags -- the code does not need modification and training still works (the format_reward signal just becomes inactive, and overall reward degrades to pure accuracy).
+The upstream EasyR1 `r1v.jinja`/`r1v.py` pair uses `<think>` / `</think>` reasoning tags, while the GeoQA-8K R1-V prompts in this section ask for `<thinkutan>` / `</thinkutan>`. The upstream `format_reward` regex `</think\s*>` matches the `<think>` variant: after `think` the pattern allows only whitespace (`\s*`) before `>`, so it cannot match `</thinkutan>` (the letters `utan` are not whitespace and the next character is not `>`), and the format reward on `<thinkutan>`-style outputs is effectively 0. This section uses a simplified template whose tags and regex agree (`<thinkutan>...</thinkutan>` in both). If you run the official EasyR1 scripts directly, check which tags the reward function actually matches before trusting `reward/format` -- training still runs when they disagree, but the format signal goes silent and overall reward degrades to pure accuracy.
 :::
 
 ## 23.4.5 Reward Design
 
-EasyR1's reward function is simply a plain Python file. The framework loads it dynamically via `importlib`, requiring no registration or decorators. The official reward function for GeoQA-8K is as follows:
+EasyR1's reward function is simply a plain Python file. The framework loads it dynamically via `importlib`, requiring no registration or decorators. The reward function used for GeoQA-8K in this section -- adapted from EasyR1's `r1v.py` so its tags match the `<thinkutan>` template above -- is as follows:
 
 ```python
 # examples/reward_function/r1v.py
@@ -270,7 +270,7 @@ export PYTHONUNBUFFERED=1
 
 MODEL_PATH=Qwen/Qwen2.5-VL-3B-Instruct  # or a local path
 
-python3 -m verl.tainer.main \
+python3 -m verl.trainer.main \
     config=examples/config.yaml \
     data.train_files=leonardPKU/GEOQA_8K_R1V@train \
     data.val_files=leonardPKU/GEOQA_8K_R1V@test \
@@ -292,7 +292,7 @@ What does this command do?
 6. **`worker.reward.reward_function=...`**: specifies the reward function file and entry function name (separated by a colon)
 7. **`trainer.n_gpus_per_node=8`**: uses 8 GPUs
 
-The CLI dot syntax overrides the corresponding fields in the YAML layer by layer. For example, `worker.actor.model.model_path` corresponds to `worker.actor.model.path` in the YAML. This design lets you quickly switch experiment configurations without creating new YAML files.
+The CLI dot syntax overrides the corresponding fields in the YAML layer by layer. For example, `worker.actor.model.model_path` corresponds to the `model_path` key under `worker.actor.model` in the YAML. This design lets you quickly switch experiment configurations without creating new YAML files.
 
 ### Full Configuration Explained
 
@@ -408,7 +408,7 @@ trainer:
 If you only have 1-2 GPUs with 24GB, you can enable LoRA to train larger models:
 
 ```bash
-python3 -m verl.tainer.main \
+python3 -m verl.trainer.main \
     config=examples/config.yaml \
     data.train_files=leonardPKU/GEOQA_8K_R1V@train \
     data.val_files=leonardPKU/GEOQA_8K_R1V@test \
@@ -444,7 +444,7 @@ bash examples/baselines/qwen2_5_vl_3b_geoqa8k.sh
 Or use CLI overrides (suitable for quick hyperparameter tuning):
 
 ```bash
-python3 -m verl.tainer.main \
+python3 -m verl.trainer.main \
     config=examples/config.yaml \
     data.train_files=leonardPKU/GEOQA_8K_R1V@train \
     data.val_files=leonardPKU/GEOQA_8K_R1V@test \
@@ -473,7 +473,7 @@ ray start --address=<head_node_ip>:6379
 ray status
 
 # Run training on the head node
-python3 -m verl.tainer.main \
+python3 -m verl.trainer.main \
     config=examples/config.yaml \
     data.train_files=leonardPKU/GEOQA_8K_R1V@train \
     data.val_files=leonardPKU/GEOQA_8K_R1V@test \
@@ -494,7 +494,7 @@ Key distributed parameters:
 
 ### Training Output
 
-After training starts, the terminal outputs key metrics:
+After training starts, the terminal outputs key metrics (schematic excerpt showing the log format and a typical format-led start -- values vary run to run and are not the exact run plotted in Figure 5 below):
 
 ```
 [Step 1]  train | reward/overall=0.28 | reward/format=0.45 | reward/accuracy=0.11 | kl=0.000 | loss=2.34
@@ -517,18 +517,18 @@ If WandB is also enabled (`trainer.logger` includes `"wandb"`), these metrics ar
 ![EasyR1 GeoQA training curves](./images/easyr1-geoqa-curves.png)
 
 <div style="text-align: center; font-size: 0.9em; color: var(--vp-c-text-2); margin-top: -10px; margin-bottom: 20px;">
-  <em>Figure 5: Reward and accuracy curves for Qwen2.5-VL-7B trained with EasyR1 GRPO on Geo3K/GeoQA. Source: <a href="https://github.com/hiyouga/EasyR1" target="_blank" rel="noopener noreferrer">EasyR1 GitHub</a></em>
+  <em>Figure 5: Upstream EasyR1 reference curves (Qwen2.5-VL-7B trained with GRPO on Geo3K/GeoQA data): actor entropy loss, train accuracy reward, mean response length, and validation accuracy reward over ~60 steps. Note this run uses the 7B model on Geo3K/GeoQA while the §23.4.6 experiment uses Qwen2.5-VL-3B on GeoQA-8K, so read the shapes of the curves -- not the exact values -- as the reference. There is no format-reward panel here; the format-led start described below comes from runs that log it. Source: <a href="https://github.com/hiyouga/EasyR1" target="_blank" rel="noopener noreferrer">EasyR1 GitHub</a></em>
 </div>
 
 ### Reading the Reward Curve
 
-A typical training curve on GeoQA-8K goes through three phases:
+A typical training run on GeoQA-8K goes through three phases. The format-led start (phases 1-2) is seen in runs that log the format reward; the accuracy climb (phase 2 onward) is what Figure 5 shows directly:
 
-**Phase 1: Learning format (steps 1-30)**. `format` quickly rises to 0.8+, while `accuracy` barely moves. The model first learns "how to answer" -- outputting in the `<thinkutan>...<answer>...` format, but the answer content is still wrong. This is because format reward is easier to obtain than accuracy reward -- as long as the output structure is correct, you get points.
+**Phase 1: Learning format (early steps)**. `format` quickly rises toward 0.8+, while `accuracy` barely moves. The model first learns "how to answer" -- outputting in the `<thinkutan>...<answer>...` format, but the answer content is still wrong. This is because format reward is easier to obtain than accuracy reward -- as long as the output structure is correct, you get points.
 
-**Phase 2: Learning content (steps 30-100)**. `accuracy` starts rising, while `format` stays high. The model begins using the reasoning process to derive correct answers. In this phase, the growth of `overall` mainly comes from the contribution of `accuracy`.
+**Phase 2: Learning content**. `accuracy` starts rising, while `format` stays high. The model begins using the reasoning process to derive correct answers. In Figure 5 this is the steady climb of `reward/accuracy` from ≈0.34 to ≈0.51 over ~60 steps, mirrored by `val/accuracy_reward` rising from ≈0.37 to ≈0.49 -- and `response_length/mean` stays roughly flat (around 320-350 tokens after the initial drop), so the gain comes from better answers rather than from length inflation.
 
-**Phase 3: Slow improvement (steps 100+)**. `accuracy` growth slows, indicating the model has hit a bottleneck -- the remaining errors may be due to insufficient visual encoding capability (diagrams too complex, angles too small to see clearly), and such errors are difficult to fix through RL.
+**Phase 3: Slow improvement**. `accuracy` growth slows, indicating the model has hit a bottleneck -- the remaining errors may be due to insufficient visual encoding capability (diagrams too complex, angles too small to see clearly), and such errors are difficult to fix through RL.
 
 ### Typical Answer Changes
 
@@ -548,16 +548,15 @@ No reasoning process, no format tags, and the answer may also be wrong.
 
 The format is correct (the `<thinkutan>/<answer>` structure is complete), but the reasoning content is superficial and the answer is guessed.
 
-**Phase 2** (reward/overall ≈ 0.7, format ≈ 1.0, accuracy ≈ 0.4):
+**Phase 2** (batch averages around reward/overall ≈ 0.7, format ≈ 1.0, accuracy ≈ 0.4; a single fully correct response like the one below scores format 1.0, accuracy 1.0, overall 1.0):
 
 ```
-<thinkutan>Observing the diagram, the diagonals of parallelogram ABCD divide the figure into four triangles.
-Because the diagonals bisect each other, the four triangles have equal areas.
-The shaded region contains two triangles, with a total area of 24 cm²,
-so the shaded area is 12 cm².</thinkutan><answer>12</answer>
+<thinkutan>Parallelogram ABCD has area S = AB x h = 6 x 4 = 24 cm².
+Its diagonals split it into four equal-area triangles, so each is 24/4 = 6 cm².
+The shaded region is the single triangle AOB, so the shaded area is 6 cm².</thinkutan><answer>6</answer>
 ```
 
-The reasoning process is complete and the answer is correct.
+The reasoning process is complete and the answer follows from the figure. One caution about the item in Figure 2 itself: the dataset's own ground truth for that figure is 12, with printed reasoning "S△AOB = S□/4 = 6 cm²×2 = 12 cm²" -- the unexplained doubling of the quarter area (24/4 = 6) makes it a noisy label. Real datasets contain such items, and the accuracy reward can only be as clean as the labels it checks against.
 
 ### KL Divergence Monitoring
 
@@ -647,7 +646,7 @@ If LoRA was enabled, `model_merger.py` automatically merges the LoRA weights bac
 
 ## 23.4.11 Comparison with the Handwritten Experiment in Section 23.3
 
-| Aspect              | 11.1 Handwritten GRPO                       | EasyR1 in this section                       |
+| Aspect              | 23.3 Handwritten GRPO                       | EasyR1 in this section                       |
 | ------------------- | ------------------------------------------- | -------------------------------------------- |
 | Dataset             | Synthetic geometric shapes (self-generated) | GeoQA-8K real dataset                        |
 | Inference engine    | `model.generate()` one-by-one               | vLLM continuous batching                     |
@@ -661,7 +660,7 @@ The workload EasyR1 saves you: vLLM rollout integration, FSDP distributed traini
 
 ## 23.4.12 Extension Experiments
 
-1. **Change the base model**: compare training curves for Qwen2.5-VL-3B versus 7B. The 3B model has a smaller vision encoder, so its geometry reasoning accuracy ceiling may be lower
+1. **Change the base model**: compare training curves for Qwen2.5-VL-3B versus 7B. The 3B model has a much smaller language model (both checkpoints share the same vision encoder), so its geometry reasoning accuracy ceiling may be lower
 2. **Change the algorithm**: switch `algorithm.adv_estimator` from `grpo` to `dapo` or `reinforce_plus_plus` and compare training curves. EasyR1 supports 7 algorithms, requiring only a one-line config change
 3. **LoRA vs full-parameter ablation**: for the same model, compare `lora.rank=0` (full-parameter) vs `lora.rank=16` (LoRA), examining accuracy and memory usage
 4. **Adjust `format_weight`**: change from the default 0.5 to 0.1 or 0.9, observing the impact of format reward weight on reasoning quality

@@ -1,5 +1,5 @@
 ---
-title: '23.3 Hands-On: Train a VLM with GRPO'
+title: '23.3 Hands-on: Multimodal GRPO'
 ---
 
 # 23.3 Hands-on: Multimodal GRPO
@@ -47,50 +47,56 @@ Each image contains several basic geometric shapes (triangles, circles, squares)
 from datasets import Dataset
 import random
 
-def generate_shape_image(num_triangles, num_circles, num_squares, seed=None):
+def generate_shape_image(num_triangles, num_circles, num_squares, rng):
     """Generate an image containing a specified number of geometric shapes."""
     from PIL import Image, ImageDraw
-
-    if seed is not None:
-        random.seed(seed)
 
     img = Image.new('RGB', (256, 256), 'white')
     draw = ImageDraw.Draw(img)
 
     # Randomly place triangles
     for _ in range(num_triangles):
-        x, y = random.randint(20, 236), random.randint(20, 236)
-        size = random.randint(15, 35)
+        x, y = rng.randint(20, 236), rng.randint(20, 236)
+        size = rng.randint(15, 35)
         draw.polygon([(x, y - size), (x - size, y + size), (x + size, y + size)],
                      fill='red', outline='darkred')
 
     # Randomly place circles
     for _ in range(num_circles):
-        x, y = random.randint(20, 236), random.randint(20, 236)
-        r = random.randint(10, 25)
+        x, y = rng.randint(20, 236), rng.randint(20, 236)
+        r = rng.randint(10, 25)
         draw.ellipse([(x - r, y - r), (x + r, y + r)],
                      fill='blue', outline='darkblue')
 
     # Randomly place squares
     for _ in range(num_squares):
-        x, y = random.randint(20, 236), random.randint(20, 236)
-        s = random.randint(12, 28)
+        x, y = rng.randint(20, 236), rng.randint(20, 236)
+        s = rng.randint(12, 28)
         draw.rectangle([(x - s, y - s), (x + s, y + s)],
                        fill='green', outline='darkgreen')
 
     return img
 
 
-def generate_dataset(num_samples=500):
-    """Generate a geometric shape counting dataset."""
+def generate_dataset(num_samples=500, seed_offset=0):
+    """Generate a geometric shape counting dataset.
+
+    Each sample draws from its own ``random.Random(seed_offset + i)``
+    generator, so two splits built with different offsets share no RNG
+    state. (Do NOT call ``random.seed(i)`` on the global RNG here: the
+    seed would reset the shared state on every sample, making sample ``i``
+    of any split a near-deterministic function of ``i`` and leaking
+    training samples into the validation split.)
+    """
     data = []
     for i in range(num_samples):
+        rng = random.Random(seed_offset + i)
         # Randomly generate 1-5 of each shape
-        n_tri = random.randint(1, 5)
-        n_cir = random.randint(1, 5)
-        n_sqr = random.randint(1, 5)
+        n_tri = rng.randint(1, 5)
+        n_cir = rng.randint(1, 5)
+        n_sqr = rng.randint(1, 5)
 
-        img = generate_shape_image(n_tri, n_cir, n_sqr, seed=i)
+        img = generate_shape_image(n_tri, n_cir, n_sqr, rng)
 
         # Randomly choose a question
         questions = [
@@ -99,7 +105,7 @@ def generate_dataset(num_samples=500):
             f"How many squares are in the image?",
         ]
         answers = [str(n_tri), str(n_cir), str(n_sqr)]
-        q_idx = random.randint(0, 2)
+        q_idx = rng.randint(0, 2)
 
         data.append({
             'image': img,
@@ -114,9 +120,14 @@ def generate_dataset(num_samples=500):
 
     return Dataset.from_list(data)
 
-# Generate training and validation sets
-train_dataset = generate_dataset(500)
-val_dataset = generate_dataset(100)
+# Generate training and validation sets with disjoint seed ranges.
+# Note: with only 1-5 shapes per type the (counts, question) space is tiny,
+# so strict non-overlap of combinations is not the goal here -- the disjoint
+# seeds only guarantee independently drawn splits. The genuine
+# generalization test is the one in Section 23.3.4: shapes per type beyond the
+# training range (e.g. 7 of one shape, never seen in training).
+train_dataset = generate_dataset(500, seed_offset=0)
+val_dataset = generate_dataset(100, seed_offset=100_000)
 ```
 
 ## 23.3.2 Reward Design: Three-Dimensional Evaluation
@@ -219,10 +230,12 @@ def vlm_grpo_train(model, tokenizer, dataset, num_epochs=3, group_size=4, lr=1e-
                 all_rewards.append(group_rewards)
 
             # GRPO core: compute group-relative advantages
-            # Recall Chapter 16: group-relative advantage = (R_i - mean) / std
+            # Recall Chapter 15: group-relative advantage = (R_i - mean) / std
+            # Population std (unbiased=False, the DeepSeekMath convention also
+            # used in Section 23.R and code/chapter23_vlm/vlm_grpo_train.py).
             rewards_tensor = torch.tensor(all_rewards)
             mean_r = rewards_tensor.mean(dim=-1, keepdim=True)
-            std_r = rewards_tensor.std(dim=-1, keepdim=True) + 1e-8
+            std_r = rewards_tensor.std(dim=-1, keepdim=True, unbiased=False) + 1e-8
             advantages = (rewards_tensor - mean_r) / std_r
 
             # Policy gradient loss
@@ -268,7 +281,7 @@ In practice, a common approach is to use different learning rates for the vision
 
 </details>
 
-This experiment is simple, but it demonstrates the core VLM RL workflow: the algorithm is exactly the same as pure-text RL (GRPO), but the input now includes images, and reward evaluation needs to account for visual understanding dimensions. Next, we will dive deeper into what new challenges arise when input goes from pure text to "image + text" that simply do not exist in pure-text scenarios -- [Special Challenges in VLM RL](./vlm-challenges).
+This experiment is simple, but it demonstrates the core VLM RL workflow: the algorithm is exactly the same as pure-text RL (GRPO), but the input now includes images, and reward evaluation needs to account for visual understanding dimensions. The new challenges that arise when input goes from pure text to "image + text" -- challenges that simply do not exist in pure-text scenarios -- are analyzed in [23.1 Visual Reward Design](./vlm-challenges).
 
 ## References
 
