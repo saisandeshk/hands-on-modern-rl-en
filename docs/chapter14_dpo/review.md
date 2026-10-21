@@ -1,8 +1,8 @@
 ---
-title: 14.R Summary and Exercises
+title: 14.5 Summary and Exercises
 ---
 
-# 14.R Summary and Exercises
+# 14.5 Summary and Exercises
 
 This chapter replaced the RLHF loop (train a reward model, then run PPO) with a single contrastive objective trained on fixed preference pairs. Section 14.1 derived the DPO loss from the KL-regularized objective, Section 14.2 taught you to read its training logs, Section 14.3 derived it again from first principles and surveyed the offline-preference family (KTO, SimPO, IPO, ORPO, conservative DPO), and Section 14.4 ran two alignment experiments on a 0.5B instruct model.
 
@@ -20,7 +20,7 @@ This chapter replaced the RLHF loop (train a reward model, then run PPO) with a 
 
 $$\max_{\pi_\theta}\ \mathbb{E}_{x,y\sim\pi_\theta}[r(x,y)] - \beta\,D_{\mathrm{KL}}(\pi_\theta(\cdot\mid x)\,\|\,\pi_{\mathrm{ref}}(\cdot\mid x))$$
 
-The KL-regularized RLHF objective: earn reward without straying from the reference model; $\beta$ sets the leash length.
+The KL-regularized RLHF objective: earn reward without straying from the reference model; $\beta$ sets the leash length (larger $\beta$ means a shorter leash).
 
 $$\pi^*(y\mid x) = \frac{1}{Z(x)}\,\pi_{\text{ref}}(y\mid x)\exp\!\left(\frac{r(x,y)}{\beta}\right)$$
 
@@ -45,7 +45,7 @@ IPO: stop at a fixed raw log-ratio gap of $1/(2\beta)$ instead of pushing the ma
 ## Common Pitfalls
 
 1. **Reading accuracy as quality.** Reward accuracy near 1.0 only says the model ranks training pairs correctly. Without held-out prompts and external task/safety checks, it is often memorization.
-2. **Forgetting the reference is frozen.** If $\pi_{\text{ref}}$ accidentally trains (or is reloaded with a different tokenizer/template), every log-ratio is garbage. The fixed-batch recompute test in Section 14.2 catches this in seconds.
+2. **Forgetting the reference is frozen.** If $\pi_{\text{ref}}$ accidentally trains (or is reloaded with a different tokenizer/template), every log-ratio is garbage. Catch a trainable reference by recomputing reference log-probs after an optimizer step -- they must be unchanged. (The fixed-batch recompute test in Section 14.2 catches nondeterminism and mask bugs, not a trainable reference.)
 3. **Letting length decide the winner.** Summed log-probabilities penalize long completions. If chosen answers are systematically longer or shorter, check the length-normalized margin before celebrating.
 4. **Setting $\beta$ blindly.** Tiny $\beta$ lets the policy drift into fluent nonsense; huge $\beta$ nails it to the reference so nothing learns. Both chosen and rejected rewards stuck near zero means the leash is too short.
 5. **Trusting noisy labels.** DPO up-weights exactly the pairs it ranks backwards, so flipped labels dominate the gradient. With annotator disagreement, reach for conservative DPO/label smoothing, not more epochs.
@@ -88,7 +88,7 @@ Batch mean loss $= (0.621 + 0.708 + 0.621)/3 = 0.650$; mean margin $= (0.15 - 0.
 For per-sample margins $u \in \{2, 0, -1.5\}$, compute the DPO gradient weight $w = \sigma(-u)$ for each. If the $u = -1.5$ pair is mislabeled (the "rejected" answer is actually better), what happens if you keep training on it?
 
 ::: details Solution
-$w(2) = \sigma(-2) = 1/(1+e^2) = 1/8.389 = 0.119$. $w(0) = \sigma(0) = 0.5$. $w(-1.5) = \sigma(1.5) = 1/(1+e^{-1.5}) = 1/1.2231 = 0.818$. The backwards pair carries roughly $0.818/0.119 \approx 6.9$ times the weight of the easy pair. If it is mislabeled, every step pushes the model toward the wrong ranking with the largest weight in the batch, and the weight never decays because fitting the wrong label keeps the margin negative. The fix is to cap such pairs' influence: filter or relabel them, or use conservative DPO so a single confident-but-wrong pair cannot demand infinite margin.
+$w(2) = \sigma(-2) = 1/(1+e^2) = 1/8.389 = 0.119$. $w(0) = \sigma(0) = 0.5$. $w(-1.5) = \sigma(1.5) = 1/(1+e^{-1.5}) = 1/1.2231 = 0.818$. The backwards pair carries roughly $0.818/0.119 \approx 6.9$ times the weight of the easy pair. If it is mislabeled, every step pushes the model toward the wrong ranking with the largest weight in the batch, and the weight never decays because fitting the wrong label keeps the margin negative. The fix is to cap such pairs' influence: filter or relabel them, or use conservative DPO so that already-separated pairs keep a non-vanishing loss floor instead of dropping out of the objective entirely.
 :::
 
 ### 4. Derive the optimal policy
@@ -138,7 +138,7 @@ def dpo_forward(chosen_logps, ref_chosen, rejected_logps, ref_rejected, beta=0.1
     ref_rejected = torch.as_tensor(ref_rejected, dtype=torch.float64)
     margin = beta * ((chosen_logps - ref_chosen) - (rejected_logps - ref_rejected))
     loss = -F.logsigmoid(margin).mean()
-    acc = (margin > 0).float().mean()
+    acc = (margin > 0).double().mean()
     return loss, margin, acc
 
 # Fixture from Exercise 2 (per-sample sequence log-probs)
@@ -153,7 +153,7 @@ assert loss1.item() == loss2.item() and torch.equal(m1, m2)  # (i) determinism
 print(f"loss={loss1.item():.4f} margin_mean={m1.mean().item():.4f} acc={a1.item():.4f}")
 # expect loss=0.6501 margin_mean=0.0900 acc=0.6667
 
-# (ii) swap invariance
+# (ii) swap invariance (exact in float64; with float32 logits use a ~1e-6 tolerance)
 _, m_swap, a_swap = dpo_forward(rejected, ref_r, chosen, ref_c, beta=0.1)
 assert torch.allclose(m_swap, -m1) and abs(a_swap.item() - (1 - a1.item())) < 1e-12
 
@@ -171,7 +171,7 @@ The printed loss $0.6501$ reproduces the hand computation in Exercise 2 ($0.650$
 
 ### 8. Coding: $\beta$ sweep and conservative DPO on the chapter's data format
 
-Load the preference pairs produced by `code/chapter14_dpo/1-generate_data.py` (`output/preference_data.json` with `prompt`/`chosen`/`rejected` keys; fall back to two inline toy pairs if the file is absent). Assign each pair synthetic log-ratios $\Delta_w = +0.8$, $\Delta_l = -0.4$ (as if the policy already favors chosen). For $\beta \in \{0.01, 0.1, 1.0\}$ compute the mean DPO margin, the mean loss, and the accuracy; then implement the conservative DPO loss $\mathcal{L}_{\text{cDPO}} = -(1-\varepsilon)\log\sigma(u) - \varepsilon\log\sigma(-u)$ with $\varepsilon = 0.1$ and show it bounds the loss on a confidently-correct pair ($u = 5$) while barely changing an uncertain one ($u = 0$). Pure Python/`math` only.
+Load the preference pairs produced by `code/chapter14_dpo/1-generate_data.py` (`output/preference_data.json` with `prompt`/`chosen`/`rejected` keys; fall back to two inline toy pairs if the file is absent). Assign each pair synthetic log-ratios $\Delta_w = +0.8$, $\Delta_l = -0.4$ (as if the policy already favors chosen). For $\beta \in \{0.01, 0.1, 1.0\}$ compute the mean DPO margin, the mean loss, and the accuracy; then implement the conservative DPO loss $\mathcal{L}_{\text{cDPO}} = -(1-\varepsilon)\log\sigma(u) - \varepsilon\log\sigma(-u)$ with $\varepsilon = 0.1$ and show it floors the loss on a confidently-correct pair ($u = 5$) while barely changing an uncertain one ($u = 0$). Pure Python/`math` only.
 
 ::: details Solution
 
@@ -212,5 +212,5 @@ for u in (5.0, 0.0):
 #      terms equal ln 2 and (1-eps) + eps = 1.
 ```
 
-Takeaway: $\beta$ rescales the margin but (for fixed log-ratios) cannot flip accuracy, which is why Section 14.4's $\beta$ table speaks of drift speed and stability rather than ranking direction; and cDPO's floor of roughly $\varepsilon|u|$ on extreme margins is exactly what stops one mislabeled pair from dominating training.
+Takeaway: $\beta$ rescales the margin but (for fixed log-ratios) cannot flip accuracy, which is why Section 14.4's $\beta$ table speaks of drift speed and stability rather than ranking direction; and cDPO's floor of roughly $\varepsilon|u|$ on extreme margins keeps already-separated pairs in the objective instead of letting their loss saturate at zero while all of the gradient comes from the hardest (possibly mislabeled) pairs.
 :::

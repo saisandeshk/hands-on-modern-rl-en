@@ -1,5 +1,5 @@
 ---
-title: 14.2 Training Metrics
+title: 14.2 DPO Training and Evaluation Metrics
 ---
 
 # 14.2 DPO Training and Evaluation Metrics
@@ -18,6 +18,8 @@ Step  Training Loss  Rewards/Margins  Rewards/Chosen  Rewards/Rejected  Rewards/
  ...
  45       0.2103          1.5632           0.9201          -0.6431              0.92
 ```
+
+(Illustrative values averaged over a logging window. A single batch at the chapter's `per_device_train_batch_size=2` can only give accuracies of 0.0, 0.5, or 1.0; intermediate values like 0.52 arise from averaging per-batch accuracies across the window.)
 
 If you also log to SwanLab or TensorBoard, you can inspect the same signals as curves. We'll go through each column and explain what it means and how to diagnose problems.
 
@@ -105,7 +107,7 @@ $$
 
 ![Reward accuracy curve](./images/dpo-reward-accuracy.svg)
 
-At initialization, the two responses often receive similar implicit rewards, so accuracy is near 0.5. Training should raise it above chance toward roughly 0.8 to 0.95. Accuracy and margin answer different questions: accuracy records which response ranks higher (a coarse, binary signal: chosen wins or not), while margin records the size of that separation (a finer, continuous signal: by how much). In a healthy run, they tend to improve together: accuracy rises and margin grows.
+At initialization, the two responses often receive similar implicit rewards, so accuracy is near 0.5. Training should raise it above chance toward roughly 0.8 to 0.95 (window-averaged; a single batch of size 2 only takes values 0.0/0.5/1.0). Accuracy and margin answer different questions: accuracy records which response ranks higher (a coarse, binary signal: chosen wins or not), while margin records the size of that separation (a finer, continuous signal: by how much). In a healthy run, they tend to improve together: accuracy rises and margin grows.
 
 If accuracy is high but margin stays tiny, the ordering is usually correct but weak: the model can barely rank correctly, with low-confidence separation.
 
@@ -151,12 +153,12 @@ Since $\pi_{\text{ref}}$ is fixed, changes in this term come entirely from $\ln 
 
 The five logged signals above share one blind spot: they are all computed on the fixed preference batch. A margin can grow while the policy quietly drifts or degenerates, so before declaring victory, check four extra diagnostics:
 
-- **KL drift.** Estimate per-token or per-sequence $\mathbb{E}[\log \pi_\theta - \log \pi_{\text{ref}}]$ on the batch (the batch mean of the chosen and rejected log-ratios is a rough proxy). If the margin grows only because both log-ratios drift far from zero, the policy is leaving the reference behind and $\beta$ is effectively too small.
-- **Entropy / log-probability level.** Track the raw means `logps/chosen` and `logps/rejected`, not just their difference. A healthy run keeps both in a plausible range; a collapse of both means the model is becoming peaky or repetitive even though the gap looks good.
+- **KL drift.** Estimate per-token or per-sequence $\mathbb{E}[\log \pi_\theta - \log \pi_{\text{ref}}]$ on the batch (the batch mean of the chosen and rejected log-ratios is a rough proxy). The margin grows only if the gap $\Delta_w - \Delta_l$ grows: if the two log-ratios drift _together_ (both far from zero) the margin is unchanged even though the policy has left the reference, so track the drift separately. Joint drift with a flat margin means the policy is leaving the reference behind and $\beta$ is effectively too small.
+- **Entropy / log-probability level.** Track the raw means `logps/chosen` and `logps/rejected`, not just their difference. A healthy run keeps both in a plausible range; a fall in both means the completions became less likely (or longer), while a rise toward 0 is the peaky/repetitive signature -- compare the length-normalized value before drawing conclusions. Note the metric is length-confounded, since the sum grows with the number of tokens.
 - **Length.** Log mean completion length for chosen and rejected generations. Summed log-probabilities penalize longer responses (more tokens multiplied means a more negative sum), so a "better margin" achieved only by shortening outputs is a length hack, not a preference win. Compare against a length-normalized margin when lengths differ systematically.
 - **Validity.** For constrained outputs (JSON, code, fixed format), track the fraction of generations that still parse. Preference training can trade validity for style; a rising margin with falling validity is overoptimization, not alignment.
 
-Two cheap invariance tests catch plumbing bugs before they waste a run. Recompute the loss on one fixed batch twice: the numbers must be bit-identical (any nondeterminism here means the reference model is not actually frozen or the mask moved). Then swap chosen and rejected on that batch: the margin must change sign exactly and accuracy must map $a \mapsto 1 - a$. If either check fails, the data loader or the mask, not the optimizer, is broken.
+Two cheap invariance tests catch plumbing bugs before they waste a run. Put the policy in `eval()` (dropout off) and recompute the loss on one fixed batch twice: the numbers must match up to floating-point tolerance (a mismatch means nondeterminism -- e.g. dropout left on or a nondeterministic kernel -- or the mask moved). This test does not catch a trainable reference, whose weights only change when the optimizer steps; catch that separately by recomputing the reference log-probs after an optimizer step -- they must be unchanged. Then swap chosen and rejected on that batch: the margin must change sign exactly and accuracy must map $a \mapsto 1 - a$. If either check fails, the data loader or the mask, not the optimizer, is broken.
 
 One final plumbing rule: chosen and rejected sequences must pass through the identical tokenizer, chat template, and truncation settings. TRL builds the prompt once and masks it out (labels of $-100$), so prompt tokens contribute nothing and the prompt cancels in the ratio; but if one side is truncated from the left and the other from the right, or templated differently, the "margin" measures formatting, not preference.
 
@@ -164,13 +166,13 @@ One final plumbing rule: chosen and rejected sequences must pass through the ide
 
 ## Quick Reference Table
 
-| Metric          | TRL log key          | Healthy behavior                    | Red flags                        |
-| --------------- | -------------------- | ----------------------------------- | -------------------------------- |
-| Training Loss   | `loss`               | decreases from ~ln2 then stabilizes | stuck near 0.69; collapses to ~0 |
-| Reward Margin   | `rewards/margins`    | increases from ~0 then stabilizes   | negative; oscillates near 0      |
-| Reward Accuracy | `rewards/accuracies` | rises from ~0.5 to ~0.8-0.95        | stays near 0.5                   |
-| Chosen Reward   | `rewards/chosen`     | increases                           | decreases or flat                |
-| Rejected Reward | `rewards/rejected`   | decreases                           | increases                        |
+| Metric          | TRL log key          | Healthy behavior                           | Red flags                        |
+| --------------- | -------------------- | ------------------------------------------ | -------------------------------- |
+| Training Loss   | `loss`               | decreases from ~ln2 then stabilizes        | stuck near 0.69; collapses to ~0 |
+| Reward Margin   | `rewards/margins`    | increases from ~0 then stabilizes          | negative; oscillates near 0      |
+| Reward Accuracy | `rewards/accuracies` | rises from ~0.5 to ~0.8-0.95 (window avg.) | stays near 0.5                   |
+| Chosen Reward   | `rewards/chosen`     | increases                                  | decreases or flat                |
+| Rejected Reward | `rewards/rejected`   | decreases                                  | increases                        |
 
 ---
 
@@ -180,7 +182,7 @@ In this section, we learned to read DPO training logs:
 
 1. **Training Loss** starts near $\ln 2$ and should fall, but a collapse to zero means memorization.
 2. **Reward Margin** measures the policy's chosen-over-rejected separation; it should rise from near zero and stabilize.
-3. **Reward Accuracy** records ranking wins; it should climb from about 0.5 toward 0.8-0.95, but says nothing about separation size.
+3. **Reward Accuracy** records ranking wins; it should climb from about 0.5 toward 0.8-0.95 (window-averaged), but says nothing about separation size.
 4. **Chosen and rejected rewards** decompose the margin; both drifting together, or validity and entropy degrading, warns of drift even when the margin looks good.
 
 The next section, [14.3 DPO Improvements](./dpo-theory-and-family), continues with the theory and variants of preference optimization.

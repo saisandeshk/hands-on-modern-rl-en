@@ -96,7 +96,7 @@ Reviewed and edited all four Chapter 14 pages (`dpo-objective-derivation.md`, `m
 
 ## Sidebar additions
 
-- Title: `14.R Summary and Exercises`, link: `/chapter14_dpo/review` (to be placed after `14.4 Hands-on: A DPO Alignment Experiment`).
+- Title: `14.5 Summary and Exercises`, link: `/chapter14_dpo/review` (to be placed after `14.4 Hands-on: A DPO Alignment Experiment`). (Renamed from `14.R` during review response: `14.R` matches neither the sidebar `N.M` convention nor the `fix:headings` regexes.)
 
 ## Commands run and results
 
@@ -106,6 +106,27 @@ Reviewed and edited all four Chapter 14 pages (`dpo-objective-derivation.md`, `m
 
 ## Open issues
 
-- `code/`, images, and components were not touched per scope; the Chinese-language strings in `code/chapter14_dpo/dpo_hands_on.py` and `dpo_math_reward.py` vs the English-only book policy belong to the code worker.
+- `code/`, images, and components were not touched per scope; the Chinese-language strings in `code/chapter14_dpo/dpo_hands_on.py` and `dpo_math_reward.py` vs the English-only book policy belong to the code worker. (Doc side now quotes the script's print strings verbatim and labels the JSON sample as an English translation.)
 - `review.md` references `output/preference_data.json` from `1-generate_data.py` with an inline fallback, so its coding exercise works with or without running the pipeline.
-- No `docs/.vitepress/config.mjs` edits made (coordinator to add the `review.md` sidebar entry).
+- No `docs/.vitepress/config.mjs` edits made (coordinator to add the `review.md` sidebar entry as `14.5 Summary and Exercises`).
+
+## Review response
+
+One line per reviewer finding (E = error, D = doubt):
+
+- E1 (Ex. 7 swap assertion aborts in float32): accepted -- `acc` now uses `.double().mean()` with a float-tolerance note; snippet re-executed in `.venv` (prints `loss=0.6501 margin_mean=0.0900 acc=0.6667`, all asserts pass).
+- E2 (cDPO "stays bounded" contradicts the review page's own floor): accepted -- theory bullet now says the loss grows linearly in $|u|$ ($\varepsilon u$ / $(1-\varepsilon)|u|$); `review.md` Ex. 8 "bounds" changed to "floors", and its takeaway/Ex. 3 wording corrected to the real mechanism.
+- E3 ("bit-identical" recompute catches an unfrozen reference): accepted -- test now requires `eval()` and is described as catching nondeterminism/mask bugs; a separate post-optimizer-step reference-logprob check added; `review.md` pitfall 2 reworded the same way.
+- E4 (illustrative `Rewards/Accuracies` 0.52-0.92 impossible at batch size 2): accepted -- both logs now note values are averaged over a logging window (a single batch gives only 0.0/0.5/1.0); "0.8-0.95" targets marked as window-averaged.
+- E5 ("collapse of both" logps means peaky, sign inverted): accepted -- bullet rewritten (a fall means less likely/longer; a rise toward 0 is the peaky signature; length-confound noted).
+- E6 ("both log-ratios drift" grows the margin, impossible): accepted -- bullet rewritten (margin grows only if $\Delta_w-\Delta_l$ grows; joint drift tracked separately).
+- E7 (implicit reward stated with and without the prompt constant on sibling pages): accepted -- theory formula, code docstring, and the PPO-comparison question box now carry the prompt-only constant.
+- E8 (IPO "1,000 examples" threshold survives in tables after prose was softened): accepted -- both table cells reworded qualitatively (small/noisy data, uncertain signal), no numeric threshold.
+- E9 (`review.md` unregistered + `14.R` numbering breaks `fix:headings`): accepted -- page renamed to `14.5 Summary and Exercises` (front matter + H1); sidebar entry left for the coordinator (config out of scope), report's Sidebar addition updated.
+- E10 (rejection-sampling baseline = SFT-on-chosen / circular implicit-reward best-of-$n$): accepted -- control 2 now specifies sampling from the policy with an _independent_ scorer and drops the circular variant.
+- E11 (metrics front matter vs sidebar/H1 mismatch): accepted -- set to `14.2 DPO Training and Evaluation Metrics`.
+- D1 (cDPO "down-weights exactly" mislabeled pairs; wrong/right weight ratio actually rises): accepted -- gradient section now states cDPO shrinks every pair's update with worked numbers and describes the real effect (loss floor, non-vanishing gradient on separated pairs).
+- D2 (Step 0 quotes differ from `1-generate_data.py` strings): accepted on the doc side -- print block now quotes the script verbatim; JSON sample labeled as an English translation of the script's Chinese templates (code translation belongs to the code worker).
+- D3 (`sequence_logprob_sum` BPE boundary merge + chat-template caveat): accepted -- docstring warns separate prompt tokenization can shift the mask by a token and defers to jointly-templated `-100` labels for chat models.
+- D4 (KTO sketch is directional, no years/citations): accepted -- KTO bullet marked simplified with the paper's value-function form noted; years added for KTO/SimPO/IPO/ORPO.
+- D5 ($\beta$ "leash" metaphor used in both directions): accepted as clarification -- Key Equations now reads "larger $\beta$ means a shorter leash", consistent with pitfall 4.
