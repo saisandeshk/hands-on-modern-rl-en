@@ -203,7 +203,7 @@ This introduces a training challenge: **the final reward of different rollouts u
 another 8 rollouts          → 5 successes / 3 failures
 ```
 
-This fluctuation does not necessarily indicate that the model has suddenly become stronger or weaker; it may simply be the result of sampling and environmental feedback variance. Therefore, Agentic RL cannot rely solely on the single reward curve; it must also pay attention to **reward variance, gradient spikes, whether the trajectory distribution has collapsed, and whether the model has fallen into a repetitive behavioral pattern**. Works such as AEM and RAGEN-2 have addressed this from the perspective of stability.
+This fluctuation does not necessarily indicate that the model has suddenly become stronger or weaker; it may simply be the result of sampling and environmental feedback variance. Therefore, Agentic RL cannot rely solely on the single reward curve; it must also pay attention to **reward variance, gradient spikes, whether the trajectory distribution has collapsed, and whether the model has fallen into a repetitive behavioral pattern**. Works such as AEM have addressed this from the perspective of stability.
 
 ### Challenge 3: Rollout Design — Three Overlooked Dimensions
 

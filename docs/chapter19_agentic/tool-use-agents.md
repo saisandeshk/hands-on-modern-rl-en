@@ -186,7 +186,7 @@ If the earlier discussion was about theoretical feasibility, rStar2-Agent is one
 
 The core innovation of rStar2-Agent is **GRPO-RoC** (Group Relative Policy Optimization with Resampling on Correct). After group sampling, it resamples among the correct trajectories, keeping concise successes with few tool errors. This provides a finer learning signal than a single within-group comparison.
 
-This result contains two important insights. First, **the training efficiency of agentic RL is much higher than expected**: 510 RL steps can outperform a model 40 times larger, suggesting that RL data efficiency can be very high for large models. Second, **small model + RL can beat large model + SFT**. The key is that RL teaches the model how to use tools and reasoning strategies effectively, rather than merely imitating expert behavior.
+This result contains two important insights. First, **the training efficiency of agentic RL is much higher than expected**: 510 RL steps can outperform a model roughly 48 times larger (671B versus 14B), suggesting that RL data efficiency can be very high for large models. Second, **small model + RL can beat large model + SFT**. The key is that RL teaches the model how to use tools and reasoning strategies effectively, rather than merely imitating expert behavior.
 
 ### Agnostics: Code RL in Any Language[^agnostics]
 

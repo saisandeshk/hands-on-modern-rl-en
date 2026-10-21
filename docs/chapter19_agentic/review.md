@@ -69,7 +69,7 @@ Take the flight-booking example from Section 19.1: search flights, filter by tim
 ::: details Solution
 One valid mapping:
 
-- $S$: the true world state — airline database contents, live seat inventory, prices, plus the conversation history so far.
+- $S$: the environment state space — airline database contents, live seat inventory, prices — plus the agent's context and conversation history so far.
 - $A$: text replies plus structured tool calls such as `search_flights(origin, dest, date)`, `check_seat(flight_id)`, and `order(flight_id, passenger)`.
 - $P$: how actions change the world and produce observations — a search returns matching rows, an order decrements inventory and returns a confirmation or an error.
 - $R$: task reward, for example 1 if the correct ticket is issued and 0 otherwise, possibly with an efficiency penalty per turn.
@@ -112,11 +112,11 @@ where $x_t$ ranges over every token in the trajectory, including tool observatio
 
 $$ \nabla*\theta J(\theta) = \mathbb{E}*{\tau \sim \pi*\theta}\left[ R(\tau) \nabla*\theta \log \pi*\theta(\tau) \right] = \mathbb{E}*{\tau \sim \pi*\theta}\left[ R(\tau) \sum*{t=0}^{T} \nabla*\theta \log p*\theta(x*t \mid x*{<t}) \right]. $$
 
-Now split positions into model-generated tokens $a(\tau)$ and environment-produced tokens. Environment tokens are sampled from the world (retriever, sandbox), not from $\pi_\theta$, so $\nabla_\theta \log p(x_t \mid x_{<t}) = 0$ for them as far as the policy is concerned — yet if they are fed through the policy network as if self-generated, the sum includes nonzero pseudo-gradients that push the policy toward reproducing observations. The action mask $m_t \in \{0, 1\}$ (1 for model tokens, 0 for observations and prompts) corrects the estimator:
+Now split positions into model-generated tokens $a(\tau)$ and environment-produced tokens. Environment tokens carry no factor in the trajectory log-probability, so they contribute no term to the gradient; if they are nevertheless fed through the policy network as if self-generated, the implemented loss includes spurious pseudo-gradients that push the policy toward reproducing observations. The action mask $m_t \in \{0, 1\}$ (1 for model tokens, 0 for observations and prompts) corrects the estimator:
 
 $$ \nabla*\theta J(\theta) = \mathbb{E}*{\tau \sim \pi*\theta}\left[ R(\tau) \sum*{t \in a(\tau)} \nabla*\theta \log p*\theta(x*t \mid x*{<t}) \right], $$
 
-so only decisions the policy controlled are reinforced. This is the same masking used in the rollout code of Sections 19.4 and 19.8.
+so only decisions the policy controlled are reinforced. This is the same masking used in the action-mask formalism of Section 19.2 and in the rollout code of the chapter's project pages.
 :::
 
 ### Exercise 5 — Compute discounted returns by hand
@@ -155,7 +155,7 @@ In the DeepCoder lab, one GRPO group of 4 rollouts for the same problem earns re
 
 1. Compute the group mean, the population standard deviation, and the advantage of each rollout.
 2. State which rollouts are reinforced and which are suppressed.
-3. The baseline evaluation solves 6 of 20 problems and the post-training evaluation solves 20 of 50. Compute both Pass@1 values and the percentage-point gain.
+3. The baseline evaluation solves 6 of 20 problems and the post-training evaluation scores about 20 of 50 (39.0% as printed by the lab). Compute both Pass@1 values and the percentage-point gain.
 
 ::: details Solution
 
@@ -165,7 +165,7 @@ $$ \mathbf{A} = [-1.0,\ +1.0,\ -1.0,\ +1.0]. $$
 
 2. The two successful rollouts (advantage $+1$) are reinforced — the update raises the probability of the decisions that produced them. The two failed rollouts (advantage $-1$) are suppressed. Note the signal exists only because the group is mixed: had all four succeeded or all four failed, the std would be 0 and no relative advantage could be computed, which is why GRPO needs enough samples per group.
 
-3. Baseline Pass@1 $= 6/20 = 30.0\%$. Post-training Pass@1 $= 20/50 = 40.0\%$. Gain $= 40.0 - 30.0 = 10$ percentage points (consistent with the lab's reported +8–10 point range).
+3. Baseline Pass@1 $= 6/20 = 30.0\%$. Post-training Pass@1 $= 39.0\%$ as reported by the lab (about 20 of 50). Gain $\approx 9$ percentage points (consistent with the lab's reported +8–10 point range).
    :::
 
 ### Exercise 7 — Coding: verify discounted returns with the chapter code
