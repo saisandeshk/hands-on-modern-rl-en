@@ -901,6 +901,10 @@ const sidebar = {
             {
               text: '8.6 Hands-on: Long-Horizon Tasks and Planning',
               link: '/chapter08_ppo/rl-long-horizon-planning'
+            },
+            {
+              text: '8.7 Summary and Exercises',
+              link: '/chapter08_ppo/review'
             }
           ]
         },

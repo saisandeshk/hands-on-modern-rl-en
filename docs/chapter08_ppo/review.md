@@ -1,8 +1,8 @@
 ---
-title: 8.R Summary and Exercises
+title: 8.7 Summary and Exercises
 ---
 
-# 8.R Summary and Exercises
+# 8.7 Summary and Exercises
 
 This chapter turned the Actor-Critic of Chapter 7 into a stable, reusable algorithm: reuse old data through importance sampling, cap each update with clipping, estimate credit with GAE, and — in the LLM setting — manufacture rewards with a reward model. This page collects what to retain, the formulas that do the work, the mistakes that recur in practice, and exercises with full solutions.
 
