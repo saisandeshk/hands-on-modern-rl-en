@@ -1,3 +1,7 @@
+---
+title: 15.4 Improved Methods for GRPO
+---
+
 # 15.4 Improved Methods for GRPO
 
 In the previous section, we examined DeepSeek-R1-Zero and DAPO — they respectively demonstrated that "pure RL can replace SFT cold start" and "engineering improvements can allow GRPO to reach the level of R1-Zero with half the steps." However, DAPO is just **one member** of the family of GRPO improvements in 2025. From the publication of the R1 paper (2025.01) to early 2026, the open-source community and industrial laboratories proposed at least five influential GRPO variants within less than a year. These variants are not mutually exclusive but rather address different defects of GRPO from different angles.
@@ -23,15 +27,9 @@ $$\tilde{r}_i^{\text{Dr.GRPO}} = r_i - \text{mean}(r_1, \ldots, r_G)$$
 
 Experiments show that this change significantly alleviates the problem of answer length inflation in the later stages of training and reduces reward hacking behavior. The Qwen series adopted a similar correction in their internal training.
 
-### Further Engineering of DeepSeek V3.2
+### Further engineering in the DeepSeek-V3.2 line
 
-In the V3.2 version of DeepSeek (2025.12, [arXiv:2512.02556](https://arxiv.org/abs/2512.02556)), the idea of Dr.GRPO is pushed to its extreme, with three engineering adjustments made specifically for mathematical reasoning tasks:
-
-- **Zero KL for Math Tasks**: Traditional GRPO uses KL divergence to constrain the policy from deviating from the reference model. However, in mathematical tasks, the reward itself is already sufficient to constrain performance (a wrong answer receives zero points). The KL constraint can instead suppress the model's exploration of new problem-solving paths. DeepSeek directly disables the KL constraint during the pure mathematical RL phase.
-- **Self-Verification RLVR**: The model is given an additional "verification step" after generating an answer—re-reading the question, checking calculations, and confirming the answer. The reward from this verification step is also incorporated into the RL optimization, forming an internal self-check mechanism.
-- **mHC Residual Stability**: Optimization of the numerical stability of the Modified Hamiltonian Monte Carlo (mHC) sampler during long Chain-of-Thought (CoT) training, to prevent gradient explosions.
-
-The V3.2 Speciale variant achieves a score of 97 on the AIME 2025, surpassing the performance of GPT-5 at the same time.
+DeepSeek's late-2025 V3.2 technical report describes pushing the Dr.GRPO idea further for mathematical reasoning tasks. Two directions are reported: using mean-only advantages without standard-deviation normalization, and weakening or disabling the KL penalty during the pure mathematical RL phase, on the argument that a strong verifiable reward already constrains the policy and the KL term can suppress exploration of new solution paths. Specific benchmark numbers attached to these reports (including AIME scores and comparisons with other labs' models) come from rapidly changing internal evaluations and should not be quoted as settled results.
 
 ## Improvement Route Two and Sequence-Level Importance Sampling
 
@@ -71,7 +69,7 @@ $$\mathcal{J}^{\text{GSPO}} = \mathbb{E}\left[\min\left(s_i(\theta)\hat A_i, \; 
 
 The $1/|y_i|$ length normalization is essential. Using the raw product $\prod_t\rho_{i,t}$ makes the ratio fluctuate with response length and would require different clipping ranges for responses of different lengths. For this reason, the former GRPO example—which summed all token log-probability differences and exponentiated without length normalization—was not a correct GSPO implementation either. [Equations (5) and (7) in the original GSPO paper](https://arxiv.org/html/2507.18071#S4.SS1)
 
-This change may seem simple, but it has a significant impact on the training stability of MoE models — all Qwen3 series (including Qwen3-235B-A22B, Qwen3-Thinking-2507, Qwen3-Coder) are trained based on GSPO. The variance of the sequence-level ratio is much smaller than that of the token-level, making large-scale RL training on a 10,000-card cluster feasible.
+This change may seem simple, but it has a significant impact on the training stability of MoE models. The variance of the sequence-level ratio is much smaller than that of the token-level product, which is reported to make large-scale MoE training more feasible (specific cluster sizes and model-line attributions are not independently verified here).
 
 The cost of GSPO: the sequence-level ratio **couple all token updates**, and its ability to perform fine-grained credit assignment at the token level is weaker than token-level methods. Therefore, GSPO performs significantly well on long CoT tasks (reasoning, mathematics), but is less effective than DAPO on code generation tasks that require token-level rewards.
 
@@ -87,13 +85,13 @@ Note that the numerator and denominator of the ratio are reversed here — $\pi_
 
 Intuitively: traditional pruning is "if a token's policy deviates too much, directly remove it from the gradient." CISPO is "if the deviation is too large, reduce its contribution weight to the advantage estimate, but keep the gradient direction unchanged." The latter avoids the problem of "some tokens completely stop updating in the later stage of training," which can cause the policy to get stuck.
 
-CISPO also has an engineering advantage — it works well with MiniMax's self-developed lightning attention, solving the problem of precision alignment. The recursive computation of lightning attention leads to the accumulation of floating-point errors in token-level ratios. Traditional pruning can mistakenly prune many tokens in low-precision training. CISPO avoids this issue by scaling the weights instead of pruning. MiniMax M1 trains on 512 H800 cards, achieving a training speed twice as fast as DAPO.
+CISPO also has an engineering motivation — it is designed to work with MiniMax's own attention implementation, where per-token ratio computation in low precision can accumulate floating-point error. Scaling the importance weight instead of dropping tokens is reported to be more robust in that setting. Claims about exact hardware counts or speedups over other methods' training runs are not independently verifiable and are omitted here.
 
 ## Improvement Route Four: Against the Value-based Counter-trend
 
 ### VAPO (Byte Seed's Counter-trend)
 
-At this point, you might have the impression that **the Critic network has been eliminated by GRPO**. However, the paper VAPO (Value-based Augmented PPO, [arXiv:2504.05118](https://arxiv.org/abs/2504.05118)) published by Byte Seed in April 2025 demonstrates — at least in long CoT reasoning tasks — that **the value model has once again defeated GRPO**.
+At this point, you might have the impression that **the Critic network has been eliminated by GRPO**. However, the paper VAPO ([arXiv:2504.05118](https://arxiv.org/abs/2504.05118)) published by ByteDance Seed in April 2025 demonstrates — at least in long CoT reasoning tasks — that **the value model has once again defeated GRPO**.
 
 The core argument of VAPO is that GRPO replaces the Critic network with the group mean, essentially using the "relative ranking among multiple rollouts of the same prompt" to estimate advantage. This is sufficient for short answer tasks (e.g., function calling, simple math problems). However, in long CoT tasks:
 
@@ -107,9 +105,9 @@ $$\hat{A}_t = \delta_t + (\gamma\lambda)\delta_{t+1} + (\gamma\lambda)^2\delta_{
 
 where $\delta_t = r_t + \gamma V_\phi(s_{t+1}) - V_\phi(s_t)$ is the TD error. Then, it applies PPO-style clipping on this token-level advantage.
 
-VAPO achieves a score of 60.4 on AIME 2024, surpassing all contemporary GRPO variants (DAPO at 50, R1-Zero at 71 but with double the training steps). **Byte Seed's internal reasoning model training has shifted from pure GRPO to VAPO**.
+VAPO reports a score of 60.4 on AIME 2024, above the score DAPO reported in its own setup. DeepSeek-R1-Zero reported a higher score (around 71), but with substantially more training steps, so the honest reading is about efficiency and setup rather than outright supremacy: reintroducing a value model can pay off on long chain-of-thought tasks where token-level credit matters, at the cost of the extra model.
 
-The cost of VAPO: it requires training an independent value model, doubling the memory usage, and increasing engineering complexity. This is why GRPO became the mainstream approach in 2024 — **critic-free is an engineering compromise, not an algorithmic necessity**.
+The cost of VAPO: it requires training an independent value model, doubling the memory usage, and increasing engineering complexity. This is why GRPO became the mainstream approach around 2025 — **critic-free is an engineering compromise, not an algorithmic necessity**.
 
 ## Improvement Route Five: Integrating RL into Pre-training
 
@@ -123,11 +121,21 @@ $$\mathcal{L}_{\text{LM}} = -\mathbb{E}\left[\log \pi_\theta(a_t | s_{<t})\right
 
 In this setup, each token is treated as an equal teacher-forcing target. RPT transforms this by having the model first generate a reasoning about the next token ("Given the context, the next word might be X because..."), and then use the reasoning result to predict the next token, rewarding the model when it is correct:
 
-$$\mathcal{L}_{\text{RPT}} = -\mathbb{E}\left[\log \pi_\theta(a_t | s_{<t}, \text{reasoning}_t)\right] + \beta \cdot \text{RL loss}$$
+$$\mathcal{L}_{\text{RPT}} \approx -\mathbb{E}\left[\log \pi_\theta(a_t \mid s_{<t}, \text{reasoning}_t)\right] + \text{RL term rewarding correct prediction}$$
 
-This change is revolutionary — **RL can be performed during the pre-training phase**, and RPT's scaling properties are comparable to traditional pre-training. This suggests that the future may no longer have a clear distinction between "pre-training" and "post-training," with RL being integrated throughout the entire training process.
+Schematically: the model first generates a short reasoning trace about the next token and is rewarded when the resulting prediction is correct. This change is conceptual — **RL can be performed during the pre-training phase** — and RPT's scaling properties are reported to be comparable to traditional pre-training. This suggests that the future may no longer have a clear distinction between "pre-training" and "post-training," with RL being integrated throughout the entire training process.
 
 RPT is still in its early stages and has not yet been widely adopted in industry practice. However, its conceptual impact is significant enough for this book to dedicate a separate improvement route to it.
+
+## Operating Envelopes: Zero-Signal Groups, Stale Rollouts, and Collapse Signals
+
+The variants above change the update rule. A separate set of problems comes from how rollouts are reused and what the training traces look like while they are reused.
+
+**Zero-signal groups.** When every answer in a group is correct or every answer is wrong, the within-group advantage is exactly zero and the group contributes no gradient. DAPO's dynamic sampling handles this by filtering out solved prompts and oversampling the rest, so each batch keeps a usable fraction of groups with nonzero variance. The same logic applies to invalid outputs: a response that cannot be parsed or executed should receive the group's minimum reward (typically 0) rather than being dropped silently, because dropping it biases the group mean upward. Verifier failures need the same treatment — if the verifier itself errors, mark the rollout as failed and exclude the whole prompt from the update instead of recording a 0, or the policy learns to avoid whatever triggered the verifier bug.
+
+**One update per rollout versus several.** The original GRPO analysis uses each rollout batch once (`num_iterations=1`): the sampling policy and the policy being updated coincide, so the importance ratio starts at 1 and clipping rarely binds. Taking several gradient steps on the same batch (as PPO commonly does) improves sample efficiency but makes the data off-policy: after the first step, $\pi_\theta$ has moved away from $\pi_{\text{old}}$, the ratios drift from 1, and clipping starts discarding token updates. A practical rule is to watch the clipped-token fraction and the mean absolute ratio error $|\rho - 1|$: a rising clipped fraction is the signal that the rollout batch is going stale and should be replaced rather than re-used. Asynchronous systems (see Section 15.5) face the same trade-off continuously and typically cap policy lag at a few versions, downweighting or discarding older rollouts.
+
+**Collapse signals.** Three traces warn that the policy is contracting instead of improving: entropy of the next-token distribution falls toward zero while reward plateaus (entropy collapse — the model repeats one template), KL against the reference model spikes suddenly (one update moved too far), and mean response length drifts up while external quality is flat (verbosity incentive — longer answers harvest format or partial-credit rewards without solving more problems). Length normalization in the loss (averaging inside each response, as `loss_type="grpo"` does) removes the direct reward for verbosity, but the indirect incentive remains whenever longer answers have more chances to hit a sparse reward. The fix is diagnostic rather than algorithmic: track reward together with KL, entropy, mean length, and the fraction of valid outputs, and stop or regularize when reward rises alone.
 
 ## Decision Tree for Selection
 
@@ -165,4 +173,4 @@ This decision tree is not absolute — within ByteDance Seed, there is frequent 
 
 The rapid evolution of the GRPO improvement family reflects a fact: **RL in the era of large models is no longer a single choice of "just using PPO is enough."** Each lab has chosen different improvement directions based on their training infrastructure (MoE vs Dense, lightning attention vs standard attention, memory budget) and task characteristics (inference vs dialogue, long CoT vs short answer).
 
-The true value of this section is not in remembering the specific formulas of each algorithm — it is in building a sense of judgment: **when seeing a new GRPO variant, being able to immediately ask, "Which of the four directions — normalization, sequence-level, clipping, or value model — is this variant addressing?"** This sense of judgment is a crucial step from reading papers to being able to improve algorithms hands-on.
+The true value of this section is not in remembering the specific formulas of each algorithm — it is in building a sense of judgment: **when seeing a new GRPO variant, being able to immediately ask, "Which of the five directions — normalization, sequence-level, clipping, value model, or pre-training integration — is this variant addressing?"** This sense of judgment is a crucial step from reading papers to being able to improve algorithms hands-on.
