@@ -143,7 +143,7 @@ python code/chapter06_policy_gradient/render_cartpole_baseline.py \
   --seed 0
 ```
 
-This script retrains both policies, then renders deterministic-action replays for CartPole, and writes the GIFs into `docs/chapter08_policy_gradient/images/`.
+This script retrains both policies, then renders deterministic-action replays for CartPole, and writes the GIFs into `docs/chapter06_policy_gradient/images/`.
 
 ## 6.5.4 Reading the Reward Curves
 
@@ -291,12 +291,6 @@ In the next chapter, Actor-Critic will go one step further: it will replace full
 4. Reduce the hidden size of the Value Network from `128` to `32` and see whether weaker baseline estimation leads to a noisier training curve.
 
 ## References
-
-[^1]: Williams, R. J. (1992). Simple statistical gradient-following algorithms for connectionist reinforcement learning. _Machine Learning_, 8(3-4), 229-256. [DOI](https://doi.org/10.1007/BF00992696)
-
-[^2]: Sutton, R. S., McAllester, D., Singh, S., & Mansour, Y. (1999). Policy gradient methods for reinforcement learning with function approximation. _Advances in Neural Information Processing Systems_, 12.
-
-[^3]: Gymnasium. CartPole-v1 documentation. <https://gymnasium.farama.org/environments/classic_control/cart_pole/>
 
 [^williams1992]: Williams, R. J. (1992). Simple statistical gradient-following algorithms for connectionist reinforcement learning. _Machine Learning_, 8, 229-256. DOI: <https://doi.org/10.1007/BF00992696>.
 

@@ -141,4 +141,7 @@ This section is still REINFORCE with a Value Baseline. It waits until an entire 
 
 ## Section Summary
 
-This lab connects the runnable experiment to the main idea of the section. Use the reported metrics together with replay or task-level evaluation, and keep conclusions within the conditions that were actually tested.
+- Replacing the update signal $G_t$ with the advantage $G_t - V(s_t)$ leaves the expected gradient direction unchanged but makes updates far more consistent across episodes.
+- In this run the value baseline lifted the last-50-episode average from about `95.1` to about `493.0` and cut gradient-estimator variance to roughly `38%` of the vanilla version.
+- The value network is trained by regressing $V(s_t)$ onto Monte Carlo returns $G_t$; its prediction quality sets how much variance is actually removed.
+- This is still REINFORCE, not Actor-Critic: updates wait for full-episode returns. Chapter 7 removes that wait with TD-style critic targets.

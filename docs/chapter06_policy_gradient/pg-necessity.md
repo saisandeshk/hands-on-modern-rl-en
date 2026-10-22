@@ -90,7 +90,7 @@ $\arg\max$ (greedy decoding) picks the most probable "shi" every time. If the pr
 
 Since "score first, then pick" does not work, let's take another road: **skip the $Q$ values and learn the policy $\pi_\theta(a|s)$ directly**. Instead of asking "how many points is each action worth," we learn directly "what to do in what situation."
 
-This is exactly the core idea of the [policy objective $J(\theta)$](./reinforce) in Chapter 2: define a policy objective function $J(\theta)$, and then directly optimize the parameters $\theta$ so as to maximize $J(\theta)$.
+This is exactly the core idea of the [policy objective $J(\theta)$](./reinforce) introduced in Chapter 2 and derived in Section 6.1: define a policy objective function $J(\theta)$, and then directly optimize the parameters $\theta$ so as to maximize $J(\theta)$.
 
 The difference between the two routes can be made clear with an analogy: a value-based method is like a food critic, who scores every dish and then picks the one with the highest score; a policy-based method is like an experienced chef, who does not need to score anything and directly knows what dish to cook given which ingredients and which occasion.
 

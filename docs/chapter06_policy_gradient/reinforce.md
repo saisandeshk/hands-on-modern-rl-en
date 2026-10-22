@@ -4,9 +4,9 @@ title: 6.1 The Policy Gradient Theorem and REINFORCE
 
 # 6.1 Policy Gradient and REINFORCE
 
-Chapter 3 followed one route: learn $Q(s,a)$, use it to score each action, and choose the action with the highest score. This route works well for CartPole and Atari because their action sets are finite. A robotic arm is different: its shoulder, elbow, and wrist can each apply a continuous torque, giving infinitely many possible action combinations. A language model also makes a sequence of decisions while preserving the ability to sample rather than always selecting the single most likely token.
+Chapter 5 followed one route: learn $Q(s,a)$, use it to score each action, and choose the action with the highest score. This route works well for CartPole and Atari because their action sets are finite. A robotic arm is different: its shoulder, elbow, and wrist can each apply a continuous torque, giving infinitely many possible action combinations. A language model also makes a sequence of decisions while preserving the ability to sample rather than always selecting the single most likely token.
 
-These tasks suggest a second route: skip the intermediate $Q$ values and learn a **policy** $\pi_\theta(a\mid s)$ directly. This is the idea behind the [policy objective $J(\theta)$](../chapter02_rl_basics/policy-value) from Chapter 3 — define a score for the policy as a whole, then adjust its parameters $\theta$ to increase that score. The differences between the two routes can be summarized as:
+These tasks suggest a second route: skip the intermediate $Q$ values and learn a **policy** $\pi_\theta(a\mid s)$ directly. This is the idea behind the [policy objective $J(\theta)$](../chapter02_rl_basics/policy-value) from Chapter 2 — define a score for the policy as a whole, then adjust its parameters $\theta$ to increase that score. The differences between the two routes can be summarized as:
 
 | Property         | Value-based methods                     | Policy-based methods                        |
 | ---------------- | --------------------------------------- | ------------------------------------------- |
@@ -30,7 +30,7 @@ This section answers two questions: what metric should we use to measure "how go
 
 ## The Policy Objective
 
-Chapter 3 introduced the [policy objective](../chapter02_rl_basics/policy-value) $J(\theta)$ — a measure of how well the policy performs overall. Across possible starting points, how much [discounted return](../chapter02_rl_basics/mdp) does policy $\pi_\theta$ accumulate on average?
+Chapter 2 introduced the [policy objective](../chapter02_rl_basics/policy-value) $J(\theta)$ — a measure of how well the policy performs overall. Across possible starting points, how much [discounted return](../chapter02_rl_basics/mdp) does policy $\pi_\theta$ accumulate on average?
 
 $$J(\theta) = \mathbb{E}_{\pi_\theta} \left[ \sum_{t=0}^{\infty} \gamma^t r_t \right]$$
 
@@ -393,6 +393,18 @@ loss = -log_prob * reward         # REINFORCE core
 After 300 episodes, the probability of choosing B will typically climb from around 0.5 to 0.85–0.95: the policy learns to prefer the arm with the higher win rate. But the curve will not be smooth — it will be jagged and noisy. If you increase the learning rate from 0.01 to 0.1, the policy may swing violently between A and B.
 
 This is the core pain point of REINFORCE: **high variance**.
+
+### Reward-to-Go: Past Rewards Are Not Your Doing
+
+There is one more source of noise we can remove for free. In the estimator above, the action at step $t$ is multiplied by $G_t$, the return from $t$ onward. But suppose we instead multiplied it by the return of the _whole_ episode, $G_0 = r_0 + \gamma r_1 + \gamma^2 r_2$. That would credit the action at step 2 for rewards $r_0$ and $r_1$ that happened _before_ it was taken. An action cannot influence the past, so past rewards only add noise to its gradient signal.
+
+Formally, rewards before time $t$ are independent of $a_t$ given $s_t$, so their contribution has expectation zero:
+
+$$\mathbb{E}_{\pi_\theta}\left[ \nabla_\theta \log \pi_\theta(a_t|s_t) \cdot \sum_{k < t} \gamma^k r_k \right] = 0.$$
+
+Dropping them leaves the **reward-to-go** $G_t = \sum_{k \ge t} \gamma^{k-t} r_k$, unbiased but less noisy. Go back to the 3-step example: for the action at step 2, the full-episode return gives a weight of $5.23$, so its gradient contribution would be $[0.1, 0.2] \times 5.23 = [0.523, 1.046]$. The reward-to-go gives the correct, smaller weight $G_2 = 3$, contributing $[0.3, 0.6]$. Same expected direction, less exaggeration from rewards the action did not cause.
+
+In code this is why `compute_returns` works backward from the end of the episode ($G_t = r_t + \gamma G_{t+1}$): each step's loss weight contains only the rewards that follow it.
 
 ## The Variance Problem in REINFORCE
 
