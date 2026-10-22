@@ -76,9 +76,9 @@ The reward curve answers “does the policy get better?” The variance curve an
 
 ![Variance comparison of the policy-gradient estimator on CartPole between vanilla REINFORCE and REINFORCE + Value Baseline. After converting returns into advantages, the gradient signal becomes more concentrated.](./images/reinforce-baseline-cartpole-variance.png)
 
-This figure plots the variance of the gradient estimator within a sliding window. A larger value means different episodes suggest very different update directions; a smaller value means each policy update is more consistent.
+This figure plots, within a sliding window, the variance of a per-episode scalar proxy for the update signal, `(log_probs * returns_t).mean()` versus `(log_probs * advantages).mean()` (a loss-scale signal, not the full parameter-gradient vector). A larger value means different episodes suggest very different update directions; a smaller value means each policy update is more consistent.
 
-In this run, the gradient-estimator variance is about `100.41` for vanilla REINFORCE and about `38.27` for the Value Baseline version. That is roughly `38.1%` of the original. This matches what we saw in the reward curve: when the update signal is steadier, the policy can keep moving in the direction of “keeping the pole upright”.
+In this run, that proxy-signal variance is about `100.41` for vanilla REINFORCE and about `38.27` for the Value Baseline version. That is roughly `38.1%` of the original. Part of the drop is genuine variance reduction and part is a scale effect (advantages are smaller than raw returns by construction); the two runs also use different seeds (0 vs 100), so treat the ratio as illustrative. This matches what we saw in the reward curve: when the update signal is steadier, the policy can keep moving in the direction of “keeping the pole upright”.
 
 ## 6.6.5 What Exactly Changed In The Code
 
@@ -142,6 +142,6 @@ This section is still REINFORCE with a Value Baseline. It waits until an entire 
 ## Section Summary
 
 - Replacing the update signal $G_t$ with the advantage $G_t - V(s_t)$ leaves the expected gradient direction unchanged but makes updates far more consistent across episodes.
-- In this run the value baseline lifted the last-50-episode average from about `95.1` to about `493.0` and cut gradient-estimator variance to roughly `38%` of the vanilla version.
+- In this run the value baseline lifted the last-50-episode average from about `95.1` to about `493.0` and cut the scalar update-signal proxy variance to roughly `38%` of the vanilla version (illustrative: partly a scale effect, and the two runs use different seeds).
 - The value network is trained by regressing $V(s_t)$ onto Monte Carlo returns $G_t$; its prediction quality sets how much variance is actually removed.
 - This is still REINFORCE, not Actor-Critic: updates wait for full-episode returns. Chapter 7 removes that wait with TD-style critic targets.

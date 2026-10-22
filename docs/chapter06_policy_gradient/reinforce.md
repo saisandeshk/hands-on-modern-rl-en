@@ -6,7 +6,7 @@ title: 6.1 The Policy Gradient Theorem and REINFORCE
 
 Chapter 5 followed one route: learn $Q(s,a)$, use it to score each action, and choose the action with the highest score. This route works well for CartPole and Atari because their action sets are finite. A robotic arm is different: its shoulder, elbow, and wrist can each apply a continuous torque, giving infinitely many possible action combinations. A language model also makes a sequence of decisions while preserving the ability to sample rather than always selecting the single most likely token.
 
-These tasks suggest a second route: skip the intermediate $Q$ values and learn a **policy** $\pi_\theta(a\mid s)$ directly. This is the idea behind the [policy objective $J(\theta)$](../chapter02_rl_basics/policy-value) from Chapter 2 — define a score for the policy as a whole, then adjust its parameters $\theta$ to increase that score. The differences between the two routes can be summarized as:
+These tasks suggest a second route: skip the intermediate $Q$ values and learn a **policy** $\pi_\theta(a\mid s)$ directly. This is the idea behind the policy objective $J(\theta)$ — define a score for the policy as a whole, then adjust its parameters $\theta$ to increase that score. Chapter 2 introduced the policy and the discounted return this objective builds on; Section 6.1 turns them into $J(\theta)$. The differences between the two routes can be summarized as:
 
 | Property         | Value-based methods                     | Policy-based methods                        |
 | ---------------- | --------------------------------------- | ------------------------------------------- |
@@ -30,7 +30,7 @@ This section answers two questions: what metric should we use to measure "how go
 
 ## The Policy Objective
 
-Chapter 2 introduced the [policy objective](../chapter02_rl_basics/policy-value) $J(\theta)$ — a measure of how well the policy performs overall. Across possible starting points, how much [discounted return](../chapter02_rl_basics/mdp) does policy $\pi_\theta$ accumulate on average?
+Chapter 2 introduced the policy and the discounted return behind the [policy objective](../chapter02_rl_basics/policy-value) $J(\theta)$ — a measure of how well the policy performs overall. Across possible starting points, how much [discounted return](../chapter02_rl_basics/mdp) does policy $\pi_\theta$ accumulate on average?
 
 $$J(\theta) = \mathbb{E}_{\pi_\theta} \left[ \sum_{t=0}^{\infty} \gamma^t r_t \right]$$
 
@@ -97,7 +97,7 @@ But how do we compute $\nabla_\theta J(\theta)$? The objective contains an expec
 
 ## The Policy Gradient Theorem
 
-This is exactly where the policy gradient theorem enters. In 1992, Williams showed in the REINFORCE paper that the seemingly intractable gradient $\nabla_\theta J(\theta)$ can be rewritten into a form that can be estimated by sampling. [^1] Sutton and colleagues later generalized and systematized this result in 2000. [^2]
+This is exactly where the policy gradient theorem enters. In 1992, Williams introduced the REINFORCE class of algorithms, showing that the seemingly intractable gradient $\nabla_\theta J(\theta)$ can be rewritten into a form that can be estimated by sampling. [^1] Sutton and colleagues later generalized and systematized this result in 1999. [^2]
 
 $$\nabla_\theta J(\theta) = \mathbb{E}_{\pi_\theta} \left[ \sum_t \nabla_\theta \log \pi_\theta(a_t | s_t) \cdot G_t \right]$$
 
@@ -398,11 +398,11 @@ This is the core pain point of REINFORCE: **high variance**.
 
 There is one more source of noise we can remove for free. In the estimator above, the action at step $t$ is multiplied by $G_t$, the return from $t$ onward. But suppose we instead multiplied it by the return of the _whole_ episode, $G_0 = r_0 + \gamma r_1 + \gamma^2 r_2$. That would credit the action at step 2 for rewards $r_0$ and $r_1$ that happened _before_ it was taken. An action cannot influence the past, so past rewards only add noise to its gradient signal.
 
-Formally, rewards before time $t$ are independent of $a_t$ given $s_t$, so their contribution has expectation zero:
+Formally, write $G_0 = (r_0 + \gamma r_1) + \gamma^2 G_2$: the first bracket holds rewards the step-2 action did not cause, and the second term is the discounted reward-to-go. Rewards before time $t$ are independent of $a_t$ given $s_t$, so their contribution has expectation zero:
 
 $$\mathbb{E}_{\pi_\theta}\left[ \nabla_\theta \log \pi_\theta(a_t|s_t) \cdot \sum_{k < t} \gamma^k r_k \right] = 0.$$
 
-Dropping them leaves the **reward-to-go** $G_t = \sum_{k \ge t} \gamma^{k-t} r_k$, unbiased but less noisy. Go back to the 3-step example: for the action at step 2, the full-episode return gives a weight of $5.23$, so its gradient contribution would be $[0.1, 0.2] \times 5.23 = [0.523, 1.046]$. The reward-to-go gives the correct, smaller weight $G_2 = 3$, contributing $[0.3, 0.6]$. Same expected direction, less exaggeration from rewards the action did not cause.
+Dropping them leaves the **reward-to-go** $G_t = \sum_{k \ge t} \gamma^{k-t} r_k$, unbiased up to the known discount factor. Go back to the 3-step example: using $G_0$ for the step-2 action gives a weight of $5.23$ and a gradient contribution of $[0.1, 0.2] \times 5.23 = [0.523, 1.046]$. Removing only the past rewards ($2.8 = 1 + 0.9 \times 2$) leaves $\gamma^2 G_2 = 0.81 \times 3 = 2.43$, contributing $[0.1, 0.2] \times 2.43 = [0.243, 0.486]$. The textbook reward-to-go weight $G_2 = 3$, contributing $[0.3, 0.6]$, additionally drops the $\gamma^2 = 0.81$ discount, so it is about $23\%$ larger in magnitude than the past-rewards-only correction — same expected direction, less exaggeration from rewards the action did not cause, plus the standard undiscounting of the step's own weight.
 
 In code this is why `compute_returns` works backward from the end of the episode ($G_t = r_t + \gamma G_{t+1}$): each step's loss weight contains only the rewards that follow it.
 

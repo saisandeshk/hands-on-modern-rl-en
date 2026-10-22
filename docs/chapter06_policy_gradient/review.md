@@ -86,12 +86,12 @@ For a discrete action set, prove $\mathbb{E}_{a \sim \pi_\theta}[\nabla_\theta \
 Differentiate both sides of $\sum_a \pi_\theta(a|s) = 1$ with respect to $\theta$: $\sum_a \nabla_\theta \pi_\theta(a|s) = 0$. Use $\nabla_\theta \log \pi = \nabla_\theta \pi / \pi$, i.e. $\nabla_\theta \pi = \pi \cdot \nabla_\theta \log \pi$. Substituting gives $\sum_a \pi_\theta(a|s) \, \nabla_\theta \log \pi_\theta(a|s) = 0$, which is exactly the stated expectation.
 :::
 
-### Exercise 6 — Reward-to-Go Is Unbiased
+### Exercise 6 — Reward-to-Go Removes Past Rewards (Up to Discount)
 
-Show that replacing the full-episode return $G_0$ with the reward-to-go $G_t$ in the step-$t$ gradient term does not change its expectation.
+Show that using the full-episode return $G_0$ in the step-$t$ gradient term, instead of the reward-to-go $G_t$, changes that term's expectation by a factor $\gamma^t$: the past-reward part has expectation zero, so the direction is unchanged while the past-reward noise is removed.
 
 ::: details Solution
-Split $G_0 = \sum_{k<t} \gamma^k r_k + \gamma^t G_t$. The past-reward part contributes $\mathbb{E}[\nabla_\theta \log \pi_\theta(a_t|s_t) \cdot \sum_{k<t} \gamma^k r_k]$. Condition on the history up to $s_t$: past rewards and $s_t$ are then fixed numbers, and the inner expectation over $a_t \sim \pi_\theta(\cdot|s_t)$ of the score function is zero by Exercise 5. So the past-reward term has expectation zero, and only the $\gamma^t G_t$ part (a positive rescaling of the reward-to-go term) survives.
+Split $G_0 = \sum_{k<t} \gamma^k r_k + \gamma^t G_t$. The past-reward part contributes $\mathbb{E}[\nabla_\theta \log \pi_\theta(a_t|s_t) \cdot \sum_{k<t} \gamma^k r_k]$. Condition on the history up to $s_t$: past rewards and $s_t$ are then fixed numbers, and the inner expectation over $a_t \sim \pi_\theta(\cdot|s_t)$ of the score function is zero by Exercise 5. So the past-reward term has expectation zero, and $\mathbb{E}[\nabla_\theta \log \pi_\theta(a_t|s_t) G_0] = \gamma^t \, \mathbb{E}[\nabla_\theta \log \pi_\theta(a_t|s_t) G_t]$: the same direction, rescaled by $\gamma^t$ (for example $0.81$ at $t = 2$, $\gamma = 0.9$). Equality of the two expectations would require absolute discounting ($\sum_{k \ge t} \gamma^k r_k$), not the chapter's $G_t$.
 :::
 
 ### Exercise 7 — Coding: Constant Baseline on the Bandit
@@ -99,7 +99,7 @@ Split $G_0 = \sum_{k<t} \gamma^k r_k + \gamma^t G_t$. The past-reward part contr
 Extend the Section 6.3 bandit script (`policy_gradient_bandit.py` pattern: `loss = -log_prob * reward`) with a constant baseline $b$ equal to the running mean of past rewards, i.e. `loss = -log_prob * (reward - b)`. Run 300 episodes with and without it. Report final $P(B)$ and the standard deviation of $P(B)$ over the last 50 episodes for each version.
 
 ::: details Solution
-Keep a running mean `b`: after each episode, `b += (reward - b) / count`. Replace the loss with `loss = -log_prob * (reward - b)` where `b` is a plain Python float (never a tensor requiring grad, so nothing extra flows into autograd). Typical outcome: both versions finish with $P(B)$ in the $0.85$–$0.95$ band, but the baseline version shows a visibly smaller standard deviation of $P(B)$ over the last 50 episodes, because wins on the worse arm no longer push as hard: with $b \approx 0.5$ mid-training, a lucky $1$ on arm A contributes weight $1 - 0.5 = 0.5$ instead of $1$. Exact numbers vary by seed; the expected pattern is equal-or-better final $P(B)$ with lower late-training fluctuation.
+Keep a running mean `b`: after each episode, `b += (reward - b) / count`. Replace the loss with `loss = -log_prob * (reward - b)` where `b` is a plain Python float (never a tensor requiring grad, so nothing extra flows into autograd). What to measure: run both versions and compare final $P(B)$ and the standard deviation of $P(B)$ over the last 50 episodes. The expected pattern is equal-or-better final $P(B)$ with lower late-training fluctuation, because with $b \approx 0.5$ mid-training, a lucky $1$ on arm A contributes weight $1 - 0.5 = 0.5$ instead of $1$. Exact numbers vary by seed, so report your measured numbers rather than taking any quoted band as a result.
 :::
 
 ### Exercise 8 — Coding: Entropy Bonus on CartPole
@@ -114,5 +114,5 @@ entropy = -(probs * torch.log(probs + 1e-8)).sum(dim=1)
 loss = -(log_probs * returns_tensor).mean() - beta * entropy.mean()
 ```
 
-`entropy` needs no `no_grad`: the bonus must differentiate through `probs` so the policy is rewarded for staying stochastic. With `beta = 0.01` the run typically matches or slightly trails the vanilla script on the last-50 average (entropy costs a little exploitation) while showing fewer full collapses across seeds; with `beta = 0.1` the bonus dominates the return signal and the policy stays near-uniform, so the last-50 average drops markedly (often back toward random-level balancing). That contrast is the point: a small $\beta$ preserves exploration, a large one prevents commitment. As with all single-seed CartPole comparisons, treat exact numbers as illustrative and compare moving averages, not single episodes.
+`entropy` needs no `no_grad`: the bonus must differentiate through `probs` so the policy is rewarded for staying stochastic. Scale check before running: a typical mean return weight on CartPole is $G_t \approx 37$, so the per-step return term $|G_t| \cdot |\log \pi| \approx 25$ dwarfs the entropy bonus ($\le 0.693$ nats, times $\beta$). At $\beta = 0.01$ the bonus is at most $0.0069$ and at $\beta = 0.1$ at most $0.069$ — about $0.03\%$ and $0.3\%$ of the return term — so expect no measurable difference from vanilla REINFORCE at either setting in this raw-return loss. That null result is the point: the $10^{-3}$–$10^{-2}$ $\beta$ range only matters for return-normalized losses (PPO/RLHF); here $\beta$ must be $O(10)$ (try $\beta \approx 50$) before the bonus can compete with returns and keep the policy near-uniform. As with all single-seed CartPole comparisons, compare moving averages, not single episodes.
 :::

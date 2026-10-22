@@ -195,12 +195,13 @@ why does the value baseline make training more stable?
 
 ![Variance comparison of gradient estimates between vanilla REINFORCE and REINFORCE + Value Baseline on CartPole. After turning returns into advantages, the Value Baseline concentrates the gradient signal.](./images/reinforce-baseline-cartpole-variance.png)
 
-This plot shows the variance of gradient estimates within a sliding window.
+This plot shows the variance, within a sliding window, of a per-episode scalar proxy for the update signal, `(log_probs * returns_t).mean()` for vanilla REINFORCE and `(log_probs * advantages).mean()` for the baseline version (a loss-scale signal, not the full parameter-gradient vector).
 A larger value means that different episodes imply more divergent update directions;
 a smaller value means that updates are more consistent from episode to episode.
 
-In this run, the variance of the gradient estimate is about `100.41` for vanilla REINFORCE and about `38.27` for the Value Baseline version.
-In other words, the Value Baseline reduces the variance to roughly `38.1%` of the original.
+In this run, that proxy-signal variance is about `100.41` for vanilla REINFORCE and about `38.27` for the Value Baseline version.
+In other words, the Value Baseline reduces this proxy to roughly `38.1%` of the original.
+Part of the drop is genuine variance reduction, and part is a scale effect (advantages are smaller than raw returns by construction); the two runs also use different seeds (0 vs 100), so seed effects are confounded with the method difference. Treat the ratio as illustrative rather than a pure variance measurement.
 This aligns with what we saw in the reward curves:
 when the learning signal is steadier, the policy is more likely to keep moving in the direction of “keeping the pole upright.”
 

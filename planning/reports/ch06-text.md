@@ -42,6 +42,24 @@ Chapter 6 text pass. No partial work was present in the worktree (clean tree, no
 - `.venv/bin/python -c` arithmetic checks for review/pg-improvements numbers: all match.
 - Allowed-shell note: `code/` was read but never edited (another worker owns it); no tests were run since the task names none and the chapter scripts require long training runs.
 
+## Review response
+
+- Error 1 (review.md Ex. 6 false premise): accepted. Restated exercise as "$G_0$ changes the step-$t$ expectation by $\gamma^t$" and rewrote the solution with the $2.8 + 0.81 \times 3$ decomposition and the $0.81$ example.
+- Error 2 (review.md Ex. 8 $\beta=0.1$ scale): accepted. Rewrote solution with scale check ($G_t \approx 37$, return term $\approx 25$ vs bonus $\le 0.069$ at $\beta=0.1$); both $\beta=0.01/0.1$ now predict no measurable difference, with $\beta=O(10)$ suggested for a visible effect. Verified $G$-mean $\approx 37.2$ and max entropy-gradient factor $\approx 0.224$ with `.venv/bin/python`.
+- Error 3 (pg-improvements.md entropy scale): accepted. Added the return-term comparison ($37 \times 0.69 \approx 25$ vs $0.0069$ nats) and noted the $10^{-3}$–$10^{-2}$ range belongs to normalized PPO/RLHF losses.
+- Error 4 (reinforce.md 5.23 vs 3): accepted. Now compares $5.23$ with $\gamma^2G_2 = 2.43$ ($[0.243,0.486]$), spelling out the $2.8$ past-reward part and the $1/0.81 \approx 23\%$ discount effect.
+- Error 5 ($J(\theta)$ "from Chapter 2"): accepted. Removed the attribution in `reinforce.md` (two places) and `pg-necessity.md`; text now says Ch. 2 introduced the policy and discounted return and Sec. 6.1 turns them into $J(\theta)$.
+- Error 6 (missing sidebar entry for review.md): accepted in substance but out of scope — `config.mjs` edits are forbidden for this worker. Page remains listed under "Sidebar additions" for the coordinator: `6.R Summary and Exercises` → `/chapter06_policy_gradient/review`.
+- Doubt 1 (variance proxy + seeds): accepted. Both 6.5/6.6 pages and the 6.6 summary now call the curve a scalar proxy signal, note the scale effect and the 0-vs-100 seed confound, and label the 38% ratio illustrative.
+- Doubt 2 (heading "Best Baseline" + convergence claim): accepted. Heading → "The Standard Baseline Is $V(s)$"; "without changing what the policy converges to" → "without changing the expected gradient (finite-sample path still changes)".
+- Doubt 3 (Ch. 13 bullet): accepted. Now reads as token-level reward signal with advantages over token positions.
+- Doubt 4 (cartpole.md summary pointers): accepted. Forward pointer now goes to 6.5 with 6.2 cited as background; bandit comparison notes the bandit has no multi-step return computation.
+- Doubt 5 (Ex. 7 unverified outcome): accepted. Solution now frames the pattern as "what to measure / expected pattern" and tells the reader to report measured numbers.
+- Doubt 6 (Ex. 8 multi-seed claim): accepted. Dropped "fewer full collapses across seeds"; single-seed moving-average comparison only.
+- Doubt 7 (Williams/Sutton history + year): accepted. Now "Williams introduced the REINFORCE class (1992)… Sutton et al. generalized in 1999", consistent with footnote [^2].
+- Doubt 8 (code docstrings "Chapter 5", pg-necessity sidebar): no change — both targets are outside this task's scope (`code/` owned by another worker; `config.mjs` forbidden). Flagged for coordinator.
+- Doubt 9 (report verification lines): accepted. Report items 1–2 trails corrected by the fixes above; original sidebar label was "6. Policy Gradient Methods" vs `chapter05_dqn` (DQN), and $J(\theta)$ attribution removed.
+
 ## Open issues
 
 - **Sections 6.5 (`baseline-experiment.md`) and 6.6 (`cartpole-baseline.md`) are near-duplicates**: same experiment, same scripts, same reported numbers (`95.1`/`493.0`, `100.41`/`38.27`), same figures, near-identical prose. Both are individually correct, so both were left intact, but the coordinator should consider merging them into one page (and updating the sidebar) rather than shipping the same comparison twice. The 6.6 learning-path line (6.4 → 6.5 → 6.6) currently asks the reader to run the same experiment twice.

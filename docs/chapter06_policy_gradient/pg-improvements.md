@@ -58,7 +58,7 @@ Without a baseline, all three cases produce a positive $G_t$, so the policy gets
 
 What the baseline does is build a per-state “passing line”: if the outcome is above the line, reinforce; if it is below the line, suppress. The line is not constant: different states have different $V(s)$, because what counts as “normal performance” depends on where you are in the episode.
 
-## The Best Baseline Is $V(s)$
+## The Standard Baseline Is $V(s)$
 
 The baseline can be any function that does not depend on the action. The simplest choice is a constant (for example, the average return across episodes). A constant baseline is already useful in stateless bandits, but it cannot distinguish between different states.
 
@@ -84,11 +84,11 @@ We will use the advantage function repeatedly in later chapters:
 
 - **Chapter 7 Actor-Critic**: use a critic network to estimate $V(s)$ directly, enabling per-step updates (no need to wait for the episode to end)
 - **Chapter 8 PPO**: use GAE (Generalized Advantage Estimation) to trade off bias and variance
-- **Chapter 13 RLHF**: a learned reward model supplies the reward signal from which advantage-like comparisons between responses are computed
+- **Chapter 13 RLHF**: a learned reward model supplies the token-level reward signal; advantages are then estimated over token positions within each response
 
 ## Entropy Regularization: Pay the Policy to Stay Uncertain
 
-Baselines reduce variance without changing what the policy converges to. Entropy regularization changes the objective itself, on purpose: it rewards the policy for staying stochastic so that exploration does not collapse too early.
+Baselines reduce variance without changing the expected gradient (so the stationary point is unchanged in expectation; with a learned, moving baseline the finite-sample update path still changes). Entropy regularization changes the objective itself, on purpose: it rewards the policy for staying stochastic so that exploration does not collapse too early.
 
 The entropy of a policy at state $s$ is
 
@@ -100,7 +100,7 @@ $$J_\beta(\theta) = J(\theta) + \beta \, \mathbb{E}_{\pi_\theta}[H(\pi_\theta(\c
 
 Its gradient, $\beta \, \nabla_\theta H$, pushes probability mass back toward uniformity and directly counteracts premature convergence to a deterministic policy.
 
-A concrete comparison makes the scale clear. A two-action policy at $[0.9, 0.1]$ has entropy $-(0.9 \ln 0.9 + 0.1 \ln 0.1) = -(-0.0948 - 0.2303) \approx 0.325$ nats. A uniform $[0.5, 0.5]$ policy has entropy $\ln 2 \approx 0.693$ nats. With $\beta = 0.01$, the entropy bonus differs by only $0.01 \times (0.693 - 0.325) \approx 0.0037$ per step: a gentle pull that matters most when returns are ambiguous and fades into the background once one action is clearly better. In practice $\beta$ is kept small ($10^{-3}$ to $10^{-2}$) or annealed toward zero late in training; too large a $\beta$ stops the policy from ever committing, too small lets it lock in after a few lucky episodes. Chapter 8 reuses this mechanism inside PPO, where the entropy bonus is a standard diagnostic alongside the clipped surrogate loss.
+A concrete comparison shows both the direction and the scale. A two-action policy at $[0.9, 0.1]$ has entropy $-(0.9 \ln 0.9 + 0.1 \ln 0.1) = -(-0.0948 - 0.2303) \approx 0.325$ nats. A uniform $[0.5, 0.5]$ policy has entropy $\ln 2 \approx 0.693$ nats. With $\beta = 0.01$, the entropy bonus differs by only $0.01 \times (0.693 - 0.325) \approx 0.0037$ per step. Compare that with the return term in this chapter's own raw-return loss, `-(log_probs * returns_tensor).mean()`: a typical per-step return weight is $G_t \approx 37$ on a 100-step CartPole episode with $\gamma = 0.99$, so the return term per step is $|G_t| \cdot |\log \pi| \approx 37 \times 0.69 \approx 25$ — three orders of magnitude larger than the $0.0069$-nat entropy bonus at $\beta = 0.01$. In this unnormalized loss the entropy term only becomes comparable when $\beta = O(10)$; the often-quoted $\beta = 10^{-3}$ to $10^{-2}$ range refers to return-normalized losses such as PPO or RLHF, not to the raw-return loss of Section 6.4/6.6. So here a small $\beta$ is a gentle pull that matters most when returns are ambiguous and fades into the background once one action is clearly better. In practice keep $\beta$ small or anneal it toward zero late in training; too large a $\beta$ stops the policy from ever committing, too small lets it lock in after a few lucky episodes. Chapter 8 reuses this mechanism inside PPO, where the entropy bonus is a standard diagnostic alongside the clipped surrogate loss.
 
 ## Implementation: Adding a Value Network
 
