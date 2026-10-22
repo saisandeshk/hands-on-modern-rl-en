@@ -182,10 +182,10 @@ $$
 Q^\pi(s, a) = \mathbb{E}_{s'}\left[r + \gamma V^\pi(s')\right]
 $$
 
-Here $V(s)$ is no longer $\max_a Q(s,a)$ but the expectation of Q plus the entropy bonus. For continuous actions the soft max has an analytic form:
+Here $V(s)$ is no longer $\max_a Q(s,a)$ but the expectation of Q plus the entropy bonus. For reference, the optimal soft value has a closed form in continuous action spaces:
 
 $$
-V^\pi(s) = \alpha \log \int \exp\left(\frac{Q^\pi(s, a)}{\alpha}\right) da
+V^*(s) = \alpha \log \int \exp\left(\frac{Q^*(s, a)}{\alpha}\right) da
 $$
 
 This integral looks a bit frightening, but you do not need to memorize it. SAC uses a clever technique (the reparameterization trick) in its implementation to avoid computing this integral directly.
@@ -247,7 +247,7 @@ What is the objective? We want the policy entropy to stay near a target value $\
 Formally, the optimization objective for $\alpha$ is:
 
 $$
-\alpha^* = \arg\max_\alpha \mathbb{E}\left[-\alpha \log \pi(a \mid s) - \alpha \mathcal{H}_0\right]
+\alpha^* = \arg\min_\alpha \mathbb{E}\left[-\alpha \log \pi(a \mid s) - \alpha \mathcal{H}_0\right]
 $$
 
 In practice the target entropy $\mathcal{H}_0$ is usually set to $-|\mathcal{A}|$, the negative of the action dimension. For example, if the action is a 6-dimensional continuous vector, the target entropy is set to -6. This is a heuristic, but it works well on most tasks and needs no manual tuning.
@@ -269,6 +269,35 @@ def update_alpha(self, states):
 
 Note that the code optimizes `log_alpha` rather than $\alpha$ directly. This guarantees that $\alpha$ is always positive (since $\exp(\log \alpha) > 0$).
 
+### Bounded Actions: Tanh Squashing
+
+There is one practical problem we have glossed over: a Gaussian has unbounded support, but real actuators do not. A HalfCheetah joint accepts torques only in a bounded range such as $[-1, 1]$, and a steering command saturates at its mechanical limit. Clipping the sampled action afterwards is tempting but wrong for SAC, because clipping piles probability mass onto the boundary points while the stored $\log \pi(a \mid s)$ still describes the unclipped Gaussian, so the entropy term and the temperature update are computed for a distribution the policy does not actually execute.
+
+The standard fix is **squashing**: sample an unbounded pre-action $u$ with the reparameterization trick, then pass it through $\tanh$ and rescale:
+
+$$
+u \sim \mathcal{N}(\mu_\theta(s), \sigma_\theta^2(s)), \qquad a = a_{\max} \cdot \tanh(u).
+$$
+
+Because $\tanh$ maps $\mathbb{R}$ onto $(-1, 1)$, the executed action always respects the control constraint, and the policy stays differentiable. The price is a change-of-variables correction to the log-probability: probability mass gets compressed where $\tanh$ is flat, so
+
+$$
+\log \pi(a \mid s) = \log \mu(u \mid s) - \sum_i \log\left(1 - \tanh^2(u_i)\right),
+$$
+
+where $\mu(u \mid s)$ is the Gaussian density of the pre-action. Every $\log \pi$ in the actor loss and the temperature loss must use this corrected value, which corresponds to the entropy of the squashed distribution the environment actually sees.
+
+```python
+mu, sigma = self.actor(states)
+dist = Normal(mu, sigma)
+u = dist.rsample()                          # unbounded pre-action
+actions = self.action_max * torch.tanh(u)   # squash into [-action_max, action_max]
+log_probs = dist.log_prob(u).sum(-1, keepdim=True) \
+    - torch.log(1 - torch.tanh(u).pow(2) + 1e-6).sum(-1, keepdim=True)
+```
+
+A quick check in one dimension with $a_{\max} = 1$, $\mu_0 = 0$, $\sigma = 0.5$, and a sampled $u = 0.5$: the executed action is $\tanh(0.5) \approx 0.462$, safely inside the bound. The Gaussian log-density at $u = 0.5$ is about $-0.726$, and the squashing correction is $-\log(1 - \tanh^2(0.5)) \approx +0.240$, giving $\log \pi(a \mid s) \approx -0.486$. Near saturation ($|u|$ large) the correction grows, correctly reporting that the squashed policy has lower entropy there than the raw Gaussian suggests.
+
 ### The Advantages of SAC
 
 SAC puts these pieces together:
@@ -283,7 +312,7 @@ How well does it work? On the MuJoCo continuous-control benchmarks, SAC has **lo
 1. **High sample efficiency**: it is off-policy and inherits the strengths of DDPG
 2. **Stable training**: maximum entropy plus twin Q-networks make it insensitive to hyperparameters
 3. **Out of the box**: with automatic temperature tuning, one set of hyperparameters works in most environments
-4. **Strong final performance**: on environments such as HalfCheetah it reaches scores above 15000, surpassing TD3 and DDPG
+4. **Strong final performance**: on environments such as HalfCheetah it reaches scores around 12000 after a million steps, matching or surpassing TD3 and DDPG, with higher scores possible given longer training
 
 ### Comparing DDPG, TD3, and SAC
 
@@ -302,7 +331,7 @@ Let's compare the three algorithms side by side:
 
 ## Comparing Training Curves
 
-Training for 1 million steps on the MuJoCo HalfCheetah-v3 environment, the typical behavior of the three algorithms looks like this:
+Training for 1 million steps on the MuJoCo HalfCheetah-v4 environment, the typical behavior of the three algorithms looks like this:
 
 ```
 Return
