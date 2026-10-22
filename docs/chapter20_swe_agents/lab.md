@@ -11,7 +11,7 @@ Chapter 20 argues that executable tests turn software repair into a reinforcemen
 - How a test suite becomes an RL reward: a candidate implementation is executed in an isolated sandbox, and the pass fraction $R_{\text{test}}$ is the reward signal.
 - How REINFORCE with a per-task baseline raises the probability of high-reward candidates in a discrete action space (one softmax per task).
 - What reward hacking looks like quantitatively: train reward 1.000 alongside a hidden-test pass rate of 0.491, with 0.537 of the policy mass sitting on memorizing shortcuts.
-- Why held-out tests and randomized test inputs fix the hack: both restore the correct implementations as the unique optimum.
+- Why held-out tests and randomized test inputs defeat the shortcuts -- and where they can still fall short: on this suite both make the correct implementation the unique optimum (a contract test enforces it), but a small or unlucky held-out suite can still leave a near-miss arm tied or ahead, so coverage decides how faithful the signal is.
 
 ## 20.L.2 Background
 
@@ -19,7 +19,7 @@ Read [20.1 Foundations of SWE-RL](/chapter20_swe_agents/swe-bench-and-rlvr) firs
 
 - Each toy task has **visible tests** (the analogue of the repository tests the agent may run) and **hidden tests** (the analogue of the held-out evaluation tests). The chapter's split between "tests the agent can call" and "tests that decide the result" is implemented literally as two lists per task.
 - The training reward is the chapter's pass fraction $R_{\text{test}}(\tau) = \frac{1}{m}\sum_i z_i$, and the headline evaluation metric is its binary sibling $R_{\text{resolved}}$, reported here as the fraction of tasks whose greedy pick passes every hidden test.
-- The shortcut candidates implement exactly the failure modes the chapter lists: hardcoding answers to the public examples, plus one shallow heuristic per tricky task (first/last-character match for palindromes, digital root for digit sums) that passes the visible tests while missing the real requirement.
+- The shortcut candidates implement the chapter's second failure mode -- hardcoding answers to the public examples -- plus one shallow heuristic per tricky task (first/last-character match for palindromes, digital root for digit sums) that passes the visible tests while missing the real requirement. The "wrong" arms are often *almost* right (for example the binary-search `first_ge` fallback passes 3 of 4 hidden tests), which is why even the hidden regime's residual error stays above zero.
 - The fixes mirror the chapter's prescriptions: evaluate on tests the agent cannot modify (the `hidden` regime), and broaden test coverage with freshly randomized inputs (the `randomized` regime).
 
 For context on how the same test-reward idea scales to real repositories, see the [supplementary reading on Meta SWE-RL](/chapter20_swe_agents/meta-swe-rl) (GRPO with a binary test reward) and [20.3 Self-Play SWE-RL](/chapter20_swe_agents/self-play-ssr-and-summary) (what happens when even the tasks must be generated). The multi-step agent loop that this lab deliberately compresses into a single decision is covered in [19.1 Agentic RL Basics](/chapter19_agentic/overview).
@@ -36,7 +36,7 @@ No installation is needed beyond the project virtualenv (Python 3.12, torch, num
 .venv/bin/python code/chapter20_swe_agents/train.py --seed 0 --device cpu
 ```
 
-Useful options: `--reward {all,visible,hidden,randomized}` trains one regime only, `--epochs` and `--lr` control the REINFORCE loop, `--n-random` sets how many fresh inputs each task draws per epoch in the randomized regime, `--timeout` sets the sandbox wall-clock limit per test batch, and `--max-tasks` truncates the task list. Everything is seeded (`--seed`); reruns are reproducible.
+Useful options: `--reward {all,visible,hidden,randomized}` selects which regime(s) to train (`all` runs all three regimes), `--epochs` and `--lr` control the REINFORCE loop, `--n-random` sets how many fresh inputs each task draws per epoch in the randomized regime, `--timeout` sets the sandbox wall-clock limit per test batch, and `--max-tasks` truncates the task list. Everything is seeded (`--seed`); reruns are reproducible.
 
 Artifacts land in `runs/chapter20_swe_agents/` (gitignored): `metrics_<mode>.csv` per-epoch histories, `summary.json` with the config and final numbers, `train_curves.png` and `visible_vs_hidden.png` plots, plus a summary table printed to stdout. The test suite also runs the smoke configuration end to end:
 
@@ -46,7 +46,7 @@ Artifacts land in `runs/chapter20_swe_agents/` (gitignored): `metrics_<mode>.csv
 
 ## 20.L.4 Walkthrough of the key code
 
-**The verifier** ([sandbox.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter20_swe_agents/sandbox.py)) writes the candidate source and the test cases into a fresh temporary directory and executes a small driver there as a subprocess with a timeout. Timeouts and child crashes are flagged separately from test failures, following the chapter's rule that infrastructure errors must not be counted as ability failures:
+**The verifier** ([sandbox.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter20_swe_agents/sandbox.py)) writes the candidate source and the test cases into a fresh temporary directory and executes a small driver there as a subprocess with a timeout. Timeouts and child crashes are flagged separately from test failures in the sandbox result; the training loop maps them to reward 0 in this toy setting (no run in this lab triggers a timeout, so no number below depends on that mapping):
 
 ```python
 proc = subprocess.run(
@@ -76,7 +76,7 @@ else:
     r = randomized_rate(task, action, rng, n_random, timeout)
 ```
 
-The task suite itself ([tasks.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter20_swe_agents/tasks.py)) holds 14 single-function tasks (`fib`, `factorial`, `reverse_words`, `is_palindrome`, `gcd`, `sum_squares`, `count_vowels`, `fizzbuzz`, `clamp`, `unique_sorted`, `binary_search`, `second_largest`, `collatz`, `digit_sum`), each with visible tests, disjoint hidden tests, four candidates (correct / two memorizers-or-heuristics / one plausible-but-wrong), plus a reference oracle and a random-input generator per task. A static audit plus a contract test guarantee the design: every correct candidate scores 1.0 on both suites, every shortcut scores 1.0 on visible and strictly below 1.0 on hidden.
+The task suite itself ([tasks.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter20_swe_agents/tasks.py)) holds 14 single-function tasks (`fib`, `factorial`, `reverse_words`, `is_palindrome`, `gcd`, `sum_squares`, `count_vowels`, `fizzbuzz`, `clamp`, `unique_sorted`, `binary_search`, `second_largest`, `collatz`, `digit_sum`), each with visible tests, disjoint hidden tests, four candidates (correct / two memorizers-or-heuristics / one plausible-but-wrong), plus a reference oracle and a random-input generator per task. A static audit plus contract tests guarantee the design: every correct candidate scores 1.0 on both suites and is the unique maximizer on the hidden suite and on freshly randomized inputs, every shortcut scores 1.0 on visible and strictly below 1.0 on hidden. (Two hidden suites needed an extra discriminating case -- an even-length palindrome `deed` and an uppercase-vowel `Apple` -- before the wrong fallbacks stopped tying the correct answer.)
 
 ## 20.L.5 Results from a real run
 
@@ -109,9 +109,9 @@ The visible-only regime reaches a perfect train reward by epoch 149 while its hi
 
 ## 20.L.7 Extension exercises
 
-1. **Add a task.** Add a 15th task (e.g. anagrams, or merging two sorted lists) with visible tests, disjoint hidden tests, and four candidates following the file's contract. Hint: pick hidden inputs that break the most natural memorizer fallback, and let `test_candidate_reward_contract` verify your design -- it runs the sandbox for you.
+1. **Add a task.** Add a 15th task (e.g. anagrams, or merging two sorted lists) with visible tests, disjoint hidden tests, and four candidates following the file's contract. Hint: pick hidden inputs that break the most natural memorizer fallback, register the reference in `ORACLES` and add a branch in `random_inputs` (both are needed or the randomized-regime test fails), and let `test_candidate_reward_contract` verify your design -- it runs the sandbox for you.
 2. **Binary resolve reward.** Change the train reward to the chapter's $R_{\text{resolved}}$ (1.0 only if every test in the suite passes). Hint: partial-credit arms now all score 0, so the signal is sparser; try raising `--epochs` and compare the epoch-9 row against the table above.
-3. **Shaping-term ablation.** Add the chapter's trajectory-cost term, e.g. $R = R_{\text{test}} - \lambda \cdot (\text{lines of code} / 20)$, and sweep $\lambda$. Hint: memorizers are shorter than correct solutions, so a large $\lambda$ makes hacks optimal even under hidden rewards -- find the $\lambda$ where the hidden regime flips, and explain why this is a verifier-design bug rather than an RL bug.
+3. **Shaping-term ablation.** Add the chapter's trajectory-cost term, e.g. $R = R_{\text{test}} - \lambda \cdot (\text{lines of code} / 20)$, and sweep $\lambda$. Hint: the length trade-off is task-dependent -- the memorizer carries the visible-test lookup table, so on most tasks in this suite (11 of 14) it is longer than, or the same length as, the correct solution (only `fizzbuzz`, `binary_search` and `collatz` have shorter memorizers). A length penalty therefore handicaps the correct arm on most tasks rather than the hack; report per-task flips instead of a single global flip point, or use a shaping feature that actually separates the arms (e.g. the number of literal test values embedded in the source).
 4. **Baseline comparison.** Replace the running baseline with the batch mean, then with no baseline at all, logging the variance of the advantages across epochs. Hint: keep the learning rate fixed; the no-baseline run should show noisier early updates and slower ARM sorting while converging to the same visible-regime fixed point.
 5. **A tiny world model.** Following [20.2](/chapter20_swe_agents/world-model-and-deep-swe), fit a predictor of sandbox pass rates from cheap features (candidate length, keyword flags) on the cached grid, train the policy against predicted rewards for 300 epochs, then evaluate against the real sandbox. Hint: report sandbox calls saved versus the final E[hidden] gap -- the gap is the world-model deviation the chapter warns about.
 6. **Two-step composition.** Replace "pick one candidate" with two sequential picks (e.g. pick a helper, then a main function) where the reward is granted only for the pair. Hint: the action space becomes the product set; watch the epoch-9 train reward -- credit assignment over the pair is harder, which is the toy analogue of the long-horizon difficulty in [20.2](/chapter20_swe_agents/world-model-and-deep-swe).

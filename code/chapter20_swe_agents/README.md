@@ -35,8 +35,8 @@ Full run (~8 min on CPU; 14 tasks, 300 epochs):
 .venv/bin/python code/chapter20_swe_agents/train.py --seed 0 --device cpu
 ```
 
-Useful options: `--reward {all,visible,hidden,randomized}` to train one regime
-only, `--epochs`, `--lr`, `--n-random` (fresh random inputs per task/epoch),
+Useful options: `--reward {all,visible,hidden,randomized}` selects which
+regime(s) to train (`all` runs all three), `--epochs`, `--lr`, `--n-random` (fresh random inputs per task/epoch),
 `--timeout` (sandbox seconds per test batch), `--max-tasks`, `--outdir`.
 
 Outputs go to `runs/chapter20_swe_agents/` (gitignored): `metrics_<mode>.csv`

@@ -10,7 +10,8 @@ CPU-only textbook lab:
 - "Container" = a fresh temporary directory used as the child's working
   directory, plus a per-batch wall-clock timeout. The candidates are our own
   fixed snippets (never model-generated code); ``tasks.FORBIDDEN_TOKENS``
-  audits that they import nothing capable of network or filesystem access.
+  applies a heuristic token scan as a hygiene check, not a security
+  boundary (it does not cover every network/filesystem spelling).
 - One subprocess call executes a whole batch of test cases for one
   candidate, so training needs only one sandbox call per (task, candidate).
 

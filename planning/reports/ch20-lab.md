@@ -29,12 +29,12 @@ were verified by execution rather than assumed:
    < 1.0 hidden, every wrong candidate scores < 1.0 visible. Boolean tasks
    (palindrome) were the hardest to keep strict; hidden inputs were chosen
    so both constant-True and first-last-character fallbacks fail at least one
-   hidden test (verified: hack hidden rates 0.25-0.75 on that task, never 1.0).
+   hidden test (verified: hack hidden rates 0.50-0.75 on that task, never 1.0).
 2. **File:** `code/chapter20_swe_agents/policy.py` (REINFORCE update)
    **Risk:** sign/scale error in the policy-gradient loss.
    **Verification:** `test_reinforce_loss_matches_hand_computation` checks the
    loss against a hand-derived value (logits [1,0], rewards [1,0], baseline
-   0.2 -> expected loss +0.00602 within 1e-6), and
+   0.2 -> expected loss -0.00602 within 1e-6), and
    `test_reinforce_step_reinforces_positive_advantage` checks one SGD step
    raises the probability of the advantage-positive arm. Also fixed a real
    bug found during smoke testing: rewards/baselines on CPU vs logits on

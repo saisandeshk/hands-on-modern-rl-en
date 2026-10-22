@@ -210,7 +210,7 @@ TASKS: list[Task] = [
         description="solve(s) returns True iff the string reads the same forwards and backwards.",
         signature="solve(s)",
         visible=[(("racecar",), True), (("hello",), False), (("abba",), True)],
-        hidden=[(("madam",), True), (("abca",), False), (("a",), True), (("ab",), False)],
+        hidden=[(("madam",), True), (("abca",), False), (("a",), True), (("ab",), False), (("deed",), True)],
         candidates=[
             _cand(
                 "correct",
@@ -334,7 +334,7 @@ TASKS: list[Task] = [
         description="solve(s) counts the vowels (a, e, i, o, u, both cases) in s.",
         signature="solve(s)",
         visible=[(("hello",), 2), (("sky",), 0), (("AEIOU",), 5)],
-        hidden=[(("banana",), 3), (("xyz",), 0), (("Hello World",), 3), (("",), 0)],
+        hidden=[(("banana",), 3), (("xyz",), 0), (("Hello World",), 3), (("",), 0), (("Apple",), 2)],
         candidates=[
             _cand(
                 "correct",
@@ -818,7 +818,7 @@ ORACLES = {
 }
 
 _WORDS = ["alpha", "beta", "gamma", "delta", "fox", "box", "red", "sun"]
-_LETTERS = "abcdeXYZ  "
+_LETTERS = "abcdeAEIOU  "
 
 
 def _rand_list(rng: random.Random, lo: int, hi: int) -> list[int]:
@@ -883,9 +883,11 @@ def get_task(task_id: str) -> Task:
     raise ValueError(f"unknown task {task_id!r}")
 
 
-# Tokens that must never appear in a candidate snippet. The sandbox runs our
-# own fixed snippets (never model-generated code), and this audit guarantees
-# they cannot touch the network or the filesystem outside their temp dir.
+# Tokens heuristically audited in each candidate snippet. The sandbox runs our
+# own fixed snippets (never model-generated code) in a temp-dir + timeout
+# sandbox; this token scan is a hygiene check, not a security boundary, and
+# does not by itself block network or filesystem access (e.g. bare
+# ``import os`` or ``urllib``/``requests`` spellings are not covered).
 FORBIDDEN_TOKENS = (
     "os.",
     "sys.",

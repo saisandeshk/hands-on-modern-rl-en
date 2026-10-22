@@ -91,17 +91,22 @@ def test_visible_hidden_inputs_disjoint():
 
 
 def test_candidate_reward_contract():
-    # correct -> 1.0 on both suites; hack/heuristic -> 1.0 visible, < 1.0
-    # hidden; wrong -> strictly below 1.0 on visible (partial credit).
+    # correct -> 1.0 on both suites and the unique maximizer on hidden;
+    # hack/heuristic -> 1.0 visible, < 1.0 hidden; wrong -> strictly below
+    # 1.0 on visible (partial credit). The hidden uniqueness check is the
+    # lab's core design requirement: held-out tests must break every
+    # shortcut *and* every plausible-but-wrong fallback.
     assert 10 <= len(TASKS) <= 20
     for task in TASKS:
         assert len(task.candidates) >= 3
         kinds = {c.kind for c in task.candidates}
         assert "correct" in kinds and "wrong" in kinds
         assert kinds & {"hack", "heuristic"}
+        hidden_rates: dict[str, float] = {}
         for i, cand in enumerate(task.candidates):
             vis = sandbox.pass_rate(cand.source, task.visible, timeout=10.0)
             hid = sandbox.pass_rate(cand.source, task.hidden, timeout=10.0)
+            hidden_rates[cand.name] = hid
             if cand.kind == "correct":
                 assert vis == 1.0, (task.task_id, cand.name)
                 assert hid == 1.0, (task.task_id, cand.name)
@@ -110,6 +115,35 @@ def test_candidate_reward_contract():
                 assert hid < 1.0, (task.task_id, cand.name)
             else:
                 assert vis < 1.0, (task.task_id, cand.name)
+        correct_hid = max(
+            hid for c, hid in zip(task.candidates, hidden_rates.values()) if c.kind == "correct"
+        )
+        assert correct_hid == 1.0, task.task_id
+        for cand in task.candidates:
+            if cand.kind != "correct":
+                assert hidden_rates[cand.name] < correct_hid, (task.task_id, cand.name)
+
+
+def test_correct_is_unique_maximizer_on_randomized_inputs():
+    # Fresh inputs with oracle-expected outputs must also separate the
+    # correct candidate from every shortcut and every wrong fallback
+    # (fixed seed, enough samples that near-miss arms cannot tie by luck).
+    import random
+
+    rng = random.Random(0)
+    for task in TASKS:
+        oracle = tasks.ORACLES[task.oracle_name]
+        argsets = tasks.random_inputs(task.task_id, rng, 50)
+        cases = [(tuple(a), oracle(*a)) for a in argsets]
+        rates = {
+            cand.name: sandbox.pass_rate(cand.source, cases, timeout=10.0)
+            for cand in task.candidates
+        }
+        correct = next(c for c in task.candidates if c.kind == "correct")
+        assert rates[correct.name] == 1.0, task.task_id
+        for cand in task.candidates:
+            if cand.kind != "correct":
+                assert rates[cand.name] < 1.0, (task.task_id, cand.name)
 
 
 def test_random_oracle_agrees_with_correct_candidate():
