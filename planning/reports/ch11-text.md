@@ -48,6 +48,14 @@ Out-of-scope items (Chapter 10: offline transition datasets, behavior-policy ide
 
 ## Commands run and results
 
+**Review-response pass:**
+
+- Numeric re-verification `.venv/bin/python -c ...`: $e^5 = 148.413$; $-\log 0.4 = 0.916291$, $-\log 0.99 = 0.010050$, ratio $91.17$ — all match the corrected text.
+- `npx prettier --write` on `irl-gail.md`, `meta-rl.md`, `review.md`, `planning/reports/ch11-text.md`: all unchanged (clean).
+- `npx vitepress build docs`: first attempt segfaulted in the SSR-bundle step (exit 139, environmental); retry succeeded — build complete.
+
+**Original pass:**
+
 - Numeric verification `.venv/bin/python -c ...`: BC losses, $(0.99)^T$ table, $e^{10}/e^5$, GAIL $D^*$ rewards, MAML hand computation, softplus rewards — all matched the text and `review.md` solutions.
 - `npx prettier --write` on the four chapter files: clean (two unchanged, two reformatted).
 - `npx vitepress build docs`: to be run after report (see Open issues).
@@ -55,3 +63,19 @@ Out-of-scope items (Chapter 10: offline transition datasets, behavior-policy ide
 ## Open issues
 
 - None. `npx vitepress build docs` succeeded. No code changes were made (per scope), so no tests apply.
+
+## Review response
+
+- Error 1 (GCL attribution "Finn et al. 2016" → "Tamar et al. 2016"): **rejected, no change.** "Guided Cost Learning: Deep Inverse Optimal Control via Policy Optimization", ICML 2016, is by Chelsea Finn, Sergey Levine, and Pieter Abbeel — "Finn et al. 2016" is correct. (The review's quoted title/authors do not match that paper.)
+- Error 2 (GAIL snippet header "# === 2. Train the policy: use -log D as the reward ==="): **accepted.** Changed to `-log(1-D)` in `irl-gail.md`, matching the code (`-F.logsigmoid(-l)` = softplus = $-\log(1-D)$) and the surrounding prose.
+- Error 3 (orphaned `review.md`, "11.R" numbering, sidebar entry): **rejected, no change** (out of scope). The task explicitly required front matter/H1 `11.R Summary and Exercises` and forbids editing `docs/.vitepress/config.mjs`; the sidebar addition is already listed under "Sidebar additions" for the coordinator.
+- Error 4 (MAML snippet `n_inner_steps` NameError + in-place leaf update): **accepted.** Added `n_inner_steps=5` to the signature in `meta-rl.md` and replaced both in-place `-=` updates with out-of-place assignments.
+- Doubt 1 ("$D^* = 0.5$ gives a neutral reward"): **accepted.** Reworded the pitfall in `review.md`: at $D^* = 0.5$ the discriminator is indifferent, while the reward value itself is $0.6931$, not 0.
+- Doubt 2 (missing factor $M$ in MaxEnt gradient): **accepted.** Added "(per-trajectory form; full-batch gradient carries overall factor $M$)" in `irl-gail.md` and in `review.md` key equations, and rewrote the Exercise 4 solution to derive the full-batch gradient then divide by $M$ (verified: direction unchanged since $M > 0$).
+- Doubt 3 (`self.disc` two call signatures; undefined `ones`/`zeros`/`disc_optim`): **accepted.** Unified the discriminator step in `irl-gail.md` to `self.disc(expert_states, expert_actions)` with `expert_states, expert_actions = self.expert_buffer.sample()`, and defined `ones`/`zeros` via `torch.ones_like/zeros_like`. (`self.disc_optim` is the discriminator optimizer owned by the class, consistent with the snippet's pseudocode level.)
+- Doubt 4 ($p$ vs $\rho_\pi$ notation): **accepted.** Changed to "$p(s,a) \equiv \rho_\pi(s,a) = \dots$" in `irl-gail.md`.
+- Doubt 5 (AD "52 points/50th/200th" and MAML "80%" numbers): **accepted as softening.** Both were illustrative examples, but are now explicitly flagged ("numbers illustrative, not from any single paper figure"; "in this illustrative example") in `meta-rl.md`.
+- Doubt 6 (DWBC unexplained): **accepted.** Expanded to "Discriminator-Weighted Behavioral Cloning (DWBC)" in `irl-gail.md` §4.1 and `meta-rl.md` §4.4 (no citation added per no-internet rule).
+- Doubt 7 (§1.5 "directly inspired" vs §3.2 "analogous"): **accepted.** Qualified §1.5 in `meta-rl.md` to "closely related ... in the sense that both adapt from a context", deferring to the §3.2 distinction.
+- Doubt 8 (`planning/content-review-notes.md` items unmarked): **no change, out of scope.** That file is outside the task's editable scope; the two items are recorded as fixed here ([x] in the Technical fixes above) for whoever owns the notes file.
+- Doubt 9 (rounding: "149 times", "90x"): **accepted.** Changed to "about 148 times ($e^5 \approx 148.4$)" in `irl-gail.md` and "roughly $91\times$" in `review.md` (verified: $e^5 = 148.413$; $0.916291/0.010050 = 91.17$).

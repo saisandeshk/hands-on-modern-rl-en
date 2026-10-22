@@ -20,7 +20,7 @@ title: 11.R Summary and Exercises
 - **BC negative log-likelihood:** $\mathcal{L}_{BC}(\theta) = -\mathbb{E}_{(s,a)\sim\mathcal{D}_{\text{expert}}}[\log\pi_\theta(a\mid s)]$ — raise the probability of the expert's action. (Classification for discrete actions; Gaussian NLL or MSE for continuous actions.)
 - **Compounding error:** $P(\text{no mistake}) = (1-\epsilon)^T$; BC cost scales as $O(T^2\epsilon)$, DAgger improves it to $O(T\epsilon)$ — early mistakes change all later states, so cost snowballs quadratically without on-policy data.
 - **MaxEnt IRL distribution:** $p(\tau\mid r_\psi) = Z^{-1}\exp(\sum_t r_\psi(s_t,a_t))$ — trajectories with higher total reward are exponentially more probable; $Z$ sums over all trajectories.
-- **MaxEnt gradient:** $\nabla_\psi\mathcal{L} = \mathbb{E}_{\tau\sim\text{expert}}[\sum_t\nabla r_\psi] - \mathbb{E}_{\tau\sim p(\cdot\mid r_\psi)}[\sum_t\nabla r_\psi]$ — push expert state-actions up, push current-policy state-actions down.
+- **MaxEnt gradient:** $\nabla_\psi\mathcal{L} = \mathbb{E}_{\tau\sim\text{expert}}[\sum_t\nabla r_\psi] - \mathbb{E}_{\tau\sim p(\cdot\mid r_\psi)}[\sum_t\nabla r_\psi]$ (per-trajectory form; the full-batch gradient carries an overall factor $M = \lvert\mathcal{D}\rvert$) — push expert state-actions up, push current-policy state-actions down.
 - **GAIL discriminator:** $\max_\phi\,\mathbb{E}_{\text{expert}}[\log D_\phi] + \mathbb{E}_{\pi_\theta}[\log(1-D_\phi)]$ — binary classifier for expert versus policy state-action pairs.
 - **GAIL policy and optimal discriminator:** $\min_\theta\,\mathbb{E}_{\pi_\theta}[\log(1-D_\phi)] - \lambda\mathcal{H}(\pi_\theta)$ with $D^*(s,a) = p_{\text{expert}}/(p_{\text{expert}}+p_{\pi})$ — the implicit reward $-\log(1-D)$ is high where the expert goes and the policy does not.
 - **MAML:** inner $\theta_i' = \theta - \alpha\nabla\mathcal{L}_{T_i}(\theta)$; outer $\min_\theta \mathbb{E}_{T_i}[\mathcal{L}_{T_i}(\theta_i')]$ — optimize the initialization for post-adaptation loss, backpropagating through the inner step.
@@ -31,7 +31,7 @@ title: 11.R Summary and Exercises
 
 - **Treating BC error like i.i.d. test error.** A 1% per-step error is not a 1% episode failure rate: $(0.99)^{100} \approx 0.37$ episodes are error-free, so one third survive untouched and two thirds hit at least one mistake — and post-mistake states are out of distribution, where the error rate is higher.
 - **Fitting a unimodal policy to a multimodal expert.** Averaging "turn left" and "turn right" demonstrations with MSE yields "drive straight into the obstacle". Check whether the same state admits several valid actions before choosing a Gaussian or deterministic head.
-- **Mixing up GAIL signs and conventions.** Whether the implicit reward is $-\log(1-D)$, $\log D$, or $-\log D$ depends on whether the discriminator labels the expert as 1 and whether it outputs probabilities or logits. Always verify $D^* = 0.5$ gives a neutral reward and expert-like pairs give high reward under your convention.
+- **Mixing up GAIL signs and conventions.** Whether the implicit reward is $-\log(1-D)$, $\log D$, or $-\log D$ depends on whether the discriminator labels the expert as 1 and whether it outputs probabilities or logits. Always verify $D^* = 0.5$ means the discriminator is indifferent (it assigns equal probability to expert-like and policy-like pairs) and expert-like pairs give high reward under your convention. Note the reward value at $D^* = 0.5$ is not zero (e.g. $-\log(1-0.5) = 0.6931$); what is neutral there is the discriminator, not the reward value.
 - **Calling every prompt an RL algorithm.** Few-shot prompting carries input-output examples without rewards; Algorithm Distillation carries reward-bearing histories ordered from poor to good. Only the latter even has the signal needed to implement policy improvement in context, and even then it must be verified with adaptation curves.
 - **Expecting GAIL to work with a frozen discriminator or no environment interaction.** GAIL still needs on-policy rollouts against the learned reward signal and careful balancing of discriminator and policy updates; an overtrained discriminator gives vanishing gradients, an undertrained one gives noise.
 - **Overclaiming the LLM correspondences.** SFT and BC share the exact conditional-likelihood objective, but reward models use pairwise preferences (not full trajectories like MaxEnt IRL) and DPO is preference optimization (not occupancy matching like GAIL). Keep "exact equivalence" and "conceptual analogy" separate.
@@ -75,7 +75,7 @@ Starting from $\mathcal{L}(\psi) = \sum_{\tau\in\mathcal{D}}[\sum_t r_\psi(s_t,a
 ::: details Solution
 Differentiate term by term. The first term gives $\sum_{\tau\in\mathcal{D}}\sum_t \nabla_\psi r_\psi(s_t,a_t) = M\,\mathbb{E}_{\tau\sim\text{expert}}[\sum_t\nabla r_\psi]$.
 
-For the second term, $\nabla_\psi \log Z = Z^{-1}\nabla_\psi Z$ and $\nabla_\psi Z = \sum_{\tau}\exp(\sum_t r_\psi)\sum_t\nabla_\psi r_\psi$. Dividing by $Z$ turns $\exp(\cdot)/Z$ into $p(\tau\mid r_\psi)$, so $\nabla_\psi\log Z = \mathbb{E}_{\tau\sim p(\cdot\mid r_\psi)}[\sum_t\nabla_\psi r_\psi]$. Multiplying by $M$ and subtracting gives the stated gradient: expert feature expectation minus model feature expectation. In words: raise rewards where the expert goes, lower rewards where the current reward-induced policy goes, and stop when the two visit the same state-actions.
+For the second term, $\nabla_\psi \log Z = Z^{-1}\nabla_\psi Z$ and $\nabla_\psi Z = \sum_{\tau}\exp(\sum_t r_\psi)\sum_t\nabla_\psi r_\psi$. Dividing by $Z$ turns $\exp(\cdot)/Z$ into $p(\tau\mid r_\psi)$, so $\nabla_\psi\log Z = \mathbb{E}_{\tau\sim p(\cdot\mid r_\psi)}[\sum_t\nabla_\psi r_\psi]$. Multiplying by $M$ and subtracting gives the full-batch gradient $M(\mathbb{E}_{\text{expert}}[\cdot] - \mathbb{E}_{\text{model}}[\cdot])$; dividing through by the positive constant $M$ gives the per-trajectory form stated in §11.2 (same update direction, absorbed into the step size). In words: raise rewards where the expert goes, lower rewards where the current reward-induced policy goes, and stop when the two visit the same state-actions.
 :::
 
 ### Exercise 5 — Optimal discriminator and implicit reward
@@ -94,7 +94,7 @@ Pair A: $D^* = 600/1000 = 0.6$. Reward $= -\log(1-0.6) = -\log 0.4 = 0.9163$.
 
 Pair B: $D^* = 10/1000 = 0.01$. Reward $= -\log(1-0.01) = -\log 0.99 = 0.0101$.
 
-Pair A gives roughly $90\times$ more reward, so policy-gradient steps toward higher implicit reward shift visits from B-like pairs to A-like pairs, which is exactly occupancy matching.
+Pair A gives roughly $91\times$ more reward, so policy-gradient steps toward higher implicit reward shift visits from B-like pairs to A-like pairs, which is exactly occupancy matching.
 :::
 
 ### Exercise 6 — MAML initialization by hand

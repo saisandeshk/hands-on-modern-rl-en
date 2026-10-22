@@ -61,7 +61,7 @@ Let's compute $Z$ with numbers. Suppose the environment is tiny, with only three
 | $\tau_2$: a somewhat longer path  | 5                            | $e^{5}\approx 148$    | 0.0067                 |
 | $\tau_3$: the path into a wall    | 0                            | $e^{0}=1$             | 0.00005                |
 
-$Z = 22026 + 148 + 1 \approx 22176$. Adding up the whole third column normalizes the probabilities. The exponential amplifies the reward gap between "10 points and 5 points" into a probability gap of about 149 times: trajectories with high total reward are strongly preferred, while trajectories with close scores still keep a chance.
+$Z = 22026 + 148 + 1 \approx 22176$. Adding up the whole third column normalizes the probabilities. The exponential amplifies the reward gap between "10 points and 5 points" into a probability gap of about 148 times ($e^5 \approx 148.4$): trajectories with high total reward are strongly preferred, while trajectories with close scores still keep a chance.
 
 Applying the same exponential rule to the action choice at each step gives the softmax policy:
 
@@ -81,6 +81,8 @@ This objective looks a bit complicated, but the intuition is clear:
 Taking the gradient with respect to the parameters $\psi$ gives a more intuitive form:
 
 $$\nabla_\psi \mathcal{L} = \mathbb{E}_{\tau \sim \text{expert}}\left[\sum_t \nabla_\psi r_\psi(s_t, a_t)\right] - \mathbb{E}_{\tau \sim p(\cdot \mid r_\psi)}\left[\sum_t \nabla_\psi r_\psi(s_t, a_t)\right]$$
+
+This is the per-trajectory (mean-over-demonstrations) form: the full-batch gradient of the objective above carries an overall positive factor $M = \lvert\mathcal{D}_{\text{expert}}\rvert$ on both terms, which only scales the step size and is absorbed into the learning rate.
 
 Let's "translate" this gradient into words:
 
@@ -164,16 +166,19 @@ class GAIL:
         for _ in range(n_disc_steps):
             # Sample policy data
             policy_states, policy_actions = self.policy.sample_rollout()
-            # Binary cross-entropy
-            expert_logits = self.disc(self.expert_buffer.sample())
+            # Binary cross-entropy (logits in, targets created to match shape)
+            expert_states, expert_actions = self.expert_buffer.sample()
+            expert_logits = self.disc(expert_states, expert_actions)
             policy_logits = self.disc(policy_states, policy_actions)
+            ones = torch.ones_like(expert_logits)
+            zeros = torch.zeros_like(policy_logits)
             d_loss = (
                 F.binary_cross_entropy_with_logits(expert_logits, ones) +
                 F.binary_cross_entropy_with_logits(policy_logits, zeros)
             )
             self.disc_optim.zero_grad(); d_loss.backward(); self.disc_optim.step()
 
-        # === 2. Train the policy: use -log D as the reward ===
+        # === 2. Train the policy: use -log(1-D) as the reward ===
         for _ in range(n_policy_steps):
             states, actions, next_states, _ = self.policy.rollout()
             with torch.no_grad():
@@ -194,7 +199,7 @@ With the policy fixed, the optimal solution of the binary discriminator can be w
 
 $$D_\phi^*(s, a) = \frac{p_{\text{expert}}(s, a)}{p_{\text{expert}}(s, a) + p_{\pi_\theta}(s, a)}$$
 
-Here each $p(s, a)$ is a discounted state-action occupancy measure, $\rho_\pi(s,a) = (1-\gamma)\sum_{t \geq 0}\gamma^t \Pr(s_t=s, a_t=a \mid \pi)$, so matching occupancies means matching the discounted frequency with which each state-action pair is visited rather than matching single-step actions. GAIL therefore performs occupancy matching: it minimizes a divergence between $\rho_{\pi_\theta}$ and $\rho_{\text{expert}}$ without ever writing down a reward.
+Here each $p(s, a)$ is a discounted state-action occupancy measure, $p(s,a) \equiv \rho_\pi(s,a) = (1-\gamma)\sum_{t \geq 0}\gamma^t \Pr(s_t=s, a_t=a \mid \pi)$, so matching occupancies means matching the discounted frequency with which each state-action pair is visited rather than matching single-step actions. GAIL therefore performs occupancy matching: it minimizes a divergence between $\rho_{\pi_\theta}$ and $\rho_{\text{expert}}$ without ever writing down a reward.
 
 Substituting this $D^*$ into the log ratio gives:
 
@@ -238,7 +243,7 @@ But GAIL is not perfect either. It inherits the common ailment of GANs: unstable
 - Adjusting the update frequencies of the discriminator and the policy (for example, update the discriminator once for every 5 policy updates, to keep the discriminator from becoming too strong)
 - Tuning the entropy regularization coefficient $\lambda$ to 0.1-1.0 to prevent the policy from collapsing to a deterministic policy
 
-GAIL can approach expert level on MuJoCo, but it needs millions of environment interaction steps, so **sample efficiency remains a bottleneck**. This has driven research on **offline imitation learning** (such as DemoDICE and DWBC), which combines expert data with suboptimal data and needs no online interaction.
+GAIL can approach expert level on MuJoCo, but it needs millions of environment interaction steps, so **sample efficiency remains a bottleneck**. This has driven research on **offline imitation learning** (such as DemoDICE and Discriminator-Weighted Behavioral Cloning (DWBC)), which combines expert data with suboptimal data and needs no online interaction.
 
 ## Section Summary
 
