@@ -1,0 +1,4 @@
+# Chapter 22 lab dependencies
+numpy>=1.24.0
+torch>=2.0.0
+matplotlib>=3.7.0
