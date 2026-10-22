@@ -1,8 +1,8 @@
 ---
-title: Course Overview
+title: Introduction to RL
 ---
 
-# Introduction to Reinforcement Learning
+# Introduction to RL
 
 ::: warning 📣 Announcement
 We sincerely thank everyone for supporting this tutorial! The course is iterating quickly and a new version is coming soon. Many sections are still being organized and refined, so we appreciate your patience. Suggestions and corrections are always welcome. If you find the course useful, please give the [GitHub repository](https://github.com/walkinglabs/hands-on-modern-rl) a Star 🌟 to help speed up updates.
@@ -79,7 +79,7 @@ The interaction process of reinforcement learning is a loop that repeats continu
 
 The loop produces a **trajectory**: $s_0, a_0, r_1, s_1, a_1, r_2, s_2, \ldots$
 
-Several distinctions matter here. A **state** is a complete description of the environment (such as a chess board), while an **observation** is a partial description (such as the screen near the character in Super Mario). This book usually uses "state" for both, and in code you will see the variable name `obs`. **Action spaces** come in two kinds: **discrete** (Mario has only 4 actions: left, right, jump, crouch) and **continuous** (a robot arm joint angle can take any real value). Different kinds call for different algorithms.
+Several distinctions matter here. A **state** is a complete description of the environment (such as a chess board), while an **observation** is a partial description (such as the screen near the character in Super Mario). This book usually uses "state" for both, and in code you will see the variable name `obs`. **Action spaces** come in two kinds: **discrete** (Mario has only a handful of discrete actions such as left, right, jump, and crouch) and **continuous** (a robot arm joint angle can take any real value). Different kinds call for different algorithms.
 
 As for rewards, if the agent looked only at the immediate single-step reward, it would become very "short-sighted." So what the agent actually cares about is the **return $G_t$**: the sum of all future rewards from the current time $t$ until the episode ends.
 
@@ -175,7 +175,7 @@ In RL terminology, algorithms can also be divided into two further classes, acco
 - **Model-Free methods**: the agent does not care how the environment works internally. It cares only about "how many points I get if I do this." Whether value-based, policy-based, or Actor-Critic, any method that accumulates experience through frantic trial and error in the environment is Model-Free. It is like playing Super Mario: you do not need to know the game engine's code, and after dying a few times you naturally learn how to jump.
 - **Model-Based methods**: the agent first builds a "world model" (a model of the environment) in its head, predicting "if I do this, what will the environment become?" For example, when AlphaGo plays Go, it knows the rules of Go (the model) and can simulate the board several moves ahead in its head before deciding.
 
-This book focuses mainly on **Model-Free** algorithms (such as DQN, PPO, and DPO), because they are more general and overwhelmingly dominate large-language-model alignment and complex environments today.
+This book focuses mainly on **Model-Free** algorithms (such as DQN and PPO), which are more general and overwhelmingly dominate complex environments and large-language-model alignment today.
 
 <div align="center" style="margin: 2.5rem 0;">
 
@@ -231,7 +231,7 @@ In a game environment, the reward signal is clear and automatic: collecting a co
 2. **Reward model training (RM)**: have humans rank multiple answers from the model, and train a scoring model that can "imitate" human preferences.
 3. **Reinforcement learning optimization (RL)**: use an algorithm such as PPO, with the reward model's score as the signal, to further optimize the model's answering policy.
 
-RL in the era of large models has evolved along two key routes. **Route one: preference-based alignment (RLHF / DPO).** When the criterion is "do humans like it" (is the tone polite, is the answer safe), the environment cannot give scores automatically. We first train a reward model on human annotations to "imitate" human preferences, then use it to guide RL training. DPO goes one step further and cleverly "hides" the reward signal in the policy probability ratio, bypassing the explicit reward model. You will practice this pipeline hands-on in Chapters 8-9. **Route two: pure reinforcement learning with verifiable rewards (RLVR).** When we turn to mathematics, code, or complex reasoning tasks, the correctness of an answer is objectively verifiable. Frontier work such as DeepSeek-R1-Zero showed that neither prior SFT nor a trained reward model is needed. Given only rule-based feedback, pure reinforcement learning can drive a base model to spontaneously develop long chains of thought (Chain-of-Thought) and strong reasoning ability. This is one of the frontier explorations on AI's road toward AGI.
+RL in the era of large models has evolved along two key routes. **Route one: preference-based alignment (RLHF / DPO).** When the criterion is "do humans like it" (is the tone polite, is the answer safe), the environment cannot give scores automatically. We first train a reward model on human annotations to "imitate" human preferences, then use it to guide RL training. DPO goes one step further and cleverly "hides" the reward signal in the policy probability ratio, bypassing the explicit reward model. You will practice this pipeline hands-on in Chapters 13-14. **Route two: pure reinforcement learning with verifiable rewards (RLVR).** When we turn to mathematics, code, or complex reasoning tasks, the correctness of an answer is objectively verifiable. Frontier work such as DeepSeek-R1-Zero showed that neither prior SFT nor a trained reward model is needed. Given only rule-based feedback, pure reinforcement learning can drive a base model to spontaneously develop long chains of thought (Chain-of-Thought) and strong reasoning ability. This is one of the frontier explorations on AI's road toward AGI.
 
 ![DeepSeek-R1 RL training pipeline](../chapter26_selfplay_frontiers/self-play-outlook/images/deepseek_r1_pipeline.png)
 
@@ -245,7 +245,7 @@ Remember PPO from earlier? In the era of large models it went from the culminati
 
 Reinforcement learning is moving from "letting AI make single-step decisions" to "letting AI complete whole tasks." There are three directions worth watching on this road.
 
-The first direction is **agentic reinforcement learning (Agentic RL)**. Current large language models are essentially "single-turn question-answering machines": you ask one question and they give one answer. But real tasks often need multi-turn interaction. Planning a trip means searching several websites and comparing prices, and debugging code means running tests repeatedly, reading error messages, modifying, and verifying again. Agentic RL trains an AI to act continuously in an environment, call tools, adjust its policy dynamically according to intermediate results, and finally complete long-horizon complex tasks. This is the key leap from "dialogue model" to "autonomous agent," and you will practice it in depth in Chapter 8.
+The first direction is **agentic reinforcement learning (Agentic RL)**. Current large language models are essentially "single-turn question-answering machines": you ask one question and they give one answer. But real tasks often need multi-turn interaction. Planning a trip means searching several websites and comparing prices, and debugging code means running tests repeatedly, reading error messages, modifying, and verifying again. Agentic RL trains an AI to act continuously in an environment, call tools, adjust its policy dynamically according to intermediate results, and finally complete long-horizon complex tasks. This is the key leap from "dialogue model" to "autonomous agent," and you will practice it in depth in Part V (Chapters 19-22).
 
 The second direction is **multimodality and embodied intelligence**. RL is breaking past the boundary of pure text. Vision-language models (VLMs) extend RL to image understanding and visual reasoning, while embodied AI pushes RL into the physical world, letting robots learn to walk, grasp, and manipulate by trial and error in real environments. The biggest challenge is the gap between simulation and reality (Sim-to-Real Gap): a policy trained in a virtual environment may fail completely in the real world. Techniques such as domain randomization (Domain Randomization) are easing the problem, while Model-Based RL and self-play (Self-Play) are opening new possibilities.
 
@@ -308,8 +308,9 @@ graph TD
     end
 
     subgraph P4["Part IV · LLM Alignment and Post-Training (Chapters 13-18)"]
-        L["RLHF, RLAIF, and industrial training<br/>(Chapters 13-14)"] --> M["DPO, GRPO, and RLVR<br/>(Chapters 15-16)"]
-        M --> N["Reasoning models and PRM<br/>(Chapters 17-18)"]
+        L["RLHF pipeline<br/>(Chapter 13)"] --> M["DPO<br/>(Chapter 14)"]
+        M --> N["GRPO and RLVR<br/>(Chapter 15)"]
+        N --> O2["Reasoning models, PRM,<br/>and industrial training<br/>(Chapters 16-18)"]
     end
 
     subgraph P5["Part V · Agentic Reinforcement Learning (Chapters 19-22)"]
@@ -327,7 +328,7 @@ graph TD
     Q --> A
     H --> I
     K --> L
-    N --> O
+    O2 --> O
     P --> R
     S --> T
 
@@ -352,6 +353,7 @@ graph TD
     style L fill:#f5eef8,stroke:#7b1fa2,color:#000
     style M fill:#f5eef8,stroke:#7b1fa2,color:#000
     style N fill:#f5eef8,stroke:#7b1fa2,color:#000
+    style O2 fill:#f5eef8,stroke:#7b1fa2,color:#000
     style O fill:#fff8e1,stroke:#f9a825,color:#000
     style P fill:#fff8e1,stroke:#f9a825,color:#000
     style R fill:#e0f7fa,stroke:#00838f,color:#000
@@ -367,7 +369,7 @@ The seven parts cover the following.
 
 **Part I (Chapters 1 to 4)** starts from CartPole and builds, in turn, the problem definition of reinforcement learning, value functions, the Bellman equation, and classical solution methods.
 
-**Part II (Chapters 5 to 9)** enters deep reinforcement learning: DQN learns action values, policy gradients optimize the policy directly, Actor-Critic combines the two routes, PPO provides stable policy updates, and Off-Policy methods and Model-Based RL further improve sample efficiency.
+**Part II (Chapters 5 to 9)** enters deep reinforcement learning: DQN learns action values, policy gradients optimize the policy directly, Actor-Critic combines the two routes, PPO provides stable policy updates, and continuous control together with model-based RL extends the toolkit to high-dimensional action spaces and learned environment models.
 
 **Part III (Chapters 10 to 12)** discusses offline reinforcement learning, imitation learning, inverse reinforcement learning, meta-reinforcement learning, exploration, multi-agent reinforcement learning, and hierarchical reinforcement learning, filling in methodological tools for more complex data and environment settings.
 

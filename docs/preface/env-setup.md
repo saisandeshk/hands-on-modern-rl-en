@@ -1,5 +1,5 @@
 ---
-title: Environment Setup Guide
+title: Environment Setup
 ---
 
 # Environment Setup
@@ -7,36 +7,41 @@ title: Environment Setup Guide
 ::: tip Ask a coding assistant to install it for you
 If you are using a coding assistant such as Codex, tell it your learning goal first and then ask it to do the installation:
 
-> Hello, I am about to start this reinforcement learning course and want to set up the lab environment first. Please check my operating system, Python version, and GPU/CUDA status, create a Python 3.10 environment named `rl-course`, install the dependencies needed for the minimal runnable course environment, and then run the CartPole verification program. If you hit installation problems, keep troubleshooting and fixing them. If you need administrator privileges or system-level configuration changes, ask for my confirmation first.
+> Hello, I am about to start this reinforcement learning course and want to set up the lab environment first. Please check my operating system, Python version, and GPU/CUDA status, create a Python 3.12 virtualenv named `.venv` at the repository root with uv, install the pinned dependencies from `code/requirements.lock.txt`, and then run the CartPole verification program plus the smoke tests with `.venv/bin/pytest code -q`. If you hit installation problems, keep troubleshooting and fixing them. If you need administrator privileges or system-level configuration changes, ask for my confirmation first.
 > :::
 
 > **Goal of this section**: build a complete development environment for this course from scratch, covering Python, PyTorch, the RL toolchain, and LLM training frameworks. Follow the steps end to end, and you will be able to run every experiment in the book.
 
+This repository keeps one pinned environment for the whole book in `code/requirements.lock.txt` (Python 3.12), plus a minimal dependency list per chapter in each `code/chapter*/requirements.txt`. Install the lock file once for the full course, or install a single chapter file when you only want that chapter's dependencies.
+
 ## Minimal Working Setup (Get Running in 5 Minutes)
 
-If you cannot wait to start coding, the following 4 steps are enough to run all experiments in Chapters 1 through 6. The remaining simulators and LLM frameworks can be installed later as needed.
+If you cannot wait to start coding, the following steps install the full pinned environment, which covers the experiments in Chapters 1-9 and the LLM post-training chapters out of the box. Niche simulators (Atari ROMs, Isaac Lab, Unity) can be installed later as needed.
 
 ::: code-group
 
-```bash [conda (recommended)]
-conda create -n rl-course python=3.10 -y
-conda activate rl-course
-pip install torch torchvision
-pip install gymnasium stable-baselines3[extra]
-pip install numpy scipy matplotlib tqdm
+```bash [uv (recommended)]
+# From the repository root. Creates the project virtualenv with Python 3.12.
+uv venv --python 3.12
+source .venv/bin/activate
+uv pip install -r code/requirements.lock.txt
 ```
 
-```bash [venv]
-python3.10 -m venv rl-course
-source rl-course/bin/activate   # Windows: rl-course\Scripts\activate
-pip install torch torchvision
-pip install gymnasium stable-baselines3[extra]
-pip install numpy scipy matplotlib tqdm
+```bash [pip]
+python3.12 -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r code/requirements.lock.txt
+```
+
+```bash [per-chapter (lightweight)]
+python3.12 -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r code/chapter01_cartpole/requirements.txt
 ```
 
 :::
 
-After installation, verify with the following code. If a `CartPole` window pops up, everything is ready:
+After installation, verify with the following code, then run the repository smoke tests. If a `CartPole` window pops up, everything is ready:
 
 ```python
 import gymnasium as gym
@@ -57,8 +62,13 @@ env.close()
 print("Minimal environment verified!")
 ```
 
+```bash
+# Repository smoke tests (from the repository root)
+.venv/bin/pytest code -q
+```
+
 ::: details No GPU? You can still run the course.
-The first half of the course (CartPole, DQN, etc.) can be trained on CPU; a GPU is not required. The second half on LLM fine-tuning (Chapters 7-10) recommends at least 24 GB of VRAM, or you can use a cloud GPU environment in [ModelScope Notebook](https://modelscope.cn/my/mynotebook).
+The first parts of the course (CartPole, classical methods, DQN, and other control experiments in Chapters 1-9) can be trained on CPU; a GPU is not required. LLM fine-tuning (Chapters 13-18) recommends at least 24 GB of VRAM, or you can use a cloud GPU environment in [ModelScope Notebook](https://modelscope.cn/my/mynotebook).
 :::
 
 ---
@@ -67,21 +77,25 @@ The first half of the course (CartPole, DQN, etc.) can be trained on CPU; a GPU 
 
 ## Python Environment
 
-We recommend **Python 3.10+** (3.10, 3.11, or 3.12 are all fine). We suggest using conda to manage environments, as it makes switching CUDA versions easier.
+We recommend **Python 3.12**, matching the pinned `code/requirements.lock.txt`. We suggest using [uv](https://docs.astral.sh/uv/) to create the project virtualenv, since the lock file pins every dependency for you.
 
 ```bash
-# Using conda (recommended)
-conda create -n rl-course python=3.10 -y
-conda activate rl-course
+# Using uv (recommended, from the repository root)
+uv venv --python 3.12
+source .venv/bin/activate  # Linux/macOS
+# .venv\Scripts\activate   # Windows
 
-# Using venv (lightweight)
-python3.10 -m venv rl-course
-source rl-course/bin/activate  # Linux/macOS
-# rl-course\Scripts\activate   # Windows
+# Install the full pinned environment
+uv pip install -r code/requirements.lock.txt
+
+# Or install only one chapter's minimal dependencies
+uv pip install -r code/chapter01_cartpole/requirements.txt
 ```
 
-::: tip Why Python 3.10?
-PyTorch 2.x, transformers 4.x, and gymnasium have the best compatibility with 3.10. Python 3.12 also works, but some older libraries may not yet be fully adapted.
+If you prefer conda or plain venv, any Python 3.12 environment works; install the same lock file with `pip install -r code/requirements.lock.txt`.
+
+::: tip Why Python 3.12?
+The lock file in `code/requirements.lock.txt` was resolved with Python 3.12 (torch 2.14.1, transformers 4.57.3, gymnasium 1.4.0). Using the same interpreter avoids binary-wheel surprises.
 :::
 
 ## Installing PyTorch
@@ -126,7 +140,7 @@ if torch.cuda.is_available():
 
 ## Core RL Packages
 
-These packages are used throughout the first half of the course (Chapters 1-6).
+These packages are used throughout the classic and deep RL parts of the course (Chapters 1-9).
 
 ```bash
 # Gymnasium (the successor to OpenAI Gym; the foundation for all environments)
@@ -218,7 +232,7 @@ The unique value of ML-Agents is **3D spatial reasoning**: Atari uses 2D pixels,
 
 ## LLM Training Frameworks
 
-The second half of the course (Chapters 7-10) involves large model alignment training.
+The LLM post-training part of the course (Chapters 13-18) involves large model alignment training.
 
 ```bash
 # Hugging Face ecosystem
@@ -238,7 +252,7 @@ pip install lm-eval
 If you encounter version conflicts, you can install a tested combination with the following command:
 
 ```bash
-pip install "transformers==4.57.3" "trl==0.23.0" "datasets==4.4.1" "accelerate==1.10.1" "peft==0.17.1"
+pip install "transformers==4.57.3" "trl==0.24.0" "datasets==4.4.1" "accelerate==1.10.1" "peft==0.21.2"
 ```
 
 :::
@@ -336,9 +350,9 @@ import sys
 
 checks = []
 
-# 1. Python version
+# 1. Python version (the lock file targets Python 3.12)
 ver = sys.version_info
-checks.append(("Python >= 3.10", ver >= (3, 10)))
+checks.append(("Python >= 3.12", ver >= (3, 12)))
 
 # 2. Core packages
 for pkg in ["numpy", "matplotlib", "scipy", "tqdm"]:
@@ -386,27 +400,38 @@ print("=" * 45 + "\n")
 
 ## Package Overview
 
-| Package           | Recommended version | Purpose                                      | Relevant chapters |
-| ----------------- | ------------------- | -------------------------------------------- | ----------------- |
-| Python            | 3.10+               | Runtime                                      | Entire book       |
-| PyTorch           | 2.1+                | Deep learning framework                      | Entire book       |
-| gymnasium         | 0.29+               | RL environment interface                     | Ch1, Ch3-Ch6      |
-| stable-baselines3 | 2.2+                | Pre-packaged RL algorithms                   | Ch1, Ch4-Ch6      |
-| numpy             | 1.24+               | Numerical computing                          | Entire book       |
-| matplotlib        | 3.7+                | Visualization and plotting                   | Entire book       |
-| pybullet          | 3.2+                | Robotics simulation                          | Ch11              |
-| mujoco            | 3.0+                | High-fidelity physics simulation             | Ch11              |
-| isaacsim          | 4.0+                | GPU-parallel robotics simulation (Isaac Lab) | Ch11, Ch12        |
-| mlagents          | 1.0+                | Unity 3D game RL environments                | Appendix          |
-| ale-py            | 0.8+                | Atari emulator                               | Ch4               |
-| transformers      | 4.45+               | LLM model loading                            | Ch7-Ch10          |
-| trl               | 0.12+               | LLM reinforcement learning training          | Ch7-Ch8           |
-| peft              | 0.13+               | Parameter-efficient fine-tuning (LoRA)       | Ch7-Ch10          |
-| accelerate        | 1.0+                | Distributed training                         | Ch7-Ch10          |
-| datasets          | 3.0+                | Dataset loading                              | Ch7-Ch10          |
-| wandb             | 0.16+               | Experiment tracking                          | Entire book       |
-| tensorboard       | 2.15+               | Training visualization                       | Entire book       |
+| Package           | Recommended version | Purpose                                        | Relevant chapters |
+| ----------------- | ------------------- | ---------------------------------------------- | ----------------- |
+| Python            | 3.12                | Runtime (matches `code/requirements.lock.txt`) | Entire book       |
+| PyTorch           | 2.14+               | Deep learning framework                        | Entire book       |
+| gymnasium         | 1.4+                | RL environment interface                       | Ch1-Ch9           |
+| stable-baselines3 | 2.9+                | Pre-packaged RL algorithms                     | Ch1-Ch9           |
+| numpy             | 2.5+                | Numerical computing                            | Entire book       |
+| matplotlib        | 3.7+                | Visualization and plotting                     | Entire book       |
+| pybullet          | 3.2+                | Robotics simulation                            | Ch7-Ch9           |
+| mujoco            | 3.0+                | High-fidelity physics simulation               | Ch7-Ch9           |
+| isaacsim          | 4.0+                | GPU-parallel robotics simulation (Isaac Lab)   | Ch9               |
+| mlagents          | 1.0+                | Unity 3D game RL environments                  | Ch9, Appendix C   |
+| ale-py            | 0.8+                | Atari emulator                                 | Ch5               |
+| transformers      | 4.57+               | LLM model loading                              | Ch13-Ch18         |
+| trl               | 0.24+               | LLM reinforcement learning training            | Ch13-Ch15         |
+| peft              | 0.21+               | Parameter-efficient fine-tuning (LoRA)         | Ch13-Ch15         |
+| accelerate        | 1.10+               | Distributed training                           | Ch13-Ch18         |
+| datasets          | 4.4+                | Dataset loading                                | Ch13-Ch18         |
+| wandb             | 0.16+               | Experiment tracking                            | Entire book       |
+| tensorboard       | 2.15+               | Training visualization                         | Entire book       |
 
 ::: tip No need to install everything at once
 We recommend installing packages as you progress through the course: start with the basics (Python environment, PyTorch, core RL packages), then install simulator environments and LLM frameworks when you reach the corresponding chapters. This avoids having to resolve too many dependency conflicts at once.
 :::
+
+## Running the Course Website
+
+The book itself is a VitePress site. From the repository root:
+
+```bash
+npm install
+npm run dev:fast   # dev server, no asset optimization (~5s startup)
+```
+
+`npm run dev:fast` is the day-to-day command. The full `npm run build` also optimizes assets and regenerates the sitemap.
