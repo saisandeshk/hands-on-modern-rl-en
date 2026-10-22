@@ -256,12 +256,12 @@ DT is not in-context RL; it is a **conditional policy**. But it inspired later w
 
 ### 3.2 The Connection Between In-Context RL and LLMs
 
-You may have noticed that the history of in-context learning in LLMs runs highly parallel to in-context RL, almost the same thing independently discovered in two fields, supervised learning and reinforcement learning:
+You may have noticed that in-context learning in LLMs runs closely parallel to in-context RL: the two mechanisms share the same template, but they operate on different signals and should not be called the same thing.
 
-- **In-context learning in GPT-3** (2020): give a few examples in the prompt, and the model learns the task without updating parameters. This is the in-context version of **supervised learning**.
-- **In-context RL of Algorithm Distillation** (2022): give a few reward-bearing trajectories in the context, and the model learns RL without updating parameters. This is the in-context version of **reinforcement learning**.
+- **In-context learning in GPT-3** (2020): give a few input-output examples in the prompt, and the model performs the task without updating parameters. This is the in-context version of **supervised learning**: the context carries task identifiers, not rewards.
+- **In-context RL of Algorithm Distillation** (2022): give reward-bearing trajectories ordered from poor to good in the context, and the model improves its behavior without updating parameters. This is the in-context version of **reinforcement learning**: the context additionally carries reward signals and policy-improvement structure.
 
-Both put examples or interaction history into the context and then predict the next output. Whether some kind of RL update is truly implemented has to be tested through adaptation curves on new tasks, and one cannot conclude from the model changing its answers in context alone. But their mechanisms are completely consistent.
+Both put examples or interaction history into the context and then predict the next output, so the machinery looks the same. But whether a model truly implements an RL update in context has to be tested through adaptation curves on new tasks; one cannot conclude it from the model merely changing its answers in context. The safe reading is that they are analogous mechanisms applied to different learning signals, not one discovery made twice.
 
 ## 4. Returning Imitation and Adaptation to LLM Post-Training
 
