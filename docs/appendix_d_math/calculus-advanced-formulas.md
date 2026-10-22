@@ -1,5 +1,5 @@
 ---
-title: D.3.5 Complete Formulas
+title: D.3.5 Complete Formulas for PG, DQN, GAE, PPO, and GRPO
 ---
 
 # D.3.5 Complete Formulas for PG, DQN, GAE, PPO, and GRPO
@@ -198,4 +198,4 @@ This page summarized all core formulas in module D.3:
 
 When you encounter an unfamiliar symbol, return to this page for reference. The next page uses exercises to check your understanding of these formulas.
 
-> **Next**: [D.3.6 Formula Reference and Exercises](./calculus-formulas-exercises), which summarizes all formulas in this module and checks understanding through exercises.
+> **Next**: [D.3.6 Calculus and Optimization Formula Reference and Exercises](./calculus-formulas-exercises), which summarizes all formulas in this module and checks understanding through exercises.

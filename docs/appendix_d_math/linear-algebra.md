@@ -20,7 +20,7 @@ Chapter 3 introduced the Bellman equation $V(s) = R(s) + \gamma\sum_{s'}P(s'|s,a
 
 | Article                                                                                   | Question it answers                                                        | Corresponding problem      |
 | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------- |
-| [D.1.1 Scalars, Vectors, and Matrices](./linear-algebra-basics)                           | How do we represent states, values, and transitions?                       | Too many equations, basics |
+| [D.1.1 Vectors and Matrices](./linear-algebra-basics)                                     | How do we represent states, values, and transitions?                       | Too many equations, basics |
 | [D.1.2 Matrix Form of the Bellman Equation](./linear-algebra-bellman)                     | Can 1000 Bellman equations be compressed into one?                         | Too many equations         |
 | [D.1.3 Dot Products, Norms, and Function Approximation](./linear-algebra-function-approx) | What if there are too many states to store? How do we measure update size? | State space too large      |
 | [D.1.4 Convergence, Eigenvalues, and Trust Regions](./linear-algebra-advanced)            | Will training explode? How can parameters be updated safely?               | Training stability         |

@@ -1,5 +1,5 @@
 ---
-title: D.3.1 Derivatives and Gradients
+title: D.3.1 Derivatives, Gradients, and the Chain Rule
 ---
 
 # D.3.1 Derivatives, Gradients, and the Chain Rule

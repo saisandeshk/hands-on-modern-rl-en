@@ -1,5 +1,5 @@
 ---
-title: D.2.2 Random Variables, Returns, and State Values
+title: D.2.2 From Random Trajectories to State Values
 ---
 
 # D.2.2 From Random Trajectories to State Values

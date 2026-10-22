@@ -1,5 +1,5 @@
 ---
-title: 'D.1.1 Linear Algebra Basics: Vectors and Matrices'
+title: 'D.1.1 Vectors and Matrices'
 ---
 
 # D.1.1 Vectors and Matrices

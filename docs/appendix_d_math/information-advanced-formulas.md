@@ -1,5 +1,5 @@
 ---
-title: D.4.5 Complete Formulas
+title: D.4.5 Complete Formulas for KL, RLHF, DPO, and Mutual Information
 ---
 
 # D.4.5 Complete Formulas for KL, RLHF, DPO, and Mutual Information
@@ -127,4 +127,4 @@ This page summarized the core formulas from module D.4:
 | DPO loss                 | $-\log\sigma(\beta\log\frac{\pi_\theta(y_w)}{\pi_{ref}(y_w)}-\beta\log\frac{\pi_\theta(y_l)}{\pi_{ref}(y_l)})$ | A larger relative probability gap is better                    |
 | Mutual information       | $I(X;Y)=H(X)-H(X\mid Y)=D_{KL}(P_{XY}\|P_XP_Y)$                                                                | How much uncertainty in $X$ is reduced after knowing $Y$       |
 
-> **Next**: [D.4.6 Formula Reference and Exercises](./information-formulas-exercises) -- review all formulas in this module and check your understanding with exercises.
+> **Next**: [D.4.6 Information Theory Formula Reference and Exercises](./information-formulas-exercises) -- review all formulas in this module and check your understanding with exercises.

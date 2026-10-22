@@ -1,5 +1,5 @@
 ---
-title: D.4.6 Formulas and Exercises
+title: D.4.6 Information Theory Formula Reference and Exercises
 ---
 
 # D.4.6 Information Theory Formula Reference and Exercises

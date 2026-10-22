@@ -1,5 +1,5 @@
 ---
-title: D.4.4 Mutual Information
+title: D.4.4 Mutual Information and Representation Learning
 ---
 
 # D.4.4 Mutual Information and Representation Learning
@@ -69,4 +69,4 @@ This article introduced a tool for measuring how much information two random var
 
 Mutual information connects the entropy and KL divergence from the previous articles: it uses KL to measure the difference between a joint distribution and the independence assumption, and it uses the reduction in entropy to measure information gain. The next article summarizes all complete formulas in module D.4.
 
-> **Next**: [D.4.5 Complete Information Theory Formulas](./information-advanced-formulas) -- full expressions for KL, RLHF, DPO, and mutual information.
+> **Next**: [D.4.5 Complete Formulas for KL, RLHF, DPO, and Mutual Information](./information-advanced-formulas) -- full expressions for KL, RLHF, DPO, and mutual information.

@@ -14,11 +14,11 @@ This section starts from the simplest probability events and builds up to the ma
 
 ## Roadmap
 
-| Article                                                                           | Mathematical rhythm                                           | Role in reinforcement learning                                   |
-| --------------------------------------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------- |
-| [D.4.1 Self-Information, Entropy, and Exploration](./information-basics)          | Probability event -> self-information -> entropy              | Measures policy randomness and exploration                       |
-| [D.4.2 Cross-Entropy and KL Divergence](./information-cross-entropy-kl)           | Encoding cost -> cross-entropy -> KL                          | Measures differences between prediction and policy distributions |
-| [D.4.3 KL Constraints, RLHF, and DPO](./information-rlhf-dpo)                     | KL regularization -> log probability ratio -> preference loss | Understands policy constraints in alignment training             |
-| [D.4.4 Mutual Information and Representation Learning](./information-mutual-info) | Reduction in conditional uncertainty -> mutual information    | Measures task-relevant information kept in representations       |
-| [D.4.5 Complete Information Theory Formulas](./information-advanced-formulas)     | Full expressions for KL, RLHF, DPO, and mutual information    | Unifies distribution distance and preference optimization        |
-| [D.4.6 Summary, Formulas, and Exercises](./information-formulas-exercises)        | Formula review -> common mistakes -> exercises                | Reviews and checks understanding                                 |
+| Article                                                                                              | Mathematical rhythm                                           | Role in reinforcement learning                                   |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------- |
+| [D.4.1 Self-Information, Entropy, and Exploration](./information-basics)                             | Probability event -> self-information -> entropy              | Measures policy randomness and exploration                       |
+| [D.4.2 Cross-Entropy and KL Divergence](./information-cross-entropy-kl)                              | Encoding cost -> cross-entropy -> KL                          | Measures differences between prediction and policy distributions |
+| [D.4.3 Information Theory in PPO, RLHF, and DPO](./information-rlhf-dpo)                             | KL regularization -> log probability ratio -> preference loss | Understands policy constraints in alignment training             |
+| [D.4.4 Mutual Information and Representation Learning](./information-mutual-info)                    | Reduction in conditional uncertainty -> mutual information    | Measures task-relevant information kept in representations       |
+| [D.4.5 Complete Formulas for KL, RLHF, DPO, and Mutual Information](./information-advanced-formulas) | Full expressions for KL, RLHF, DPO, and mutual information    | Unifies distribution distance and preference optimization        |
+| [D.4.6 Information Theory Formula Reference and Exercises](./information-formulas-exercises)         | Formula review -> common mistakes -> exercises                | Reviews and checks understanding                                 |
