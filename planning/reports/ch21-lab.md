@@ -79,10 +79,78 @@ code links use the required github path pattern.
   `docs/chapter21_deep_research/lab.md`; sidebar edit left to the
   coordinator per worker rules.)
 
-## Commands run and results
+## Review response
+
+Re-checked every finding against the code and by recomputation; the reviewer
+was right on all 10 errors and most doubts. Fixes applied in this branch
+(text + one test; no environment behavior changed, so all reported numbers
+still stand):
+
+1. **Runtime (~25 s claim) — accepted.** The page contradicted its own
+   README ("3-7 minutes") and independent timing (372 s seed 0 / 242 s seed
+   1 on a 24-core box). My "23.8 s" report line was wrong (an under-timed
+   partial run). Page now says "about 4-7 minutes on CPU"; re-ran the full
+   config to confirm (see Commands).
+2. **Non-monotone "monotonically" — accepted.** Reproduced the `any` curve
+   from `metrics.json`: +1.630, +1.634, +1.612, +1.611, +1.579, +1.622,
+   +1.685, +1.684, +1.788, +1.817. Page now says "rose overall ..., dipping
+   to +1.58 around episode 2000".
+3. **+1.5 arithmetic — accepted.** Recomputed with the lab's own
+   `discounted_returns`: the correct 5-step trajectory is +1.70
+   undiscounted / +1.6467 discounted, not "+1.5". Page now gives both
+   (+1.7 / +1.65) against the loose trajectory (+2.24 / +2.16).
+4. **Reward-hacking mechanism — accepted.** Rewrote the section: the +1.82
+   is a mean over stochastic training rollouts (it exceeds the +1.65 any
+   correct short trajectory can earn, so it must come from longer
+   bonus-collecting rollouts); the evaluated greedy policy burns the
+   10-step budget re-opening already-opened documents — which pay nothing
+   (`shaped_paid`) — and times out without answering. The features explain
+   why: they record result types but not which slots were already opened.
+   Dropped the "answers wrong after harvesting" story and the claim that
+   the evaluated policy maximizes its proxy.
+5. **Hard questions never need 3 documents — accepted (text fix).**
+   Verified in code: the target is always the lower-id twin and search
+   sorts profiles by doc id, so the target's profile always ranks first.
+   Page, `web_env.py` docstring, and README now state plainly that both
+   splits are 2-document chains in practice and the lab cue is never
+   needed. Chose the reviewer's "state plainly" option over re-randomizing
+   the environment (keeps all measured numbers valid; minimal-change rule).
+6. **Entity leakage across split — accepted (disclosure + exercise).**
+   Confirmed: hard test questions reuse training profile pairs. Page no
+   longer claims 21.2 compliance ("disjoint papers" kept as fact; added an
+   explicit limitation note); exercise 4 now asks learners to impose a
+   strict hold-out-whole-pairs split and re-measure.
+7. **Sidebar entry — rejected (out of scope).** Worker rules forbid editing
+   `docs/.vitepress/config.mjs`; the page stays listed under "Sidebar
+   additions" for the coordinator.
+8. **21.L numbering vs tooling — rejected (task-mandated, coordinator call).**
+   The `21.L` title/H1 format comes from the task spec itself; renumbering
+   to 21.3 unilaterally would conflict with it and with the pending sidebar
+   entry. Flagged for the coordinator in Open issues instead.
+9. **`a1`/`a2` snippet — accepted.** Page now shows `a1['name']` with a note
+   that they are scholar dicts.
+10. **"Barely above chance" — accepted.** 0.12 is 2/16 = exactly the 1/8
+    guessing rate (random policy scores 0.00). Page now says "at chance".
+
+Doubts: D1 (bonus arithmetic, no behavioral separation) — accepted,
+section now states the +1.25 vs +0.86 gap is mostly arithmetic with
+identical behavior; D2 (easy/hard no-op) — accepted, added a skepticism
+bullet noting loose scores higher on hard (0.75) than easy (0.12); D3
+("~random level") — accepted, README now says chance guessing rate
+(1/8 ≈ 0.12); D4 (misnamed test) — accepted, renamed to
+`test_any_bonus_paid_for_any_new_doc` and extended to pin the actual
+semantics (any-bonus fires for gold docs too when `rel_bonus` is 0);
+D5 (REINFORCE snippet) — accepted, snippet now shows advantage
+normalization and the `Categorical`/`log_prob` lines; D6 ("links") —
+accepted, reworded to shared names/labs/titles in page, docstring, and
+README; D7 (pytest in requirements) — rejected, matches house convention
+of the other chapters; D8 (code/README table) — rejected, that table is
+already stale for many chapters and out of this task's scope.
+
+## Commands run and results (review round)
 
 - `.venv/bin/python code/chapter21_deep_research/train_research_agent.py --smoke --seed 0 --device cpu` — OK (~3–15 s).
-- `.venv/bin/python code/chapter21_deep_research/train_research_agent.py --seed 0 --device cpu` (canonical full run) — OK, 23.8 s. Results: heuristic 1.00; outcome 1.00 (5.0 steps); relevant 1.00 (5.0 steps, train return +1.25 vs +0.86); loose-any 0.44 (9.1 steps, train return +1.82, highest); scratch-outcome 0.12 (1.0 steps); scratch-relevant 0.12; random 0.00. Full table in `docs/chapter21_deep_research/lab.md` and `code/runs/chapter21_deep_research/`.
+- `.venv/bin/python code/chapter21_deep_research/train_research_agent.py --seed 0 --device cpu` (canonical full run) — OK. Results: heuristic 1.00; outcome 1.00 (5.0 steps); relevant 1.00 (5.0 steps, train return +1.25 vs +0.86); loose-any 0.44 (9.1 steps, train return +1.82, highest); scratch-outcome 0.12 (1.0 steps); scratch-relevant 0.12; random 0.00. Full table in `docs/chapter21_deep_research/lab.md` and `code/runs/chapter21_deep_research/`. NOTE (review round): the "23.8 s" originally reported here was wrong — an under-timed partial run on a fast box. Independent timing on a 24-core box: 372 s (seed 0), 242 s (seed 1); my re-run this round took [FILL] s. The docs page now says "about 4-7 minutes on CPU".
 - Same full command with `--seed 1 --outdir /tmp/opencode/ch21-seed1` — OK; loose-any 0.81 / 6.8 steps (documents seed sensitivity for exercise 6).
 - `.venv/bin/pytest code/chapter21_deep_research -q` — 19 passed.
 - `npx prettier --write` on the markdown files (the repo's prettier has no
@@ -91,6 +159,10 @@ code links use the required github path pattern.
 
 ## Open issues
 
+- The `21.L` page number breaks `scripts/fix-heading-numbers.mjs` syncing
+  (sidebar regex never matches it; a `21.3` rename would be mangled to
+  `21.3.L`). Renumbering needs a coordinator decision across the task spec,
+  the sidebar, and the heading tooling — flagged, not changed here.
 - The warm-started outcome and relevant regimes both saturate at 1.00 from
   the behavior-cloned start, so their learning curves are flat at ceiling;
   the shaping contrast rests on training-return density and the from-scratch

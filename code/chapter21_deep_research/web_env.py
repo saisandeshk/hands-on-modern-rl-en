@@ -1,8 +1,9 @@
 """Offline toy web for the Chapter 21 deep-research lab.
 
-The environment is a small synthetic "web" of interlinked documents plus a set
-of multi-hop questions.  Answering a question requires finding and combining
-facts from 2-3 documents, mirroring the browser-RL harness in Section 21.1:
+The environment is a small synthetic "web" of documents related by shared
+names, labs, and titles, plus a set of multi-hop questions.  Answering a
+question requires finding and combining facts from a paper and a profile,
+mirroring the browser-RL harness in Section 21.1:
 
     search(term) -> open(doc) -> ... -> answer(candidate)
 
@@ -20,10 +21,11 @@ Question design (combining facts across documents)
 
 Easy questions name a paper whose first author has a unique name, so the chain
 is paper -> one profile (2 documents).  Hard questions target a first author
-whose name is shared by two scholars and additionally name the author's lab,
-so the agent must open the paper plus both same-name profiles and use the
-affiliation to disambiguate (3 documents).  This reproduces the "Chen Li"
-same-name disambiguation example from Section 21.1.
+whose name is shared by two scholars and additionally name the author's lab
+(the "Chen Li" same-name case from Section 21.1); the gold evidence set lists
+the paper plus both same-name profiles.  Caveat: the search ranking always
+surfaces the target scholar's profile first, so in practice the agent opens
+one profile and answers without ever using the lab cue (see the lab page).
 """
 
 from __future__ import annotations

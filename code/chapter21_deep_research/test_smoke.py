@@ -150,13 +150,21 @@ def test_relevant_bonus_paid_once(corpus, easy_q):
     assert r2 == pytest.approx(-env.step_cost)
 
 
-def test_any_bonus_ignores_gold_docs(corpus, easy_q):
+def test_any_bonus_paid_for_any_new_doc(corpus, easy_q):
+    # The any-document bonus pays for every newly opened document, including
+    # gold documents (when rel_bonus is 0 the `elif self.any_bonus` branch
+    # fires for them too) — which is exactly why the proxy is gameable.
     env = make_env(corpus, easy_q, any_bonus=0.4)
     env.reset(easy_q)
     other = next(d for d in corpus.docs if d not in easy_q.gold_doc_ids)
     env.results = [other]
     _, r, _, _ = env.step(4)
     assert r == pytest.approx(0.4 - env.step_cost)
+    env2 = make_env(corpus, easy_q, any_bonus=0.4)
+    env2.reset(easy_q)
+    env2.results = [easy_q.gold_doc_ids[0]]
+    _, r2, _, _ = env2.step(4)
+    assert r2 == pytest.approx(0.4 - env.step_cost)
 
 
 # --------------------------------------------------------------------------

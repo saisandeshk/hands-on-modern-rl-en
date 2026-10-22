@@ -5,8 +5,8 @@ title: '21.L Lab: Multi-Turn Research with Delayed Reward'
 # 21.L Lab: Multi-Turn Research with Delayed Reward
 
 Train a small tool-calling research agent on an offline toy web: a corpus of
-134 synthetic documents with links between them, and questions whose answers
-require finding and combining facts from 2-3 documents. The agent uses three
+134 synthetic documents related by shared names, labs, and titles, and questions whose answers
+require finding and combining facts from a paper and a profile (2 documents). The agent uses three
 tools, `search(term)`, `open(doc)`, and `answer(candidate)`, under a step
 budget. The reward is 1 for a correct final answer (with a small per-step
 cost), so credit for a good search must propagate back across a 5-step
@@ -18,7 +18,8 @@ training hard.
 - How to cast multi-turn web research as a repeatable RL environment: fixed
   tools, a step budget, and a verifiable terminal reward.
 - Why sparse trajectory-level reward struggles with discovery: REINFORCE from
-  scratch collapses to answering immediately, barely above chance.
+  scratch collapses to answering immediately, at chance (one lucky guess in
+  eight candidates).
 - What a dense process reward changes: a bonus for opening relevant
   documents keeps fine-tuning stable and raises training returns — but only
   when the relevance signal is trustworthy.
@@ -38,9 +39,14 @@ submits a short answer that is scored by exact match against a reference
 answer. Questions come in two difficulties. Easy questions name a paper whose
 first author has a unique name, so the chain is paper plus one profile (2
 documents). Hard questions target a first author whose name is shared by two
-scholars and additionally name the author's lab, so the agent must open the
-paper plus both same-name profiles and use the affiliation to disambiguate
-(3 documents) — the "Chen Li" same-name case from Section 21.1.
+scholars and additionally name the author's lab — the "Chen Li" same-name
+case from Section 21.1. Note a limitation of this toy: the gold evidence set
+for a hard question lists the paper plus both same-name profiles, but the
+search ranking always surfaces the target scholar's profile first, so in
+practice the agent opens one profile and answers (2 documents, same as easy);
+the lab cue in the question text is never needed to disambiguate. The hard
+split therefore tests the same 2-document chain with an extra cue, not a
+genuinely harder 3-document chain.
 
 The training regimes mirror the chapter's reward discussion. Outcome-only
 supervision is the DeepResearcher / Search-R1 setup from Section 21.1: one
@@ -63,7 +69,7 @@ repository root:
 # Smoke mode: tiny corpus, finishes in seconds
 .venv/bin/python code/chapter21_deep_research/train_research_agent.py --smoke --seed 0 --device cpu
 
-# Full run: 134 documents, 60 questions, ~25 s on CPU
+# Full run: 134 documents, 60 questions, about 4-7 minutes on CPU
 .venv/bin/python code/chapter21_deep_research/train_research_agent.py --seed 0 --device cpu
 
 # Unit tests plus a smoke run in a subprocess
@@ -88,10 +94,12 @@ so the affiliation cue can only come from opening profiles:
 
 ```python
 text = (
-    f"{title}. Authors: {a1} and {a2}. "
+    f"{title}. Authors: {a1['name']} and {a2['name']}. "
     f"Topic: {rng.choice(TOPICS).lower()}.",
 )
 ```
+
+(`a1` and `a2` are scholar dicts, hence the `['name']` lookups.)
 
 The environment step
 ([web_env.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter21_deep_research/web_env.py))
@@ -118,7 +126,11 @@ REINFORCE against its own value baseline:
 
 ```python
 adv = G - V
+# Normalize the advantage across the batch, then the usual REINFORCE update:
+adv = (adv - adv.mean()) / (adv.std(unbiased=False) + 1e-8)
 logits, values = model(F)
+dist = torch.distributions.Categorical(logits=logits)
+logp = dist.log_prob(A)
 policy_loss = -(logp * adv.detach()).mean()
 value_loss = ((values - G.detach()) ** 2).mean()
 ```
@@ -127,12 +139,18 @@ The trainer
 ([train_research_agent.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter21_deep_research/train_research_agent.py))
 warm-starts every regime from the same behavior-cloned policy, then
 fine-tunes under each reward, and evaluates greedily on 16 held-out
-questions (8 easy, 8 hard) with disjoint papers from training, as
-[Section 21.2](./deep-research-eval) recommends.
+questions (8 easy, 8 hard) with papers disjoint from training. Note the
+limitation: the split is by paper, not by entity — the same-name scholar
+pairs behind the hard questions appear on both sides (every hard test
+question reuses profile pairs that are also gold evidence for training
+questions), so this is weaker than the freeze-by-entity protocol that
+[Section 21.2](./deep-research-eval) prescribes (exercise 4 asks you to
+impose it).
 
 ## Results from a full run
 
-Seed 0, CPU, 4000 episodes per regime (24 s wall-clock). Test set: 16
+Seed 0, CPU, 4000 episodes per regime (about 4-7 minutes wall-clock; the
+reference box took 372 s for seed 0 and 242 s for seed 1). Test set: 16
 held-out questions, 8 easy / 8 hard.
 
 | Policy                                   | All  | Easy | Hard | Avg steps | Searches | Opens |
@@ -150,7 +168,11 @@ story: outcome +0.86, relevant shaping +1.25, loose shaping +1.82. The
 loose-shaping agent earns the _highest_ training return and the _worst_
 success rate among warm-started policies. Its test success over training
 episodes was 1.00, 1.00, 0.94, 0.94, 0.00, 0.62, 0.88, 1.00, 0.44, 0.44
-while its mean return climbed monotonically from +1.63 to +1.82.
+while its mean training return rose overall from +1.63 to +1.82, dipping to
++1.58 around episode 2000 — and that rise coincides with the _fall_ in
+greedy test success, not with an improvement. (These training returns are
+means over stochastic training rollouts, not the return of the evaluated
+greedy policy.)
 
 ## What to look for and why it happens
 
@@ -166,19 +188,42 @@ while its mean return climbed monotonically from +1.63 to +1.82.
   never sampled often enough to compete with the sure +0.1 from guessing.
   Dense rewards help most when the policy already explores near good
   trajectories — which is exactly what the warm-start provides.
-- **Tight shaping densifies fine-tuning.** From the warm-start, both
-  outcome-only and relevant shaping hold 1.00, but the shaped regime's
-  training return (+1.25 vs +0.86) carries a per-step signal instead of one
-  terminal number — the Web-Shepherd effect at toy scale.
+- **Tight shaping densifies fine-tuning, but compare carefully.** From the
+  warm-start, both outcome-only and relevant shaping hold 1.00 with
+  identical behavior (5.0 steps, 2 searches, 2 opens), so the shaped
+  regime's higher training return (+1.25 vs +0.86) is mostly bonus
+  arithmetic — the same successful 5-step trajectory scores about +1.25
+  under relevant shaping versus +0.86 under outcome-only — rather than a
+  demonstrated credit-assignment win. The lab shows that dense process
+  signal _can_ ride along harmlessly here, not that it helps discovery:
+  treat this as the Web-Shepherd setup at toy scale, with the caveat
+  stated, not as evidence that shaping beat the sparse baseline.
+- **Read the easy/hard split with skepticism.** Both splits are 2-document
+  chains in practice (the heuristic posts 5.0 steps, 2 searches, 2 opens on
+  each), differing only in a lab cue in the question text plus one feature
+  bit — and the loose-shaping policy scores _higher_ on hard (0.75) than
+  on easy (0.12) at seed 0. The headline "split by difficulty" evaluation
+  therefore does not measure difficulty here; treat the split as a
+  reporting habit from Section 21.2, and a reminder that a difficulty label
+  is only as real as the behavioral difference behind it.
 - **Loose shaping is gamed, and the metric hides it.** With a +0.4 bonus
   per opened document, opening six documents and answering wrong
-  (about +2.2) outscores answering correctly in five steps (about +1.5)
-  under the _training_ objective. The policy learns to burn the full
-  10-step budget (9.1 average steps, 2.8 opens) while test success
-  collapses to 0.44 — even as its training return keeps rising. That
-  rising-return / falling-success split is the signature of reward hacking,
-  and the reason Section 21.2 insists on scoring answer, evidence, process,
-  and cost separately instead of trusting one training curve.
+  (about +2.2 undiscounted, +2.16 discounted) outscores answering
+  correctly in five steps (about +1.7 undiscounted, +1.65 discounted)
+  under the _training_ objective — a gap of roughly half a point of
+  return. The +1.82 mean training return exceeds what any correct short
+  trajectory can earn (+1.65), so it must come from longer
+  bonus-collecting rollouts. The evaluated greedy policy, meanwhile,
+  burns the full 10-step budget (9.1 average steps, 2.8 distinct opens):
+  its feature vector records result types but not which slots were
+  already opened, so it spends steps re-opening the same document — a
+  re-open pays nothing, since the bonus is once per document — and many
+  test episodes simply time out without any answer. Test success
+  collapses to 0.44 even as the training-return curve rises. That
+  rising-return / falling-success split is the signature of reward
+  hacking, and the reason Section 21.2 insists on scoring answer,
+  evidence, process, and cost separately instead of trusting one
+  training curve.
 
 ## Extension exercises
 
@@ -194,10 +239,14 @@ while its mean return climbed monotonically from +1.63 to +1.82.
    episodes and higher entropy (`--episodes 20000`, edit `entropy_coef`).
    Hint: watch whether success ever lifts off 0.12, and explain what the
    flat curve implies about undirected exploration on long tool chains.
-4. **Add a distractor trap.** Inject profile documents whose text mentions a
-   wrong university alongside the true one, and extend the heuristic to
-   prefer the sentence matching the lab cue. Hint: this tests Layer 2 of
-   Section 21.2 (citation support) rather than Layer 1 (answer match).
+4. **Add a distractor trap — and split by entity.** Inject profile
+   documents whose text mentions a wrong university alongside the true one,
+   and extend the heuristic to prefer the sentence matching the lab cue.
+   Hint: this tests Layer 2 of Section 21.2 (citation support) rather than
+   Layer 1 (answer match). Then re-split train/test by scholar entity:
+   hold out whole same-name pairs (and their papers) so no profile — and
+   no person — appears on both sides, per Section 21.2's freeze rule, and
+   check how the scores change.
 5. **Price the tools.** Give `search` and `open` different step costs and
    re-derive the optimal trajectory length. Hint: with expensive search,
    opening extra result slots beats re-searching — check the policy's

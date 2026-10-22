@@ -1,8 +1,9 @@
 # Chapter 21 Lab: Multi-Turn Research Agent with Delayed Reward
 
 A hands-on lab for the browser-RL harness (Section 21.1) and research-agent
-evaluation (Section 21.2): an offline toy "web" of linked synthetic documents,
-multi-hop questions, and a tool-calling agent trained with REINFORCE.
+evaluation (Section 21.2): an offline toy "web" of synthetic documents
+related by shared names, labs, and titles, multi-hop questions, and a
+tool-calling agent trained with REINFORCE.
 
 ## What the lab shows
 
@@ -13,8 +14,8 @@ multi-hop questions, and a tool-calling agent trained with REINFORCE.
 - Credit assignment: sparse trajectory-level reward versus a dense shaped
   reward for opening relevant documents — and how a loose shaping proxy
   (bonus for opening _any_ document) gets gamed.
-- Evaluation split by question difficulty (2-document chains vs. 3-document
-  same-name disambiguation), reporting success rate, average steps, and
+- Evaluation split by question difficulty (2-document chains with or without
+  a same-name cue), reporting success rate, average steps, and
   search/open call counts.
 
 ## Files
@@ -58,9 +59,9 @@ Full run, seed 0 (representative; exact numbers vary with seed):
 - Scripted heuristic: ~100% success, ~5 steps (2 searches, 2 opens).
 - REINFORCE from a BC warm-start: high success (roughly 0.9-1.0) under the
   outcome-only and relevant-shaping regimes.
-- REINFORCE from scratch (outcome reward only): ~random level (~0.1),
-  answering almost immediately — sparse terminal reward cannot discover a
-  5-step tool chain unaided.
+- REINFORCE from scratch (outcome reward only): at the chance guessing rate
+  (1/8 ≈ 0.12), answering almost immediately — sparse terminal reward cannot
+  discover a 5-step tool chain unaided.
 - Loose `any`-document shaping (bonus 0.4): trajectories get longer (more
   searches/opens) while success stalls or drops — the policy harvests
   open bonuses instead of answering. Tight relevant shaping keeps
