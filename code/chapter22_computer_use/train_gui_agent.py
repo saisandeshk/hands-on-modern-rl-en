@@ -8,8 +8,9 @@ The lab compares four training regimes on the MiniForm environment
   field) to full (two fields + two boxes) as success improves.
 * ``shaped``      -- full task with a progress reward for each newly
   satisfied sub-goal (Chapter 22, Step 7: dense progress rewards).
-* ``hackable``    -- shaped rewards plus a bonus for *any* submit click,
-  which reproduces the "submit early" reward-hacking failure mode.
+* ``hackable``    -- shaped rewards plus a bonus for every *failed*
+  submit click (a correct submit still pays only +1), which reproduces
+  the "submit early" reward-hacking failure mode.
 
 Algorithm: Monte-Carlo REINFORCE with a state-value baseline, implemented
 from scratch in torch (no RL libraries):
@@ -381,7 +382,8 @@ def plot_curves(all_evals: dict[str, list[dict]], out: str) -> None:
 
 
 def print_table(summary: dict[str, dict]) -> None:
-    print("\nSummary (greedy policy, full task, last eval snapshot)")
+    print("\nSummary (greedy policy, full task, last eval snapshot; "
+          "mean_rew = mean undiscounted reward over last 200 training episodes)")
     print(f"  {'regime':>10}  {'train_succ':>10}  {'heldout':>8}  "
           f"{'mean_len':>8}  {'submit_fr':>9}  {'mean_rew':>8}")
     for mode, s in summary.items():

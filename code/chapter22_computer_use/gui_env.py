@@ -18,7 +18,8 @@ task:
   Step 2 -- flattened into one discrete action index.
 * Reward is sparse by default: +1 only for a correct submission, 0
   otherwise. Optional shaping pays for newly satisfied sub-goals; a
-  deliberately hackable variant also pays for *any* submit click, which lets
+  deliberately hackable variant also pays +0.4 for every *failed* submit
+  click (a correct submit still pays only the +1 terminal reward), which lets
   the lab reproduce the "submit early" reward-hacking failure mode.
 
 Notation follows the book: states ``s``, actions ``a``, rewards ``r``,
@@ -302,8 +303,9 @@ class MiniFormEnv:
                     # A wrong submit shows a form error and the episode goes
                     # on, so the agent can use the feedback to recover.
                     if self.reward_mode == "shaped_hackable":
-                        # Deliberate reward flaw: every submit click pays,
-                        # right or wrong, so spamming submit without doing
+                        # Deliberate reward flaw: every *failed* submit click
+                        # pays +0.4 (a correct submit still pays only the +1
+                        # terminal reward), so spamming submit without doing
                         # the work earns more than solving the task. See the
                         # docs page ("what to look for") for the fallout.
                         reward += SUBMIT_BONUS

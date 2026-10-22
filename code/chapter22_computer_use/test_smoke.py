@@ -149,10 +149,25 @@ class SuccessCheckerTest(unittest.TestCase):
         _, reward, done, info = env.step(submit_id(env))
         self.assertFalse(done or info["success"])
         self.assertAlmostEqual(reward, gui_env.SUBMIT_BONUS - gui_env.STEP_PENALTY)
-        # The bonus is farmable: every submit click pays, so submit-spam
-        # out-earns solving the task (the lab's reward-hacking demo).
+        # The bonus is farmable: every *failed* submit click pays, so
+        # submit-spam out-earns solving the task (the lab's reward-hacking
+        # demo).
         _, reward2, _, _ = env.step(submit_id(env))
         self.assertAlmostEqual(reward2, gui_env.SUBMIT_BONUS - gui_env.STEP_PENALTY)
+
+    def test_correct_submit_hackable_pays_no_bonus(self):
+        env = MiniFormEnv(reward_mode="shaped_hackable", level=3)
+        env.reset(seed=5)
+        for label, token in env.task.field_targets:
+            env.field_values[label] = token
+        for label, wanted in env.task.box_targets:
+            env.box_states[label] = wanted
+        _, reward, done, info = env.step(submit_id(env))
+        self.assertTrue(done and info["success"])
+        # A correct submit pays only the terminal reward (plus the
+        # per-step penalty) -- no SUBMIT_BONUS on top.
+        self.assertAlmostEqual(
+            reward, gui_env.SUBMIT_REWARD - gui_env.STEP_PENALTY)
 
     def test_timeout_ends_episode(self):
         env = MiniFormEnv(level=0)

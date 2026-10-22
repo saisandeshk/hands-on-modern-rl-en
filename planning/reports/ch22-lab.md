@@ -108,3 +108,27 @@ within noise".
 3. Curriculum greedy submit share is 0.565 (submit-as-free-check under free
    retries). Documented as intended reading; exercise 4 explores charging
    for wrong submits.
+
+## Review response
+
+Reviewer report: `planning/reviews/ch22-lab.md` (6 errors, 8 doubts).
+Each was re-checked by re-reading the code/page and recomputing where
+applicable; all fixes below are in the original scope
+(`code/chapter22_computer_use/`, `docs/chapter22_computer_use/lab.md`).
+
+- Error 1 (hackable bonus described as "every submit click, right or wrong"): accepted. The `step` failure branch is the only place `SUBMIT_BONUS` is added, so a correct submit pays only +1. Fixed the `gui_env.py` module docstring, the inline comment, the `train_gui_agent.py` docstring, and the lab page reward-modes paragraph; added `test_correct_submit_hackable_pays_no_bonus` asserting a correct hackable submit pays exactly `SUBMIT_REWARD - STEP_PENALTY`. Verified: full `pytest` green (23 passed, 7 subtests).
+- Error 2 (results-table "mean reward" mixes training mean under a greedy header): accepted. `mean_reward` is computed from the last 200 stochastic training episodes, not the greedy snapshot (the hackable greedy value would be exactly 6.24, not 6.173). Renamed the column to "mean train reward (last 200 eps)" in `lab.md` and `README.md`, and clarified the `print_table` caption to state the definition. The printed numbers are unchanged -- only the header/definition was wrong, matching the reviewer's diagnosis.
+- Error 3 (level-0 luck "~10-15%"): accepted. Re-ran the measurement: uniform-random policy over 20000 episodes gives 8.2% level-0 success, confirming the reviewer's 8.2%. Page now says "~8%".
+- Error 4 (exercise 2 asks to break a shaped run via `SUBMIT_BONUS`, which shaped never reads): accepted. Reworded to target only the hackable run and fixed the spam arithmetic to 16 x (bonus - 0.01), with the crossing at bonus ~0.12-0.13 (mean optimal solve 1.71 measured over 500 tasks, min 1.47, max 1.95).
+- Error 5 (exercise 3 cites a "30-line BC probe in the report" that does not exist): accepted. The hint now describes the pilot observation directly (net fits the shared rule only once the buffer holds hundreds of clean steps from dozens of layouts) without pointing at a nonexistent artifact.
+- Error 6 (page not in sidebar; "22.L" numbering): partially accepted but not changed -- `docs/.vitepress/config.mjs` is outside my scope, so the coordinator must still add the entry. Note the "22.L" front matter/H1 follows the task spec verbatim (`title: 22.L Lab: <short title>`); renumbering to "22.3" as suggested conflicts with that spec, so left for the coordinator to decide when adding the sidebar line (proposed: `22.3 Hands-on: Form-Filling GUI Agent`, link `/chapter22_computer_use/lab`).
+- Doubt 1 (eval "train" seeds disjoint from training seeds): accepted as a wording fix. Confirmed: training uses 1M+ seeds, eval uses 500k/900k blocks. Column names and numbers kept (results must stay reproducible); added a sentence stating both eval blocks are disjoint from training seeds, so "train" is itself a generalisation check.
+- Doubt 2 (optimal solve "~1.9"): accepted. Measured the optimal action sequence over 500 level-3 tasks: mean 1.71, min 1.47, max 1.95 ("uncheck" targets are satisfied at reset and never pay progress, hence the spread). Page now reads "averages ~1.7, up to ~1.95".
+- Doubt 3 ("exactly the Chapter 6 update"): accepted. The lab adds batch advantage standardisation and an entropy bonus on top of the Chapter 6 baseline update; wording fixed.
+- Doubt 4 (Step 9 "verifier failure" label): accepted. In the hackable regime the verifier is correct and the reward is mis-specified; rephrased to "a mis-specified reward of the kind Step 9 asks you to diagnose".
+- Doubt 5 (Step 6 30-70% band): accepted. Clarified that the lab borrows the band as a level-promotion rule while the chapter uses it as a task-sampling filter, citing the chapter's own "experimental teaching setting" disclaimer.
+- Doubt 6 (`training_curves.png` only for multi-mode runs): accepted. Setup paragraph now says the PNG is written only for multi-regime runs.
+- Doubt 7 ("deterministic under --seed"): accepted. Softened to "reproducible under --seed on the same machine" in both `lab.md` and `README.md`.
+- Doubt 8 ("uncheck" box targets need no action): accepted. Added an explicit note (2-4 payable sub-goals per episode depending on sampled targets) in the reward-modes paragraph and qualified the "five correct actions" sentence.
+
+No reported numbers changed: the full-run table, promotion episodes, and CSV-confirmed narrative figures are untouched, consistent with the reviewer's own reproduction of the identical summary table.
