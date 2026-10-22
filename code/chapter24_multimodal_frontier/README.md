@@ -17,7 +17,7 @@ that broadcasts the terminal reward to every denoising step. The script:
    while the sampler stays near the pretrained distribution.
 3. **Fine-tunes without the KL penalty** (`beta = 0`): higher reward, but the
    sampler collapses onto the reward peak and forgets the other modes —
-   reward hacking / mode collapse in miniature.
+   single-reward over-optimization (mode collapse) in miniature.
 
 It saves scatter plots (before/after samples), reward/diversity/KL curves,
 `metrics.csv`, `summary.json`, and prints a summary table.
@@ -28,7 +28,7 @@ hand-computed values, plus an end-to-end smoke run).
 
 ## How to run (from the repository root)
 
-Smoke test (tiny config, well under 60 s on CPU):
+Smoke test (tiny config, under a minute on CPU):
 
 ```bash
 .venv/bin/python code/chapter24_multimodal_frontier/ddpo_toy.py --smoke
@@ -53,7 +53,8 @@ Run the tests:
 
 ## Expected runtime
 
-- Smoke: a few seconds on CPU.
+- Smoke: under a minute on CPU (1.9 s measured on the reference machine; the full
+  pytest suite, which includes one smoke run plus the unit tests, takes ~5 s).
 - Full run: about 10–11 minutes on CPU (631 s measured on the reference run),
   well under the 15-minute budget. GPU is faster but not needed.
 

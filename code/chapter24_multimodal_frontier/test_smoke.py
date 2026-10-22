@@ -136,6 +136,23 @@ def test_rollout_shapes_and_reward_range():
     assert torch.isfinite(out["old_logps"]).all()
 
 
+def test_make_plots_handles_skipped_nokl(tmp_path):
+    device = torch.device("cpu")
+    ddpo_toy.set_seed(0)
+    sched = ddpo_toy.DiffusionSchedule(4, 0.01, 0.35).to(device)
+    model = ddpo_toy.DenoiserMLP(hidden=16).to(device)
+    ref = ddpo_toy.DenoiserMLP(hidden=16).to(device)
+    ev = ddpo_toy.evaluate(model, ref, sched, 32, device)
+    outdir = str(tmp_path / "nokl-skipped")
+    os.makedirs(outdir, exist_ok=True)
+    hist = [
+        {"iter": 1, "reward_mean": 0.1, "diversity": 3.0, "kl": 0.01},
+    ]
+    ddpo_toy.make_plots(ev, ev, None, hist, [], outdir)
+    assert os.path.isfile(os.path.join(outdir, "samples_before_after.png"))
+    assert os.path.isfile(os.path.join(outdir, "training_curves.png"))
+
+
 def test_smoke_run_end_to_end(tmp_path):
     outdir = str(tmp_path / "smoke-out")
     cmd = [

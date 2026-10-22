@@ -19,7 +19,7 @@ each other.
 - How one scalar reward on the final sample is broadcast back to every denoising step
   through per-step Gaussian log-probabilities.
 - Why a KL penalty toward the pretrained model trades reward against diversity, and what
-  reward hacking looks like when the penalty is removed.
+  single-reward over-optimization (mode collapse) looks like when the penalty is removed.
 - How to report a generation-RL experiment honestly: reward, diversity, and KL together,
   never reward alone.
 
@@ -46,7 +46,7 @@ You need the project virtualenv (Python 3.12 with torch, numpy, matplotlib, pyte
 All commands run from the repository root. Nothing is downloaded; the dataset is sampled
 on the fly from a Gaussian mixture.
 
-Smoke run (tiny config, well under 60 seconds on CPU):
+Smoke run (tiny config, under a minute on CPU):
 
 ```bash
 .venv/bin/python code/chapter24_multimodal_frontier/ddpo_toy.py --smoke
@@ -110,11 +110,14 @@ never differentiated: only its scalar scores enter through $\hat A$.
 pretrained model with $\beta = 0.05$ and a second copy with $\beta = 0$ on the same
 reward. `evaluate` reports mean reward, fraction of samples in the target region,
 diversity (mean pairwise distance), and the mean per-step KL to the frozen pretrained
-model — the four numbers every generation-RL report needs.
+model — a conditional per-step average evaluated along the sampled chains, i.e. an
+approximation of the trajectory-level KL — the four numbers every generation-RL report
+needs.
 
 ## Results from a real run
 
-Full configuration, seed 0, CPU (631 s). Pretraining: 4000 steps, batch 512, $T = 30$
+Full configuration, seed 0, CPU (631 s). All numbers below are this single seed.
+Pretraining: 4000 steps, batch 512, $T = 30$
 diffusion steps. RL: 60 iterations, 256 trajectories each, clip $\epsilon = 0.2$,
 2 gradient epochs per batch, learning rate $3 \times 10^{-4}$.
 
@@ -126,9 +129,13 @@ diffusion steps. RL: 60 iterations, 256 trajectories each, clip $\epsilon = 0.2$
 
 The reward curves rise steadily in both runs (at iteration 20: 0.25 with KL vs 0.31
 without; at iteration 40: 0.45 vs 0.67). Diversity tells the runs apart: it stays above
-3.0 through iteration 40 with the KL penalty and ends at 1.98, while the unpenalized run
-falls to 2.21 by iteration 30 and 0.73 by iteration 60. The KL estimate mirrors this:
-0.23 per step with the penalty versus 6.29 without — a 27-fold gap. The scatter plots
+3.0 through iteration 40 with the KL penalty and ends at 1.98 in the final evaluation,
+while the unpenalized run ends at 0.73. The KL estimate mirrors this: 0.222 per step
+with the penalty versus 6.290 without in the final 2048-sample evaluations — a 28-fold
+gap. (The in-training curves end at slightly different values — KL 0.2305 for the KL
+run and diversity 0.783 for the no-KL run at iteration 60 — because they reuse the
+smaller periodic evaluation batches rather than a fresh 2048-sample final rollout.)
+The scatter plots
 (saved as `samples_before_after.png`) show the same story visually: the pretrained model
 covers all three mixture modes, the KL run shifts most mass to the reward peak while
 keeping a remnant of the original modes, and the no-KL run piles nearly every sample
@@ -141,11 +148,11 @@ onto the peak.
   the direction of chains that ended near the target. The reward model can be a black box
   precisely because the gradient flows through the sampler's log-probabilities, never
   through the reward.
-- **The KL run keeps diversity because the penalty prices every step's drift.**
-  $\beta \times \mathrm{KL}$ is added per denoising step, so moving the whole chain far
-  from the reference costs $T$ times the per-step price. The policy settles where the
-  marginal reward gain equals that price — most mass near the target, some mass left on
-  the old modes.
+- **The KL run keeps diversity because the penalty prices every step's drift.** The
+  loss adds $\beta$ times the mean per-step KL, so a chain that drifts at every
+  denoising step pays $T$ times what a chain that drifts in only one step pays. The
+  policy settles where the marginal reward gain equals that price — most mass near
+  the target, some mass left on the old modes.
 - **The no-KL run collapses because nothing prices drift.** Once sampling near the peak
   earns above-average reward, the clipped update keeps raising those chains' probability
   until the sampler forgets the other modes. This is the same mechanism as the
@@ -153,30 +160,39 @@ onto the peak.
   from quality-only rewards): the optimizer is not misbehaving, it is executing the
   objective it was given.
 - **The baseline matters for variance, not for direction.** Subtracting the batch mean
-  leaves the expected gradient unchanged (the probabilities of all trajectories sum to
-  1. while shrinking update noise; dividing by the batch std keeps step sizes stable as
-     rewards shift upward during training.
+  leaves the expected gradient approximately unchanged (the probabilities of all
+  trajectories sum to 1, so differentiating them gives 0 — exact for a fixed
+  baseline, up to a negligible $1/N$ shrinkage for the in-batch mean with
+  $N = 256$) and shrinks update noise; dividing by the batch std keeps step sizes
+  stable as rewards shift upward during training.
 
 ## Extension exercises
 
-1. **Sweep the KL weight.** Run with `--beta 0.0 --skip-nokl`, `0.02`, `0.1`, `0.3` and
-   plot final reward versus diversity. Hint: you are tracing a Pareto frontier; expect
-   reward to saturate while diversity keeps falling as $\beta \to 0$.
+1. **Sweep the KL weight.** Run with `--beta 0.02`, `0.1`, `0.3` (each keeps the
+   `beta = 0` comparison run) and plot final reward versus diversity. Hint: you are
+   tracing a Pareto frontier; expect reward to saturate while diversity keeps falling
+   as $\beta \to 0$.
 2. **Move the reward peak.** Change `TARGET_CENTER` to the valley between the modes
-   (e.g. `(0.0, -0.3)`) and rerun. Hint: the KL cost of reaching it is smaller now, so
-   the two runs should differ less — a case where alignment and the prior agree.
+   (e.g. `(0.0, -0.3)`) and rerun. Hint: the valley sits closer to the pretrained
+   modes (2.3 from the nearest, against 3.04 for the original peak), so the KL cost of
+   reaching it is smaller and the two runs should differ less — a case where the
+   reward sits nearer the pretrained distribution, not where the two agree (the
+   valley itself is where the prior density is lowest).
 3. **Break the reward on purpose.** Replace the bump with a narrow spike
    (`REWARD_WIDTH = 0.15`) and compare. Hint: a sharper peak is harder to find by chance,
    so early advantages are noisier; watch whether the KL run still finds it.
-4. **Ablate the PPO clip.** Try `--clip-eps 1.0` (effectively REINFORCE) versus `0.05`.
-   Hint: with only 256 trajectories per batch, large ratios make a few lucky chains
-   dominate; the KL and diversity curves reveal the instability first.
+4. **Ablate the PPO clip.** Try `--clip-eps 1.0` (the ratio is still capped at 2, so
+   this is PPO with a very loose trust region, not unclipped REINFORCE) versus
+   `0.05`. Hint: with only 256 trajectories per batch, large ratios make a few lucky
+   chains dominate; the KL and diversity curves reveal the instability first.
 5. **Ablate advantage normalization.** Standardize with the mean only (edit
    `compute_advantages` to skip the std division). Hint: as mean reward climbs from 0.02
    to 0.6, the raw advantage scale drifts; check whether a fixed learning rate still
    behaves late in training.
 6. **Rerank instead of fine-tuning.** Sample 32 chains from the frozen pretrained model,
-   keep the highest-reward sample, and compare its reward/diversity against the fine-tuned
-   policy's single samples. Hint: this is inference-time reranking from
+   keep the highest-reward sample, and compare its reward against the fine-tuned
+   policy's mean reward (and the diversity of your 32-sample pool against the
+   fine-tuned policy's diversity — diversity is a population metric, undefined for a
+   single sample). Hint: this is inference-time reranking from
    [24.4.7](./visual-generation-dancegrpo#_24-4-7-a-reward-can-be-used-at-training-time-or-at-inference-time);
    it costs 32 samples per image and never collapses — when is that the better deal?

@@ -24,8 +24,8 @@ The lab has three phases:
    distribution.
 3. **RL fine-tune without the KL penalty.** A second copy trains on the same
    reward with ``beta = 0``. It reaches a higher reward but collapses onto the
-   reward peak and forgets the pretrained distribution (reward hacking / mode
-   collapse in miniature).
+   reward peak and forgets the pretrained distribution (single-reward
+   over-optimization / mode collapse in miniature).
 
 Everything is implemented from scratch with torch (no RL libraries).
 
@@ -446,16 +446,29 @@ def evaluate(
 
 
 def make_plots(
-    eval_pre: dict, eval_kl: dict, eval_nokl: dict, hist_kl: list, hist_nokl: list, outdir: str
+    eval_pre: dict,
+    eval_kl: dict,
+    eval_nokl: dict | None,
+    hist_kl: list,
+    hist_nokl: list,
+    outdir: str,
 ) -> None:
-    """Scatter plots before/after RL plus reward / diversity / KL curves."""
+    """Scatter plots before/after RL plus reward / diversity / KL curves.
+
+    When the no-KL comparison run is skipped (``eval_nokl is None``), only
+    the pretrained and KL panels are drawn so the figure never labels
+    pretrained samples as an RL run.
+    """
     tx, ty = TARGET_CENTER
-    fig, axes = plt.subplots(1, 3, figsize=(12, 3.6), sharex=True, sharey=True)
-    for ax, ev, title in (
-        (axes[0], eval_pre, "Pretrained"),
-        (axes[1], eval_kl, "RL + KL penalty"),
-        (axes[2], eval_nokl, "RL, no KL (beta=0)"),
-    ):
+    panels = [(eval_pre, "Pretrained"), (eval_kl, "RL + KL penalty")]
+    if eval_nokl is not None:
+        panels.append((eval_nokl, "RL, no KL (beta=0)"))
+    n_panels = len(panels)
+    fig, axes = plt.subplots(1, n_panels, figsize=(4.2 * n_panels, 3.6),
+                             sharex=True, sharey=True)
+    if n_panels == 1:
+        axes = [axes]
+    for ax, (ev, title) in zip(axes, panels):
         pts = ev["x0"].numpy()
         ax.scatter(pts[:, 0], pts[:, 1], s=4, alpha=0.35)
         ax.scatter([tx], [ty], marker="*", s=160, c="red", label="reward peak")
@@ -468,7 +481,7 @@ def make_plots(
     axes[0].set_ylabel("$x_2$")
     for ax in axes:
         ax.set_xlabel("$x_1$")
-    axes[2].legend(loc="upper left", fontsize=8)
+    axes[-1].legend(loc="upper left", fontsize=8)
     fig.suptitle("Samples before and after DDPO fine-tuning (red star = reward peak)")
     fig.tight_layout()
     fig.savefig(os.path.join(outdir, "samples_before_after.png"), dpi=150)
@@ -478,17 +491,20 @@ def make_plots(
     iters_nokl = [h["iter"] for h in hist_nokl]
     fig, axes = plt.subplots(1, 3, figsize=(12, 3.4))
     axes[0].plot(iters_kl, [h["reward_mean"] for h in hist_kl], label="KL run")
-    axes[0].plot(iters_nokl, [h["reward_mean"] for h in hist_nokl], label="no-KL run")
+    if hist_nokl:
+        axes[0].plot(iters_nokl, [h["reward_mean"] for h in hist_nokl], label="no-KL run")
     axes[0].set_title("Mean reward")
     axes[0].set_xlabel("RL iter")
     axes[0].legend(fontsize=8)
     axes[1].plot(iters_kl, [h["diversity"] for h in hist_kl], label="KL run")
-    axes[1].plot(iters_nokl, [h["diversity"] for h in hist_nokl], label="no-KL run")
+    if hist_nokl:
+        axes[1].plot(iters_nokl, [h["diversity"] for h in hist_nokl], label="no-KL run")
     axes[1].set_title("Diversity (mean pairwise dist)")
     axes[1].set_xlabel("RL iter")
     axes[1].legend(fontsize=8)
     axes[2].plot(iters_kl, [h["kl"] for h in hist_kl], label="KL run")
-    axes[2].plot(iters_nokl, [h["kl"] for h in hist_nokl], label="no-KL run")
+    if hist_nokl:
+        axes[2].plot(iters_nokl, [h["kl"] for h in hist_nokl], label="no-KL run")
     axes[2].set_title("KL to pretrained (per step)")
     axes[2].set_xlabel("RL iter")
     axes[2].legend(fontsize=8)
@@ -625,7 +641,7 @@ def main(argv: list[str] | None = None) -> dict:
     eval_kl = evaluate(model_kl, ref, sched, args.eval_n, device)
 
     if args.skip_nokl:
-        model_nokl, hist_nokl, eval_nokl = None, [], eval_pre
+        model_nokl, hist_nokl, eval_nokl = None, [], None
     else:
         print("  [4/4] DDPO fine-tune without KL penalty (beta=0)...")
         model_nokl, hist_nokl = finetune(base, sched, args, device, 0.0, "no-kl")
@@ -655,16 +671,26 @@ def main(argv: list[str] | None = None) -> dict:
         "elapsed_s": elapsed,
         "pretrained": {k: v for k, v in eval_pre.items() if k != "x0"},
         "rl_kl": {k: v for k, v in eval_kl.items() if k != "x0"},
-        "rl_nokl": {k: v for k, v in eval_nokl.items() if k != "x0"},
+        "rl_nokl": (
+            {k: v for k, v in eval_nokl.items() if k != "x0"}
+            if eval_nokl is not None
+            else None
+        ),
     }
     with open(os.path.join(outdir, "summary.json"), "w") as f:
         json.dump(summary, f, indent=2)
 
-    print_summary_table([
+    rows = [
         {"name": "pretrained", **{k: v for k, v in eval_pre.items() if k != "x0"}},
         {"name": "rl+kl", **{k: v for k, v in eval_kl.items() if k != "x0"}},
-        {"name": "rl no-kl", **{k: v for k, v in eval_nokl.items() if k != "x0"}},
-    ])
+    ]
+    if eval_nokl is not None:
+        rows.append(
+            {"name": "rl no-kl", **{k: v for k, v in eval_nokl.items() if k != "x0"}}
+        )
+    else:
+        print("  (no-KL run skipped via --skip-nokl)")
+    print_summary_table(rows)
     print(f"\nDone in {elapsed:.1f} s. Outputs in {outdir}")
     return summary
 
