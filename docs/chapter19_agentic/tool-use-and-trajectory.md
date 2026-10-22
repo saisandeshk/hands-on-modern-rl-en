@@ -671,6 +671,8 @@ def search_reward(answer, ground_truth, num_searches, max_searches=5):
     return correctness + efficiency_penalty
 ```
 
+The deeper treatment of search-augmented RL — prompting limits, the SearchR1 MDP, and the work that followed — continues in [Section 19.5](./tool-use-agents).
+
 ### Training Flow for Tool-Use Strategy
 
 Putting the ideas above together, a complete tool-use RL training flow usually has three stages.

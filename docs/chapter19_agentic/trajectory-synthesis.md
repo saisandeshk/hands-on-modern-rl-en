@@ -338,7 +338,7 @@ def compute_quality(traj):
 
 Although this pipeline is simple, it contains the core stages of trajectory synthesis: generation -> filtering -> quality control. In real engineering systems, you can gradually replace rejection sampling with LoopTool's closed-loop iteration and replace simple quality checks with more precise verifiers.
 
-In the next section, we focus on another key dimension of Agentic RL: [tool-use RL for Web Agents and Code Agents](./tool-use-agents). We will examine how a model learns "when to use tools, and which tools to use".
+In the next section, we focus on another key dimension of Agentic RL: [tool-use RL for Web Agents and Code Agents](./tool-use-and-trajectory#tool-use-rl-web-agents-and-code-agents). We will examine how a model learns "when to use tools, and which tools to use".
 
 ## References
 
