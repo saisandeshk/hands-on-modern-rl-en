@@ -61,7 +61,7 @@ In 1998, Sutton and Barto published the influential classic textbook _Reinforcem
 
 After the turn of the 21st century, although the theory of reinforcement learning continued to mature, traditional table-based methods and linear function approximations were fundamentally incapable of handling the high-dimensional and complex inputs (such as images) present in the real world. It was not until the breakthrough of deep learning that reinforcement learning truly entered its "golden age."
 
-- **2013**, DeepMind introduced the **Deep Q-Network (DQN)** [^6], which for the first time seamlessly integrated deep neural networks with reinforcement learning, enabling an agent to learn control policies directly from screen pixels and reach human-level scores on many Atari arcade games (extended to dozens of games in the 2015 Nature version). This marked the official beginning of the era of deep reinforcement learning. The core idea of DQN is to use a neural network $ Q(s,a;\theta) $ with parameters $\theta$ to approximate the Q-value function. Its loss function is defined as:
+- **2013**, DeepMind introduced the **Deep Q-Network (DQN)** [^6], which was the first to reach human-level scores with deep RL directly from screen pixels, learning control policies on several of the Atari games it evaluated (seven games; extended to 49 games in the 2015 Nature version). This marked the official beginning of the era of deep reinforcement learning. The core idea of DQN is to use a neural network $ Q(s,a;\theta) $ with parameters $\theta$ to approximate the Q-value function. Its loss function is defined as:
 
 $$\mathcal{L}(\theta) = \mathbb{E}_{(s,a,r,s') \sim \mathcal{D}} \left[ \left( r + \gamma \max_{a'} Q(s', a'; \theta^{-}) - Q(s, a; \theta) \right)^2 \right]$$
 
@@ -113,7 +113,7 @@ where $y_w$ (winner) and $y_l$ (loser) are the human-labeled "good answer" and "
 
 $$\tilde{r}_i = \frac{r_i - \text{mean}(r_1, \ldots, r_G)}{\text{std}(r_1, \ldots, r_G)}$$
 
-Then directly optimize the policy using the clipped objective (simplified here; the full GRPO objective adds a KL penalty against a reference policy):
+Then directly optimize the policy using the clipped objective (simplified here to sequence-level ratios; the original GRPO objective computes token-level ratios with length handling and adds a KL penalty against a reference policy — see Chapter 15):
 
 $$\mathcal{L}_{\text{GRPO}}(\theta) = \mathbb{E}_q \left[ \frac{1}{G} \sum_{i=1}^{G} \min \left( \frac{\pi_\theta(o_i|q)}{\pi_{\theta_{\text{old}}}(o_i|q)} \tilde{r}_i, \; \text{clip}\left(\frac{\pi_\theta(o_i|q)}{\pi_{\theta_{\text{old}}}(o_i|q)}, 1-\epsilon, 1+\epsilon\right) \tilde{r}_i \right) \right]$$
 
@@ -152,7 +152,7 @@ Another development was the expansion of RL from single-turn question answering 
 
 ### 5.4 The Rise of Chinese Laboratories
 
-Chinese laboratories have taken on a unique position in this wave of RL industrialization. **DeepSeek has the highest transparency**—it publicly disclosed that the V3 pre-training used about 2.788M H800 GPU hours.
+Chinese laboratories have taken on a unique position in this wave of RL industrialization. **DeepSeek has the highest transparency**—it publicly disclosed that the V3 pre-training used about 2.664M H800 GPU hours (about 2.788M H800 hours for the full training pipeline, including context-length extension and post-training).
 
 See the [Stanford CRFM Foundation Model Transparency Index](https://crfm.stanford.edu/fmti/) for a broader comparison of public disclosures.
 
@@ -160,9 +160,9 @@ See the [Stanford CRFM Foundation Model Transparency Index](https://crfm.stanfor
 
 ByteDance's public work spans DAPO, VAPO, UI agents, and generative-model RL. Zhipu's GLM releases likewise explore curriculum design and agentic RL ([GLM-4.5 report](https://arxiv.org/abs/2508.06471)).
 
-**Step3-VL by Starry Sky** proposes PaCoRe parallel coordinated reasoning, opening up another path for test-time scaling.
+**Step3-VL by StepFun** reports parallel coordinated reasoning work, opening up another path for test-time scaling.
 
-In November 2025, **Anthropic published "Natural Emergent Misalignment from Reward Hacking"** ([arXiv:2511.18397](https://arxiv.org/abs/2511.18397)), bringing reward-hacking research into a new stage: misaligned behavior that emerges naturally during RL training became an active security topic.
+In November 2025, **Anthropic published "Emergent Misalignment: Researching the impact of reward hacking"** ([arXiv:2511.18397](https://arxiv.org/abs/2511.18397)), bringing reward-hacking research into a new stage: misaligned behavior that emerges naturally during RL training became an active security topic.
 
 In the same year, **Microsoft introduced Reinforcement Pre-Training (RPT)** ([arXiv:2506.08007](https://arxiv.org/abs/2506.08007)). RPT moves reinforcement learning into the pre-training stage and therefore changes the usual boundary between pre-training and fine-tuning. **DeepMind's AlphaEvolve** (May 2025) combines language models, evolutionary search, and automatic evaluators, showing how learned proposals and executable feedback can be placed in the same search loop.
 

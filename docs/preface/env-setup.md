@@ -10,13 +10,17 @@ If you are using a coding assistant such as Codex, tell it your learning goal fi
 > Hello, I am about to start this reinforcement learning course and want to set up the lab environment first. Please check my operating system, Python version, and GPU/CUDA status, create a Python 3.12 virtualenv named `.venv` at the repository root with uv, install the pinned dependencies from `code/requirements.lock.txt`, and then run the CartPole verification program plus the smoke tests with `.venv/bin/pytest code -q`. If you hit installation problems, keep troubleshooting and fixing them. If you need administrator privileges or system-level configuration changes, ask for my confirmation first.
 > :::
 
-> **Goal of this section**: build a complete development environment for this course from scratch, covering Python, PyTorch, the RL toolchain, and LLM training frameworks. Follow the steps end to end, and you will be able to run every experiment in the book.
+> **Goal of this section**: build a complete development environment for this course from scratch, covering Python, PyTorch, the RL toolchain, and LLM training frameworks. Follow the steps end to end, and you will be able to run the core experiments in the book (niche simulators and some chapter extras need additional installs described below).
 
-This repository keeps one pinned environment for the whole book in `code/requirements.lock.txt` (Python 3.12), plus a minimal dependency list per chapter in each `code/chapter*/requirements.txt`. Install the lock file once for the full course, or install a single chapter file when you only want that chapter's dependencies.
+This repository keeps one pinned core environment for the whole book in `code/requirements.lock.txt` (Python 3.12, Linux + CUDA resolution), a merged dependency summary in `code/requirements.txt`, and a minimal dependency list for each chapter that ships code in `code/chapter*/requirements.txt` (Chapters 1-3, 5-9, 12-15, 17, 19, 23, plus Appendix A). Install the lock file for the core stack on Linux with CUDA; on other platforms, or when you only want one chapter's dependencies, install the merged file or a single chapter file on top, since the lock file does not include every chapter extra (for example `matplotlib`, `swanlab`, `ale-py`, `opencv-python`, `modelscope`, `openai`; `scipy` appears in no requirements file).
 
-## Minimal Working Setup (Get Running in 5 Minutes)
+## Quickstart Setup (Core Stack)
 
-If you cannot wait to start coding, the following steps install the full pinned environment, which covers the experiments in Chapters 1-9 and the LLM post-training chapters out of the box. Niche simulators (Atari ROMs, Isaac Lab, Unity) can be installed later as needed.
+If you cannot wait to start coding, the following steps install the pinned core environment (torch 2.14.1 plus the CUDA 13 wheel stack — allow time for a multi-GB download), which covers the core experiments in Chapters 1-9 and the LLM post-training chapters. Chapter extras such as plotting (`matplotlib`), Atari (`ale-py`), logging (`swanlab`), and agentic/LLM helpers (`openai`, `modelscope`) come from `code/requirements.txt` or the per-chapter files. Niche simulators (Atari ROMs, Isaac Lab, Unity) can be installed later as needed.
+
+::: warning The lock file is Linux + CUDA only
+`code/requirements.lock.txt` pins Linux/CUDA wheels (`nvidia-*`, `cuda-toolkit`, `triton`), so it cannot be installed as-is on macOS or Windows, and it downloads the full CUDA stack even for CPU-only use. Readers on macOS, Windows (WSL2 excepted), or CPU-only machines should install the per-chapter file (or `code/requirements.txt`) with a CPU PyTorch wheel instead — see [Installing PyTorch](#installing-pytorch).
+:::
 
 ::: code-group
 
@@ -64,7 +68,7 @@ print("Minimal environment verified!")
 
 ```bash
 # Repository smoke tests (from the repository root)
-.venv/bin/pytest code -q
+.venv/bin/pytest code -q   # Windows: .venv\Scripts\pytest code -q
 ```
 
 ::: details No GPU? You can still run the course.
@@ -92,7 +96,11 @@ uv pip install -r code/requirements.lock.txt
 uv pip install -r code/chapter01_cartpole/requirements.txt
 ```
 
-If you prefer conda or plain venv, any Python 3.12 environment works; install the same lock file with `pip install -r code/requirements.lock.txt`.
+::: tip Chapter extras are not in the lock file
+Chapter scripts also import packages the lock file omits (`matplotlib`, `swanlab`, `ale-py`, and others). After the lock install, add the chapter extras you need, for example `uv pip install -r code/requirements.txt` (merged summary) or the chapter file above.
+:::
+
+If you prefer conda or plain venv, any Python 3.12 environment works on Linux + CUDA; install the same lock file with `pip install -r code/requirements.lock.txt`. On macOS or Windows, or for CPU-only use, prefer the per-chapter route with a matching PyTorch wheel instead of the Linux/CUDA lock file.
 
 ::: tip Why Python 3.12?
 The lock file in `code/requirements.lock.txt` was resolved with Python 3.12 (torch 2.14.1, transformers 4.57.3, gymnasium 1.4.0). Using the same interpreter avoids binary-wheel surprises.
@@ -339,7 +347,7 @@ export MUJOCO_GL=osmesa
 
 ## Global Verification Script
 
-Run the following script. If all outputs show "OK", the environment setup is complete.
+Run the following script. "OK" on every row except "CUDA GPU" means the setup is complete (that row is expected to read "MISSING" on CPU-only and macOS machines); a "MISSING" extra just means you have not installed that chapter's extras yet (see the tip under [Python Environment](#python-environment)).
 
 ```python
 """
@@ -354,13 +362,21 @@ checks = []
 ver = sys.version_info
 checks.append(("Python >= 3.12", ver >= (3, 12)))
 
-# 2. Core packages
-for pkg in ["numpy", "matplotlib", "scipy", "tqdm"]:
+# 2. Core packages (pinned in the lock file) and chapter extras
+for pkg in ["numpy", "tqdm"]:
     try:
         __import__(pkg)
         checks.append((pkg, True))
     except ImportError:
         checks.append((pkg, False))
+
+# Chapter extras (installed via code/requirements.txt or a chapter file, not the lock file)
+for pkg in ["matplotlib"]:
+    try:
+        __import__(pkg)
+        checks.append((pkg + " (extra)", True))
+    except ImportError:
+        checks.append((pkg + " (extra)", False))
 
 # 3. PyTorch
 try:
@@ -400,26 +416,26 @@ print("=" * 45 + "\n")
 
 ## Package Overview
 
-| Package           | Recommended version | Purpose                                        | Relevant chapters |
-| ----------------- | ------------------- | ---------------------------------------------- | ----------------- |
-| Python            | 3.12                | Runtime (matches `code/requirements.lock.txt`) | Entire book       |
-| PyTorch           | 2.14+               | Deep learning framework                        | Entire book       |
-| gymnasium         | 1.4+                | RL environment interface                       | Ch1-Ch9           |
-| stable-baselines3 | 2.9+                | Pre-packaged RL algorithms                     | Ch1-Ch9           |
-| numpy             | 2.5+                | Numerical computing                            | Entire book       |
-| matplotlib        | 3.7+                | Visualization and plotting                     | Entire book       |
-| pybullet          | 3.2+                | Robotics simulation                            | Ch7-Ch9           |
-| mujoco            | 3.0+                | High-fidelity physics simulation               | Ch7-Ch9           |
-| isaacsim          | 4.0+                | GPU-parallel robotics simulation (Isaac Lab)   | Ch9               |
-| mlagents          | 1.0+                | Unity 3D game RL environments                  | Ch9, Appendix C   |
-| ale-py            | 0.8+                | Atari emulator                                 | Ch5               |
-| transformers      | 4.57+               | LLM model loading                              | Ch13-Ch18         |
-| trl               | 0.24+               | LLM reinforcement learning training            | Ch13-Ch15         |
-| peft              | 0.21+               | Parameter-efficient fine-tuning (LoRA)         | Ch13-Ch15         |
-| accelerate        | 1.10+               | Distributed training                           | Ch13-Ch18         |
-| datasets          | 4.4+                | Dataset loading                                | Ch13-Ch18         |
-| wandb             | 0.16+               | Experiment tracking                            | Entire book       |
-| tensorboard       | 2.15+               | Training visualization                         | Entire book       |
+| Package           | Recommended version | Purpose                                        | Relevant chapters   |
+| ----------------- | ------------------- | ---------------------------------------------- | ------------------- |
+| Python            | 3.12                | Runtime (matches `code/requirements.lock.txt`) | Entire book         |
+| PyTorch           | 2.14+               | Deep learning framework                        | Entire book         |
+| gymnasium         | 1.4+                | RL environment interface                       | Ch1-Ch9             |
+| stable-baselines3 | 2.9+                | Pre-packaged RL algorithms                     | Ch1-Ch9             |
+| numpy             | 2.5+                | Numerical computing                            | Entire book         |
+| matplotlib        | 3.7+                | Visualization and plotting                     | Entire book         |
+| pybullet          | 3.2+                | Robotics simulation                            | Appendix C          |
+| mujoco            | 3.0+                | High-fidelity physics simulation               | Ch4, Ch7-Ch10, Ch24 |
+| isaacsim          | 4.0+                | GPU-parallel robotics simulation (Isaac Lab)   | Ch7, Ch24           |
+| mlagents          | 1.0+                | Unity 3D game RL environments                  | Ch8, Appendix C     |
+| ale-py            | 0.10+               | Atari emulator                                 | Ch5                 |
+| transformers      | 4.57+               | LLM model loading                              | Ch13-Ch18           |
+| trl               | 0.24+               | LLM reinforcement learning training            | Ch13-Ch15           |
+| peft              | 0.21+               | Parameter-efficient fine-tuning (LoRA)         | Ch19, Ch23          |
+| accelerate        | 1.10+               | Distributed training                           | Ch13-Ch18           |
+| datasets          | 4.4+                | Dataset loading                                | Ch13-Ch18           |
+| wandb             | 0.16+               | Experiment tracking                            | Entire book         |
+| tensorboard       | 2.15+               | Training visualization                         | Entire book         |
 
 ::: tip No need to install everything at once
 We recommend installing packages as you progress through the course: start with the basics (Python environment, PyTorch, core RL packages), then install simulator environments and LLM frameworks when you reach the corresponding chapters. This avoids having to resolve too many dependency conflicts at once.

@@ -104,6 +104,10 @@ created.
   was available offline; left for the coordinator to confirm or drop.
 - GPU sponsorship contact (`physicoada@gmail.com`) and the WalkingLabs
   attribution/announcement block were kept untouched as upstream material.
+- Added during review response (could not be checked offline): Anthropic
+  "Emergent Misalignment" arXiv ID 2511.18397 and November 2025 date;
+  StepFun as the Step3-VL lab and its "parallel coordinated reasoning"
+  method name.
 
 ## Sidebar additions
 
@@ -127,3 +131,74 @@ None. No new pages were created (per the task, no summary/exercises page).
   chapter numbers (e.g. `chapter05_dqn` says "Chapter 4",
   `chapter14_dpo` says "Chapter 2", `chapter08_ppo` unchecked). Same
   suggestion: a small code-scope cleanup task.
+
+## Review response
+
+- Error 1 (DeepSeek-V3 2.788M labelled pre-training): accepted. Re-checked
+  against `docs/appendix_c_resources/gpu-hours-estimation.md` lines 111-112
+  (2.664M pre-training), 113-114, and 120-122 (2.664M × $2/h = $5.33M of the
+  $5.576M total); 2.788M = 2664K + 119K + 5K is the all-in figure. Restored
+  "about 2.664M H800 GPU hours (about 2.788M for the full pipeline,
+  including context extension and post-training)" in
+  `docs/preface/brief-history/index.md`.
+- Error 2 (lock file "covers the full course"): accepted. Read
+  `code/requirements.lock.txt` (97 pins; has `json5` but no `matplotlib`,
+  `scipy`, `swanlab`, `ale-py`, `opencv-python`, `pyboy`, `modelscope`,
+  `openai`) and confirmed chapter scripts import the missing packages
+  (e.g. `code/chapter01_cartpole/plot_curves.py`, `1-ppo_cartpole.py`,
+  `code/chapter05_dqn/dqn_atari_sb3.py`). Reworded `env-setup.md` to call
+  the lock file the core stack and to install `code/requirements.txt` or
+  the per-chapter files on top for extras. Lock-file edits are out of scope.
+- Error 3 (verification script checks matplotlib/scipy): accepted. Neither
+  is in the lock file; `scipy` is in no requirements file at all. Script now
+  checks only lock-pinned `numpy`/`tqdm` as required and `matplotlib` as a
+  labelled extra, with a caption explaining MISSING extras.
+- Error 4 (lock is Linux/CUDA-only): accepted. Lock pins `nvidia-cublas`,
+  `nvidia-cudnn-cu13`, `nvidia-cusparselt-cu13`, `cuda-toolkit`,
+  `nvidia-nccl-cu13`, `triton`. Added a warning box (Linux + CUDA only;
+  macOS/Windows/CPU-only readers use the per-chapter route) and softened the
+  conda/venv sentence.
+- Error 5 (package-table chapter column, ale-py floor): accepted. Verified
+  via grep: PyBullet appears only in Appendix C resources; Isaac Lab is
+  covered in Ch7 (`ac-frontier.md`) and Ch24 (`embodied-intelligence`);
+  Unity ML-Agents in Ch8 (`ppo-game-benchmark.md`); MuJoCo in
+  Ch4/Ch7/Ch9/Ch10/Ch24; `peft` in Ch19 (`projects.md`) and Ch23 with no
+  `peft` in `code/chapter13_rlhf/requirements.txt`; `ale-py>=0.10.0` in
+  `code/requirements.txt`. Table now reads pybullet → Appendix C, isaacsim
+  → Ch7, Ch24, mlagents → Ch8, Appendix C, mujoco → Ch4, Ch7-Ch10, Ch24,
+  peft → Ch19, Ch23, ale-py → 0.10+.
+- Error 6 ("each `code/chapter*/requirements.txt`"): accepted. Only 15
+  chapter directories ship code, and 12 headers carry stale numbers
+  (verified via grep). Header fixes are out of scope, so the page now says
+  "each chapter that ships code" and enumerates Chapters 1-3, 5-9, 12-15,
+  17, 19, 23 plus Appendix A.
+- Doubt 1 (DQN 2013 "many games"): accepted. Softened to seven evaluated
+  games with the 49-game 2015 Nature extension named.
+- Doubt 2 (GRPO sequence-level ratio): accepted. Re-checked against
+  `docs/chapter15_grpo/grpo-family.md` (token-level GRPO vs sequence-level
+  GSPO). Parenthetical now states the display uses simplified
+  sequence-level ratios and the original uses token-level ratios plus KL.
+- Doubt 3 (Anthropic title vs ref): accepted. Aligned the body title with
+  reference [^19] ("Emergent Misalignment: Researching the impact of reward
+  hacking"); the arXiv ID/date still needs external verification (listed
+  below).
+- Doubt 4 (Step3-VL "Starry Sky"/PaCoRe): accepted in part. Changed the lab
+  to StepFun; softened the unverifiable "PaCoRe" method name to "parallel
+  coordinated reasoning work" and listed it for external verification.
+- Doubt 5 (R1-Zero 128K rationale): accepted. My original rationale was
+  wrong: Appendix C lines 113-114 attribute ~128K to the R1 RL phase and
+  ~80K to R1-Zero. The deletion stands (the old sentence misattributed 128K
+  to R1-Zero), but the justification is corrected here.
+- Doubt 6 ("5 minutes" heading): accepted. Renamed to "Quickstart Setup
+  (Core Stack)" with a multi-GB download caveat.
+- Doubt 7 (POSIX-only pytest): accepted. Added the Windows
+  `.venv\Scripts\pytest` variant.
+- Doubt 8 ("from PPO to DPO"): accepted. Reworded to "from PPO to GRPO —
+  with offline alternatives such as DPO alongside them".
+- Doubt 9 (DQN "first to seamlessly integrate"): accepted. Softened to
+  "the first to reach human-level scores with deep RL directly from screen
+  pixels".
+- Doubt 10 (`planning/content-review-notes.md` entries): rejected as a
+  file edit — that file is outside this task's scope (only the three
+  preface pages plus this report may be edited), so the coordinator must
+  apply the `[x]` marks and factual-fix records there.
