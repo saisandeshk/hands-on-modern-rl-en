@@ -4,8 +4,11 @@ A fixed deterministic target policy (the DP-optimal greedy policy on
 slippery FrozenLake) is evaluated from episodes collected by a different
 behaviour policy (epsilon-greedy around ``Q*``), using two estimators:
 
-* ordinary importance sampling (OIS): ``mean(rho * G)`` — unbiased, but
-  the product weight ``rho`` over a whole trajectory has huge variance;
+* ordinary importance sampling (OIS): ``mean(rho * G)`` — unbiased for
+  full episodes, but the product weight ``rho`` over a whole trajectory
+  has huge variance (and gymnasium's 100-step time limit truncates a few
+  percent of episodes without bootstrapping, which adds a small downward
+  bias — see the results section);
 * weighted (self-normalized) importance sampling (WIS):
   ``sum(rho * G) / sum(rho)`` — biased, but much lower variance.
 

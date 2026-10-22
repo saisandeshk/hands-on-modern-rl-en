@@ -90,11 +90,14 @@ def run_cliff(algo, n_episodes, alpha, epsilon, gamma, seed,
             step_done = terminated or truncated or capped
             # Termination ends the episode for real; truncation (gym signal
             # or our step cap) only cuts the rollout short, so the update
-            # must still bootstrap from the next state.
+            # must still bootstrap from the next state. Sample the next
+            # behaviour action whenever the update bootstraps; it is unused
+            # on true termination but required on truncation steps for
+            # SARSA to stay on-policy.
             bootstrapped_done = terminated and not truncated and not capped
             next_action = (
                 epsilon_greedy_action(Q, int(ns), epsilon, rng)
-                if not step_done
+                if not bootstrapped_done
                 else 0
             )
             if algo == "sarsa":

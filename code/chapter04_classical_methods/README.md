@@ -53,12 +53,12 @@ are listed with `--help` (e.g. `--n-episodes`, `--n-seeds`,
 
 ## Expected runtime
 
-| Script | Full config | Approx. CPU time |
-|---|---|---|
-| `dp_oracle.py` | 16-state model, theta=1e-6 | < 5 s |
-| `mc_td_control.py` | 4 algos x 10 seeds x 20,000 eps | ~7 min |
-| `cliffwalking.py` | 2 algos x 10 seeds x 500 eps | ~25 s |
-| `ope_is.py` | 100 trials x 2,000 behaviour eps | ~4 min |
+| Script             | Full config                      | Approx. CPU time (measured, `--seed 0`) |
+| ------------------ | -------------------------------- | --------------------------------------- |
+| `dp_oracle.py`     | 16-state model, theta=1e-6       | < 1 s                                   |
+| `mc_td_control.py` | 4 algos x 10 seeds x 20,000 eps  | ~90 s                                   |
+| `cliffwalking.py`  | 2 algos x 10 seeds x 500 eps     | ~5 s                                    |
+| `ope_is.py`        | 100 trials x 2,000 behaviour eps | ~35 s                                   |
 
 ## Expected results (full run, `--seed 0`, CPU)
 
@@ -67,33 +67,35 @@ uniform policy takes 40 sweeps; policy iteration takes 617 eval sweeps
 with 2 improvements (residual 6.6e-7); value iteration takes 431 sweeps
 (residual 9.6e-7). PI and VI agree to ~1e-5; `V*(s0) = 0.8235 = 14/17`.
 
-MC/TD control (10 seeds x 20,000 episodes, eps=0.1, alpha=0.1):
+MC/TD control (10 seeds x 20,000 episodes, eps=0.1; alpha=0.1 for the
+three TD methods, MC uses the incremental 1/N mean instead of a step
+size). Measured full-run numbers (`--seed 0`, CPU):
 
-<!-- TODO: fill from control_summary.json -->
-
-| Method | Final greedy return | Final max |Q-Q*| | Online (last 10%) |
-|---|---|---|---|
-| MC first-visit | ... | ... | ... |
-| SARSA | ... | ... | ... |
-| Expected SARSA | ... | ... | ... |
-| Q-learning | ... | ... | ... |
+| Method         | Final greedy return | Final max oracle error | Online (last 10%) |
+| -------------- | ------------------- | ---------------------- | ----------------- |
+| MC first-visit | 0.1400 +/- 0.118    | 0.8516                 | 0.0734            |
+| SARSA          | 0.3800 +/- 0.384    | 0.7957                 | 0.1932            |
+| Expected SARSA | 0.3800 +/- 0.384    | 0.8486                 | 0.1960            |
+| Q-learning     | 0.2300 +/- 0.353    | 0.7071                 | 0.1337            |
 
 CliffWalking (10 seeds x 500 episodes, alpha=0.5, eps=0.1): SARSA online
-return -35.90 (0.102 falls/ep) with greedy return -53.60 (safe path);
-Q-learning online return -56.95 (0.365 falls/ep) with greedy return
+return -38.56 (0.108 falls/ep) with greedy return -35.50 (safer path);
+Q-learning online return -56.62 (0.362 falls/ep) with greedy return
 -13.00 on all 10 seeds (optimal cliff-edge path).
 
 OPE of the optimal greedy policy (exact V(s0)=0.823529) from
-eps=0.1 behaviour data (100 trials x 2,000 episodes):
+eps=0.1 behaviour data (100 trials x 2,000 episodes). Measured full-run
+numbers (`--seed 0`, CPU):
 
-<!-- TODO: fill from ope_summary.json -->
+| Estimator   | Mean   | Std    | Bias    | RMSE   |
+| ----------- | ------ | ------ | ------- | ------ |
+| Ordinary IS | 0.7722 | 0.2437 | -0.0513 | 0.2491 |
+| Weighted IS | 0.7949 | 0.1458 | -0.0286 | 0.1486 |
 
-| Estimator | Mean | Std | Bias | RMSE |
-|---|---|---|---|---|
-| Ordinary IS | ... | ... | ... | ... |
-| Weighted IS | ... | ... | ... | ... |
+Mean effective-sample-size fraction: 0.0226.
 
-Ordinary IS is approximately unbiased with large variance (most
-trajectory weights are exactly zero; mean ESS fraction is a few
-percent); weighted IS has smaller variance at the cost of
-finite-sample bias.
+Ordinary IS is unbiased for full episodes but shows a small downward
+bias here (-0.05) because gymnasium truncates episodes at 100 steps
+without bootstrapping the missing tail; weighted IS has smaller
+variance at the cost of finite-sample bias (most trajectory weights
+are exactly zero; only a few percent of each batch effectively counts).

@@ -9,8 +9,12 @@ Compares four tabular control methods, all with epsilon-greedy behaviour:
 
 The exact ``Q*`` from :mod:`dp_oracle` is the oracle: besides the usual
 learning curves (mean over seeds with a shaded std band) we plot the
-max-norm error ``||Q - Q*||_inf`` so sampling noise can be told apart
-from genuine convergence.
+max-norm error ``||Q - Q*||_inf``. For Q-learning this error measures
+genuine convergence (its target is ``Q*``); the on-policy methods target
+``Q`` of their epsilon-greedy behaviour policy instead, so their curves
+bottom out at a positive floor (see the lab page). The comparison still
+tells sampling noise apart from learning: a shrinking error means the
+table itself is moving.
 
 How to run (from the repository root)::
 
@@ -109,7 +113,10 @@ def run_episode_td(env, Q, update_fn, epsilon, gamma, rng, seed):
     sampled next behaviour action, while Expected SARSA and Q-learning
     use the expectation / maximum over next actions instead. Returns the
     undiscounted online return. Truncation bootstraps (the episode did not
-    really end); termination does not.
+    really end); termination does not. The next behaviour action is always
+    sampled when the update bootstraps (including on truncation steps),
+    so SARSA stays on-policy; it is only skipped when the update target
+    uses no bootstrap at all (true termination).
     """
     state, _ = env.reset(seed=seed)
     action = epsilon_greedy_action(Q, int(state), epsilon, rng)
@@ -120,11 +127,14 @@ def run_episode_td(env, Q, update_fn, epsilon, gamma, rng, seed):
         total += float(reward)
         step_done = terminated or truncated
         # A truncated episode is cut short by the time limit, not by the
-        # MDP, so the bootstrap target must still look past it.
+        # MDP, so the bootstrap target must still look past it. Sample the
+        # next behaviour action whenever the update bootstraps; the value
+        # is unused on true termination (target = r), but on a truncation
+        # step SARSA needs the actual behaviour action to stay on-policy.
         bootstrapped_done = terminated and not truncated
         next_action = (
             epsilon_greedy_action(Q, int(ns), epsilon, rng)
-            if not step_done
+            if not bootstrapped_done
             else 0
         )
         update_fn(Q, int(state), action, float(reward), int(ns),

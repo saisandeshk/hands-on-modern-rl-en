@@ -91,10 +91,12 @@ def make_env(env_id: str):
 def load_model(env_id: str):
     """Read the exact transition model ``P`` from a toy-text environment.
 
-    Returns ``(P, n_states, n_actions, terminals)`` where
+    Returns ``(P, n_states, n_actions, terminals, resolved_id)`` where
     ``P[s][a]`` is a list of ``(prob, next_state, reward, done)`` tuples,
     exactly as stored in ``env.unwrapped.P``. Terminal states are those
     from which every action ends the episode (holes and goals).
+    ``resolved_id`` is the environment id that was actually constructed
+    (relevant for the CliffWalking v1/v0 fallback).
     """
     env, resolved_id = make_env(env_id)
     raw_P = env.unwrapped.P
