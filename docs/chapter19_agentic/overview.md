@@ -79,7 +79,7 @@ This chapter continues to use the previously established MDP, policy gradient, G
 | [19.2 Multi-Turn Reinforcement Learning](./formulation)              | How do we formalize joint states, structured actions, partial observations, step-level trajectories, and action masks? |
 | [19.3 Trajectory Credit Assignment](./credit-assignment)             | When a multi-turn interaction fails, which actions should receive the blame?                                           |
 | [19.4 Tool Use and Trajectory Generation](./tool-use-and-trajectory) | How are trajectories generated, tools invoked, sandboxes managed, and rollouts scheduled asynchronously?               |
-| [19.5 Search-Augmented RL](./tool-use-agents)                        | How do systems such as DeepSeek-Researcher and Kimi-Researcher train search behavior?                                  |
+| [19.5 Search-Augmented RL](./tool-use-agents)                        | How does RL teach a model when to search, what to query, and how to use the results?                                   |
 | [19.6 Code Interpreter RL](./industrial-practice)                    | How do code agents handle instability, excessive trajectory length, and reward hacking?                                |
 | [19.7 Multi-Agent Collaboration](./multi-agent-swarm)                | How do multiple agents divide roles, communicate, and assign group-level advantages?                                   |
 

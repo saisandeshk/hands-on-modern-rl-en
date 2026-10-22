@@ -11,7 +11,7 @@ General tool-use RL — why RL is needed for tool calls, the main training frame
 The topics below duplicate Section 19.4, so each is summarized here in a sentence or two with a link to the full treatment. This keeps the page focused on search.
 
 - **Why RL is needed for tool use.** SFT can teach the JSON syntax of a tool call, but when to call, which tool to call, and how to combine tools are strategic decisions the model must discover through trial and error; see [Why Is RL Essential for Tool Use?](./tool-use-and-trajectory#why-is-rl-essential-for-tool-use).
-- **Core methods.** ReTool lets the model invoke tools freely mid-reasoning, VERL-TOOL unifies tools from many domains into one RL action space, and ToolRL treats tool calls as first-class RL actions; see [Core Methods](./tool-use-and-trajectory#core-methods).
+- **Core methods.** ReTool lets the model invoke tools freely mid-reasoning, VERL-TOOL unifies tools from many domains into one RL action space, MCP-RL adds a standard protocol layer so the same loop can discover and call tools across servers, and ToolRL treats tool calls as first-class RL actions; see [Core Methods](./tool-use-and-trajectory#core-methods).
 - **Reward design.** Tool-use rewards combine a verifiable task outcome with efficiency and format penalties, with the exact mix set by the scenario; see [Reward Design](./tool-use-and-trajectory#reward-design-the-scenario-determines-the-reward).
 - **Web agents.** Browser agents operate on screenshots plus DOM state with click-and-type actions, and step-level rewards such as Web-Shepherd's densify the sparse task-completion signal; see [Web Agent RL](./tool-use-and-trajectory#web-agent-rl-teaching-a-model-to-use-the-web).
 - **Code agents.** Code agents iterate write-execute-fix against unit-test pass rates, and results such as rStar2-Agent show a 14B tool-using model surpassing a 671B model; see [Code Agent RL](./tool-use-and-trajectory#code-agent-rl-write-code-debug-and-iterate).
@@ -33,7 +33,7 @@ Before SearchR1, the mainstream approach was to use prompting to teach the model
 
 **Search-query strategy cannot be imitated mechanically.** For a task such as "compare the latest performance data for three quantum-computing platforms", the search strategy must adapt dynamically to previous results. The first query, "quantum computing benchmark 2025", may be too broad, so the second query becomes "IBM quantum advantage vs Google Sycamore 2025". This kind of **adaptive query generation** is a policy-learning problem, not just a language-modeling problem.
 
-**Long-horizon optimization over multiple searches.** A complex task may require 5-10 searches. Stopping too early means insufficient information; stopping too late wastes resources. This trade-off is exactly where RL is useful.
+**Long-horizon optimization over multiple searches.** A complex task may require several rounds of search. Stopping too early means insufficient information; stopping too late wastes resources. This trade-off is exactly where RL is useful.
 
 ### SearchR1's MDP Formulation
 
@@ -68,13 +68,13 @@ Training uses GRPO group sampling plus within-group comparison. The key design i
 
 ### Technical Lineage After SearchR1
 
-| Work                       | Core innovation                                                                                         | Citations    |
-| -------------------------- | ------------------------------------------------------------------------------------------------------- | ------------ |
-| **SearchR1 **[^searchr1]   | RL trains the model to search autonomously, GRPO + RLVR                                                 | 819          |
-| **ReSearch **[^research]   | Deep integration of reasoning and search; each reasoning step can include reflection on search strategy | -            |
-| **ToRL **[^torl]           | Extends to computational tools (code executors), finding scaling laws for tool use                      | 131          |
-| **ReTool **[^retool]       | Distinguishes reasoning tasks from computational tasks; RL lets the model choose tools strategically    | 247          |
-| **ZeroTIR **[^zeroscaling] | Models spontaneously learn code execution without supervised examples; power-law scaling law            | NeurIPS 2025 |
+| Work                       | Core innovation                                                                                         | Citations / venue |
+| -------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------- |
+| **SearchR1 **[^searchr1]   | RL trains the model to search autonomously, GRPO + RLVR                                                 | 819               |
+| **ReSearch **[^research]   | Deep integration of reasoning and search; each reasoning step can include reflection on search strategy | -                 |
+| **ToRL **[^torl]           | Extends to computational tools (code executors), finding scaling laws for tool use                      | 131               |
+| **ReTool **[^retool]       | Distinguishes reasoning tasks from computational tasks; RL lets the model choose tools strategically    | 247               |
+| **ZeroTIR **[^zeroscaling] | Models spontaneously learn code execution without supervised examples; power-law scaling law            | NeurIPS 2025      |
 
 The 32B model trained by ToRL[^torl] outperformed a 70B model without tools on mathematical reasoning, showing that "small model + tools > large model with pure reasoning". ReTool[^retool] further teaches models strategic tool selection: not every problem needs a tool; the model should decide dynamically based on the problem's characteristics.
 
@@ -82,7 +82,7 @@ The 32B model trained by ToRL[^torl] outperformed a 70B model without tools on m
 def search_reward(answer, ground_truth, num_searches, max_searches=5):
     """Reward function for search RL."""
     correctness = 1.0 if verify_answer(answer, ground_truth) else 0.0
-    efficiency_penalty = -0.05 * num_searches  # Search-cost penalty
+    efficiency_penalty = -0.05 * (min(num_searches, max_searches) / max_searches)  # Bounded search-cost penalty.
     return correctness + efficiency_penalty
 ```
 
@@ -90,7 +90,7 @@ def search_reward(answer, ground_truth, num_searches, max_searches=5):
 
 Search-augmented RL trains the model to decide for itself when to search, what to query, and how to use the results, with SearchR1 showing that this behavior can emerge from RLVR-style rewards plus an efficiency penalty. For the broader picture — trajectory synthesis, general tool-use methods, and the engineering stack — see the [Chapter Summary in Section 19.4](./tool-use-and-trajectory#chapter-summary).
 
-In the next section, we will look at practical agentic RL experience from industry: [Industrial Practice](./industrial-practice).
+In the next section, we turn to the problems code agents hit in real training — instability, excessive trajectory length, and reward hacking: [Code Interpreter RL](./industrial-practice).
 
 ## References
 
