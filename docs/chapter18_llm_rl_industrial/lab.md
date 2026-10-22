@@ -35,7 +35,8 @@ Install the chapter requirements and run from the repository root:
 pip install -r code/chapter18_llm_rl_industrial/requirements.txt
 # Smoke test: all three experiments, finishes in well under 60 s on CPU
 .venv/bin/python code/chapter18_llm_rl_industrial/rollout_system.py --experiment all --smoke
-# Full lab run (~5-10 min on a laptop CPU)
+# Full lab run (a few minutes on a laptop CPU; the reference timing below
+# took 231 s wall-clock, up to ~15 min on machines with fewer cores)
 .venv/bin/python code/chapter18_llm_rl_industrial/rollout_system.py --experiment all --seed 0
 ```
 
@@ -69,7 +70,7 @@ def vtrace_truncated_weights(new_logprobs, beh_logprobs, c_bar=1.0, rho_bar=1.0)
     return c, rho_tr
 ```
 
-`--mode none` ignores the ratio entirely (plain policy gradient on stale data); `--mode clip` uses the PPO-clip loss against the stored behaviour log-probs; `--mode vtrace` weights the policy term by `c` and corrects the value target with `rho_tr`.
+`--mode none` ignores the ratio entirely (plain policy gradient on stale data); `--mode clip` uses the PPO-clip loss against the stored behaviour log-probs; `--mode vtrace` weights the policy term by `c` and corrects the value target with `rho_tr`. Note this is a simplified one-step Monte-Carlo analogue of V-trace: the full algorithm applies the truncation to bootstrapped TD residuals, while here the target is `V(s) + rho_tr * (G - V(s))` with Monte-Carlo returns.
 
 **3. Version bookkeeping.** Weights are broadcast every M updates and arrive D updates late, so at learner update `t` the workers hold:
 
@@ -83,9 +84,7 @@ def behaviour_version_at(update, broadcast_every, delay):
 
 Every batch carries its `beh_version`; `LagTracker` records `learner_version - beh_version` per update and reports mean/max lag — the same per-trajectory version metadata AReaL attaches in the asynchronous-scheduling comparison in 18.4.
 
-**4. Real multiprocessing for throughput.** In `run_throughput`, each worker process loads the broadcast weights, collects a step budget, and puts a shard on the queue; the parent (learner) drains the queue and performs a real gradient update per shard. Startup (spawn → all workers ready) is timed separately from the steady-state window, so you can see both the fixed broadcast/spawn cost and the scaling collection rate. The staleness curves use a deterministic single-process simulation of the identical `(version, data)` queue discipline, so they are exactly reproducible per seed.
-
-<!-- RESULTS-FROM-RUN -->
+**4. Real multiprocessing for throughput.** In `run_throughput`, each worker process loads the broadcast weights once, collects a step budget, and puts a single shard on the queue; the parent (learner) drains the queue and performs a real gradient update per shard. Startup (spawn → all workers ready) is timed separately from the steady-state window, so `steps_per_sec` excludes spawn cost by construction. No weight broadcast happens inside the throughput run — the scaling number isolates collection parallelism (and CPU contention between worker processes). The staleness curves use a deterministic single-process simulation of the identical `(version, data)` queue discipline, so they are exactly reproducible per seed.
 
 ## Results from a full run
 
@@ -100,7 +99,11 @@ timeout 900 .venv/bin/python code/chapter18_llm_rl_industrial/rollout_system.py 
 A timed repeat of this exact command took 231 s wall-clock on a laptop CPU.
 Throughput timings vary from run to run (multiprocessing scheduling); the
 staleness and sweep learning curves are deterministic per seed and reproduced
-exactly across repeats.
+exactly across repeats on the same machine. Reference environment: torch
+2.14.1, gymnasium 1.4.0, numpy 2.5.4 — the action-sampling stream
+(`torch.distributions.Categorical.sample`) is not guaranteed stable across
+torch releases, so exact episode returns may differ on other versions even
+at the same seed.
 
 **Throughput (steady-state; startup excluded).** Collection used 8000
 environment steps per worker; startup is the spawn-to-all-ready time:
@@ -113,12 +116,18 @@ environment steps per worker; startup is the spawn-to-all-ready time:
 | 8       | 64000       | 4.064     | 4.542    | 14092         | 0.164        | 21.41          |
 
 Read it as: steady-state collection throughput roughly doubles from 1 to 8
-workers (6240 to 14092 steps/s) while spawn/startup cost grows from ~2.4 s to
-~4.1 s, so small worker counts show sublinear scaling — the fixed
-broadcast/spawn cost dominates short runs. Learner utilization stays low here
-(0.07–0.19) because the synthetic update workload is deliberately tiny next to
-collection; the learner idles on the queue rather than the workers idling on
-the learner.
+workers (6240 to 14092 steps/s), but the steady-state window excludes
+spawn/startup by construction (`steps_per_sec` is timed from the moment the
+last worker reports ready), so startup cost cannot explain the shortfall —
+the cause is per-worker CPU contention. The per-worker rate falls from 6240
+steps/s at K=1 to 14092/8 ≈ 1761 steps/s at K=8: 8× the workers buy only
+~2.26× the throughput. Learner utilization (`busy / steady_s`) stays low
+here (0.07–0.19) because the synthetic update workload is deliberately tiny
+next to collection; with exactly one shard (and hence one learner update)
+per worker, updates-per-collected-step is constant in K, so there is no
+saturation knee to find in this design — utilization is roughly flat and
+non-monotone (highest at K=1), tracking `t_update / t_worker` rather than
+rising with K.
 
 **Staleness curves (60 updates × 2048 steps, delay 4, broadcast every update).**
 `final_return` is the mean greedy return over 3 evaluation episodes:
@@ -162,8 +171,8 @@ updates, 6.56 at delay 8 over 25 updates).
 
 ## What to look for and why
 
-- **Throughput rises sublinearly.** Each extra worker adds collection capacity but also spawn/broadcast overhead (`startup_s` in the table). This is the small-scale shadow of 18.4's colocated-vs-disaggregated choice: separate rollout capacity helps until weight synchronization and queue handling become the bottleneck.
-- **Learner utilization rises with K.** With one slow worker the learner starves (it blocks on the queue); with more workers the queue stays full and the learner spends its time updating. In the reference run the synthetic update workload is deliberately tiny, so utilization stays low in absolute terms (0.07–0.19) — read the _trend_ across K, not the level. Saturation (utilization flat while throughput still rises) is the point where extra workers only add staleness, not learning speed.
+- **Throughput rises sublinearly — because workers contend for cores, not because of spawn cost.** Each extra worker adds collection capacity, but the steady-state window excludes startup by construction and no broadcast happens inside the throughput run, so the sublinear number isolates parallel-collection efficiency: per-worker rate falls with K while total throughput still climbs. This is the small-scale shadow of 18.4's colocated-vs-disaggregated choice: separate rollout capacity helps until core contention and queue handling become the bottleneck.
+- **Learner utilization does not rise with K in this design.** Because each worker sends exactly one shard, the learner performs exactly K updates over K×8000 collected steps for every K — updates-per-collected-step is constant, the queue never backs up, and utilization is `t_update / t_worker`: roughly flat and non-monotone (highest at K=1 in the reference run), falling when workers contend for cores. In the reference run the synthetic update workload is deliberately tiny, so utilization stays low in absolute terms (0.07–0.19) — read the flat shape, not the level. A real saturation knee would need streaming workers (many shards each) so the queue can stay full; here there is none to find, which is itself the lesson about what has to be true for utilization to saturate.
 - **Uncorrected staleness biases the policy toward the past.** `--mode none` replays old behaviour as if it were fresh, so improvements the learner already made get overwritten by gradients from data generated before they existed. The learning curve lags the sync baseline and plateaus lower — the failure mode 18.1 warns about for long agent trajectories.
 - **Truncation helps when ratios actually spread.** In the full run above, ratios
   stay near 1.0 at delay 4, so clipping rarely binds and all async variants
@@ -172,13 +181,13 @@ updates, 6.56 at delay 8 over 25 updates).
   stale batches spread the ratios wider, the bound binds, and off-policy steps
   are muted while on-policy-like steps still contribute. Compare `mean_rho`
   across runs: near 1.0 for sync, drifting for stale batches.
-- **Lag compounds.** In the sweep, each extra version of delay shifts the behaviour distribution further from the learner, ratios spread wider, truncation binds more often, and effective sample size shrinks. That is the throughput/staleness trade-off in one picture: delaying broadcasts buys rollout throughput at the price of correction-bound updates.
+- **Lag does not compound into a monotone return curve at this budget.** In the sweep, each extra version of delay shifts the behaviour distribution further from the learner and the measured `mean_lag` grows exactly as `broadcast_every` and `delay` predict (about 3.8 versions at delay 4 over 60 updates, 6.56 at delay 8 over 25 updates) — the bookkeeping is exact. But final returns do not degrade monotonically with delay: most sweep points sit near the random-policy level and `clip` scores its best value (46.00) at the largest delay. The throughput/staleness trade-off is still the right lens (delaying broadcasts buys rollout throughput at the price of training on older data), but at 25 updates × 1024 steps the data say budget, not delay, dominates the level — compare shapes across seeds before reading a monotone story into one row.
 
 ## Exercises
 
-1. **Vary the broadcast interval.** Run `--broadcast-every 4 --delay 0` against `--broadcast-every 1 --delay 3`. Both produce stale batches — do they produce the _same_ lag distribution and the same learning curve? _Hint: compare the `lags` column pattern, not just the mean._
-2. **Tighten and loosen the clip.** Re-run the delay-4 `clip` curve with `--clip-eps 0.1` and `--clip-eps 0.4`. Which degrades faster, and why does too-tight clipping also hurt? _Hint: track `clip_frac` — a bound that always binds discards signal along with staleness._
+1. **Vary the broadcast interval.** Run `--broadcast-every 4 --delay 0` against `--broadcast-every 1 --delay 3`. Both produce stale batches — do they produce the _same_ lag distribution and the same learning curve? _Hint: compare the per-update `lag` column in `staleness_curves.csv`, not just the mean._
+2. **Tighten and loosen the clip.** Re-run the delay-4 `clip` curve with `--clip-eps 0.1` and `--clip-eps 0.4`. Which degrades faster, and why does too-tight clipping also hurt? _Hint: track the per-update `clip_frac` column in `staleness_curves.csv` (and `mean_clip_frac` in the stdout table) — a bound that always binds discards signal along with staleness._
 3. **Split the V-trace caps.** Set `--c-bar 1.0 --rho-bar 0.5` vs `--c-bar 0.5 --rho-bar 1.0` at delay 8. Which cap matters more for the actor, which for the critic? _Hint: read the `vtrace` branch of `learner_update` and predict before running._
-4. **Starve, then flood, the learner.** Run throughput with `--workers 1` and `--workers 8` and compare `learner_util` against `steps_per_sec`. At what K does the learner saturate on your machine, and what would that imply for colocated vs disaggregated GPU pools in 18.4? _Hint: saturation is where utilization stops rising while throughput still does._
+4. **Why there is no saturation knee here.** Run throughput with `--workers 1` and `--workers 8` and compare `learner_util` against `steps_per_sec`. Why doesn't utilization rise with K in this design, and what would have to change (think: how many shards each worker sends) for the queue to stay full and utilization to saturate? _Hint: compute updates-per-collected-step for each K from the `throughput.csv` row — it is constant by construction._
 5. **Break the behaviour-logprob record.** Deliberately replace the stored `beh_logprobs` with recomputed log-probs from a perturbed policy copy, then re-run `clip` at delay 4. How does the curve change? _Hint: this reproduces the 18.4 training-inference mismatch — the ratio is wrong before any update begins, and clipping cannot repair it._
-6. **Try LunarLander-v3.** Run `--env LunarLander-v3 --smoke` first, then a short full comparison. Does staleness hurt more or less than on CartPole, and what property of the environment explains it? _Hint: think about episode length and reward sparsity._
+6. **Try LunarLander-v3.** Run `--env LunarLander-v3 --smoke` first (needs the Box2D extra, already in this chapter's `requirements.txt`), then a short full comparison. Does staleness hurt more or less than on CartPole, and what property of the environment explains it? _Hint: think about episode length and reward sparsity._

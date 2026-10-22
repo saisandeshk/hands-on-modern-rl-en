@@ -14,12 +14,10 @@ import torch
 
 from rollout_system import (
     ActorCritic,
-    Batch,
     LagTracker,
     behaviour_version_at,
     collect_batch,
     importance_ratios,
-    learner_update,
     ppo_clipped_weights,
     simulate_training,
     vtrace_truncated_weights,
@@ -49,6 +47,14 @@ def test_ppo_clip_hand_values():
     clipped = ppo_clipped_weights(rho, eps=0.2)
     # 1.5 -> 1.2 (upper bound), 0.5 -> 0.8 (lower bound), 1.0 unchanged
     assert clipped.tolist() == pytest.approx([1.2, 0.8, 1.0])
+    # clip fraction: 2 of 3 samples fall outside [0.8, 1.2]
+    clip_frac = float(((rho.lt(0.8)) | (rho.gt(1.2))).float().mean().item())
+    assert clip_frac == pytest.approx(2 / 3)
+    # a ratio distribution symmetric around 1 can still bind everywhere:
+    # half at 0.5, half at 1.5 has mean 1.0 yet clip_frac 1.0
+    rho_sym = torch.tensor([0.5, 1.5])
+    assert float(rho_sym.mean()) == pytest.approx(1.0)
+    assert float(((rho_sym.lt(0.8)) | (rho_sym.gt(1.2))).float().mean()) == pytest.approx(1.0)
 
 
 def test_vtrace_truncation_hand_values():
@@ -85,41 +91,22 @@ def test_lag_tracker_summary():
     assert s["n"] == 2
 
 
-def _fixed_batch() -> Batch:
-    rng = np.random.RandomState(0)
-    n = 64
-    return Batch(states=rng.randn(n, 4).astype(np.float32),
-                 actions=rng.randint(0, 2, size=n),
-                 returns=rng.randn(n),
-                 beh_logprobs=np.full(n, math.log(0.5), dtype=np.float32))
-
-
 def test_one_worker_equals_sync_update():
     """A 1-worker run with zero delay must equal the synchronous update.
 
-    When the behaviour policy is the current policy, the stored behaviour
-    log-probs match fresh log-probs, every ratio is 1, and the async-clip
-    update is bit-for-bit the sync update on the same data.
+    At the system level, ``simulate_training`` with ``delay=0`` and a
+    broadcast every update feeds each learner step data from the current
+    weights, so ``clip`` (PPO-clip against the stored behaviour log-probs)
+    must trace exactly the ``sync`` learning curve. This exercises the real
+    version-bookkeeping and queue-discipline path, not just one gradient
+    step on fixed data.
     """
-    batch = _fixed_batch()
-    torch.manual_seed(7)
-    net_sync = ActorCritic(4, 2)
-    torch.manual_seed(7)
-    net_async = ActorCritic(4, 2)
-    assert net_sync is not net_async
-    # Refresh the stored behaviour log-probs from the live policy (delay 0:
-    # behaviour == learner), exactly what collect_batch would have recorded.
-    with torch.no_grad():
-        fresh_lp, _, _ = net_async.evaluate(
-            torch.as_tensor(batch.states), torch.as_tensor(batch.actions))
-    batch.beh_logprobs = fresh_lp.numpy().astype(np.float32)
-
-    opt_s = torch.optim.Adam(net_sync.parameters(), lr=3e-3)
-    opt_a = torch.optim.Adam(net_async.parameters(), lr=3e-3)
-    learner_update(net_sync, opt_s, batch, "sync", DEVICE, epochs=2)
-    learner_update(net_async, opt_a, batch, "clip", DEVICE, epochs=2)
-    for p_s, p_a in zip(net_sync.parameters(), net_async.parameters()):
-        assert torch.equal(p_s, p_a)
+    kw = dict(env_name="CartPole-v1", num_updates=3, steps_per_update=256,
+              broadcast_every=1, delay=0, device=DEVICE, eval_episodes=1)
+    r_sync = simulate_training(mode="sync", seed=0, **kw)
+    r_clip = simulate_training(mode="clip", seed=0, **kw)
+    assert r_sync["lags"] == r_clip["lags"] == [0, 0, 0]
+    assert r_sync["eval_curve"] == pytest.approx(r_clip["eval_curve"])
 
 
 def test_simulation_deterministic():

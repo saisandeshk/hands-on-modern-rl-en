@@ -201,6 +201,11 @@ def vtrace_truncated_weights(new_logprobs: torch.Tensor,
       one stale step can pull the update.
     * ``rho_tr = min(rho_bar, rho)`` truncates the fixed-point weight used for
       the value target, so a stale batch cannot dominate the critic either.
+
+    This is a simplified one-step Monte-Carlo analogue of V-trace (Espeholt et
+    al., 2018): the real V-trace recursion applies the truncation to TD
+    residuals ``r + gamma * V(s') - V(s)`` with bootstrapped values, while here
+    the target is ``V(s) + rho_tr * (G - V(s))`` with Monte-Carlo returns G.
     """
     rho = torch.exp(new_logprobs - beh_logprobs)
     c = torch.minimum(torch.full_like(rho, c_bar), rho)
@@ -336,27 +341,33 @@ def simulate_training(env_name: str, num_updates: int, steps_per_update: int,
     opt = torch.optim.Adam(learner.parameters(), lr=lr)
     snapshots = [{k: v.cpu().clone() for k, v in learner.state_dict().items()}]
     tracker = LagTracker()
-    curve, lags, rhos = [], [], []
+    curve, lags, rhos, clip_fracs = [], [], [], []
 
     for t in range(num_updates):
         bv = behaviour_version_at(t, broadcast_every, delay)
         behaviour.load_state_dict(
             {k: v.to(device) for k, v in snapshots[bv].items()})
-        lag = tracker.record(t, bv)
         batch = collect_batch(behaviour, env_name, steps_per_update,
                               seed=seed * 100003 + t, beh_version=bv)
+        # Read the version back off the batch -- the way a real queue would
+        # deliver (version, data) pairs -- rather than reusing the local `bv`.
+        lag = tracker.record(t, batch.beh_version)
         stats = learner_update(learner, opt, batch, mode, device, epochs,
                                clip_eps, c_bar, rho_bar)
         snapshots.append(
             {k: v.cpu().clone() for k, v in learner.state_dict().items()})
         lags.append(lag)
         rhos.append(stats["mean_rho"])
+        clip_fracs.append(stats["clip_frac"])
         if (t + 1) % eval_every == 0 or t == num_updates - 1:
             curve.append(evaluate_greedy(learner, env_name, eval_episodes,
                                          seed=10_000_000 + t))
     return {"eval_curve": curve, "lags": lags, "mean_lag": float(np.mean(lags)),
             "max_lag": int(np.max(lags)), "final_return": curve[-1],
-            "mean_rho": float(np.mean(rhos)), "lag_summary": tracker.summary()}
+            "mean_rho": float(np.mean(rhos)),
+            "mean_clip_frac": float(np.mean(clip_fracs)),
+            "per_update_rho": rhos, "per_update_clip_frac": clip_fracs,
+            "lag_summary": tracker.summary()}
 
 
 # ---------------------------------------------------------------------------
@@ -589,7 +600,7 @@ def main(argv=None) -> dict:
         summary["throughput"] = rows
 
     if args.experiment in ("staleness", "all"):
-        curves, stale_rows = {}, []
+        curves, stale_detail = {}, {}
         for mode in args.modes.split(","):
             delay = 0 if mode == "sync" else args.delay
             res = simulate_training(args.env, args.updates,
@@ -600,22 +611,32 @@ def main(argv=None) -> dict:
                                     epochs=args.epochs,
                                     clip_eps=args.clip_eps, c_bar=args.c_bar,
                                     rho_bar=args.rho_bar)
-            curves[f"{mode}(delay={delay})"] = res["eval_curve"]
-            stale_rows.append({"mode": mode, "delay": delay,
-                               "final_return": res["final_return"],
-                               "mean_lag": res["mean_lag"],
-                               "max_lag": res["max_lag"],
-                               "mean_rho": res["mean_rho"]})
+            label = f"{mode}(delay={delay})"
+            curves[label] = res["eval_curve"]
+            stale_detail[label] = res
         save_csv(os.path.join(args.outdir, "staleness_curves.csv"),
-                 [{"mode": m, "update": i + 1, "return": y}
-                  for m, ys in curves.items() for i, y in enumerate(ys)])
+                 [{"mode": label, "update": i + 1, "return": y,
+                   "lag": stale_detail[label]["lags"][i],
+                   "mean_rho": stale_detail[label]["per_update_rho"][i],
+                   "clip_frac": stale_detail[label]["per_update_clip_frac"][i]}
+                  for label, ys in curves.items() for i, y in enumerate(ys)])
         plot_curves(args.outdir, curves,
                     f"On-policy vs stale async ({args.env}, delay={args.delay})",
                     "staleness_curves.png")
-        print_table("Staleness: sync baseline vs async corrections", stale_rows,
+        stale_table = []
+        for mode in args.modes.split(","):
+            delay = 0 if mode == "sync" else args.delay
+            res = stale_detail[f"{mode}(delay={delay})"]
+            stale_table.append({"mode": mode, "delay": delay,
+                                "final_return": res["final_return"],
+                                "mean_lag": res["mean_lag"],
+                                "max_lag": res["max_lag"],
+                                "mean_rho": res["mean_rho"],
+                                "mean_clip_frac": res["mean_clip_frac"]})
+        print_table("Staleness: sync baseline vs async corrections", stale_table,
                     ["mode", "delay", "final_return", "mean_lag", "max_lag",
-                     "mean_rho"])
-        summary["staleness"] = stale_rows
+                     "mean_rho", "mean_clip_frac"])
+        summary["staleness"] = stale_table
 
     if args.experiment in ("sweep", "all"):
         sweep = []
@@ -632,11 +653,14 @@ def main(argv=None) -> dict:
                 sweep.append({"mode": mode, "delay": d,
                               "final_return": res["final_return"],
                               "mean_lag": res["mean_lag"],
-                              "max_lag": res["max_lag"]})
+                              "max_lag": res["max_lag"],
+                              "mean_rho": res["mean_rho"],
+                              "mean_clip_frac": res["mean_clip_frac"]})
         save_csv(os.path.join(args.outdir, "staleness_sweep.csv"), sweep)
         plot_sweep(args.outdir, sweep)
         print_table("Staleness sweep (final greedy return)", sweep,
-                    ["mode", "delay", "final_return", "mean_lag"])
+                    ["mode", "delay", "final_return", "mean_lag",
+                     "mean_clip_frac"])
         summary["sweep"] = sweep
 
     with open(os.path.join(args.outdir, "summary.json"), "w") as f:
