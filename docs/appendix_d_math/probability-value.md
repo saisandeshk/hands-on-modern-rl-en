@@ -50,9 +50,9 @@ Suppose one trajectory has the immediate reward sequence $2, 1, 3, 0, 1$.
 
 | $\gamma$ | Discounted return $G$                                      | Meaning                                |
 | -------- | ---------------------------------------------------------- | -------------------------------------- |
-| $0.5$    | $2+0.5\times1+0.25\times3+0.125\times0+0.0625\times1=3.19$ | Almost only the first two steps matter |
-| $0.9$    | $2+0.9+0.81\times3+0.729\times0+0.6561\times1=5.97$        | Looks fairly far ahead                 |
-| $0.99$   | $2+0.99+0.9801\times3+\cdots\approx6.92$                   | Almost all rewards are counted         |
+| $0.5$    | $2+0.5\times1+0.25\times3+0.125\times0+0.0625\times1=3.31$ | Almost only the first two steps matter |
+| $0.9$    | $2+0.9+0.81\times3+0.729\times0+0.6561\times1=5.99$        | Looks fairly far ahead                 |
+| $0.99$   | $2+0.99+0.9801\times3+\cdots\approx6.89$                   | Almost all rewards are counted         |
 
 When $\gamma=0.5$, the fifth reward contributes only $0.0625$ to the total return, so it is almost negligible. When $\gamma=0.99$, the fifth reward still contributes about $0.96$, nearly as important as an immediate reward.
 

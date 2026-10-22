@@ -74,7 +74,7 @@ This page applied gradient tools to policy optimization:
 | Concept             | Formula                                                                      | Role                                              |
 | ------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------- |
 | Policy gradient     | $\nabla_\theta J \approx G_t \nabla_\theta\log\pi_\theta(a_t\mid s_t)$       | Good outcomes increase the probability of actions |
-| Advantage function  | $A(s,a)=R-V(s)$                                                              | Turns "absolute quality" into "relative quality"  |
+| Advantage function  | $A(s,a)=Q(s,a)-V(s)$                                                         | Turns "absolute quality" into "relative quality"  |
 | Advantage weighting | $\nabla_\theta J \approx \hat{A}_t \nabla_\theta\log\pi_\theta(a_t\mid s_t)$ | Actions better than average are strengthened      |
 
 Policy gradients provide the direction, and advantage functions make the signal more precise. But one unresolved question remains: how large should each update step be? The next page discusses how PPO clipping and the Adam optimizer control update size.

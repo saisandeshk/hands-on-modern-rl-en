@@ -226,7 +226,7 @@ Suppose two policy gradient samples have advantages $\hat{A}=[2, -1]$, and the c
 
 Means: $\bar{A}=0.5$, $\bar{g}=2.5$.
 
-Covariance:
+Covariance (population form, averaging over the two samples):
 
 $$
 \mathrm{Cov}=\frac{(2-0.5)(4-2.5)+(-1-0.5)(1-2.5)}{2}=\frac{1.5\times1.5+(-1.5)\times(-1.5)}{2}=\frac{4.5}{2}=2.25.

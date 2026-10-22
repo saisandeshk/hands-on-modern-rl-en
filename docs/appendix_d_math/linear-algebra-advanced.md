@@ -155,7 +155,7 @@ Numerical demonstration: suppose the initial error is $\|\boldsymbol{e}_0\|=10$.
 | 1            | 5                    | 9                    | 9.9                   |
 | 5            | 0.31                 | 5.9                  | 9.51                  |
 | 10           | 0.01                 | 3.49                 | 9.04                  |
-| 50           | approx 0             | 0.005                | 6.05                  |
+| 50           | approx 0             | 0.05                 | 6.05                  |
 | 100          | approx 0             | approx 0             | 3.66                  |
 
 The closer $\gamma$ is to $1$, the slower convergence becomes, but the resulting value looks farther into the future. This is a common accuracy-efficiency tradeoff in RL.

@@ -76,7 +76,7 @@ $$
 y_t=r_{t+1}+\gamma\max_{a'}Q_{\theta^-}(s_{t+1},a').
 $$
 
-Here $\theta^-$ denotes the target-network parameters. The loss function is
+Here $\theta^-$ denotes the target-network parameters. The target $y_t$ is treated as fixed when differentiating (it is not differentiated with respect to $\theta$). The loss function is
 
 $$
 L(\theta)=\frac{1}{2}\left(Q_\theta(s_t,a_t)-y_t\right)^2.

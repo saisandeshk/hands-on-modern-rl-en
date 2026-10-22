@@ -42,7 +42,7 @@ $$
 J(\theta)=\sum_a \pi_\theta(a\mid s)Q^\pi(s,a).
 $$
 
-When taking the gradient with respect to the parameters, $Q^\pi(s,a)$ does not depend on $\theta$; only $\pi_\theta$ contains $\theta$:
+When taking the gradient with respect to the parameters, we hold $Q^\pi(s,a)$ fixed in this simplified one-state derivation (the full policy gradient theorem shows the terms from differentiating the state distribution sum to zero, so only the explicit $\pi_\theta$ dependence survives):
 
 $$
 \nabla_\theta J(\theta)
@@ -138,8 +138,8 @@ $$
 f(\theta+\Delta\theta)
 \approx
 f(\theta)
-\nabla f(\theta)^\top\Delta\theta
-\frac{1}{2}\Delta\theta^\top H\Delta\theta.
++ \nabla f(\theta)^\top\Delta\theta
++ \frac{1}{2}\Delta\theta^\top H\Delta\theta.
 $$
 
 The trust-region idea behind PPO and TRPO is exactly the concern that when parameter updates are too large, first-order approximations are no longer reliable and the second-order curvature term begins to matter. If we still take large steps based only on first-order information, we may damage the policy.

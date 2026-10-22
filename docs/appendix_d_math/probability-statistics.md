@@ -10,11 +10,11 @@ Data in reinforcement learning comes from random interaction: the policy may cho
 
 ## Roadmap
 
-| Article                                                                             | Mathematical path                                                       | Role in reinforcement learning                               |
-| ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------ |
-| [D.2.1 Probability, Conditional Probability, and Expectation](./probability-basics) | sample space -> event -> random variable -> probability -> expectation  | Describe stochastic policies and stochastic environments     |
-| [D.2.2 Random Variables, Returns, and State Values](./probability-value)            | random return -> conditional expectation -> variance                    | Define value functions and the stability of learning signals |
-| [D.2.3 Variance, Monte Carlo, and Sample Averages](./probability-sampling)          | sample mean -> incremental average -> importance sampling               | Estimate unknown expectations from data                      |
-| [D.2.4 Trajectory Probability, Baselines, and GAE](./probability-trajectory-td)     | trajectory probability -> baseline invariance -> accumulated TD errors  | Connect policy gradients with advantage estimation           |
-| [D.2.5 Bellman Expectation Equation](./probability-bellman-advanced)                | take expectations over actions, rewards, and next states layer by layer | Derive the full Bellman expectation equation                 |
-| [D.2.6 Summary, Formulas, and Exercises](./probability-formulas-exercises)          | formula review -> common pitfalls -> exercises                          | Review and check understanding                               |
+| Article                                                                                              | Mathematical path                                                       | Role in reinforcement learning                               |
+| ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------ |
+| [D.2.1 Probability, Conditional Probability, and Expectation](./probability-basics)                  | sample space -> event -> random variable -> probability -> expectation  | Describe stochastic policies and stochastic environments     |
+| [D.2.2 Random Variables, Returns, and State Values](./probability-value)                             | random return -> conditional expectation -> variance                    | Define value functions and the stability of learning signals |
+| [D.2.3 Monte Carlo, Incremental Averages, and Importance Sampling](./probability-sampling)           | sample mean -> incremental average -> importance sampling               | Estimate unknown expectations from data                      |
+| [D.2.4 Trajectory Probability, Baselines, and GAE](./probability-trajectory-td)                      | trajectory probability -> baseline invariance -> accumulated TD errors  | Connect policy gradients with advantage estimation           |
+| [D.2.5 Bellman Expectation Equation and Action Values](./probability-bellman-advanced)               | take expectations over actions, rewards, and next states layer by layer | Derive the full Bellman expectation equation                 |
+| [D.2.6 Probability and Statistics Formula Reference and Exercises](./probability-formulas-exercises) | formula review -> common pitfalls -> exercises                          | Review and check understanding                               |
