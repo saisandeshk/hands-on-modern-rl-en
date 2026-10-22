@@ -198,6 +198,8 @@ $$
 a \sim \mathcal{N}\left(\mu_\theta(s),\ \sigma_\theta^2(s)\right)
 $$
 
+This is the simplified unsquashed form used in the snippets below so the reparameterization idea stays visible. Real bounded actuators need the squashed policy of the Bounded Actions subsection ($a = a_{\max}\tanh(u)$ with the corrected $\log \pi$); every $\log \pi$ there replaces the plain Gaussian log-density used here.
+
 But there is a problem. If we sample $a$ directly from the Gaussian and then compute the Q-value, how does the gradient flow back to $\mu$ and $\sigma$? The sampling operation is not differentiable: you cannot tell whether a small change in the sampled $a$ is due to a change in $\mu$ or a change in the sampled noise.
 
 The solution is the **reparameterization trick**. We separate the randomness from the deterministic part: first sample noise $\epsilon$ from a fixed standard normal distribution, then use $\mu$ and $\sigma$ to "transform" the noise into an action:
@@ -218,7 +220,9 @@ Here $a = \mu_\theta(s) + \sigma_\theta(s) \odot \epsilon$ is the reparameterize
 
 ```python
 def actor_loss(self, states):
-    # Reparameterized sampling
+    # Simplified: no tanh squashing, so this matches the Gaussian above.
+    # For bounded actions use the squashed policy of the Bounded Actions
+    # subsection and its corrected log_prob instead.
     mu, sigma = self.actor(states)
     dist = Normal(mu, sigma)
     # Use rsample() rather than sample(): rsample supports reparameterized gradients
@@ -254,6 +258,8 @@ In practice the target entropy $\mathcal{H}_0$ is usually set to $-|\mathcal{A}|
 
 ```python
 def update_alpha(self, states):
+    # Simplified: same unsquashed log_prob as the actor snippet above.
+    # With bounded actions, substitute the squashed corrected log_prob here too.
     mu, sigma = self.actor(states)
     dist = Normal(mu, sigma)
     actions = dist.rsample()
@@ -282,10 +288,10 @@ $$
 Because $\tanh$ maps $\mathbb{R}$ onto $(-1, 1)$, the executed action always respects the control constraint, and the policy stays differentiable. The price is a change-of-variables correction to the log-probability: probability mass gets compressed where $\tanh$ is flat, so
 
 $$
-\log \pi(a \mid s) = \log \mu(u \mid s) - \sum_i \log\left(1 - \tanh^2(u_i)\right),
+\log \pi(a \mid s) = \log \mu(u \mid s) - \sum_i \log a_{\max} - \sum_i \log\left(1 - \tanh^2(u_i)\right),
 $$
 
-where $\mu(u \mid s)$ is the Gaussian density of the pre-action. Every $\log \pi$ in the actor loss and the temperature loss must use this corrected value, which corresponds to the entropy of the squashed distribution the environment actually sees.
+where $\mu(u \mid s)$ is the Gaussian density of the pre-action. (For the usual MuJoCo bounds $[-1, 1]$, $a_{\max} = 1$ and the middle term vanishes.) Every $\log \pi$ in the actor loss and the temperature loss must use this corrected value, which corresponds to the entropy of the squashed distribution the environment actually sees.
 
 ```python
 mu, sigma = self.actor(states)
@@ -293,7 +299,9 @@ dist = Normal(mu, sigma)
 u = dist.rsample()                          # unbounded pre-action
 actions = self.action_max * torch.tanh(u)   # squash into [-action_max, action_max]
 log_probs = dist.log_prob(u).sum(-1, keepdim=True) \
+    - torch.log(torch.as_tensor(self.action_max)) * u.shape[-1] \
     - torch.log(1 - torch.tanh(u).pow(2) + 1e-6).sum(-1, keepdim=True)
+# Note: with action bounds [-1, 1] the log action_max term is zero.
 ```
 
 A quick check in one dimension with $a_{\max} = 1$, $\mu_0 = 0$, $\sigma = 0.5$, and a sampled $u = 0.5$: the executed action is $\tanh(0.5) \approx 0.462$, safely inside the bound. The Gaussian log-density at $u = 0.5$ is about $-0.726$, and the squashing correction is $-\log(1 - \tanh^2(0.5)) \approx +0.240$, giving $\log \pi(a \mid s) \approx -0.486$. Near saturation ($|u|$ large) the correction grows, correctly reporting that the squashed policy has lower entropy there than the raw Gaussian suggests.
@@ -312,7 +320,7 @@ How well does it work? On the MuJoCo continuous-control benchmarks, SAC has **lo
 1. **High sample efficiency**: it is off-policy and inherits the strengths of DDPG
 2. **Stable training**: maximum entropy plus twin Q-networks make it insensitive to hyperparameters
 3. **Out of the box**: with automatic temperature tuning, one set of hyperparameters works in most environments
-4. **Strong final performance**: on environments such as HalfCheetah it reaches scores around 12000 after a million steps, matching or surpassing TD3 and DDPG, with higher scores possible given longer training
+4. **Strong final performance**: in published 1M-step HalfCheetah results it reaches scores around 12000, matching or surpassing TD3 and DDPG, with higher scores possible given longer training
 
 ### Comparing DDPG, TD3, and SAC
 
@@ -359,7 +367,7 @@ $$
 y = r + \gamma \left( \min(Q_{\phi_1'}, Q_{\phi_2'})(s', \tilde{a}') - \alpha \log \pi_\theta(\tilde{a}' \mid s') \right)
 $$
 
-Here $\tilde{a}'$ is an action sampled with reparameterization from the target policy. Note that subtracting $\alpha \log \pi$ amounts to adding the entropy term (since $\mathcal{H} = -\mathbb{E}[\log \pi]$).
+Here $\tilde{a}'$ is an action sampled with reparameterization from the target policy. Note that subtracting $\alpha \log \pi$ amounts to adding the entropy term (since $\mathcal{H} = -\mathbb{E}[\log \pi]$). With bounded actions, $\log \pi_\theta(\tilde{a}' \mid s')$ must be the squashed corrected value from the Bounded Actions subsection, not the plain Gaussian density.
 
 Taking the min over twin Q-networks serves, as in TD3, to suppress overestimation. In the actual code, the computation of this target is structured like TD3's, except for the extra log_prob term and the use of the sampled action in place of the deterministic action.
 :::
