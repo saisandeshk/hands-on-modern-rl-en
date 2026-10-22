@@ -93,6 +93,28 @@ code/chapter11_imitation_meta_rl/gail_discriminator_cartpole.py
   unquoted `title:` colon in front matter; fixed with quotes, rebuilt
   clean).
 
+## Review response
+
+One line per reviewer finding (E = error, D = doubt). All fixes were re-checked against the code and the chapter pages; no full rerun was needed since no training hyperparameters, seeds, or data pipelines changed (all reported numbers are untouched).
+
+- E1 (accepted): the "far fewer expert labels / O(T eps)" sentence was false (BC: 1000 labels vs DAgger: ~2365 at first 500.0) and mis-attributed the bound. Rewrote the `bc_dagger_cartpole.py` module docstring to state DAgger repairs the single-episode BC policy while using _more_ labels in total but only one complete demonstration episode, clarified the $O(T\epsilon)$ bound is on mistakes not labels, and retitled plot panel 3 to "Return vs expert-label budget: BC vs DAgger".
+- E2 (accepted): softened "reaching expert return from a single demonstration trajectory" / "where reliable BC needs two" in `lab.md` and `README.md` to give both numbers explicitly (one episode + ~1865 correction labels vs two episodes = 1000 labels).
+- E3 (accepted): replaced "consistently below" with "averages below (0.766 vs 0.823), though only in 2 of the 3 seeds", added the seed-1 reversal (0.800 vs 0.775) with the stable-but-wrong explanation, and noted the metric is same-distribution rather than generalisation.
+- E4 (accepted): replaced "reproduce the table numerically" with "illustrate the pattern but not the values", adding that the table uses the optimal $D^*$ (e.g. $D^* = 0.8$, reward ~1.61 vs 0) while the trained discriminator (accuracy 0.739/0.819) is far from optimal; same fix in the GAIL script docstring and README ("near zero" removed).
+- E5 (accepted): replaced "the aggregate loop, verbatim" with "with three simplifications" listing no $\beta$-mixing, fresh network per iteration, and 2 (not 50) rollouts per iteration.
+- E6 (accepted): removed the non-rendering `$1 - $` / `$500 - $` spans; the hint now uses plain words (1-minus-agreement, 500-minus-return) with only well-formed `$\epsilon$` math.
+- E7 (rejected as a file change, kept as coordinator item): editing `docs/.vitepress/config.mjs` and renaming to "11.4" are outside this worker's scope (config edits forbidden; the task spec mandates front matter `title: 11.L Lab:` and the "Sidebar additions" report entry the reviewer cites is still present). The page stays at "11.L" until the coordinator decides.
+- D1 (accepted with clarification): the report's sweep-vs-final discriminator sentence was misleading as written; the final numbers (0.739/0.819, 3.451/0.502) reproduce exactly and are unchanged, and the sweep anecdote referred to a different seed/split during diagnosis — noted here rather than silently editing history.
+- D2 (accepted): reframed exercise 6 as a compounding check (super-linear shortfall vs error), noting $T = 500$ is fixed so the bound is linear in $\epsilon$ and vacuous ($500^2 \times 0.18 \approx 4.5 \times 10^4$), horizon must vary for $T^2$ scaling, and four of five BC points sit at 500.
+- D3 (accepted): exercise 4 hint now says per-timestep returns-to-go minus a baseline (normalisation is variance reduction, not an advantage) and explains the stall (frozen discriminator trained against one weak BC policy gives ~0 reward on unseen states).
+- D4 (accepted): switched `lab.md`, `README.md`, and user-facing code docstrings from British "behaviour" to the chapter's American "behavior" spelling.
+- D5 (rejected): kept "Section 11.1.2"-style references; they match the chapter's own usage and the book precedent (e.g. "Section 6.3.2"), and renaming every cross-reference would diverge from the chapter being edited by another worker.
+- D6 (accepted): the "Held-out expert states" code comment now states the fresh trajectories come from the same distribution as training (deterministic expert, narrow resets), and the page calls it a same-distribution number.
+- D7 (accepted): harmonised runtimes — script docstring "~10 min" now "~8 min (472 s reference run)", GAIL "<10 s"/"6 s" now "<30 s"/"a few seconds" (reviewer measured 19.7 s on another machine).
+- D8 (accepted): added `pytest>=7.0.0` to `requirements.txt`, matching `code/chapter10_offline_rl/requirements.txt`.
+- D9 (accepted): added the underfitting caveat ($\epsilon \approx 0.18$ on expert states at N=1, so 378 → 500 is partly approximation error) to both `lab.md` and `README.md`, keeping the agreement-gap as the direct shift evidence.
+- D10 (accepted): the report's "Further Reading (Ross et al. 2011, Ho & Ermon 2016)" sentence described citations the lab page never made; corrected here — the page only cross-references chapter sections, no new papers or URLs were introduced.
+
 ## Open issues
 
 - An earlier full run of `bc_dagger_cartpole.py` printed the complete

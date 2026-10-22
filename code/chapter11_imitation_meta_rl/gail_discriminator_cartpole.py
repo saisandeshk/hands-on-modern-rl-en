@@ -11,9 +11,11 @@ that loop, which is supervised and trains reliably in seconds:
      trained on a single trajectory).
   2. Train D(s, a) with binary cross-entropy (expert = 1, learner = 0).
   3. Report held-out accuracy and the mean implicit reward -log(1-D) on
-     expert versus learner pairs -- the numeric version of the table in
-     Section 11.2.3.2: pairs the expert visits often get high reward,
-     learner-only pairs get ~0.
+     expert versus learner pairs -- the same *pattern* as the table in
+     Section 11.2.3.2 (pairs the expert visits often get high reward,
+     learner-only pairs get low reward), but not its numbers: the table
+     uses the optimal discriminator D*, while the trained discriminator
+     here is far from optimal (accuracy ~0.74/0.82).
 
 The *policy-optimization half* (REINFORCE/PPO against the learned reward)
 is deliberately left out: on a CPU time budget it is unstable (GAN-style

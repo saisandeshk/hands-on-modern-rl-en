@@ -1,17 +1,26 @@
 """
-Chapter 11 lab: behaviour cloning versus DAgger on CartPole-v1.
+Chapter 11 lab: behavior cloning versus DAgger on CartPole-v1.
 
 What this lab shows (see docs ``11.1 Behavior Cloning and Interactive
 Imitation Learning``):
   1. A hand-written expert controller solves CartPole-v1 (return 500).
-  2. Behaviour cloning (BC) turns the expert demonstrations into supervised
+  2. Behavior cloning (BC) turns the expert demonstrations into supervised
      learning: minimise  -E[log pi(a|s)]  over expert (s, a) pairs. With few
      demonstrations the learner agrees with the expert on most *expert*
      states yet scores far below it -- the compounding-error /
      distribution-shift effect of Section 11.1.2 (error O(T^2 eps)).
   3. DAgger (Section 11.1.3) rolls out the learner, asks the expert to label
      the visited states, aggregates and retrains. It reaches expert return
-     with far fewer expert labels than BC, i.e. the O(T eps) behaviour.
+     from one *complete* demonstration episode plus on-policy corrections
+     (a BC policy trained on the same single episode scores 377.7), i.e.
+     DAgger repairs a policy that BC cannot fix from the same data. Note
+     the accounting: DAgger uses *more* expert labels in total than the
+     two-episode BC that also reaches 500 (about 2365 vs 1000 in the
+     reference run) -- what it saves is the number of complete expert
+     demonstration episodes (one instead of two), not the label count.
+     The theory (Ross et al. 2011) bounds the learned policy's number of
+     mistakes as O(T eps) rather than O(T^2 eps); it does not promise
+     fewer expert labels, since DAgger spends one label per visited step.
 
 How to run (from the repository root):
     .venv/bin/python code/chapter11_imitation_meta_rl/bc_dagger_cartpole.py
@@ -19,8 +28,8 @@ How to run (from the repository root):
 
 Outputs (metrics JSON/CSV and PNG plots) go to
 ``runs/chapter11_imitation_meta_rl/`` (gitignored); a summary table is
-printed to stdout. Full run takes ~10 min on a laptop CPU; ``--smoke``
-finishes in under ~60 s.
+printed to stdout. Full run takes ~8 min on a laptop CPU (472 s in the
+reference run); ``--smoke`` finishes in under ~60 s.
 """
 
 from __future__ import annotations
@@ -94,7 +103,7 @@ class PolicyNet(nn.Module):
 
 
 def bc_loss_from_logits(logits: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
-    """Behaviour-cloning loss: cross-entropy = -mean(log pi(a|s)).
+    """Behavior-cloning loss: cross-entropy = -mean(log pi(a|s)).
 
     This is exactly the objective L_BC of Section 11.1.1: the negative
     log-likelihood of the expert action under the learner policy.
@@ -226,7 +235,10 @@ def run_bc_sweep(seeds, traj_counts, epochs, eval_eps, device):
     """BC for each demo count; reports return + agreement on expert vs own states."""
     rows = []
     for seed in seeds:
-        # Held-out expert states for the "agreement on expert states" metric.
+        # Fresh expert states for the "agreement on expert states" metric.
+        # Note: the expert is deterministic and CartPole resets are narrow,
+        # so these states come from the same distribution as the training
+        # demonstrations, not from a genuinely held-out distribution.
         test_s, test_a, _ = collect_expert_trajectories(5, start_seed=50_000 + seed)
         for n in traj_counts:
             seed_all(seed)
@@ -349,7 +361,7 @@ def save_plots(bc_rows, dagger_rows, outdir: Path) -> None:
     ax.axhline(500, color="gray", linestyle="--", alpha=0.6, label="expert")
     ax.set_xlabel("expert labels (state-action pairs)")
     ax.set_ylabel("mean return")
-    ax.set_title("Label efficiency: BC vs DAgger")
+    ax.set_title("Return vs expert-label budget: BC vs DAgger")
     ax.legend()
     ax.grid(True, alpha=0.3)
 

@@ -1,4 +1,4 @@
-# Chapter 11 lab: imitation learning — behaviour cloning versus DAgger
+# Chapter 11 lab: imitation learning — behavior cloning versus DAgger
 
 Hands-on companion to Chapter 11 (Imitation, inverse and meta-RL), Sections
 11.1–11.2. Environment: `CartPole-v1`. Everything is implemented from
@@ -12,18 +12,25 @@ small MLPs trained with supervised losses.
    damp the angular velocity, centre the cart) scores **500/500** on every
    seed. Because it is a function of state, it can also label any state
    DAgger visits — the "interactive expert" of Section 11.1.3.
-2. **Behaviour cloning and compounding error.** BC minimises
+2. **Behavior cloning and compounding error.** BC minimises
    `-E[log pi(a|s)]` over N expert trajectories. With N=1 the learner
    agrees with the expert on ~82% of expert states yet scores only ~378
    (and just 133 on one seed): a small per-step error snowballs once the
    learner leaves the expert state distribution (Section 11.1.2,
-   `O(T^2 eps)`).
-3. **DAgger closes the gap.** Starting from the same 1-trajectory BC
-   policy, DAgger rolls out the learner, labels the visited states with
-   the expert, aggregates and retrains. Mean return goes
-   378 → 484 → 500 in two iterations while using only **one** full expert
-   trajectory (plus on-policy corrections), instead of the two full
-   trajectories BC needs for reliable 500s.
+   `O(T^2 eps)`). Part of the N=1 shortfall is plain underfitting
+   (per-step error ~0.18 even on expert states); the direct evidence for
+   the distribution-shift mechanism is the gap between agreement on
+   expert states (0.823) and on the learner's own states (0.766 on
+   average) — modest, and not present for every seed (see the docs page).
+3. **DAgger repairs the failing policy.** Starting from the same
+   1-trajectory BC policy, DAgger rolls out the learner, labels the
+   visited states with the expert, aggregates and retrains. Mean return
+   goes 378 → 484 → 500 over two iterations, starting from a single
+   complete expert demonstration episode plus on-policy corrections
+   (about 2365 expert labels in total at iteration 2) — whereas BC needs
+   two complete episodes (1000 labels) for reliable 500s. So DAgger saves
+   complete demonstration episodes (one instead of two), not expert
+   labels in total.
 4. **GAIL-style discriminator reward (small demo).**
    `gail_discriminator_cartpole.py` trains D(s, a) to tell expert pairs
    from a weak learner's pairs and reports the implicit reward
@@ -53,11 +60,11 @@ Useful flags: `--seed N` (base seed; seeds N, N+1, N+2 are used),
 
 ## Expected runtime
 
-| Script (full config)                                                     | CPU time |
-| ------------------------------------------------------------------------ | -------- |
-| `bc_dagger_cartpole.py` (3 seeds; BC N in {1,2,5,10,25}; DAgger 5 iters) | ~8 min   |
-| `gail_discriminator_cartpole.py`                                         | <10 s    |
-| `pytest` (smoke + unit tests)                                            | ~1 min   |
+| Script (full config)                                                     | CPU time                     |
+| ------------------------------------------------------------------------ | ---------------------------- |
+| `bc_dagger_cartpole.py` (3 seeds; BC N in {1,2,5,10,25}; DAgger 5 iters) | ~8 min (472 s reference run) |
+| `gail_discriminator_cartpole.py`                                         | <30 s                        |
+| `pytest` (smoke + unit tests)                                            | ~1 min                       |
 
 ## Expected results
 
@@ -81,8 +88,9 @@ repaired by two rounds of on-policy corrections.
 `gail_discriminator_reward.png`. Reference run: discriminator accuracy
 0.739 (expert pairs) / 0.819 (learner pairs); mean implicit reward
 `-log(1-D)` 3.451 on expert pairs versus 0.502 on learner pairs —
-expert-visited pairs score high, learner-only pairs score near zero,
-as in Section 11.2.3.2.
+expert-visited pairs score much higher than learner-only pairs, the same
+pattern as (but not the values of) the optimal-D\* table in
+Section 11.2.3.2.
 
 ## Why no full GAIL
 
