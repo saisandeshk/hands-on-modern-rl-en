@@ -188,9 +188,7 @@ This completes the path from single-machine algorithms through preference optimi
 
 ## Further Reading
 
-- [MiniCPM5 Technical Report](https://arxiv.org/abs/2601.04962)
-- [Kimi K3 Technical Report](https://arxiv.org/abs/2504.12593)
-- [Qwen-AgentWorld](https://arxiv.org/abs/2506.07340)
+- [MiniCPM5-1B training notes](https://github.com/OpenBMB/MiniCPM#-minicpm5-1b)
+- [Qwen-AgentWorld](https://qwen.ai/blog?id=qwen-agentworld)
 - [SimpleRL-Zoo](https://github.com/hiyouga/SimpleRL-Zoo)
-- [SLIME](https://arxiv.org/abs/2602.02779)
 - [DeepSeek-V3 Technical Report](https://arxiv.org/abs/2412.19437)

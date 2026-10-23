@@ -105,7 +105,7 @@ $\lambda$ is the knob that adjusts the dividing line between the two kinds of re
 
 #### The Claude Adaptive Thinking API
 
-Claude 4.6 and later supported models use `thinking: {type: "adaptive"}`, with the `effort` parameter adjusting the model's tendency to use extended thinking. The interface looks roughly like this:
+Claude 4.6 and later supported models use `thinking: {type: "adaptive"}`, with the `effort` parameter adjusting the model's tendency to use extended thinking. There are four effort levels on 4.6: low, medium, high (the default), and max. The interface looks roughly like this:
 
 ```python
 # Enable adaptive thinking
@@ -114,18 +114,18 @@ response = client.messages.create(
     max_tokens=16000,
     messages=[{"role": "user", "content": "..."}],
     thinking={"type": "adaptive"},       # turn on adaptive thinking
-    output_config={"effort": "high"},   # effort level: low/medium/high
+    output_config={"effort": "high"},   # effort level: low/medium/high/max
 )
 ```
 
-Earlier versions of Extended Thinking used `budget_tokens` to set a target budget manually. On 4.6 this approach entered deprecation, and from 4.7 on, adaptive thinking plus effort is recommended. This interface evolution reflects the division of labor between two layers of control:
+Earlier versions of Extended Thinking used `budget_tokens` to set a target budget manually. On 4.6 this approach entered deprecation, and from 4.7 on, adaptive thinking plus effort is required (requests using extended thinking are rejected). This interface evolution reflects the division of labor between two layers of control:
 
 - **The model decides**: how many thinking tokens the current request actually uses and when to stop.
 - **The developer decides**: the overall effort level and the hard resource cap (max_tokens).
 
 #### Thinking Signatures: Relaying Thought Across Multi-Turn Context
 
-A thinking block in the Claude API also carries a `signature` field. When a multi-turn conversation or tool call needs to pass earlier thinking back, this signature is used to verify the integrity of the thinking content. Some hidden thinking is returned as encrypted content, which the API can keep using in the next round, but the client neither needs nor is able to read the original text.
+A thinking block in the Claude API also carries a `signature` field. When a multi-turn conversation or tool call needs to pass earlier thinking back, the client must return this signature together with the thinking blocks, so the model can continue from the earlier reasoning instead of starting over. Some hidden thinking is returned as encrypted content, which the API can keep using in the next round, but the client neither needs nor is able to read the original text.
 
 Its main role is to **preserve context integrity**: the second round of thinking needs to know what the first round thought, and cannot start over from nothing. It should not be understood as a "user-visible reasoning structure" or as "automatic safety filtering."
 
@@ -168,7 +168,7 @@ These three tasks share one process: **first produce an executable plan, read th
 
 ### Behavioral Constraints from the Constitution
 
-In 2026 Anthropic published a new [Claude Constitution](https://www.anthropic.com/news/claude-new-constitution), describing the values and behavioral principles it hopes the model will follow. It does not directly disclose the model's internal thinking at each step, but it can be turned into training samples, evaluation criteria, and external tests.
+In January 2026 Anthropic published a new [Claude Constitution](https://www.anthropic.com/news/claude-new-constitution), describing the values and behavioral principles it hopes the model will follow. It does not directly disclose the model's internal thinking at each step, but it can be turned into training samples, evaluation criteria, and external tests.
 
 #### The Constitution as a Reasoning Constraint
 
