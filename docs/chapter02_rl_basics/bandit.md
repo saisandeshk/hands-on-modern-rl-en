@@ -605,7 +605,7 @@ A fixed $\epsilon$-greedy policy keeps random exploration permanently, so even w
 
 If $\epsilon$ is made to decrease over time, for example decaying from a larger initial value to a very small one, the agent explores more early and exploits more later. A suitable decay strategy can bring the long-run regret down to sublinear, and under some stricter settings a regret bound close to logarithmic can be obtained.
 
-PAC sample complexity poses a different question: it no longer asks how much is lost in total over the first $T$ rounds, but asks "how many trials are needed to find, with probability at least $1-\delta$, an action within $\epsilon$ of the optimum." (Here $\delta$ and $\epsilon$ are the PAC accuracy parameters, not the TD error $\delta_t$ or a separate exploration rate.) This viewpoint is mainly used in theoretical analysis, and this course only needs you to know that it measures "the number of samples needed to learn a sufficiently good policy."
+PAC sample complexity poses a different question: it no longer asks how much is lost in total over the first $T$ rounds, but asks "how many trials are needed to find, with probability at least $1-\delta$, an action within $\epsilon$ of the optimum." (Here $\delta$ is the confidence parameter and $\epsilon$ the accuracy tolerance, not the TD error $\delta_t$ or a separate exploration rate.) This viewpoint is mainly used in theoretical analysis, and this course only needs you to know that it measures "the number of samples needed to learn a sufficiently good policy."
 
 :::
 

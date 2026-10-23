@@ -49,8 +49,27 @@ Harmonized mathematical notation across `preface`, `chapter01`–`chapter05` aga
 - `npx prettier --write <13 changed pages>` — all formatted (12 unchanged, 1 reformatted).
 - `npx vitepress build docs` — succeeded (client + SSR built, pages rendered, no dead links).
 - No code tests named in task; no `code/` files changed, so none run.
+- Review round: `npx prettier --write` on the 10 review-touched pages plus this report (all clean); `npx vitepress build docs` succeeded; `.venv/bin/python -c` confirmed the fixed `print("\n...")` line runs.
 
 ## Open issues
 
 - Cross-chapter reward indexing is documented, not unified: Preface/Ch.1-intro use $r_{t+1}$-style, Ch.2 §2.2/Ch.3/Ch.5 use $r_t$, Ch.2 §2.3/Ch.4 use $R_{t+1}$. Each chapter is now internally consistent or noted, but a book-wide unification (D.5 prefers $r_t$) is left to the coordinator.
 - $\epsilon$ vs $\varepsilon$ glyphs still vary by chapter (Ch.2/4 $\epsilon$, Ch.3 $\varepsilon$, Ch.5 both with note); D.5 lists them as variants, so notes were used instead of mass replacement.
+
+## Review response
+
+- Error 1 (`lab.md` leftover `Q^\star`): accepted. Replaced the table header and the sentence below with `Q^*`; verified no `Q^\star` remains on the page.
+- Error 2 (`from-q-to-dqn.md` false §5.2 `$r_t` cross-reference): accepted. §5.2 uses bare `$r$`; `$r_t$` appears in the §5.4 n-step target. Reworded the note to point at the §5.4 n-step target.
+- Error 3 (`value-q.md` `print(\"\\n...` invalid Python): accepted. Fixed to `print("\nOne greedy policy learned:")`; verified the line runs under `.venv/bin/python`.
+- Error 4 (`value-q.md` "Chapter 4 ... DQN"): accepted. DQN is Chapter 5 (Chapter 4 is DP/MC/TD). Changed to "Chapter 5".
+- Error 5 (`value-q.md` "top row, one cell above the cliff"): accepted. The safe CliffWalking path runs along the row directly above the cliff (lab map row 2), not the top row. Reworded accordingly.
+- Error 6 (`dp-mc-td.md` leftover `$v_\pi$`): accepted. Changed to `$V^\pi$`; verified no `$v_\pi$` remains on the page.
+- Error 7 (`policy-value.md` `$R$`/`$r$` mix, late convention note): accepted. Added the `$R_{t+1}$` convention plus realized-value `$r$` note at first use (§2.3 optimal-policy equation), clarified `$r_1$` as the realized value of `$R_1$`, and fixed the Section Summary to `$\sum \gamma^k R_{t+k+1}$`.
+- Error 8 (`review.md` "single-digit value losses ... 0.00014"): accepted. `$0.00014 = 1.4\times 10^{-4}$` is not single-digit. Reworded to "very small value losses (for example `$1.4\times 10^{-4}$` ...)".
+- Error 9 (`review.md` "each episode now spans the full 2048-step rollout"): accepted. A completed episode is 500 steps; the rollout contains about four episodes. Reworded to "the rollout contains about four full 500-step episodes".
+- Error 10 (`bandit.md` "$\delta$ and $\epsilon$ are the PAC accuracy parameters"): accepted. `$\delta$` is the confidence/failure probability and `$\epsilon$` the accuracy tolerance. Fixed the parenthetical.
+- Doubt 1 (`review.md` `$R(s_t,a_t)$` vs §2.3 `$R_{t+1}$`): accepted. Aligned the summary optimal-policy formula with §2.3 (`$\sum \gamma^t R_{t+1}$`); equal by the tower property when `$R(s,a)$` is the expected reward, so no meaning change.
+- Doubt 2 (`dqn-family.md` `$\beta$` note omits intrinsic-reward weight): accepted. Extended the PER `$\beta$` note to also disambiguate the intrinsic-reward weight `$\beta$` below.
+- Doubt 3 (`lab.md` first/every-visit "slightly different quantities"): accepted. On this episodic task both estimate `$V^\pi$`; they differ in weighting revisits. Reworded the hint accordingly.
+- Doubt 4 (`review.md` "`$r_i$` in the next line"): accepted. `$r_i$` appears in the clip-fraction bullet two lines below, not the next line. Fixed to "in the clip-fraction line below".
+- Doubt 5 (`brief-history` `$G_t = \sum...$` as "expected" reward): accepted. `$G_t$` is the realized return; the objective is `$\max_\pi \mathbb{E}_\pi[G_0]$`. Restated the sentence to give the objective and define the return.

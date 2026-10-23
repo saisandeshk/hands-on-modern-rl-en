@@ -27,7 +27,7 @@ This chapter built the modeling language of reinforcement learning. Section 2.1 
 - MDP tuple: $\mathcal{M} = (\mathcal{S}, \mathcal{A}, P, R, \gamma)$. Reading: the situation set, the action set, the dynamics, the scoring rule, and the patience parameter.
 - Discounted return: $G_t = \sum_{k=0}^{\infty} \gamma^k r_{t+k} = r_t + \gamma G_{t+1}$. Reading: future rewards summed with shrinking weights; the tail is summarized by the next return.
 - Return bound: $G_t \le R_{\max}/(1-\gamma)$. Reading: discounting keeps infinite-horizon returns finite, with effective horizon $H = 1/(1-\gamma)$.
-- Optimal policy: $\pi^* = \arg\max_\pi \mathbb{E}_\pi[\sum_{t=0}^{\infty} \gamma^t R(s_t, a_t)]$. Reading: the decision rule with the largest expected long-term return.
+- Optimal policy: $\pi^* = \arg\max_\pi \mathbb{E}_\pi[\sum_{t=0}^{\infty} \gamma^t R_{t+1}]$. Reading: the decision rule with the largest expected long-term return.
 - State and action values: $V^\pi(s) = \mathbb{E}_\pi[G_t \mid s_t = s]$, $Q^\pi(s,a) = \mathbb{E}_\pi[G_t \mid s_t = s, a_t = a]$. Reading: the average future return from a state, and from a state plus a fixed first action.
 - Value-action link: $V^\pi(s) = \sum_a \pi(a \mid s)\, Q^\pi(s,a)$. Reading: a state's value is the policy-weighted average of its action values.
 - Advantage: $A^\pi(s,a) = Q^\pi(s,a) - V^\pi(s)$. Reading: how much better this action is than the policy's average choice.

@@ -108,7 +108,7 @@ $V^\pi(s)$ is the average of all possible future returns after "start from $s$ a
 
 This is exactly what Sutton and Barto call the prediction problem in Chapter 6: given a policy $\pi$, estimate its value function $V^\pi$[^4]. During learning, an algorithm does not directly observe the true $V^\pi$, because it is a conditional expectation: an average over all possible future returns given that we start from $s$ and keep acting according to $\pi$, not the return from a single specific trajectory. In practice, the algorithm can only sample a limited number of trajectories; it cannot exhaust all possibilities. So it maintains a current estimate $V$ and then uses newly obtained information to gradually correct it.
 
-This requires a crucial intermediary: use a **currently available estimator** to stand in for the unknown true $v_\pi$ and to correct $V(S_t)$. Sutton and Barto simply call this estimator the target.
+This requires a crucial intermediary: use a **currently available estimator** to stand in for the unknown true $V^\pi$ and to correct $V(S_t)$. Sutton and Barto simply call this estimator the target.
 
 The core difference among the three classic methods is precisely how they construct this target.
 

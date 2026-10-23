@@ -323,7 +323,7 @@ for episode in range(2000):
 print("Q-values of the four actions at the start state:")
 print(dict(zip(ARROWS, Q[to_state(START)].round(3))))
 
-print(\"\\nOne greedy policy learned:\")
+print("\nOne greedy policy learned:")
 for row in range(N):
     cells = []
     for col in range(N):
@@ -387,7 +387,7 @@ $$
 Q(s,a) \leftarrow Q(s,a) + \alpha\left[r + \gamma\max_{a'}Q(s',a') - Q(s,a)\right].
 $$
 
-Its target is $r+\gamma\max_{a'}Q(s',a')$. Regardless of which next action the behavior policy actually executes, Q-Learning uses the largest Q-value in $s'$. It therefore assumes that the next step will execute the optimal action perfectly. The resulting policy follows the shortest path along the top row, one cell above the cliff, without accounting for the risk that exploration may move the agent downward.
+Its target is $r+\gamma\max_{a'}Q(s',a')$. Regardless of which next action the behavior policy actually executes, Q-Learning uses the largest Q-value in $s'$. It therefore assumes that the next step will execute the optimal action perfectly. The resulting policy follows the shortest path along the row directly above the cliff, without accounting for the risk that exploration may move the agent downward.
 
 **SARSA** uses
 
@@ -412,7 +412,7 @@ But it relies on a fundamental assumption: **the numbers of states and actions m
 
 In 4×4 GridWorld, we have only 16 states × 4 actions = 64 $Q$ values. But in robot control, the state may include countless combinations of angles and velocities, forming a continuous space with infinitely many states. In video games, the state may be an image frame, and the number of possible pixel configurations is far beyond what any table can store. A table simply cannot fit.
 
-So the core idea of Q-Learning has not become obsolete: iteratively approximate the solution to the Bellman optimality equation using TD targets. What becomes infeasible is “store a separate row for every state-action pair”. Chapter 4 will tackle this exact issue: if a table cannot fit, can we use a neural network to **approximate** the entire $Q$ function? The answer is Deep Q-Networks (DQN).
+So the core idea of Q-Learning has not become obsolete: iteratively approximate the solution to the Bellman optimality equation using TD targets. What becomes infeasible is “store a separate row for every state-action pair”. Chapter 5 will tackle this exact issue: if a table cannot fit, can we use a neural network to **approximate** the entire $Q$ function? The answer is Deep Q-Networks (DQN).
 
 Previous section: [3.1 State Values and Bellman Expectation](./value-bellman) | Next section: [3.3 Hands-on: Value Function Experiments](./value-experiment)
 

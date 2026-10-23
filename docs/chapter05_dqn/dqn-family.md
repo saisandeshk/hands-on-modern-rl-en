@@ -186,7 +186,7 @@ w_i = \left(\frac{1}{N P(i)}\right)^\beta,
 $$
 
 and often divides $w_i$ by the largest weight in the current batch to keep the values numerically stable.
-The parameter $\beta$ controls the strength of the correction. (This PER $\beta$ is distinct from the KL-penalty $\beta$ in later LLM chapters; context disambiguates.)
+The parameter $\beta$ controls the strength of the correction. (This PER $\beta$ is distinct from the KL-penalty $\beta$ in later LLM chapters and the intrinsic-reward weight $\beta$ below; context disambiguates.)
 During training, the loss can be written as
 
 $$
