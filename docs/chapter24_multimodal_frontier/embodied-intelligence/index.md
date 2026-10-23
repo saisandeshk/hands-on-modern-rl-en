@@ -203,7 +203,7 @@ How does the RL we studied in earlier chapters (such as CartPole or Atari games)
   - **Core insight**: Most effort in embodied RL goes into designing a **composite reward function** with a dozen or more sub-terms.
   - **Mathematical modeling**: The reward is decomposed into a weighted sum of "task rewards" and "regularization penalties":
     $$
-    R_t = \sum_{i} w_i r_{task, i} - \sum_{j} \lambda_j c_{penalty, j}
+    r_t = \sum_{i} w_i r_{task, i} - \sum_{j} \lambda_j c_{penalty, j}
     $$
   - **Code in practice**: Looking at actual quadruped robot RL code (e.g., in `unitree_rl_gym`), each frame's reward calculation can span dozens of lines, like carefully crafting a work of art:
 

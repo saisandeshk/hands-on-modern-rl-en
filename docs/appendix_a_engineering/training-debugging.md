@@ -273,7 +273,7 @@ In Actor-Critic, the Critic's job is to estimate state value. It doesn't directl
 
 - **Signal — value loss doesn't decrease over time:** Critic hasn't fit returns
 - **Signal — explained variance $\le$ 0:** the value prediction is no better than predicting the mean return. Explained variance is $1 - \mathrm{Var}(y - \hat{V}) / \mathrm{Var}(y)$, where $y$ is the return target and $\hat{V}$ the Critic prediction; 1 is perfect, 0 means "as good as a constant," negative means worse. Track it alongside value loss, because loss alone is scale-dependent while explained variance is normalized.
-- **Signal — TD error or Q-scale drift:** track the mean and max of the TD error $\delta = r + \gamma V(s') - V(s)$ (or the Q-prediction scale in Q-learning). A sudden jump in $|\delta|$ or in predicted-value magnitude usually precedes value-loss explosion; it often traces back to reward outliers, a broken `done` mask (bootstrapping past termination), or a target-network sync failure.
+- **Signal — TD error or Q-scale drift:** track the mean and max of the TD error $\delta_t = r_t + \gamma V(s_{t+1}) - V(s_t)$ (or the Q-prediction scale in Q-learning). A sudden jump in $|\delta_t|$ or in predicted-value magnitude usually precedes value-loss explosion; it often traces back to reward outliers, a broken `done` mask (bootstrapping past termination), or a target-network sync failure.
 - **Signal — policy reward oscillates:** Actor is pushed around by noisy advantage
 - **Signal — value prediction scale much smaller than return:** reward scale or value target has problems
 

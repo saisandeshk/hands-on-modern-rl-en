@@ -14,9 +14,9 @@ GRPO training of long-chain reasoning models hits four issues: symmetric clippin
 
 ## Core Variables
 
-- `ratio`: new/old policy probability ratio $r = \exp(\text{new\_logp} - \text{old\_logp})$
-- `advantage`: group-wise z-score $\hat{A}_{i,t} = (R_i - \bar R)/\mathrm{std}(R)$ (same as GRPO)
-- `ε_{low}`, `ε_{high}`: decoupled clipping lower / upper bounds (paper typical 0.2 / 0.28)
+- `ratio`: new/old policy probability ratio $r_t(\theta) = \exp(\text{new\_logp} - \text{old\_logp})$ (per token; same $r_t(\theta)$ as PPO, not a reward)
+- `advantage`: group-wise z-score $\hat{A}_{i,t} = (r_i - \bar r)/\mathrm{std}(r)$ (same as GRPO: lowercase $r$ for rewards)
+- $\epsilon_{\text{low}}$, $\epsilon_{\text{high}}$: decoupled clipping lower / upper bounds (paper typical 0.2 / 0.28)
 - `reward_std`: within-group reward std, used by dynamic sampling filter
 - `max_len`, `buffer_len`, `penalty_factor`: soft overlong threshold, buffer width, max deduction
 
@@ -30,7 +30,7 @@ GRPO training of long-chain reasoning models hits four issues: symmetric clippin
 
 | Modification     | GRPO                                      | DAPO                                                                            |
 | ---------------- | ----------------------------------------- | ------------------------------------------------------------------------------- |
-| clipping         | symmetric `clip(r, 1-ε, 1+ε)`             | decoupled `clip(r, 1-ε_{low}, 1+ε_{high})`, looser upper bound                  |
+| clipping         | symmetric `clip(ratio, 1-eps, 1+eps)`     | decoupled `clip(ratio, 1-eps_low, 1+eps_high)`, looser upper bound              |
 | sampling         | keep all prompts                          | filter prompts whose within-group reward variance is 0                          |
 | loss granularity | sequence-level (token-mean then seq-mean) | token-level (sum all tokens, divide by total token count)                       |
 | overlong answer  | reward=0 (binary cliff)                   | soft penalty: linear deduction past soft threshold, capped at `-penalty_factor` |
@@ -41,11 +41,11 @@ GRPO training of long-chain reasoning models hits four issues: symmetric clippin
 
 ### Core Problem
 
-Symmetric clipping `clip(r, 1-ε, 1+ε)` uses the same ε on both sides. But good actions with positive advantage deserve larger steps (upper ε should be bigger); bad actions with negative advantage should move more cautiously (lower ε can be smaller). DAPO decouples the two bounds so each direction's exploration strength is tuned independently.
+Symmetric clipping `clip(ratio, 1-eps, 1+eps)` uses the same bound on both sides. But good actions with positive advantage deserve larger steps (the upper bound is raised); the lower bound stays tight at its symmetric value. Note the direction: lowering $1-\epsilon_{\text{low}}$ (a larger $\epsilon_{\text{low}}$) permits a stronger downward move on bad actions, not a more cautious one. DAPO decouples the two bounds so each direction's update strength is tuned independently.
 
 ### One-Line Memory
 
-> **Same min-clipped as PPO, but with asymmetric $\varepsilon$: wide upper $\varepsilon_{high}$, tight lower $\varepsilon_{low}$.**
+> **Same min-clipped as PPO, but with asymmetric $\epsilon$: wide upper $\epsilon_{high}$, tight lower $\epsilon_{low}$.**
 
 ### Pseudocode
 
@@ -246,7 +246,7 @@ loss = policy_loss  # DAPO objective; add + kl_coeff * kl only to recover the GR
 
 | Pitfall                                   | Explanation                                                                             |
 | ----------------------------------------- | --------------------------------------------------------------------------------------- |
-| Decoupled clipping ≠ no clipping          | Still PPO's `min(r*A, clip(r,lo,hi)*A)`, just with asymmetric ε                         |
+| Decoupled clipping ≠ no clipping          | Still PPO's `min(ratio*A, clip(ratio,lo,hi)*A)`, just with asymmetric ε                 |
 | Each sign of advantage binds only one ε   | For A>0 the lower bound is inactive; for A<0 the upper bound is inactive (eaten by min) |
 | Dynamic sampling criterion                | Not "reward below threshold", but "**within-group reward variance is 0**"               |
 | Token-level loss is the fourth key change | GRPO aggregates at sequence level, DAPO at token level — long answers carry more weight |

@@ -54,12 +54,12 @@ We begin with correctness, which is easiest to implement, then add prosody and l
 
 ### Content Correctness
 
-For a response $a$ and reference answer $a^*$, the simplest reward is binary:
+For a response $y$ and reference answer $y^*$, the simplest reward is binary:
 
 $$
-R_{\mathrm{content}}(a,a^*)=
+R_{\mathrm{content}}(y,y^*)=
 \begin{cases}
-1,&a=a^*,\\
+1,&y=y^*,\\
 0,&\text{otherwise}.
 \end{cases}
 $$
@@ -73,7 +73,7 @@ Prosody includes pitch, rhythm, intensity, and pauses. It has no single correct 
 $$
 \mathcal{L}_{\mathrm{RM}}
 =
--\log\sigma\!\left(R_\phi(y_w)-R_\phi(y_l)\right).
+-\log\sigma\!\left(r_\phi(y_w)-r_\phi(y_l)\right).
 $$
 
 Suppose response A is factually correct but completely monotone, while response B is factually wrong but sounds natural. Different annotators may prioritize content or experience. A single scalar hides which dimension produced the preference.
@@ -168,7 +168,7 @@ The first chain may even hallucinate lyrics. As it grows longer, it compounds re
 
 ### MGRD: Modality-Grounded Reasoning Distillation
 
-**MGRD (Modality-Grounded Reasoning Distillation)** is Step-Audio-R1's central training framework. Across $T$ iterations, it moves the basis of reasoning from textual surrogates to acoustic evidence:
+**MGRD (Modality-Grounded Reasoning Distillation)** is Step-Audio-R1's central training framework. Across $T$ iterations (here $T$ counts MGRD outer-loop iterations, not environment steps), it moves the basis of reasoning from textual surrogates to acoustic evidence:
 
 ```mermaid
 graph TB
@@ -232,7 +232,7 @@ $$
 The 0.8/0.2 split has experimental support. Removing the 0.2 format reward reduces reasoning length from 2,800 to 1,500 tokens and MMAU accuracy from 77.7 to 76.5. RL naturally favors a token-efficient shortcut—skip reasoning and emit the answer—so the training signal must explicitly preserve the reasoning process.
 
 ::: details MGRD data selection: pass@8 in [3, 6]
-The RL dataset contains only 5,000 examples and is tightly filtered. The previous policy samples each question eight times, and training keeps questions with pass@8 between 3 and 6. Easier questions offer little learning signal; questions below that range are more likely to be ambiguous.
+The RL dataset contains only 5,000 examples and is tightly filtered. The previous policy samples each question eight times, and training keeps questions where 3 to 6 of the 8 samples pass (not a pass@k rate; easy questions offer little learning signal while questions below that range are more likely to be ambiguous).
 
 ![Data-selection reward](./images/data-selection-reward.png)
 
@@ -335,7 +335,7 @@ With $c\ne\varnothing$, the evaluator can check a condition such as whether the 
 Given advantages $\hat A_t$, the paper uses a PPO-style objective with a reference-policy KL term:
 
 $$
-\mathcal{J}_{\mathrm{RLHF}}(\theta)
+J_{\mathrm{RLHF}}(\theta)
 =\mathbb{E}_t\!\left[
 \min\!\left(
 \rho_t(\theta)\hat A_t,
@@ -345,7 +345,7 @@ $$
 -\beta D_{\mathrm{KL}}(\pi_\theta\|\pi_{\mathrm{ref}}).
 $$
 
-Here $\rho_t$ is the new-to-old policy probability ratio. Clipping limits one update, and the KL term keeps the policy near the reference. This objective comes from [Section 3.3 of Step-Audio-R1.5](https://arxiv.org/html/2604.25719#S3.SS3); it should not be described as DPO.
+Here $\rho_t(\theta)$ is the new-to-old policy probability ratio (the same PPO ratio written $r_t(\theta)$ in the notation page and Appendix B; $\rho_t$ is kept here so it is not confused with the reasoning trace $r$ and the GRM scalar $r$ on this page). Clipping limits one update, and the KL term keeps the policy near the reference. This objective comes from [Section 3.3 of Step-Audio-R1.5](https://arxiv.org/html/2604.25719#S3.SS3); it should not be described as DPO.
 
 ### Preserving Prosodic Naturalness
 

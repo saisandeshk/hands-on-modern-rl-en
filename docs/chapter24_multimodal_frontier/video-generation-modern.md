@@ -128,10 +128,10 @@ The boundary of this route is also clear: the reward must be stably differentiab
 Two findings in the video part deserve a closer look. The first is how multiple rewards are combined. Different reward models score on different scales, and adding them directly lets the reward with larger numbers dominate training. DanceGRPO first normalizes each reward within the group separately and then adds up the normalized advantages:
 
 $$
-A_i=\sum_{k=1}^{K}\frac{r_i^k-\mu^k}{\sigma^k}.
+\hat A_i=\sum_{k=1}^{K_{\text{rew}}}\frac{r_i^k-\mu^k}{\sigma^k}.
 $$
 
-$r_i^k$ is the score of the $i$-th sample on the $k$-th reward, and $\mu^k$ and $\sigma^k$ are the mean and standard deviation of that reward within the group. The paper also observed that training with HPS-v2.1 alone makes images look unnaturally oily and glossy, and adding the CLIP score restores a natural look. The two rewards constrain each other, which is more stable than single-reward training.
+$r_i^k$ is the score of the $i$-th sample on the $k$-th reward ($K_{\text{rew}}$ rewards in total; a different $K$ counts candidates or unroll steps elsewhere in this chapter), and $\mu^k$ and $\sigma^k$ are the mean and standard deviation of that reward within the group. The paper also observed that training with HPS-v2.1 alone makes images look unnaturally oily and glossy, and adding the CLIP score restores a natural look. The two rewards constrain each other, which is more stable than single-reward training.
 
 The second finding comes from the image-to-video task. The input image of SkyReels-I2V already fixes the picture content and the ceiling of text matching, so what remains to optimize in parameter space is almost only motion quality. DanceGRPO uses the VideoAlign motion score as the reward and obtains a 118% relative improvement on that dimension. This example shows that choosing which sub-signal to optimize requires first looking at how much freedom the task still leaves to the model.
 

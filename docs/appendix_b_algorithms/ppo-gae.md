@@ -91,16 +91,16 @@ def compute_gae(rewards, values, dones, gamma=0.99, lam=0.95):
 
 **Core variables**:
 
-- `ratio`: $r_t(\theta) = \pi_\theta(a_t\mid s_t) / \pi_{\theta_{old}}(a_t\mid s_t)$, the new/old policy ratio (denominator is the sampling policy)
+- `ratio`: $r_t(\theta) = \pi_\theta(a_t\mid s_t) / \pi_{\text{old}}(a_t\mid s_t)$, the new/old policy ratio (denominator is the sampling policy)
 - `advantage`: $\hat{A}_t$, from GAE
 - `eps` ($\epsilon$): clip range, typically `0.1` or `0.2`
 - `new_log_prob` / `old_log_prob`: log-probs under the current and sampling policies
 
 ### One-Line Memory
 
-> Ratio $r_t = \pi_{new}/\pi_{old}$, clipped to $[1-\epsilon, 1+\epsilon]$; take min of the raw and clipped surrogate — trust only the more conservative one.
+> Ratio $r_t(\theta) = \pi_\theta/\pi_{\text{old}}$, clipped to $[1-\epsilon, 1+\epsilon]$; take min of the raw and clipped surrogate — trust only the more conservative one.
 
-$$L^{CLIP} = -\min\big(r_t(\theta) \cdot A_t,\;\text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon) \cdot A_t\big)$$
+$$L^{CLIP} = -\min\big(r_t(\theta) \cdot \hat{A}_t,\;\text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon) \cdot \hat{A}_t\big)$$
 
 ### Pseudocode
 
@@ -157,12 +157,12 @@ def ppo_policy_loss(new_logps, old_logps, advantages, clip_eps=0.2):
 
 - `value_pred`: critic's current prediction of $V(s_t)$
 - `old_values`: critic's prediction at sampling time, used as the clip reference
-- `returns`: $R_t = \hat{A}_t + V_{old}(s_t)$, regression target from GAE
+- `returns`: $y_t = \hat{A}_t + V_{old}(s_t)$, regression target from GAE (the $y_t$ target in the notation page; not a reward)
 - `eps`: clip range, shared with the policy loss
 
 ### One-Line Memory
 
-> $(V_{pred} - R)^2$ averaged; optional clip: don't let the new prediction stray past $\epsilon$ from the old one.
+> $(V_{pred} - y)^2$ averaged; optional clip: don't let the new prediction stray past $\epsilon$ from the old one.
 
 ### Pseudocode
 
@@ -212,7 +212,7 @@ A minus sign precedes entropy: maximizing entropy is equivalent to subtracting i
 | Pitfall                       | Explanation                                                                                                   |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | Using division for `ratio`    | Use `exp(logp_new - logp_old)`; it is more numerically stable.                                                |
-| Wrong `ratio` denominator     | The denominator must be the sampling policy $\pi_{old}$, not the current policy.                              |
+| Wrong `ratio` denominator     | The denominator must be the sampling policy $\pi_{\text{old}}$, not the current policy.                       |
 | Wrong clip range              | It is $[1-\epsilon, 1+\epsilon]$ around 1, not $[-\epsilon, \epsilon]$ around 0.                              |
 | `min`/`max` confusion         | Policy loss takes `min` over the **two surrogates** (conservative); value loss takes `max` over the two MSEs. |
 | Forgot to stop gradients      | `old_log_probs` and `old_values` should be `.detach()`'d.                                                     |

@@ -20,7 +20,7 @@ $$
 $$
 
 $$
-J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\left[\sum_{t=0}^{T} \gamma^t R(s_t, a_t)\right] \quad \text{(multi-turn objective over complete trajectories)}
+J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\left[\sum_{t=0}^{T} \gamma^t r(s_t, a_t)\right] \quad \text{(multi-turn objective over complete trajectories)}
 $$
 
 $$
@@ -55,9 +55,9 @@ $$\mathbb{E}_{a \sim \pi_\theta}[r(a)]$$
 
 Agentic RL instead maximizes the cumulative return of the entire trajectory. What the model searches for at step $0$ determines which flights it observes at step $1$; the flight it selects at step $1$ determines which inventory it must inspect at step $2$. The objective is therefore
 
-$$J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\left[\sum_{t=0}^{T} \gamma^t R(s_t, a_t)\right]$$
+$$J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\left[\sum_{t=0}^{T} \gamma^t r(s_t, a_t)\right]$$
 
-The notation $\tau \sim \pi_\theta$ means that the trajectory is sampled by letting the current policy interact with the environment. The factor $\gamma^t$ discounts delayed rewards, and $R(s_t,a_t)$ is the reward produced by the action at step $t$, including any final reward assigned back to that step. The training objective is now to **increase the total return of the interaction process**.
+The notation $\tau \sim \pi_\theta$ means that the trajectory is sampled by letting the current policy interact with the environment. The factor $\gamma^t$ discounts delayed rewards, $r(s_t,a_t)$ is the realized step reward produced by the action at step $t$ (lowercase $r$, as in the notation page), $T$ is the final step index (so indices $0,\ldots,T$ give $T+1$ steps), and any final task reward is assigned back to the responsible steps. The training objective is now to **increase the total return of the interaction process**.
 
 Trajectory return tells us what to optimize, but it does not yet tell us how each step should learn. A successful booking does not make every preceding action useful: the model may have taken a long detour and recovered only at the end. A failed booking does not make every action wrong either: the model may have found the correct flight and then supplied an invalid parameter when placing the order. Training needs to assign the final outcome back to individual steps so that it can strengthen useful actions and correct harmful ones.
 
@@ -67,7 +67,7 @@ $$
 A_t = R(\tau) - \bar{R}(s_t)
 $$
 
-It compares the total reward $R(\tau)$ along the entire trajectory with the baseline return $\bar{R}(s_t)$ from the nearby state $s_t$, to determine whether the performance after the $t$-th step is above the usual level. The subsequent subsections discuss reward shaping, process rewards, round discounts, and intra-group advantage, all aiming to construct a more reliable $A_t$ so that the final reward can more accurately influence each action step.
+It compares the total reward $R(\tau)$ along the entire trajectory with the baseline return $\bar{R}(s_t)$ from the nearby state $s_t$ (a baseline approximating $V(s_t)$), to determine whether the performance after the $t$-th step is above the usual level. The subsequent subsections discuss reward shaping, process rewards, round discounts, and intra-group advantage, all aiming to construct a more reliable $A_t$ so that the final reward can more accurately influence each action step.
 
 This chapter continues to use the previously established MDP, policy gradient, GRPO, and verifiable reward, and re-examines them within the context of multi-round interaction tasks. When it comes to the Agent scenario, training is not only about updating the policy, but also involves handling asynchronous environments, sandbox management, inconsistent trajectory lengths, and long-term credit assignment in engineering issues.
 

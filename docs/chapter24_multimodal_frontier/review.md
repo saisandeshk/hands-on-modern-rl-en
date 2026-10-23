@@ -20,16 +20,16 @@ This chapter moved RL from text and game simulators into audio, bodies, and pixe
 ## Key equations
 
 - Residual quantization: $c_k=\arg\min_c\|e^{(k-1)}-\mathrm{CB}_k[c]\|$, $e^{(k)}=e^{(k-1)}-\mathrm{CB}_k[c_k]$. Reading: each codebook encodes only the residual left by the previous one.
-- Bradley–Terry preference loss: $\mathcal{L}_{\mathrm{RM}}=-\log\sigma(R_\phi(y_w)-R_\phi(y_l))$. Reading: push the preferred response above the rejected one.
+- Bradley–Terry preference loss: $\mathcal{L}_{\mathrm{RM}}=-\log\sigma(r_\phi(y_w)-r_\phi(y_l))$. Reading: push the preferred response above the rejected one.
 - Audio total reward (teaching template): $R_{\mathrm{total}}=w_cR_{\mathrm{content}}+w_pR_{\mathrm{prosody}}+w_lR_{\mathrm{latency}}$. Reading: the weights state which layer the product cares about.
 - Group-relative advantage: $\hat A_i=(r_i-\mathrm{mean}(r)) / (\mathrm{std}(r)+\varepsilon)$. Reading: score each sample against its own prompt group, not against other prompts.
 - Continuous Gaussian policy: $\pi_\theta(a|s)=\mathcal{N}(\mu_\theta(s),\Sigma)$. Reading: the network outputs a mean action per joint; the covariance sets exploration.
-- Low-level PD control: $\tau=K_p(q_{\mathrm{target}}-q_{\mathrm{current}})-K_d\dot q$. Reading: torque is proportional to position error minus damping on velocity.
+- Low-level PD control: $\tau=K_p(q_{\mathrm{target}}-q_{\mathrm{current}})-K_d\dot q$. Reading: joint torque is proportional to position error minus damping on velocity. (Here $\tau$ denotes torque, not a trajectory.)
 - Domain randomization: $J(\theta)=\mathbb{E}_{\mu\sim p(\mu)}[\mathbb{E}_{\tau\sim\mathcal{P}_\mu}[R(\tau)]]$. Reading: maximize average return over randomized physics, not one simulator.
 - World model: $\hat p_\phi(s_{t+1},r_t,d_t\mid s_t,a_t)$. Reading: given state and action, predict what the world does next.
 - Probabilistic dynamics (PETS): $p_{\phi_i}(\Delta s_t,r_t\mid s_t,a_t)=\mathcal{N}(\mu_{\phi_i},\Sigma_{\phi_i})$. Reading: predict a mean change plus honest uncertainty.
 - DDPO objective and gradient: $J(\theta)=\mathbb{E}_{\tau\sim p_\theta}[R(\tau,c)]$, $\nabla_\theta J=\mathbb{E}[R(\tau,c)\sum_t\nabla_\theta\log p_\theta(x_{t-1}\mid x_t,t,c)]$. Reading: one terminal image score updates every denoising step.
-- PPO-style clip: $L_{\mathrm{clip}}=-\mathbb{E}[\min(\rho_t\hat A,\mathrm{clip}(\rho_t,1-\epsilon,1+\epsilon)\hat A)]$. Reading: encourage better actions without letting one update move too far.
+- PPO-style clip: $L^{CLIP}=-\mathbb{E}[\min(r_t(\theta)\hat A_t,\mathrm{clip}(r_t(\theta),1-\epsilon,1+\epsilon)\hat A_t)]$. Reading: encourage better actions without letting one update move too far. (The same ratio is written $\rho_t$ in §24.4; both spellings are listed as variants in the notation page.)
 - Video reward split (teaching template): $R=\lambda_qR_{\mathrm{quality}}+\lambda_aR_{\mathrm{alignment}}+\lambda_tR_{\mathrm{temporal}}+\lambda_pR_{\mathrm{physics}}$. Reading: keep the four failure layers as separate signals.
 - Causal order check: $t_{\mathrm{approach}}<t_{\mathrm{contact}}<t_{\mathrm{fall}}$. Reading: the fall must come after contact, however good each frame looks.
 

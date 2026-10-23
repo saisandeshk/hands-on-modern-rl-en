@@ -32,10 +32,10 @@ $$
 The POMDP six-tuple: the agent never sees the full environment state, only observations and interaction history.
 
 $$
-J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\left[\sum_{t=0}^{T} \gamma^t R(s_t, a_t)\right]
+J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\left[\sum_{t=0}^{T} \gamma^t r(s_t, a_t)\right]
 $$
 
-The multi-turn objective: maximize expected discounted return over complete trajectories, not over single responses.
+The multi-turn objective: maximize expected discounted return over complete trajectories, not over single responses. ($T$ is the final step index; $r(s_t, a_t)$ is the realized step reward, lowercase as in the notation page.)
 
 $$
 G_t = r_t + \gamma G_{t+1}
@@ -177,7 +177,7 @@ In the DeepCoder lab, one GRPO group of 4 rollouts for the same problem earns re
 
 1. Compute the group mean, the population standard deviation, and the advantage of each rollout.
 2. State which rollouts are reinforced and which are suppressed.
-3. The baseline evaluation solves 6 of 20 problems and the post-training evaluation scores about 20 of 50 (39.0% as printed by the lab). Compute both Pass@1 values and the percentage-point gain.
+3. The baseline evaluation solves 6 of 20 problems and the post-training evaluation scores about 20 of 50 (40.0%). Compute both Pass@1 values and the percentage-point gain.
 
 ::: details Solution
 
@@ -189,7 +189,7 @@ $$
 
 2. The two successful rollouts (advantage $+1$) are reinforced — the update raises the probability of the decisions that produced them. The two failed rollouts (advantage $-1$) are suppressed. Note the signal exists only because the group is mixed: had all four succeeded or all four failed, the std would be 0 and no relative advantage could be computed, which is why GRPO needs enough samples per group.
 
-3. Baseline Pass@1 $= 6/20 = 30.0\%$. Post-training Pass@1 $= 39.0\%$ as reported by the lab (about 20 of 50). Gain $\approx 9$ percentage points (consistent with the lab's reported +8–10 point range).
+3. Baseline Pass@1 $= 6/20 = 30.0\%$. Post-training Pass@1 $= 20/50 = 40.0\%$ (about 20 of 50). Gain $\approx 10$ percentage points.
    :::
 
 ### Exercise 7 — Coding: verify discounted returns with the chapter code

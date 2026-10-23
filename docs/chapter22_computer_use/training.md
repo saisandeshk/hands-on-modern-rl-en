@@ -58,11 +58,11 @@ Note three key design choices:
 
 ### MDP Formalization
 
-Define the Computer Use MDP as $\mathcal{M} = (\mathcal{S}, \mathcal{A}, P, R, \gamma, T)$:
+Define the Computer Use MDP as $\mathcal{M} = (\mathcal{S}, \mathcal{A}, P, R, \gamma, T)$, with horizon $T$ (maximum steps). Strictly the screenshot is only an observation of hidden application state, so the full problem is a POMDP; the MDP tuple is a teaching shorthand for the observed loop, and the history-conditioned policy below reflects the partial observability.
 
 $$\mathcal{S} = \{\text{screenshots}\}, \quad \mathcal{A} = \{\text{click, type, scroll, key, wait, done}\}$$
 
-The task description (e.g., "Help me convert this PDF into Markdown") is appended as an initial prompt $q$ before each observation. The policy is a conditional distribution:
+The task description (e.g., "Help me convert this PDF into Markdown") is appended as an initial prompt $q$ before each observation (the task prompt; it plays the role of $x$ in the notation page). The policy is a conditional distribution:
 
 $$\pi_\theta(a_t \mid q, o_{1:t}, a_{1:t-1})$$
 
@@ -110,7 +110,7 @@ However, pure supervision has a problem: the model might output **empty space**.
 
 We combine grounding and action selection into a single joint RL-plus-supervision objective (a teaching form, not the PPO clipped surrogate itself):
 
-$$\mathcal{J}(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\left[\sum_{t=0}^T \gamma^t r_t\right] - \beta \cdot \mathcal{L}_{\text{ground}}(\theta)$$
+$$J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\left[\sum_{t=0}^T \gamma^t r_t\right] - \beta \cdot \mathcal{L}_{\text{ground}}(\theta)$$
 
 The second term is a supervised loss for grounding, acting as a regularizer. This **SFT + RL joint training** is the standard recipe for GUI Agents — first imitate to learn basic operations, then use RL to optimize task success rate.
 
@@ -221,7 +221,7 @@ r=r_{\text{task}}+\alpha r_{\text{format}}
   +\rho r_{\text{recovery}}-\delta r_{\text{invalid}}.
 $$
 
-The terms check task completion, parseable actions, successful recovery, and illegal actions. Values such as $\alpha=0.1$, $\rho=0.3$, and $\delta=2.0$ are starting points for a classroom ablation, not UI-TARS-2's disclosed fixed weights. (The penalty weight is written $\delta$ here because $\gamma$ already denotes the discount factor in Section Step 1; the recovery weight is written $\rho$ to distinguish it from the grounding-loss weight $\beta$ in Step 2.) Each environment needs new calibration, especially because a large illegal-action penalty may make the policy overly conservative.
+The terms check task completion, parseable actions, successful recovery, and illegal actions. Values such as $\alpha=0.1$, $\rho=0.3$, and $\delta=2.0$ are starting points for a classroom ablation, not UI-TARS-2's disclosed fixed weights. (The penalty weight is written $\delta$ here because $\gamma$ already denotes the discount factor in Step 1; the recovery weight is written $\rho$ to distinguish it from the grounding-loss weight $\beta$ in Step 2; and $\alpha$ here is a reward-shaping weight, not the learning-rate $\alpha$.) Each environment needs new calibration, especially because a large illegal-action penalty may make the policy overly conservative.
 
 ## Step 5: Use AutoGLM to Separate Planning, Grounding, and Device Interfaces
 
@@ -328,7 +328,7 @@ The success rate of each task is re-evaluated at each epoch, allowing the curric
 
 Traditional curriculum learning progresses from easy to hard — first learning a 5-step task, then a 10-step, then a 20-step. Backward curriculum reverses this: **starting from the task endpoint**.
 
-Consider a 50-step task $T = (s_0, a_1, s_1, \ldots, a_{50}, s_{50})$. The training order for backward curriculum is:
+Consider a 50-step task $\tau = (s_0, a_1, s_1, \ldots, a_{50}, s_{50})$. The training order for backward curriculum is:
 
 ```
 Round 1: Start from $s_{49}$, execute $a_{50}$ → done (1-step task)
