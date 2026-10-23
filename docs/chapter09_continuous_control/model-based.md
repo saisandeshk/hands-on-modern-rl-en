@@ -119,7 +119,7 @@ Let's compute with concrete numbers to build intuition:
 
 - **Case 1: $L = 0.9$ (errors shrink on their own).** This is a geometric series, and for large $T$ the sum converges to $\epsilon/(1-0.9) = 10\epsilon$. The error does not grow without bound and is eventually held within $10\epsilon$. This is the ideal case.
 - **Case 2: $L = 1$ (errors neither grow nor shrink).** Each step adds one $\epsilon$, so after $T$ steps the error is $T\epsilon$, which is **linear growth**. After a rollout of 100 steps the error is 100 times the one-step error.
-- **Case 3: $L = 1.1$ (errors are amplified).** The error grows geometrically. At $T=50$ the sum is $\epsilon \times (1.1^{50} - 1)/(1.1 - 1) \approx 1174\epsilon$. If the one-step error is 0.01, then after 50 steps the error exceeds 11. For robot control, where the state dimension is typically in the tens, the prediction is already completely inaccurate.
+- **Case 3: $L = 1.1$ (errors are amplified).** The error grows geometrically. At $T=50$ the sum is $\epsilon \times (1.1^{50} - 1)/(1.1 - 1) \approx 1164\epsilon$. If the one-step error is 0.01, then after 50 steps the error exceeds 11. For robot control, where the state dimension is typically in the tens, the prediction is already completely inaccurate.
 
 This is why plain Dyna works well in simple discrete environments such as grid worlds but runs into trouble in complex continuous-control environments: **the longer the rollout, the more severely the model error accumulates, until the trajectory predicted by the model and the real trajectory have nothing to do with each other**. A policy trained on such fake data is likely to be led astray.
 
@@ -212,6 +212,14 @@ The way CEM works is also intuitive:
 
 This is much simpler than gradient-based optimization, and it is less likely to get stuck in a local optimum, because every iteration explores with a large number of samples.
 
+CEM has an instructive degenerate case worth knowing by name: **random shooting**. Sample $N$ action sequences once from a fixed distribution (often uniform over the action bounds), roll each out in the model, and execute the first action of the best sequence, with no refitting iterations at all:
+
+$$
+a_{0:H-1}^{(i)} \sim \text{Uniform}(\mathcal{A}^H), \quad i = 1, \ldots, N, \qquad \text{execute first action of } \arg\max_i \hat{R}(\tau^{(i)}).
+$$
+
+Random shooting is CEM with a single iteration and no distribution update. It is a weak planner, but precisely for that reason it is the honest **simple-controller baseline** every model-based paper should beat: if a learned model plus random shooting cannot outperform model-free training or even random actions on the task, the model itself is not pulling its weight, and there is no point blaming the planner yet.
+
 ### Experimental Results for PETS
 
 On MuJoCo, PETS was the first model-based algorithm to match the performance of model-free algorithms such as SAC, while using **10-50 times fewer** samples. This is a milestone result: it showed for the first time that model-based methods are not "toys" on continuous-control benchmarks and can truly be used.
@@ -231,23 +239,26 @@ Wait, doesn't that sound too simple? Dyna can also do short rollouts, so what is
 Let's return to the error-accumulation formula from before. Suppose $L=1.01$ (very close to 1, slightly amplifying) and the one-step error is $\epsilon=0.01$:
 
 - Rollout of 1 step: error $\epsilon = 0.01$
-- Rollout of 5 steps: error about $5\epsilon = 0.05$ (still small)
+- Rollout of 5 steps: error about $5.1\epsilon = 0.051$ (still small)
 - Rollout of 20 steps: error about $22\epsilon = 0.22$ (starting to grow)
-- Rollout of 100 steps: error about $270\epsilon = 2.7$ (about the scale of the state itself, so the prediction is no longer accurate)
+- Rollout of 100 steps: error about $170\epsilon = 1.7$ (about the scale of the state itself, so the prediction is no longer accurate)
 
 Do you see it? In the first few steps the error actually grows slowly, and only after the rollout reaches a certain length does it start to explode exponentially. MBPO's strategy is to **use only the "safe zone" of the first few steps, where the error is tiny, and "hit the brakes" before the error has time to accumulate: reset to a real state and then start the next model rollout**.
 
 Let's read the code to understand the flow:
 
 ```python
-# Short-horizon rollouts keep model error under control
-for rollout_step in range(K_short):  # K_short = 5
-    a = policy(s_sim)
-    s_sim, r = model.predict(s_sim, a)
-    replay_buffer.add(s_sim, a, r, s_sim)
-    # Key point: every 5 steps we must "reset" to a real state
-    if rollout_step % K_short == 0:
-        s_sim = real_env.state
+# Short-horizon rollouts keep model error under control.
+# Each rollout starts from a real visited state and runs only K_short steps,
+# so at most K_short steps of error can accumulate before we reset.
+for _ in range(n_model_rollouts):
+    s_sim = replay_buffer.sample_state()  # a real state the agent visited
+    for _ in range(K_short):  # K_short = 5
+        a = policy(s_sim)
+        s_sim_next, r = model.predict(s_sim, a)
+        replay_buffer.add(s_sim, a, r, s_sim_next)
+        s_sim = s_sim_next
+    # Rollout ends here: the next rollout restarts from another real state.
 ```
 
 Note the logic here. We do not roll out from the initial state all the way to the end. We start from **some state in the real data** (a state sampled from the replay buffer, one the agent has actually visited), roll out only 5 steps, stop, and then switch to another real state. Every model trajectory therefore starts from an "accurate" point (taken from the real environment) and accumulates at most 5 steps of error, so the error is held strictly within a small range.
@@ -280,6 +291,24 @@ Better still, the model rollout length $k$ in MBPO is not fixed. It can be **adj
 
 The experimental results of MBPO are striking: on MuJoCo it matches or even exceeds the performance of model-free SAC, with **10-100 times fewer samples**. And because what it ultimately trains is a SAC policy, deployment does not need the expensive CEM planning at every step that PETS requires. You simply run the policy network, at the same deployment cost as a model-free method.
 
+### Pessimism, Decision-Relevant Error, and Distribution Shift
+
+Short rollouts control how far error can compound, but three related problems remain, and they motivate most modern variants of these algorithms.
+
+**Model exploitation.** A planner or policy trained inside the model is an optimizer, and optimizers find loopholes. If the model wrongly predicts a huge reward in some region it has never seen, the policy will steer exactly there: it "hacks" the model rather than solving the task. This is the model-based analogue of overestimation in DDPG, except the adversary is the planner instead of the actor. Short rollouts limit the damage but do not remove the incentive.
+
+**Pessimistic planning.** One direct remedy is to charge the planner for uncertainty. Train an ensemble as in PETS, measure disagreement $u(s, a)$ (for example the standard deviation of the members' predicted next states), and penalize the imagined reward:
+
+$$
+\tilde{r}(s, a) = \hat{r}(s, a) - \lambda \, u(s, a).
+$$
+
+Planning against $\tilde{r}$ steers away from regions where the model is guessing, an idea used explicitly by algorithms such as MOPO. PETS gets a related effect by different means: each trajectory is rolled out with a single ensemble member (TS1), so the elite set contains whole coherent alternative futures rather than averaged dynamics, and closed-loop MPC replanning from the latest real state keeps the plan from drifting far on any one wrong model. It does not compare ensemble members within a single trajectory, so an uncertain region is not filtered out trajectory-by-trajectory the way an explicit penalty filters it.
+
+**Decision-relevant error.** Average one-step prediction error is the wrong scoreboard. A model can have tiny pixel-level error yet miss the one feature the decision depends on (the speed of an oncoming car), or large pixel error that is irrelevant (the exact texture of clouds). MuZero's implicit model takes this seriously: it never predicts observations at all and trains the model only on decision-relevant targets — reward (dynamics function) and policy and value (prediction function), that is, exactly the quantities the planner consumes. When you evaluate a dynamics model, report multi-step reward and value-prediction error on the planner's own state distribution, not just one-step state MSE on held-out data.
+
+**Distribution shift and data aggregation.** Every one of these methods has a feedback loop: the policy changes, so the states it visits change, so yesterday's training data no longer covers today's queries, so the model degrades exactly where the new policy needs it. The standard fix is **data aggregation**: keep interleaving real collection with the current policy and retrain (or fine-tune) the model on the growing dataset, as the MBPO loop already does. A model trained once on random-exploration data and then frozen will almost always be exploited, because the optimized policy drives the system into regions the frozen model never saw.
+
 ### Comparing the Three Model-Based RL Algorithms
 
 Let's put Dyna, PETS, and MBPO, three landmark algorithms, side by side to help you choose in practice:
@@ -295,6 +324,14 @@ Practical recommendations:
 - **Quick experiments and testing ideas**: choose Dyna. It is simple to implement, behaves stably, and needs no probabilistic models or planning, which makes it a good baseline.
 - **High-precision control and robot manipulation**: choose PETS. The probabilistic ensemble handles model uncertainty well and closed-loop MPC control is very robust, which suits safety-critical, high-precision settings, but you must accept the high planning cost.
 - **General continuous-control benchmarks**: choose MBPO. It has the highest sample efficiency, deploys as fast as a model-free method, works across the whole MuJoCo suite, and is currently a strong baseline for model-based continuous control.
+
+### How to Evaluate a Model-Based Method Fairly
+
+Model-based papers invite a specific kind of self-deception: the model does the learning, the planner does the work, and the policy takes the credit. Three controls keep the accounting honest.
+
+1. **Match on real interactions, and report imagined samples and compute separately.** The fair x-axis is the number of real environment steps. Imagined rollouts are nearly free but not free: log how many model predictions each method used per real step (recall PETS spends about 25,000 per action) alongside wall-clock time, so a "10 times fewer samples" claim cannot hide "100 times more compute".
+2. **Beat the model-free baseline and the no-model baselines.** Compare against SAC or TD3 trained on the same number of real steps, against random shooting inside your own learned model, and, when a simulator is available, against MPC with the ground-truth dynamics (the known-dynamics oracle). If the oracle fails, the planner is the bottleneck; if the oracle works but the learned model does not, the model is.
+3. **Attribute failures before tuning.** When performance drops, test the four suspects separately: planner (does CEM with more samples fix it?), model (does one-step and multi-step prediction error spike on the current policy's states?), reward (does the predicted reward match the true reward along imagined trajectories?), and policy (does the policy underperform the planner's own action choice?). Most "model failures" turn out to be one identifiable link, and the fix depends on which one it is.
 
 ::: details Bonus: Why Not Use Long Rollouts? The Theory Behind MBPO
 Janner et al. give, in their paper, a theoretical bound on how model bias affects policy performance. The rough conclusion is this. If the model's prediction error, measured in total variation (TV) distance, is $\epsilon_m$, then the performance gap between the policy $\hat{\pi}$ learned in the model and the optimal policy $\pi^*$ in the real environment satisfies:
