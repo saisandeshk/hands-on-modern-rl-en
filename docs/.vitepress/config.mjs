@@ -931,6 +931,10 @@ const sidebar = {
             {
               text: '9.4 Search and World Models',
               link: '/chapter09_continuous_control/search-world-models'
+            },
+            {
+              text: '9.5 Summary and Exercises',
+              link: '/chapter09_continuous_control/review'
             }
           ]
         }

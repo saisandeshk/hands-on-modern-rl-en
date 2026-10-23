@@ -1,8 +1,8 @@
 ---
-title: 9.R Summary and Exercises
+title: 9.5 Summary and Exercises
 ---
 
-# 9.R Summary and Exercises
+# 9.5 Summary and Exercises
 
 This page closes Chapter 9. It collects what the chapter taught, the formulas worth memorizing, the mistakes practitioners actually make, and a set of exercises with full solutions.
 
