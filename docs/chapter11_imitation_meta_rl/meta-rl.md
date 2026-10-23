@@ -68,7 +68,7 @@ The meaning of the outer objective is: we want a $\theta$ such that **starting f
 Let's use a concrete family of tasks to see what MAML is looking for. Consider a family of mini mazes: the maze structure is the same and the exit position is random in each episode, with the exit at the upper left in task A and at the lower right in task B. Compare two initializations:
 
 - Initialization one: the parameters have already trained the policy to "head straight for the upper left corner". It is close to full performance from the start on task A, but on task B this preference is completely wrong and one gradient step cannot bend it back.
-- Initialization two: the parameters rest at a position that "favors no exit", but starting from it, one gradient step brings the policy to about 80% performance on either task A or task B.
+- Initialization two: the parameters rest at a position that "favors no exit", but starting from it, one gradient step brings the policy to substantial performance on either task A or task B (say, of the order of 80% in this illustrative example).
 
 Looking only at the starting score on task A, initialization one is higher. But the outer objective of MAML evaluates the performance **after one step of adaptation**, so it picks initialization two. "Learning an initialization that is easy to adapt" refers to a parameter position like this.
 
@@ -79,14 +79,14 @@ $$\nabla_\theta \mathcal{L}_{T_i}(\theta_i') = \nabla_{\theta_i'} \mathcal{L}_{T
 The Hessian $\nabla_\theta^2\mathcal L$ in the parentheses (the second derivative) adds computation and memory overhead. **FOMAML** (First-Order MAML) simply ignores this term and treats the gradient at the adapted parameters as the meta-gradient, greatly reducing cost. In practice the first-order approximation usually works well too.
 
 ```python
-def maml_meta_update(meta_policy, tasks, inner_lr=0.1, outer_lr=0.001):
+def maml_meta_update(meta_policy, tasks, inner_lr=0.1, outer_lr=0.001, n_inner_steps=5):
     meta_grad = 0
     for task in tasks:
         # === Inner: copy the parameters and adapt with a few SGD steps ===
         theta_prime = meta_policy.params.clone()
         for _ in range(n_inner_steps):
             inner_loss = task.compute_loss(theta_prime)
-            theta_prime -= inner_lr * grad(inner_loss, theta_prime)
+            theta_prime = theta_prime - inner_lr * grad(inner_loss, theta_prime)
 
         # === Outer: evaluate the adapted parameters and backpropagate to the meta parameters ===
         outer_loss = task.compute_loss(theta_prime)
@@ -94,7 +94,7 @@ def maml_meta_update(meta_policy, tasks, inner_lr=0.1, outer_lr=0.001):
         g = grad(outer_loss, meta_policy.params)
         meta_grad += g
 
-    meta_policy.params -= outer_lr * meta_grad / len(tasks)
+    meta_policy.params = meta_policy.params - outer_lr * meta_grad / len(tasks)
 ```
 
 The strength of MAML is that it is **model-agnostic**: as long as the model is differentiable, whether a CNN, an RNN, or a Transformer, MAML can be used. The drawbacks are that second-order gradient computation is expensive and that hyperparameters such as the inner-loop step size are sensitive.
@@ -159,7 +159,7 @@ You may have noticed that the idea of meta-RL runs completely parallel to few-sh
 - Supervised few-shot: train on many classification tasks (such as many classes in ImageNet), and then a new class given 5 examples (5-way 5-shot) can be classified
 - Meta-RL: train on many control tasks, and then a new task given a few trajectories can be adapted to quickly
 
-The two share a core idea: **train a prior with many similar tasks, and adapt quickly to a new task with a small number of samples**. This idea directly inspired in-context learning in LLMs. Let's continue.
+The two share a core idea: **train a prior with many similar tasks, and adapt quickly to a new task with a small number of samples**. This idea is closely related to in-context learning in LLMs in the sense that both adapt from a context (we unpack the exact similarities and differences in §3.2). Let's continue.
 
 ## 2. Placing the Learning Process in Context
 
@@ -167,7 +167,7 @@ RL² uses the hidden state to carry the adaptation process, while Algorithm Dist
 
 ### 2.1 The Training Data of Algorithm Distillation
 
-AD's key insight comes from a very simple observation. Imagine the complete training record of a DQN run from scratch to clearing the game: the first episode ends in death with 52 points, by the 50th it has learned to dodge bullets, and by the 200th it clears the game reliably. Hand this "from poor to good" history, the state, action, and reward of every step, to a Transformer in order and ask it to predict the next action at each step:
+AD's key insight comes from a very simple observation. To fix ideas, imagine a hypothetical complete training record of a DQN run from scratch to clearing the game: say the first episode ends quickly with a low score (tens of points), by the 50th it has learned to dodge bullets, and by the 200th it clears the game reliably (numbers illustrative, not from any single paper figure). Hand this "from poor to good" history, the state, action, and reward of every step, to a Transformer in order and ask it to predict the next action at each step:
 
 > Early episodes have low returns, and later episodes gradually improve. For a Transformer to predict the next action from the first $k$ episodes, it must use the states, actions, and rewards in the history to determine how behavior changes with experience.
 
@@ -256,12 +256,12 @@ DT is not in-context RL; it is a **conditional policy**. But it inspired later w
 
 ### 3.2 The Connection Between In-Context RL and LLMs
 
-You may have noticed that the history of in-context learning in LLMs runs highly parallel to in-context RL, almost the same thing independently discovered in two fields, supervised learning and reinforcement learning:
+You may have noticed that in-context learning in LLMs runs closely parallel to in-context RL: the two mechanisms share the same template, but they operate on different signals and should not be called the same thing.
 
-- **In-context learning in GPT-3** (2020): give a few examples in the prompt, and the model learns the task without updating parameters. This is the in-context version of **supervised learning**.
-- **In-context RL of Algorithm Distillation** (2022): give a few reward-bearing trajectories in the context, and the model learns RL without updating parameters. This is the in-context version of **reinforcement learning**.
+- **In-context learning in GPT-3** (2020): give a few input-output examples in the prompt, and the model performs the task without updating parameters. This is the in-context version of **supervised learning**: the context carries task identifiers, not rewards.
+- **In-context RL of Algorithm Distillation** (2022): give reward-bearing trajectories ordered from poor to good in the context, and the model improves its behavior without updating parameters. This is the in-context version of **reinforcement learning**: the context additionally carries reward signals and policy-improvement structure.
 
-Both put examples or interaction history into the context and then predict the next output. Whether some kind of RL update is truly implemented has to be tested through adaptation curves on new tasks, and one cannot conclude from the model changing its answers in context alone. But their mechanisms are completely consistent.
+Both put examples or interaction history into the context and then predict the next output, so the machinery looks the same. But whether a model truly implements an RL update in context has to be tested through adaptation curves on new tasks; one cannot conclude it from the model merely changing its answers in context. The safe reading is that they are analogous mechanisms applied to different learning signals, not one discovery made twice.
 
 ## 4. Returning Imitation and Adaptation to LLM Post-Training
 
@@ -320,7 +320,7 @@ Both are "**adapting without updating parameters, just by looking at the context
 
 ### 4.4 Offline Imitation Learning and the DPO Family
 
-The offline RL of Chapter 10 merges with this chapter. When there are only **expert demonstrations + suboptimal data** (which is exactly the typical RLHF setting: there are high-quality answers and also poorer answers generated by the model itself), offline imitation learning (DemoDICE, SMILe, DWBC) uses conservative estimation to avoid overestimating suboptimal actions. This is of the same origin as DPO's idea of an "explicit reference-policy regularizer": do not let the policy deviate too far from the reference model.
+The offline RL of Chapter 10 merges with this chapter. When there are only **expert demonstrations + suboptimal data** (which is exactly the typical RLHF setting: there are high-quality answers and also poorer answers generated by the model itself), offline imitation learning (DemoDICE, SMILe, Discriminator-Weighted Behavioral Cloning (DWBC)) uses conservative estimation to avoid overestimating suboptimal actions. This is of the same origin as DPO's idea of an "explicit reference-policy regularizer": do not let the policy deviate too far from the reference model.
 
 ### 4.5 The Limits of These Correspondences
 

@@ -47,7 +47,11 @@ Let's compute this loss with concrete numbers. The expert data contains one samp
 
 Policy two "agrees" more with the expert, so its loss is smaller. Behavior cloning training minimizes this kind of loss over all samples in the dataset, which is the same operation as cross-entropy training in handwritten-digit classification.
 
-Discrete actions usually use the cross-entropy loss (a classification problem), and continuous actions can use the mean squared error or the negative log-likelihood of a Gaussian distribution. Supervised fine-tuning (SFT) of LLMs also uses the same conditional-likelihood objective, except that the "action" becomes the next token. It is essentially behavior cloning.
+Discrete actions usually use the cross-entropy loss (a classification problem). For continuous actions a common choice is a Gaussian policy $\pi_\theta(\cdot \mid s) = \mathcal{N}(\mu_\theta(s), \sigma^2 I)$, whose negative log-likelihood is
+
+$$\mathcal{L}_{BC}(\theta) = \mathbb{E}_{(s,a) \sim \mathcal{D}_{\text{expert}}}\left[\frac{\|a - \mu_\theta(s)\|^2}{2\sigma^2} + \frac{d}{2}\log(2\pi\sigma^2)\right],$$
+
+which reduces to mean squared error when $\sigma$ is fixed. A single Gaussian (or a single MSE predictor) is unimodal: if the expert sometimes turns left and sometimes turns right in the same state, the mean lands in the middle and the policy may drive straight into the obstacle. Multimodal experts need mixture policies or diffusion policies instead. Supervised fine-tuning (SFT) of LLMs also uses the same conditional-likelihood objective, except that the "action" becomes the next token. It is essentially behavior cloning.
 
 ```python
 def behavior_cloning_step(policy_net, expert_batch):
