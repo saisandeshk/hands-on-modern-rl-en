@@ -279,8 +279,6 @@ An online RL course. Covers DP, TD (including Sarsa), n-step TD, Lambda Return, 
 
 **DeepMind x UCL RL Lecture Series (2021)**
 
-**Address**: [YouTube Playlist](https://www.youtube.com/playlist?list=PLqYmG7hTraZBKeNJ-JE_eyJHZ7XgBoAyb)
-
 David Silver's updated course, presented by DeepMind researchers (including Hado van Hasselt and others). It covers 13 lectures on exploration and control, MDP and DP, model-free methods, function approximation, planning, policy gradient and actor-critic methods, approximate DP, multi-step and off-policy learning, and deep reinforcement learning. **More advanced than the 2015 edition, with added content on cutting-edge topics.**
 
 **Chinese University Courses**
