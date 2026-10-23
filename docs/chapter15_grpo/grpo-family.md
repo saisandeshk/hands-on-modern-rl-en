@@ -77,15 +77,15 @@ The cost of GSPO: the sequence-level ratio **couple all token updates**, and its
 
 ### CISPO (Innovation from MiniMax)
 
-GRPO and DAPO both prune the "product of the policy ratio and advantage" — the pruning occurs at the gradient update level. In M1 model ([arXiv:2506.13585](https://arxiv.org/abs/2506.13585)), MiniMax proposes CISPO, which changes the pruning object from "token update" to "**importance sampling weight**":
+GRPO and DAPO both prune the "product of the policy ratio and advantage" — the pruning occurs at the gradient update level. In the M1 model ([arXiv:2506.13585](https://arxiv.org/abs/2506.13585)), MiniMax proposes CISPO (Clipped IS-weight Policy Optimization), which changes the pruning object from "token update" to "**importance sampling weight**":
 
-$$\tilde{\rho}_t = \text{clip}\left(\frac{\pi_{\theta_{\text{old}}}(a_t|s_t)}{\pi_\theta(a_t|s_t)}, 1-\epsilon, 1+\epsilon\right)$$
+$$\hat{r}_{t}(\theta) = \text{clip}\left(\frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_{\text{old}}}(a_t|s_t)}, 1-\epsilon^{IS}_{low}, 1+\epsilon^{IS}_{high}\right)$$
 
-Note that the numerator and denominator of the ratio are reversed here — $\pi_{\text{old}} / \pi_\theta$ instead of $\pi_\theta / \pi_{\text{old}}$. This reversed ratio serves as the **sampling weight** multiplied onto the advantage, but **retains all token gradient contributions**.
+Note the ratio keeps the standard direction — $\pi_\theta / \pi_{\theta_{\text{old}}}$ — but the clipped weight is used differently: it enters the loss as a **detached (stop-gradient) coefficient** multiplying the log-probability gradient, $\hat{r}_{t}(\theta)\,\hat{A}_{t}\,\log \pi_\theta(a_t|s_t)$, rather than as a PPO-style min-clip on the update itself. Because the gradient flows through $\log \pi_\theta$ for every token, **all tokens keep contributing gradients** even when their weight is clipped.
 
-Intuitively: traditional pruning is "if a token's policy deviates too much, directly remove it from the gradient." CISPO is "if the deviation is too large, reduce its contribution weight to the advantage estimate, but keep the gradient direction unchanged." The latter avoids the problem of "some tokens completely stop updating in the later stage of training," which can cause the policy to get stuck.
+Intuitively: traditional pruning is "if a token's policy deviates too much, directly remove it from the gradient." CISPO is "if the deviation is too large, reduce its contribution weight, but keep the gradient direction unchanged." The latter avoids the problem of "some tokens completely stop updating in the later stage of training," which can cause the policy to get stuck.
 
-CISPO also has an engineering motivation — it is designed to work with MiniMax's own attention implementation, where per-token ratio computation in low precision can accumulate floating-point error. Scaling the importance weight instead of dropping tokens is reported to be more robust in that setting. Claims about exact hardware counts or speedups over other methods' training runs are not independently verifiable and are omitted here.
+CISPO also has an engineering motivation — it is designed to work with MiniMax's own (lightning) attention implementation, where per-token ratio computation in low precision can accumulate floating-point error. Scaling the importance weight instead of dropping tokens is reported to be more robust in that setting. The paper reports that combining hybrid attention with CISPO let the full M1 RL run complete on 512 H800 GPUs in three weeks (at a stated rental cost of about \$534,700); treat exact cost figures as setup-specific rather than transferable.
 
 ## Improvement Route Four: Against the Value-based Counter-trend
 
@@ -105,7 +105,7 @@ $$\hat{A}_t = \delta_t + (\gamma\lambda)\delta_{t+1} + (\gamma\lambda)^2\delta_{
 
 where $\delta_t = r_t + \gamma V_\phi(s_{t+1}) - V_\phi(s_t)$ is the TD error. Then, it applies PPO-style clipping on this token-level advantage.
 
-VAPO reports a score of 60.4 on AIME 2024, above the score DAPO reported in its own setup. DeepSeek-R1-Zero reported a higher score (around 71), but with substantially more training steps, so the honest reading is about efficiency and setup rather than outright supremacy: reintroducing a value model can pay off on long chain-of-thought tasks where token-level credit matters, at the cost of the extra model.
+VAPO reports a score of 60.4 on AIME 2024 with a Qwen-32B base model, outperforming DeepSeek-R1-Zero-Qwen-32B and DAPO by more than 10 points under identical experimental settings. (The much higher ~71 figure sometimes quoted for R1-Zero belongs to the full-scale DeepSeek-R1-Zero, a different model scale, not the Qwen-32B comparison.) So the honest reading is about efficiency and setup rather than outright supremacy: reintroducing a value model can pay off on long chain-of-thought tasks where token-level credit matters, at the cost of the extra model.
 
 The cost of VAPO: it requires training an independent value model, doubling the memory usage, and increasing engineering complexity. This is why GRPO became the mainstream approach around 2025 — **critic-free is an engineering compromise, not an algorithmic necessity**.
 
@@ -113,7 +113,7 @@ The cost of VAPO: it requires training an independent value model, doubling the 
 
 ### RPT (Reinforcement Pre-training)
 
-The first four improvement routes assumed that RL occurred in the **post-training phase** — the model had already been pre-trained, and RL was merely fine-tuning. However, Microsoft's 2025.06 paper on Reinforcement Pre-training ([arXiv:2506.08007](https://arxiv.org/abs/2506.08007)) challenges this binary distinction.
+The first four improvement routes assumed that RL occurred in the **post-training phase** — the model had already been pre-trained, and RL was merely fine-tuning. However, Dong et al.'s June-2025 paper on Reinforcement Pre-training ([arXiv:2506.08007](https://arxiv.org/abs/2506.08007)) challenges this binary distinction.
 
 The core idea of RPT is to **reframe the next-token prediction task as a reasoning task**. The traditional pre-training loss is:
 

@@ -79,7 +79,7 @@ The final released DeepSeek-R1 therefore adopted a multi-stage compromise:
 
 ## DAPO
 
-GRPO proved that RL can work without a Critic, but it still has engineering pain points. DAPO (Decoupled Clip and Dynamic Sampling Policy Optimization) addresses them directly. Proposed in 2025, it combines four engineering improvements on top of GRPO.
+GRPO proved that RL can work without a Critic, but it still has engineering pain points. DAPO (Decoupled Clip and Dynamic Sampling Policy Optimization; Yu et al., [arXiv:2503.14476](https://arxiv.org/abs/2503.14476)) addresses them directly. Proposed in 2025, it combines four engineering improvements on top of GRPO.
 
 ### DAPO's Four Improvements
 
@@ -92,7 +92,7 @@ GRPO proved that RL can work without a Critic, but it still has engineering pain
 
 **Clip-Higher.** GRPO clips the policy ratio symmetrically, for example to $[0.8, 1.2]$. This is fine for high-probability actions that the model already prefers. But for a promising action whose current probability is only 0.01, the upper bound caps its growth at 20% per update (to 0.012), which slows exploration of rare but useful tokens. DAPO decouples the upper and lower clipping ranges — keeping the lower bound at 0.8 while raising the upper bound to 1.28 — so low-probability actions get more room to grow (0.01 can reach 0.0128 per update).
 
-**Dynamic sampling** solves the "graduation problem." Late in training, many prompts have near-zero within-group variance because the model already solves them reliably. These prompts provide no gradient signal—everyone in the group is correct. DAPO filters them out and keeps only prompts that still produce useful gradients. On the AIME 2024 math competition, DAPO reached a score of 50 using **half the training steps** of DeepSeek-R1.
+**Dynamic sampling** solves the "graduation problem." Late in training, many prompts have near-zero within-group variance because the model already solves them reliably. These prompts provide no gradient signal—everyone in the group is correct. DAPO filters them out and keeps only prompts that still produce useful gradients. On the AIME 2024 math competition, DAPO reached a score of 50 on the Qwen2.5-32B base model using **half the training steps** of DeepSeek-R1-Zero-Qwen-32B.
 
 **Token-level loss** changes the reduction, not the credit signal. Standard GRPO averages the single response-level outcome advantage per response (`1/|o_i| Σ_t`), which penalizes long answers: the same advantage is divided by a larger length. DAPO instead averages over all tokens in the batch, so response length no longer distorts the update. The advantage is still the sequence-level outcome reward — no per-token credit is created — but the length bias of GRPO's per-response average is removed. This connects directly to the [credit assignment problem in Chapter 8](../chapter08_ppo/gae-reward-model): in long sequences, even the reduction choice shapes which responses dominate the gradient.
 
