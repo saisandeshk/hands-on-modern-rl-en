@@ -1717,6 +1717,10 @@ const sidebar = {
                   link: '/appendix_d_math/information-formulas-exercises'
                 }
               ]
+            },
+            {
+              text: 'D.5 Notation',
+              link: '/appendix_d_math/notation'
             }
           ]
         }

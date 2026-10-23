@@ -1,8 +1,8 @@
 ---
-title: D.N Notation
+title: D.5 Notation
 ---
 
-# D.N Notation
+# D.5 Notation
 
 This page collects the standard symbols used throughout the book. Each entry gives the meaning in one line. Where the book uses more than one form for the same object, the preferred form comes first and variants follow in parentheses.
 
