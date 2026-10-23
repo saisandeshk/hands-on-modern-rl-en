@@ -393,7 +393,7 @@ $$
 A_t^{GAE} = \sum_{l=0}^{\infty}(\gamma\lambda)^l\delta_{t+l}
 $$
 
-This is the same machinery as in Chapters 6 and 7 on Actor-Critic / PPO. In the LLM setting, states are contexts, actions are tokens, rewards are mostly concentrated at the end, but advantage estimation still propagates along the token sequence.
+This is the same machinery as in Chapters 7 and 8 on actor-critic and PPO. In the LLM setting, states are contexts, actions are tokens, rewards are mostly concentrated at the end, but advantage estimation still propagates along the token sequence.
 
 Critic quality also needs monitoring. If value predictions are poor, advantages will be noisy. If value loss explodes, Actor updates usually become unstable as well.
 

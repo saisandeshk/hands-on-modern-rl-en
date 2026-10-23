@@ -218,7 +218,7 @@ Meta used Llama 2-70B to perform three rounds of self-rewarding (M1 → M2 → M
 - **Reward-modeling pairwise accuracy on held-out human rankings:** M1 78.7% → M2 80.4% → M3 81.7% (from a 65.1% SFT baseline trained on instruction data alone)
 
 ::: details Why Self-Rewarding Converges
-Theoretically, self-rewarding could fall into a "self-praise" trap — the model learns how to make the judge satisfied, and the judge is itself. Meta's experiments show that the first three rounds are still effective, but **after the fourth round, performance typically plateaus**. There are two main reasons:
+Theoretically, self-rewarding could fall into a "self-praise" trap — the model learns how to make the judge satisfied, and the judge is itself. Meta's experiments show that the first three rounds are still effective; the paper reports gains through M3 and does not test a fourth round, so a later plateau is an expectation, not a measured result. There are two main reasons:
 
 1. DPO's reference model $\pi_{ref}$ is updated every round, which acts as a soft KL constraint, limiting drift;
 2. A certain proportion of real SFT data is mixed in to prevent capability collapse.

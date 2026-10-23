@@ -12,7 +12,7 @@ This section reorganizes the improvements by **improvement direction** — placi
 
 ### Discovery of Dr.GRPO
 
-The original form of GRPO in the R1 paper applied two steps of normalization to the group's reward (the within-group mean and spread, written $\bar r_j$ and $s_j$ in Section 15.1):
+The original GRPO formulation (DeepSeekMath, 2024), as used in the R1 paper, applied two steps of normalization to the group's reward (the within-group mean and spread, written $\bar r_j$ and $s_j$ in Section 15.1):
 
 $$\tilde{r}_i = \frac{r_i - \text{mean}(r_1, \ldots, r_G)}{\text{std}(r_1, \ldots, r_G)}$$
 
