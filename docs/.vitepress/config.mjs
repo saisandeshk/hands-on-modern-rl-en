@@ -1343,7 +1343,11 @@ const sidebar = {
               link: '/chapter21_deep_research/deep-research-eval'
             },
             {
-              text: '21.3 Summary and Exercises',
+              text: '21.3 Lab: Multi-Turn Research with Delayed Reward',
+              link: '/chapter21_deep_research/lab'
+            },
+            {
+              text: '21.4 Summary and Exercises',
               link: '/chapter21_deep_research/review'
             }
           ]

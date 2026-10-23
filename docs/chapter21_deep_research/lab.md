@@ -1,8 +1,8 @@
 ---
-title: '21.L Lab: Multi-Turn Research with Delayed Reward'
+title: '21.3 Lab: Multi-Turn Research with Delayed Reward'
 ---
 
-# 21.L Lab: Multi-Turn Research with Delayed Reward
+# 21.3 Lab: Multi-Turn Research with Delayed Reward
 
 Train a small tool-calling research agent on an offline toy web: a corpus of
 134 synthetic documents related by shared names, labs, and titles, and questions whose answers
