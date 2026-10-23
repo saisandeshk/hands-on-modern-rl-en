@@ -1365,7 +1365,11 @@ const sidebar = {
               link: '/chapter22_computer_use/safety-swarm'
             },
             {
-              text: '22.3 Summary and Exercises',
+              text: '22.3 Lab: Form-Filling GUI Agent',
+              link: '/chapter22_computer_use/lab'
+            },
+            {
+              text: '22.4 Summary and Exercises',
               link: '/chapter22_computer_use/review'
             }
           ]

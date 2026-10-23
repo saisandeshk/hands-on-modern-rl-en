@@ -1,8 +1,8 @@
 ---
-title: '22.L Lab: Form-Filling GUI Agent'
+title: '22.3 Lab: Form-Filling GUI Agent'
 ---
 
-# 22.L Lab: Form-Filling GUI Agent
+# 22.3 Lab: Form-Filling GUI Agent
 
 > **Section goal**: Train a policy with REINFORCE plus a baseline on a miniature GUI task, and compare sparse reward against a curriculum and reward shaping -- including a shaping bug that teaches submit-spam.
 >

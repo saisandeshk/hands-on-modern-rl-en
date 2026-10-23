@@ -1,8 +1,8 @@
 ---
-title: 22.3 Summary and Exercises
+title: 22.4 Summary and Exercises
 ---
 
-# 22.3 Summary and Exercises
+# 22.4 Summary and Exercises
 
 ## What You Should Now Be Able to Do
 
