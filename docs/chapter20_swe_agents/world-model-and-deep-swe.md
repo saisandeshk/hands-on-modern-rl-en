@@ -250,12 +250,12 @@ Beam Search allows DeepSWE-style systems to trade computational resources for hi
 
 By mid-2026, mainstream SWE-RL industrial solutions include:
 
-| Route                           | Representative           | Publicly Supported Description                       | SWE-bench Verified                                  |
-| ------------------------------- | ------------------------ | ---------------------------------------------------- | --------------------------------------------------- |
-| Simple GRPO                     | SWE-RL                   | Open-source and simple                               | 41.0% Pass@1 (reported)                             |
-| Environment-trajectory modeling | Code World Model         | Mid-training on environment traces plus multitask RL | Check the paper's table for the exact scaling setup |
-| Long-horizon pure RL and search | DeepSWE-Preview          | R2E-Gym training plus test-time scaling              | 42.2% Pass@1; about 59% scaled (reported)           |
-| Multi-agent workflows           | Commercial coding agents | Training and orchestration often undisclosed         | Record by exact model and evaluation log            |
+| Route                           | Representative           | Publicly Supported Description                       | SWE-bench Verified                             |
+| ------------------------------- | ------------------------ | ---------------------------------------------------- | ---------------------------------------------- |
+| Simple GRPO                     | SWE-RL                   | Open-source and simple                               | 41.0% Pass@1 (reported)                        |
+| Environment-trajectory modeling | Code World Model         | Mid-training on environment traces plus multitask RL | 65.8% Pass@1 with test-time scaling (reported) |
+| Long-horizon pure RL and search | DeepSWE-Preview          | R2E-Gym training plus test-time scaling              | 42.2% Pass@1; about 59% scaled (reported)      |
+| Multi-agent workflows           | Commercial coding agents | Training and orchestration often undisclosed         | Record by exact model and evaluation log       |
 
 These values use different scaffolds and test-time budgets and do not form one monotonic score ladder. A fair comparison records the environment, sampling budget, verifier, and aggregation procedure.
 

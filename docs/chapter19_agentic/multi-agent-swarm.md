@@ -58,7 +58,7 @@ The training objective for Debate is **truth convergence**: making the honest ag
 
 ### Agent Swarm Mode
 
-**Kimi K2.5 (2026.01)** and **Step 3.7 Flash Advisor Mode** push the multi-agent paradigm to its extreme: **dozens of heterogeneous agents** are online simultaneously, dynamically scheduled by a meta-controller. This is essentially an A2A (Agent-to-Agent) protocol plus an RL scheduler.
+**Kimi K2.5** and **Step 3.7 Flash Advisor Mode** push the multi-agent paradigm to its extreme: **dozens of heterogeneous agents** are online simultaneously, dynamically scheduled by a meta-controller. This is essentially an A2A (Agent-to-Agent) protocol plus an RL scheduler.
 
 Key differences of Swarm:
 
@@ -73,7 +73,7 @@ $$\pi_\theta^{\text{swarm}}(a_t \mid q, \text{pool}, h_{1:t})$$
 where $a_t = (\text{select-agent}, \text{message}, \text{route-to})$.
 
 ::: warning Cost Explosion in Swarm Mode
-Swarm mode consumes an order of magnitude more tokens than a single agent (roughly 10–30× in reported cases). The Kimi K2.5 paper reports: processing a SWE-bench task on average consumes 280K tokens (single agent baseline is 18K, i.e. about 15.6×). This is why industrial deployment in 2026 still primarily uses Orchestrator-Worker—cost-controlled, with performance close to Swarm.
+Swarm mode consumes substantially more tokens than a single agent (roughly 10–30× in reported cases). The Kimi K2.5 tech report instead quantifies the trade-off the other way: Agent Swarm cuts inference latency by up to 4.5× through parallel execution, measured in critical steps rather than total tokens. Either way, total token spend stays well above a single agent, which is why industrial deployment in 2026 still primarily uses Orchestrator-Worker—cost-controlled, with performance close to Swarm.
 :::
 
 ## Reinforcement Learning for Multi-Agent Systems
@@ -159,19 +159,17 @@ def ma_grpo_step(prompts, team_size):
 
 ### Agent Swarm in Kimi K2.5
 
-Kimi K2.5 (2026.01, arXiv:2602.02276) is the first industrial model to publicly disclose the training details of the Swarm mode:
+Kimi K2.5 (arXiv:2602.02276) is the first industrial model to publicly disclose training details of a swarm-style mode, Agent Swarm with Parallel-Agent RL (PARL): a trainable orchestrator dynamically decomposes tasks and schedules frozen specialized subagents in parallel, trained with a task-level outcome reward plus auxiliary instantiation and finish-rate rewards that are annealed away:
 
-- **Agent Pool**: 32 heterogeneous agents (coder, tester, planner, reviewer, debugger, etc.)
-- **A2A Protocol**: Structured messages based on JSON Schema
-- **Training Data**: 12M team collaboration trajectories covering SWE / DeepResearch / Customer Service
-- **Reward**: Verified tasks use RLVR, open tasks use LLM-as-Judge
-- **Scheduling RL**: Meta-controller trained with PPO, aiming to minimize token consumption and maximize success rate
+- **Agent Pool**: heterogeneous specialized subagents (coder, tester, planner, reviewer, debugger, etc.)
+- **Scheduling RL**: only the orchestrator is updated; subagent trajectories are treated as environment observations, sidestepping end-to-end credit-assignment ambiguity
+- **Resource metric**: critical steps (the longest-running parallel branch) rather than total steps, so the orchestrator is rewarded for shortening end-to-end latency
 
-Reported metrics:
+Reported metrics (single-model Kimi K2.5 scores 76.8 on SWE-bench Verified in the same report):
 
-- SWE-bench Verified: 68.3% (single agent baseline 49.1%)
-- BrowseComp: 72.1% (single agent 51.4%)
-- Average token consumption: 280K (baseline 18K, 15.6×)
+- SWE-bench Verified: 68.3% (single agent baseline 49.1%, figures as cited in secondary summaries — re-check against the primary report before citing, since the report's own headline numbers are 76.8 single-model and BrowseComp 78.4 with Agent Swarm)
+- BrowseComp: 72.1% (single agent 51.4%, same caveat as above)
+- Token spend: swarm execution costs a multiple of a single agent (illustrative secondary reports cite roughly 280K vs 18K tokens per SWE-bench task); the primary report instead reports up to 4.5× latency reduction via parallelism
 
 ### Step 3.7 Flash Advisor Mode
 
@@ -183,7 +181,7 @@ Step 3.7 Flash's Advisor Mode follows a different design: a **Conservative Orche
 
 The Advisor does not execute tasks directly; it only reviews Worker outputs. After seeing the Advisor's comments, the Orchestrator decides whether the work should be revised. This dumbbell-shaped collaboration pattern costs only about one fifth as much as Swarm while achieving comparable results.
 
-Reported Metrics:
+Reported Metrics (figures from secondary summaries, not verified against a primary source — re-check before citing):
 
 - SWE-bench Verified: 62.4% (between single agent and Swarm)
 - Average token consumption: 52K (about 1/5 of Swarm)

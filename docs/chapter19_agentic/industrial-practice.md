@@ -115,11 +115,11 @@ This constraint must balance "allowing the policy to explore" and "maintaining s
 
 To encourage the model to complete tasks in fewer steps, we can introduce a reward mechanism that decays with the number of steps used.
 
-> A length-penalty scheme used in the Kimi-Researcher line of work (sometimes called Gamma-decay Reward) works as follows. When the model completes a task correctly, the trajectory reward value decays exponentially with the number of steps used:
+> A length-penalty scheme used in the Kimi-Researcher line of work (sometimes called Gamma-decay Reward) works as follows. When the model completes a task correctly, the reward of step $i$ decays exponentially with its distance from the end of the trajectory:
 >
-> $$R = r \times \gamma^{T}, \quad \gamma < 1$$
+> $$r_i = r \times \gamma^{T-i}, \quad \gamma < 1$$
 >
-> Here, $r$ is the binary task reward (1 on success) and $T$ is the number of steps the trajectory used. A successful trajectory that finishes in fewer steps keeps more of the reward (for example, with $\gamma = 0.95$, $T = 5$ gives $0.77$ while $T = 20$ gives $0.36$), which guides the model to execute tasks more efficiently [\[Reference\]](https://moonshotai.github.io/Kimi-Researcher/). This $R$ is used directly as the trajectory-level reward (e.g., compared across a GRPO group); do not apply the per-turn discounted-return decomposition of [19.3 Trajectory Credit Assignment](./credit-assignment) on top of it, since that would discount the length penalty a second time.
+> Here, $r$ is the binary task reward (1 on success), $T$ is the number of steps the trajectory used, and $i$ is the step index. The final step always keeps the full reward, but the opening steps of a shorter trajectory earn more than those of a longer one (for example, with $\gamma = 0.95$, the first step of a 5-step success earns $0.95^4 \approx 0.81$, while that of a 20-step success earns $0.95^{19} \approx 0.38$), which guides the model to execute tasks more efficiently [\[Reference\]](https://moonshotai.github.io/Kimi-Researcher/). These $r_i$ are already per-step discounted rewards, so do not apply the per-turn discounted-return decomposition of [19.3 Trajectory Credit Assignment](./credit-assignment) on top of them a second time.
 
 ---
 
