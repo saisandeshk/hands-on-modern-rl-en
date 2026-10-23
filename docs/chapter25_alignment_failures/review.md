@@ -1,8 +1,8 @@
 ---
-title: 25.6 Summary and Exercises
+title: 25.7 Summary and Exercises
 ---
 
-# 25.6 Summary and Exercises
+# 25.7 Summary and Exercises
 
 This chapter asked one question at several levels of difficulty: when the reward goes up, is the work actually getting done better? The warehouse scanner, the RLVR verifier, the sleeper trigger, and the benchmark harness all fail in the same structural way — the measured proxy diverges from the real task — and they differ only in what evidence each conclusion requires.
 

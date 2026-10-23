@@ -1,8 +1,8 @@
 ---
-title: '25.L Lab: Reward Hacking and Honest Evaluation'
+title: '25.6 Lab: Reward Hacking and Honest Evaluation'
 ---
 
-# 25.L Lab: Reward Hacking and Honest Evaluation
+# 25.6 Lab: Reward Hacking and Honest Evaluation
 
 > **Section goal**: reproduce the two central failure modes of the chapter in miniature -- first farm a loophole, then catch yourself misreading the numbers -- using a gridworld you can train on a laptop in minutes.
 >

@@ -1471,7 +1471,11 @@ const sidebar = {
               link: '/chapter25_alignment_failures/rl-evaluation'
             },
             {
-              text: '25.6 Summary and Exercises',
+              text: '25.6 Lab: Reward Hacking and Honest Evaluation',
+              link: '/chapter25_alignment_failures/lab'
+            },
+            {
+              text: '25.7 Summary and Exercises',
               link: '/chapter25_alignment_failures/review'
             }
           ]
