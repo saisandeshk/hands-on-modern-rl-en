@@ -1,8 +1,8 @@
 ---
-title: '16.L Lab: Test-Time Compute on Tiny Traces'
+title: '16.7 Lab: Test-Time Compute on Tiny Traces'
 ---
 
-# 16.L Lab: Test-Time Compute on Tiny Traces
+# 16.7 Lab: Test-Time Compute on Tiny Traces
 
 Train a 73k-parameter character-level transformer to add two-digit numbers
 through an explicit carry trace, then fix its mistakes without touching its

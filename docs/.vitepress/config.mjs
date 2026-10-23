@@ -1171,7 +1171,11 @@ const sidebar = {
               link: '/chapter16_reasoning/cot-visibility-alignment'
             },
             {
-              text: '16.7 Summary and Exercises',
+              text: '16.7 Lab: Test-Time Compute on Tiny Traces',
+              link: '/chapter16_reasoning/lab'
+            },
+            {
+              text: '16.8 Summary and Exercises',
               link: '/chapter16_reasoning/review'
             }
           ]

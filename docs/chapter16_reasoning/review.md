@@ -1,8 +1,8 @@
 ---
-title: 16.7 Summary and Exercises
+title: 16.8 Summary and Exercises
 ---
 
-# 16.7 Summary and Exercises
+# 16.8 Summary and Exercises
 
 ## What You Should Now Be Able to Do
 
