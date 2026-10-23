@@ -143,7 +143,7 @@ python code/chapter06_policy_gradient/render_cartpole_baseline.py \
   --seed 0
 ```
 
-This script retrains both policies, then renders deterministic-action replays for CartPole, and writes the GIFs into `docs/chapter08_policy_gradient/images/`.
+This script retrains both policies, then renders deterministic-action replays for CartPole, and writes the GIFs into `docs/chapter06_policy_gradient/images/`.
 
 ## 6.5.4 Reading the Reward Curves
 
@@ -195,12 +195,13 @@ why does the value baseline make training more stable?
 
 ![Variance comparison of gradient estimates between vanilla REINFORCE and REINFORCE + Value Baseline on CartPole. After turning returns into advantages, the Value Baseline concentrates the gradient signal.](./images/reinforce-baseline-cartpole-variance.png)
 
-This plot shows the variance of gradient estimates within a sliding window.
+This plot shows the variance, within a sliding window, of a per-episode scalar proxy for the update signal, `(log_probs * returns_t).mean()` for vanilla REINFORCE and `(log_probs * advantages).mean()` for the baseline version (a loss-scale signal, not the full parameter-gradient vector).
 A larger value means that different episodes imply more divergent update directions;
 a smaller value means that updates are more consistent from episode to episode.
 
-In this run, the variance of the gradient estimate is about `100.41` for vanilla REINFORCE and about `38.27` for the Value Baseline version.
-In other words, the Value Baseline reduces the variance to roughly `38.1%` of the original.
+In this run, that proxy-signal variance is about `100.41` for vanilla REINFORCE and about `38.27` for the Value Baseline version.
+In other words, the Value Baseline reduces this proxy to roughly `38.1%` of the original.
+Part of the drop is genuine variance reduction, and part is a scale effect (advantages are smaller than raw returns by construction); the two runs also use different seeds (0 vs 100), so seed effects are confounded with the method difference. Treat the ratio as illustrative rather than a pure variance measurement.
 This aligns with what we saw in the reward curves:
 when the learning signal is steadier, the policy is more likely to keep moving in the direction of “keeping the pole upright.”
 
@@ -291,12 +292,6 @@ In the next chapter, Actor-Critic will go one step further: it will replace full
 4. Reduce the hidden size of the Value Network from `128` to `32` and see whether weaker baseline estimation leads to a noisier training curve.
 
 ## References
-
-[^1]: Williams, R. J. (1992). Simple statistical gradient-following algorithms for connectionist reinforcement learning. _Machine Learning_, 8(3-4), 229-256. [DOI](https://doi.org/10.1007/BF00992696)
-
-[^2]: Sutton, R. S., McAllester, D., Singh, S., & Mansour, Y. (1999). Policy gradient methods for reinforcement learning with function approximation. _Advances in Neural Information Processing Systems_, 12.
-
-[^3]: Gymnasium. CartPole-v1 documentation. <https://gymnasium.farama.org/environments/classic_control/cart_pole/>
 
 [^williams1992]: Williams, R. J. (1992). Simple statistical gradient-following algorithms for connectionist reinforcement learning. _Machine Learning_, 8, 229-256. DOI: <https://doi.org/10.1007/BF00992696>.
 

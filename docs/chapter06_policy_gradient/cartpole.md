@@ -115,8 +115,12 @@ The CartPole experiment shows that REINFORCE can learn, but it often learns unst
 
 The policy gradient theorem has a useful property: you can subtract a baseline $b(s_t)$ that does not depend on the action from the gradient estimator, changing the update signal from $G_t$ to $G_t - b(s_t)$. This does not change the expected direction of the gradient, but it can drastically reduce variance.
 
-The math behind this baseline is explained in [6.2 Policy Gradient Improvements](./pg-improvements); the next section runs the [value-baseline CartPole experiment](./baseline-experiment).
+The math behind this baseline was introduced in [6.2 Policy Gradient Improvements](./pg-improvements); the next step forward is the [value-baseline CartPole experiment](./baseline-experiment).
 
 ## Section Summary
 
-This lab connects the runnable experiment to the main idea of the section. Use the reported metrics together with replay or task-level evaluation, and keep conclusions within the conditions that were actually tested.
+- REINFORCE on CartPole follows the bandit's core update — collect one episode, compute discounted returns $G_t$ backward from the end (the bandit has no multi-step return computation), and update with `loss = -log_prob * G_t`.
+- Actions are chosen by sampling from the policy distribution, so exploration is built in; DQN-style `argmax` never appears.
+- REINFORCE is on-policy: each episode must be collected with the current policy and discarded after the update, which is why it needs more episodes than replay-based methods.
+- The training curve typically rises but stays jagged, with sudden spikes and drops across seeds and learning rates: the visible signature of high-variance Monte Carlo returns.
+- Because $G_t$ mixes the quality of the current action with the luck of everything after it, the next step is to subtract a state-dependent baseline: the idea was introduced in [6.2 Policy Gradient Improvements](./pg-improvements), and the next section applies it in the [value-baseline CartPole experiment](./baseline-experiment).
