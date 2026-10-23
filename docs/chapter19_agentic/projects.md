@@ -840,7 +840,7 @@ print("Saved: multi_tool_agentic_rl.png")
 - Multi-tool pass@1 should be meaningfully higher than both the single-tool and no-tool baselines.
 - The right plot, "Tool Selection Strategy," should show that the model has learned when to search.
 
-The next section focuses on the engineering challenges of Agentic RL: [how to turn these ideas into a real training system](./tool-use-agents).
+The next section focuses on the engineering challenges of Agentic RL: [how to turn these ideas into a real training system](./tool-use-and-trajectory#agentic-rl-engineering-practice).
 
 ---
 
@@ -1575,7 +1575,7 @@ The minimal implementation above can verify that the whole training flow works. 
 
 1. **Real search API**: connect Tavily or Serper API and replace simulated search results.
 2. **More refined reward**: add citation-quality scoring and step-efficiency penalties, following [the reward-function design in this section](#how-to-design-reward-functions-from-simple-to-frontier).
-3. **Async concurrency**: use the async concurrent architecture from [Agentic engineering practice](./tool-use-agents) to accelerate rollout.
+3. **Async concurrency**: use the async concurrent architecture from [Agentic engineering practice](./tool-use-and-trajectory#agentic-rl-engineering-practice) to accelerate rollout.
 4. **Trajectory synthesis**: pre-synthesize training data using the method from [Section 19.4](./tool-use-and-trajectory).
 5. **Full framework**: migrate to the DeepResearcher or rStar2-Agent framework for large-scale training.
 

@@ -84,7 +84,7 @@ Observable: the list of flights returned for the issued query. Unobservable: whe
 For each task, say whether an outcome reward alone is a reasonable starting point or a process reward is needed from the start, and give the mechanism behind your answer: (a) code generation graded by hidden unit tests; (b) web navigation over 30-page browsing sessions; (c) multi-hop research answers requiring cited evidence.
 
 ::: details Solution
-(a) ORM is a reasonable start. Unit-test pass/fail is verifiable, noise-free, and decomposable (pass rate gives partial credit), so the sparse terminal signal still correlates tightly with each step's contribution. This matches the finding discussed in Section 19.5 that single-step reward can guide multi-turn code generation.
+(a) ORM is a reasonable start. Unit-test pass/fail is verifiable, noise-free, and decomposable (pass rate gives partial credit), so the sparse terminal signal still correlates tightly with each step's contribution. This matches the finding discussed in Section 19.4 that single-step reward can guide multi-turn code generation.
 
 (b) PRM from the start. Thirty turns of clicks with one terminal bit means almost every intermediate decision gets no gradient, and a lucky final click reinforces 29 wasted ones. Step-level scoring (as in Web-Shepherd) supplies the dense signal that makes credit assignment tractable.
 
