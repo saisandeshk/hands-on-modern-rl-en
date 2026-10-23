@@ -1,8 +1,8 @@
 ---
-title: '26.L Lab: Self-Play Dynamics from RPS to Kuhn Poker'
+title: '26.5 Lab: Self-Play Dynamics from RPS to Kuhn Poker'
 ---
 
-# 26.L Lab: Self-Play Dynamics from RPS to Kuhn Poker
+# 26.5 Lab: Self-Play Dynamics from RPS to Kuhn Poker
 
 ## What you will learn
 

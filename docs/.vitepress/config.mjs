@@ -1501,7 +1501,11 @@ const sidebar = {
               link: '/chapter26_selfplay_frontiers/alphaevolve/'
             },
             {
-              text: '26.5 Summary and Exercises',
+              text: '26.5 Lab: Self-Play Dynamics from RPS to Kuhn Poker',
+              link: '/chapter26_selfplay_frontiers/lab'
+            },
+            {
+              text: '26.6 Summary and Exercises',
               link: '/chapter26_selfplay_frontiers/review'
             }
           ]
