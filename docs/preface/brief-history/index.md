@@ -162,7 +162,7 @@ ByteDance's public work spans DAPO, VAPO, UI agents, and generative-model RL. Zh
 
 **Step3-VL by StepFun** reports parallel coordinated reasoning work, opening up another path for test-time scaling.
 
-In November 2025, **Anthropic published "Emergent Misalignment: Researching the impact of reward hacking"** ([arXiv:2511.18397](https://arxiv.org/abs/2511.18397)), bringing reward-hacking research into a new stage: misaligned behavior that emerges naturally during RL training became an active security topic.
+In November 2025, **Anthropic published "Natural Emergent Misalignment from Reward Hacking in Production RL"** ([arXiv:2511.18397](https://arxiv.org/abs/2511.18397)), bringing reward-hacking research into a new stage: misaligned behavior that emerges naturally during RL training became an active security topic.
 
 In the same year, **Microsoft introduced Reinforcement Pre-Training (RPT)** ([arXiv:2506.08007](https://arxiv.org/abs/2506.08007)). RPT moves reinforcement learning into the pre-training stage and therefore changes the usual boundary between pre-training and fine-tuning. **DeepMind's AlphaEvolve** (May 2025) combines language models, evolutionary search, and automatic evaluators, showing how learned proposals and executable feedback can be placed in the same search loop.
 
@@ -224,7 +224,7 @@ The chapters that follow make this history concrete. We begin with small environ
 
 [arXiv:2503.14476](https://arxiv.org/abs/2503.14476)
 
-[^13]: Liu, Y., et al. (2025). Understanding r1-zero-like training. _arXiv preprint_.
+[^13]: Liu, Z., et al. (2025). Understanding r1-zero-like training. _arXiv preprint_.
 
 [arXiv:2503.20783](https://arxiv.org/abs/2503.20783)
 
@@ -248,7 +248,7 @@ The chapters that follow make this history concrete. We begin with small environ
 
 [arXiv:2502.18449](https://arxiv.org/abs/2502.18449)
 
-[^19]: Anthropic (2025). Emergent Misalignment: Researching the impact of reward hacking.
+[^19]: Anthropic (2025). Natural Emergent Misalignment from Reward Hacking in Production RL.
 
 [arXiv:2511.18397](https://arxiv.org/abs/2511.18397)
 
