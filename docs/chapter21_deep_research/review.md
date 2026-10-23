@@ -1,8 +1,8 @@
 ---
-title: 21.R Summary and Exercises
+title: 21.3 Summary and Exercises
 ---
 
-# 21.R Summary and Exercises
+# 21.3 Summary and Exercises
 
 ## What you should now be able to do
 

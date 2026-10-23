@@ -1321,6 +1321,10 @@ const sidebar = {
             {
               text: '21.2 Evaluation Benchmarks and Open-Source Projects',
               link: '/chapter21_deep_research/deep-research-eval'
+            },
+            {
+              text: '21.3 Summary and Exercises',
+              link: '/chapter21_deep_research/review'
             }
           ]
         },
