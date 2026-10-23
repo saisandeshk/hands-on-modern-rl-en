@@ -38,8 +38,15 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.logger import HumanOutputFormat
-from swanlab.integration.sb3 import SwanLabCallback
-import swanlab
+
+try:
+    import swanlab
+    from swanlab.integration.sb3 import SwanLabCallback
+    _SWANLAB_AVAILABLE = True
+except ImportError:
+    swanlab = None
+    SwanLabCallback = None
+    _SWANLAB_AVAILABLE = False
 
 from device_utils import describe_device, resolve_sb3_device, print_device_report
 
@@ -65,6 +72,8 @@ class LogApproxKL(BaseCallback):
     def _on_rollout_end(self) -> None:
         # train() has already finished running by the time _on_rollout_end
         # fires, so the logger's cache contains all of this round's metrics.
+        if swanlab is None:
+            return
         logger = self.model.logger
         if hasattr(logger, "name_to_value") and "train/approx_kl" in logger.name_to_value:
             value = float(logger.name_to_value["train/approx_kl"])
@@ -110,11 +119,34 @@ def parse_args():
         default="auto",
         help="Training device: auto prefers CUDA, then Apple MPS, then CPU",
     )
+    parser.add_argument(
+        "--seed", type=int, default=0, help="Random seed (default 0)"
+    )
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: tiny CPU run writing only under runs/",
+    )
     return parser.parse_args()
+
+
+def seed_everything(seed):
+    import random
+
+    import numpy as np
+    import torch
+
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
 
 
 def main():
     args = parse_args()
+    seed_everything(args.seed)
+    if args.smoke:
+        args.device = "cpu"
+    out_dir = Path("runs/smoke_1_ppo_cartpole") if args.smoke else Path("output")
+    out_dir.mkdir(parents=True, exist_ok=True)
     os.makedirs("output", exist_ok=True)
     device = resolve_sb3_device(args.device)
     print_device_report(device)
@@ -137,7 +169,7 @@ def main():
           f"(≈ ±{np.degrees(env.unwrapped.theta_threshold_radians):.0f}°)")
     print("=" * 50)
 
-    model = PPO("MlpPolicy", env, verbose=1, device=device)
+    model = PPO("MlpPolicy", env, verbose=1, device=device, seed=args.seed)
     if device == "mps":
         print(
             "Note: SB3 MlpPolicy on Apple MPS works, but CPU is often faster for "
@@ -145,32 +177,40 @@ def main():
         )
 
     print(f"Starting training on {describe_device(device)} (with SwanLab logging)...")
-    swanlab_cb = SwanLabCallback(
-        project="cartpole-ppo",
-        experiment_name="PPO-CartPole-v1",
-        mode="local",
-    )
+    use_swanlab = not args.smoke and _SWANLAB_AVAILABLE
+    if not _SWANLAB_AVAILABLE:
+        print("Note: swanlab is not installed; continuing without dashboard logging.")
+    swanlab_cb = None
+    if use_swanlab:
+        swanlab_cb = SwanLabCallback(
+            project="cartpole-ppo",
+            experiment_name="PPO-CartPole-v1",
+            mode="local",
+        )
+    callbacks = [RestoreStdoutLog(), LogApproxKL()]
+    if swanlab_cb is not None:
+        callbacks.insert(0, swanlab_cb)
     model.learn(
-        total_timesteps=80000,
-        callback=[swanlab_cb, RestoreStdoutLog(), LogApproxKL()],
+        total_timesteps=512 if args.smoke else 80000,
+        callback=callbacks,
     )
 
     # Evaluate
-    mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=10)
+    mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=2 if args.smoke else 10)
     print(f"Training complete! Mean reward: {mean_reward} +/- {std_reward}")
 
-    model.save("output/ppo_cartpole")
+    model.save(str(out_dir / "ppo_cartpole"))
     env.close()
 
     # ==========================================
     # Stage 2: Demoing what the agent learned
     # ==========================================
     print("\nDemoing what the agent learned...")
-    render_mode = "human" if args.gui else None
+    render_mode = "human" if args.gui and not args.smoke else None
     vis_env = gym.make("CartPole-v1", render_mode=render_mode)
-    model = PPO.load("output/ppo_cartpole")
+    model = PPO.load(str(out_dir / "ppo_cartpole"))
 
-    for episode in range(5):
+    for episode in range(1 if args.smoke else 5):
         obs, info = vis_env.reset()
         done, truncated, score = False, False, 0
         while not (done or truncated):

@@ -43,15 +43,43 @@ def downsample_frames(frames, max_frames):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, required=True)
+    parser.add_argument("--model", type=str, default=None)
     parser.add_argument("--output-dir", type=str, default="output/lunarlander_episodes")
     parser.add_argument("--episodes", type=int, default=3)
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--seeds", type=int, nargs="*", default=None)
     parser.add_argument("--max-steps", type=int, default=1000)
     parser.add_argument("--max-frames", type=int, default=150)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="cpu")
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: random policy, few steps, writes only under runs/",
+    )
     args = parser.parse_args()
 
+    if args.smoke:
+        import gymnasium as gym
+
+        args.output_dir = "runs/smoke_render_lunarlander_split"
+        out_dir = Path(args.output_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        env = gym.make("LunarLander-v3", render_mode="rgb_array")
+        env.action_space.seed(args.seed)
+        env.reset(seed=args.seed)
+        frames = [env.render() for _ in range(5)]
+        for _ in range(5):
+            _, _, terminated, truncated, _ = env.step(env.action_space.sample())
+            frames.append(env.render())
+            if terminated or truncated:
+                break
+        env.close()
+        imageio.mimsave(out_dir / "lunarlander_ep1.gif", frames, duration=1000 / args.fps, loop=0)
+        print(f"Saved smoke render to {out_dir} ({len(frames)} frames)")
+        return
+
+    if args.model is None:
+        raise SystemExit("--model is required without --smoke")
     model = DQN.load(args.model)
 
     output_dir = Path(args.output_dir)

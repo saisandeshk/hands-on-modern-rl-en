@@ -1,5 +1,5 @@
 """
-Chapter 4: Double DQN -- solving DQN's overestimation problem
+Chapter 5: Double DQN -- solving DQN's overestimation problem
 Compares standard DQN and Double DQN on CartPole-v1
 
 Background:
@@ -19,8 +19,10 @@ Solution -- Double DQN (Hasselt et al., 2016):
 
 How to run:
     python double_dqn_cartpole.py
+    python double_dqn_cartpole.py --smoke   # fast CPU smoke test writing under runs/
 """
 
+import argparse
 import os
 import random
 import collections
@@ -29,6 +31,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import gymnasium as gym
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 # Create output directory
@@ -99,12 +104,13 @@ class DQNAgent:
     "evaluating the Q value" -- this is the root cause of overestimation.
     """
 
-    def __init__(self, state_dim, action_dim, lr=1e-3, gamma=0.99):
+    def __init__(self, state_dim, action_dim, lr=1e-3, gamma=0.99, device="cpu"):
         self.action_dim = action_dim
         self.gamma = gamma
+        self.device = torch.device(device)
 
-        self.q_net = QNetwork(state_dim, action_dim)
-        self.target_net = QNetwork(state_dim, action_dim)
+        self.q_net = QNetwork(state_dim, action_dim).to(self.device)
+        self.target_net = QNetwork(state_dim, action_dim).to(self.device)
         self.target_net.load_state_dict(self.q_net.state_dict())
         self.target_net.eval()
 
@@ -116,10 +122,19 @@ class DQNAgent:
         if random.random() < epsilon:
             return random.randint(0, self.action_dim - 1)
         else:
-            state_tensor = torch.FloatTensor(state).unsqueeze(0)
+            state_tensor = torch.as_tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
             with torch.no_grad():
                 q_values = self.q_net(state_tensor)
             return q_values.argmax(dim=1).item()
+
+    def _to_tensors(self, states, actions, rewards, next_states, dones):
+        return (
+            torch.as_tensor(states, dtype=torch.float32, device=self.device),
+            torch.as_tensor(actions, dtype=torch.int64, device=self.device),
+            torch.as_tensor(rewards, dtype=torch.float32, device=self.device),
+            torch.as_tensor(next_states, dtype=torch.float32, device=self.device),
+            torch.as_tensor(dones, dtype=torch.float32, device=self.device),
+        )
 
     def update(self, batch_size):
         """
@@ -133,11 +148,9 @@ class DQNAgent:
 
         states, actions, rewards, next_states, dones = self.buffer.sample(batch_size)
 
-        states = torch.FloatTensor(states)
-        actions = torch.LongTensor(actions)
-        rewards = torch.FloatTensor(rewards)
-        next_states = torch.FloatTensor(next_states)
-        dones = torch.FloatTensor(dones)
+        states, actions, rewards, next_states, dones = self._to_tensors(
+            states, actions, rewards, next_states, dones
+        )
 
         # Current Q values
         q_values = self.q_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)
@@ -194,11 +207,9 @@ class DoubleDQNAgent(DQNAgent):
 
         states, actions, rewards, next_states, dones = self.buffer.sample(batch_size)
 
-        states = torch.FloatTensor(states)
-        actions = torch.LongTensor(actions)
-        rewards = torch.FloatTensor(rewards)
-        next_states = torch.FloatTensor(next_states)
-        dones = torch.FloatTensor(dones)
+        states, actions, rewards, next_states, dones = self._to_tensors(
+            states, actions, rewards, next_states, dones
+        )
 
         # Current Q values (same as standard DQN)
         q_values = self.q_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)
@@ -229,9 +240,28 @@ class DoubleDQNAgent(DQNAgent):
 # ==========================================
 # Part 5: Generic training function
 # ==========================================
+def parse_args():
+    parser = argparse.ArgumentParser(description="DQN vs Double DQN on CartPole-v1 (Chapter 5)")
+    parser.add_argument("--seed", type=int, default=0, help="Random seed")
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="cpu")
+    parser.add_argument("--num-episodes", type=int, default=300, help="Episodes per agent")
+    parser.add_argument("--batch-size", type=int, default=64, help="Batch size per update")
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: tiny CPU run writing only under runs/",
+    )
+    return parser.parse_args()
+
+
+def resolve_device(choice):
+    if choice == "auto":
+        return "cuda" if torch.cuda.is_available() else "cpu"
+    return choice
+
+
 def train_agent(agent, num_episodes=300, batch_size=64,
                 epsilon_start=1.0, epsilon_end=0.01,
-                epsilon_decay=0.995, target_update_freq=10):
+                epsilon_decay=0.995, target_update_freq=10, seed=0):
     """
     Generic training function, works for both DQN and Double DQN
 
@@ -242,17 +272,23 @@ def train_agent(agent, num_episodes=300, batch_size=64,
     Returns:
         reward_history: list of cumulative rewards per episode
     """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
     env = gym.make("CartPole-v1")
+    env.reset(seed=seed)
+    env.action_space.seed(seed)
     reward_history = []
     epsilon = epsilon_start
 
     for episode in range(num_episodes):
-        state, _ = env.reset()
+        state, _ = env.reset(seed=seed + episode)
         episode_reward = 0
 
         while True:
             action = agent.select_action(state, epsilon)
             next_state, reward, done, truncated, _ = env.step(action)
+            # `done` is terminated only, so truncation keeps bootstrapping.
             agent.buffer.push(state, action, reward, next_state, float(done))
             agent.update(batch_size)
 
@@ -275,12 +311,21 @@ def train_agent(agent, num_episodes=300, batch_size=64,
 # ==========================================
 # Part 6: Comparison experiment
 # ==========================================
-def main():
+def main(args=None):
     """Run the comparison experiment between DQN and Double DQN"""
+    if args is None:
+        args = parse_args()
+    if args.smoke:
+        args.device = "cpu"
+        args.num_episodes = 5
+        args.batch_size = 32
+    device = resolve_device(args.device)
+    out_dir = os.path.join("runs", "smoke_double_dqn") if args.smoke else "output"
+    os.makedirs(out_dir, exist_ok=True)
 
     # Training parameters
-    NUM_EPISODES = 300
-    BATCH_SIZE = 64
+    NUM_EPISODES = args.num_episodes
+    BATCH_SIZE = args.batch_size
     LR = 1e-3
     GAMMA = 0.99
     EPSILON_START = 1.0
@@ -311,7 +356,7 @@ def main():
     print("\n[1/2] Training standard DQN...")
     print("-" * 60)
 
-    dqn_agent = DQNAgent(state_dim, action_dim, lr=LR, gamma=GAMMA)
+    dqn_agent = DQNAgent(state_dim, action_dim, lr=LR, gamma=GAMMA, device=device)
     dqn_rewards = train_agent(
         dqn_agent,
         num_episodes=NUM_EPISODES,
@@ -320,6 +365,7 @@ def main():
         epsilon_end=EPSILON_END,
         epsilon_decay=EPSILON_DECAY,
         target_update_freq=TARGET_UPDATE_FREQ,
+        seed=args.seed,
     )
 
     dqn_avg = np.mean(dqn_rewards[-50:])
@@ -331,7 +377,7 @@ def main():
     print("\n[2/2] Training Double DQN...")
     print("-" * 60)
 
-    double_dqn_agent = DoubleDQNAgent(state_dim, action_dim, lr=LR, gamma=GAMMA)
+    double_dqn_agent = DoubleDQNAgent(state_dim, action_dim, lr=LR, gamma=GAMMA, device=device)
     double_dqn_rewards = train_agent(
         double_dqn_agent,
         num_episodes=NUM_EPISODES,
@@ -340,6 +386,7 @@ def main():
         epsilon_end=EPSILON_END,
         epsilon_decay=EPSILON_DECAY,
         target_update_freq=TARGET_UPDATE_FREQ,
+        seed=args.seed + 1,
     )
 
     ddqn_avg = np.mean(double_dqn_rewards[-50:])
@@ -392,9 +439,9 @@ def main():
     ax2.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig("output/dqn_vs_double_dqn.png", dpi=150)
-    print("\nComparison plot saved to output/dqn_vs_double_dqn.png")
-    plt.show()
+    plt.savefig(os.path.join(out_dir, "dqn_vs_double_dqn.png"), dpi=150)
+    print(f"\nComparison plot saved to {os.path.join(out_dir, 'dqn_vs_double_dqn.png')}")
+    plt.close()
 
     # ==========================================
     # Part 8: Final results summary

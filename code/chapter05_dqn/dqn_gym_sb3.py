@@ -1,7 +1,7 @@
 """
 Train a DQN agent on common discrete-action Gymnasium environments.
 
-This script is the practical companion for Chapter 4 DQN experiments. It covers the tasks
+This script is the practical companion for Chapter 5 DQN experiments. It covers the tasks
 where DQN is usually a good first choice: Classic Control and discrete Box2D
 environments such as CartPole, MountainCar, Acrobot, and LunarLander.
 
@@ -9,6 +9,7 @@ Examples:
     python code/chapter05_dqn/dqn_gym_sb3.py --env-id CartPole-v1 --total-timesteps 100000
     python code/chapter05_dqn/dqn_gym_sb3.py --env-id MountainCar-v0 --total-timesteps 300000
     python code/chapter05_dqn/dqn_gym_sb3.py --env-id LunarLander-v3 --total-timesteps 500000
+    python code/chapter05_dqn/dqn_gym_sb3.py --smoke   # fast CPU smoke test writing under runs/
 """
 
 from __future__ import annotations
@@ -199,6 +200,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--checkpoint-freq", type=int, default=25_000)
     parser.add_argument("--eval-episodes", type=int, default=10)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--device", type=str, default="cpu",
+                        choices=["auto", "cpu", "cuda"],
+                        help="Torch device for SB3 (default cpu for reliability)")
+    parser.add_argument("--smoke", action="store_true",
+                        help="Smoke-test mode: tiny CPU run writing only under runs/")
     parser.add_argument("--progress-bar", action="store_true")
     parser.add_argument("--log-dir", type=Path, default=Path("output/dqn_gym"))
     parser.add_argument("--no-swanlab", action="store_true")
@@ -222,11 +228,24 @@ def ensure_discrete_action_space(env_id: str) -> None:
 
 def main() -> None:
     args = parse_args()
+    if args.smoke:
+        args.device = "cpu"
+        args.total_timesteps = 256
+        args.learning_starts = 64
+        args.buffer_size = 1_000
+        args.eval_freq = 0
+        args.checkpoint_freq = 0
+        args.eval_episodes = 2
+        args.no_swanlab = True
+        args.log_dir = Path("runs/smoke_dqn_gym")
+        args.progress_bar = False
     ensure_discrete_action_space(args.env_id)
 
     run_dir = args.log_dir / args.env_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
+    from stable_baselines3.common.utils import set_random_seed
+    set_random_seed(args.seed)
     env = make_vec_env(args.env_id, n_envs=1, seed=args.seed, monitor_dir=str(run_dir / "monitor"))
     eval_env = Monitor(gym.make(args.env_id))
 
@@ -246,25 +265,30 @@ def main() -> None:
         tensorboard_log=str(run_dir / "tb"),
         seed=args.seed,
         verbose=1,
+        device=args.device,
     )
 
-    checkpoint_callback = CheckpointCallback(
-        save_freq=args.checkpoint_freq,
-        save_path=str(run_dir / "checkpoints"),
-        name_prefix=f"dqn_{args.env_id}",
-        save_replay_buffer=True,
-    )
+    callbacks = []
     eval_csv_path = run_dir / "eval" / "eval_metrics.csv"
-    eval_callback = EvaluationCsvCallback(
-        eval_env,
-        best_model_save_path=str(run_dir / "best"),
-        log_path=str(run_dir / "eval"),
-        eval_freq=args.eval_freq,
-        n_eval_episodes=args.eval_episodes,
-        deterministic=True,
-        csv_path=eval_csv_path,
-    )
-    callbacks = [checkpoint_callback, eval_callback]
+    if args.eval_freq > 0:
+        checkpoint_callback = CheckpointCallback(
+            save_freq=args.checkpoint_freq if args.checkpoint_freq > 0 else args.eval_freq,
+            save_path=str(run_dir / "checkpoints"),
+            name_prefix=f"dqn_{args.env_id}",
+            save_replay_buffer=True,
+        )
+        callbacks.append(checkpoint_callback)
+        callbacks.append(
+            EvaluationCsvCallback(
+                eval_env,
+                best_model_save_path=str(run_dir / "best"),
+                log_path=str(run_dir / "eval"),
+                eval_freq=args.eval_freq,
+                n_eval_episodes=args.eval_episodes,
+                deterministic=True,
+                csv_path=eval_csv_path,
+            )
+        )
     swanlab_callback = maybe_make_swanlab_callback(args)
     if swanlab_callback is not None:
         callbacks.append(swanlab_callback)

@@ -1,4 +1,4 @@
-# Chapter 4: Deep Reinforcement Learning DQN experiment dependencies
+# Chapter 5: Deep Reinforcement Learning DQN experiment dependencies
 gymnasium[classic-control]>=0.29.0
 gymnasium[box2d]>=0.29.0
 gymnasium[atari,accept-rom-license]>=1.0.0

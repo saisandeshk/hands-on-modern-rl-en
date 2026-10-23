@@ -1,5 +1,5 @@
 """
-Chapter 5: REINFORCE with Baseline -- variance reduction comparison experiment
+Chapter 6: REINFORCE with Baseline -- variance reduction comparison experiment
 Compares vanilla REINFORCE against a version with a baseline (Value Network) added
 
 Core problem: vanilla REINFORCE has high gradient variance, making training unstable
@@ -14,8 +14,10 @@ Why does a baseline reduce variance?
 
 How to run:
     python reinforce_with_baseline.py
+    python reinforce_with_baseline.py --smoke   # fast CPU smoke test writing under runs/
 """
 
+import argparse
 import os
 import random
 import torch
@@ -23,6 +25,9 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import gymnasium as gym
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 # Create the output directory
@@ -108,13 +113,14 @@ def compute_returns(rewards, gamma=0.99):
 # ==========================================
 # Part 3: Collect an episode trajectory
 # ==========================================
-def collect_episode(policy, env):
+def collect_episode(policy, env, device="cpu"):
     """
     Use the current policy to collect data for one full episode
 
     Args:
         policy: policy network
         env: environment
+        device: torch device for tensors
     Returns:
         states, actions, rewards, episode_reward
     """
@@ -123,7 +129,7 @@ def collect_episode(policy, env):
     done, truncated = False, False
 
     while not (done or truncated):
-        state_tensor = torch.FloatTensor(state).unsqueeze(0)
+        state_tensor = torch.as_tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
         with torch.no_grad():
             probs = policy(state_tensor)
         dist = torch.distributions.Categorical(probs)
@@ -143,23 +149,24 @@ def collect_episode(policy, env):
 # ==========================================
 # Part 4: Vanilla REINFORCE training
 # ==========================================
-def train_vanilla_reinforce(num_episodes=500, gamma=0.99, lr=1e-3):
+def train_vanilla_reinforce(num_episodes=500, gamma=0.99, lr=1e-3, seed=0, device="cpu"):
     """
     Vanilla REINFORCE (no baseline)
 
     Loss = -sum log pi(a_t|s_t) * G_t
     Uses the discounted cumulative return G_t directly as the weight
     """
-    random.seed(SEED)
-    np.random.seed(SEED)
-    torch.manual_seed(SEED)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
 
     env = gym.make("CartPole-v1")
-    env.reset(seed=SEED)
+    env.reset(seed=seed)
+    env.action_space.seed(seed)
     policy = PolicyNetwork(
         state_dim=env.observation_space.shape[0],
         action_dim=env.action_space.n,
-    )
+    ).to(device)
     optimizer = optim.Adam(policy.parameters(), lr=lr)
 
     episode_rewards = []
@@ -167,15 +174,15 @@ def train_vanilla_reinforce(num_episodes=500, gamma=0.99, lr=1e-3):
 
     for episode in range(num_episodes):
         # Collect a trajectory
-        states, actions, rewards, episode_reward = collect_episode(policy, env)
+        states, actions, rewards, episode_reward = collect_episode(policy, env, device)
 
         # Compute returns
         returns = compute_returns(rewards, gamma)
 
         # Convert to tensors
-        states_t = torch.FloatTensor(np.array(states))
-        actions_t = torch.LongTensor(actions)
-        returns_t = torch.FloatTensor(returns)
+        states_t = torch.as_tensor(np.array(states), dtype=torch.float32, device=device)
+        actions_t = torch.as_tensor(actions, dtype=torch.int64, device=device)
+        returns_t = torch.as_tensor(returns, dtype=torch.float32, device=device)
 
         # Forward pass
         probs = policy(states_t)
@@ -208,7 +215,7 @@ def train_vanilla_reinforce(num_episodes=500, gamma=0.99, lr=1e-3):
 # ==========================================
 # Part 5: REINFORCE with Baseline training
 # ==========================================
-def train_reinforce_with_baseline(num_episodes=500, gamma=0.99, lr=1e-3):
+def train_reinforce_with_baseline(num_episodes=500, gamma=0.99, lr=1e-3, seed=0, device="cpu"):
     """
     REINFORCE + value baseline
 
@@ -220,19 +227,20 @@ def train_reinforce_with_baseline(num_episodes=500, gamma=0.99, lr=1e-3):
         - The policy network learns "which actions are better" (relative to the baseline)
         - The value network learns "how many points this state is worth on average" (the baseline)
     """
-    baseline_seed = SEED + 100
+    baseline_seed = seed + 100
     random.seed(baseline_seed)
     np.random.seed(baseline_seed)
     torch.manual_seed(baseline_seed)
 
     env = gym.make("CartPole-v1")
     env.reset(seed=baseline_seed)
+    env.action_space.seed(baseline_seed)
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
 
     # Initialize the policy network and value network
-    policy = PolicyNetwork(state_dim=state_dim, action_dim=action_dim)
-    value_net = ValueNetwork(state_dim=state_dim)
+    policy = PolicyNetwork(state_dim=state_dim, action_dim=action_dim).to(device)
+    value_net = ValueNetwork(state_dim=state_dim).to(device)
 
     # Each network gets its own optimizer
     policy_optimizer = optim.Adam(policy.parameters(), lr=lr)
@@ -243,15 +251,15 @@ def train_reinforce_with_baseline(num_episodes=500, gamma=0.99, lr=1e-3):
 
     for episode in range(num_episodes):
         # Collect a trajectory
-        states, actions, rewards, episode_reward = collect_episode(policy, env)
+        states, actions, rewards, episode_reward = collect_episode(policy, env, device)
 
         # Compute returns
         returns = compute_returns(rewards, gamma)
 
         # Convert to tensors
-        states_t = torch.FloatTensor(np.array(states))
-        actions_t = torch.LongTensor(actions)
-        returns_t = torch.FloatTensor(returns)
+        states_t = torch.as_tensor(np.array(states), dtype=torch.float32, device=device)
+        actions_t = torch.as_tensor(actions, dtype=torch.int64, device=device)
+        returns_t = torch.as_tensor(returns, dtype=torch.float32, device=device)
 
         # ========== Update the value network (Critic) ==========
         # The value network's goal: accurately predict V(s) ~= G_t
@@ -300,7 +308,21 @@ def train_reinforce_with_baseline(num_episodes=500, gamma=0.99, lr=1e-3):
 # ==========================================
 # Part 6: Comparison experiment main function
 # ==========================================
-def run_comparison():
+def parse_args():
+    parser = argparse.ArgumentParser(description="REINFORCE vs baseline comparison (Chapter 6)")
+    parser.add_argument("--seed", type=int, default=0, help="Random seed")
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="cpu")
+    parser.add_argument("--num-episodes", type=int, default=500, help="Training episodes per method")
+    parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
+    parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: tiny CPU run writing only under runs/",
+    )
+    return parser.parse_args()
+
+
+def run_comparison(args=None):
     """
     Run the comparison experiment: Vanilla REINFORCE vs REINFORCE + Value Baseline
 
@@ -308,9 +330,16 @@ def run_comparison():
         1. Learning speed and final performance (reward curve)
         2. Variance of the gradient estimate (lower variance = more stable training)
     """
-    num_episodes = 500
-    gamma = 0.99
-    lr = 1e-3
+    if args is None:
+        args = parse_args()
+    num_episodes = 4 if args.smoke else args.num_episodes
+    gamma = args.gamma
+    lr = args.lr
+    out_dir = os.path.join("runs", "smoke_reinforce_baseline") if args.smoke else "output"
+    os.makedirs(out_dir, exist_ok=True)
+    device = "cpu" if args.smoke or args.device == "cpu" else (
+        "cuda" if (args.device == "auto" and torch.cuda.is_available()) else args.device
+    )
 
     print("=" * 60)
     print("  REINFORCE variance reduction comparison experiment")
@@ -323,13 +352,13 @@ def run_comparison():
     # ---------- Experiment 1: Vanilla REINFORCE ----------
     print("\n[Experiment 1] Training Vanilla REINFORCE (no baseline)...")
     vanilla_rewards, vanilla_grads = train_vanilla_reinforce(
-        num_episodes=num_episodes, gamma=gamma, lr=lr
+        num_episodes=num_episodes, gamma=gamma, lr=lr, seed=args.seed, device=device
     )
 
     # ---------- Experiment 2: REINFORCE + Value Baseline ----------
     print("\n[Experiment 2] Training REINFORCE + Value Baseline...")
     baseline_rewards, baseline_grads = train_reinforce_with_baseline(
-        num_episodes=num_episodes, gamma=gamma, lr=lr
+        num_episodes=num_episodes, gamma=gamma, lr=lr, seed=args.seed, device=device
     )
 
     # ---------- Variance statistics comparison ----------
@@ -353,16 +382,16 @@ def run_comparison():
     print("=" * 60)
 
     # ---------- Comparison plot 1: reward curve ----------
-    plot_reward_comparison(vanilla_rewards, baseline_rewards, window=50)
+    plot_reward_comparison(vanilla_rewards, baseline_rewards, out_dir, window=50)
 
     # ---------- Comparison plot 2: variance comparison ----------
-    plot_variance_comparison(vanilla_grads, baseline_grads, window=50)
+    plot_variance_comparison(vanilla_grads, baseline_grads, out_dir, window=50)
 
 
 # ==========================================
 # Part 7: Plot the reward comparison curve
 # ==========================================
-def plot_reward_comparison(vanilla_rewards, baseline_rewards, window=50):
+def plot_reward_comparison(vanilla_rewards, baseline_rewards, out_dir="output", window=50):
     """
     Plot the reward curve comparison between the two experiments
 
@@ -393,15 +422,17 @@ def plot_reward_comparison(vanilla_rewards, baseline_rewards, window=50):
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig('output/reinforce_baseline_reward_comparison.png', dpi=150, bbox_inches='tight')
-    print("  Reward comparison plot saved to output/reinforce_baseline_reward_comparison.png")
-    plt.show()
+    os.makedirs(out_dir, exist_ok=True)
+    reward_path = os.path.join(out_dir, 'reinforce_baseline_reward_comparison.png')
+    plt.savefig(reward_path, dpi=150, bbox_inches='tight')
+    print(f"  Reward comparison plot saved to {reward_path}")
+    plt.close()
 
 
 # ==========================================
 # Part 8: Plot the variance comparison chart
 # ==========================================
-def plot_variance_comparison(vanilla_grads, baseline_grads, window=50):
+def plot_variance_comparison(vanilla_grads, baseline_grads, out_dir="output", window=50):
     """
     Plot the moving-window comparison of gradient estimate variance
 
@@ -446,9 +477,11 @@ def plot_variance_comparison(vanilla_grads, baseline_grads, window=50):
         )
 
     plt.tight_layout()
-    plt.savefig('output/reinforce_baseline_variance_comparison.png', dpi=150, bbox_inches='tight')
-    print("  Variance comparison plot saved to output/reinforce_baseline_variance_comparison.png")
-    plt.show()
+    os.makedirs(out_dir, exist_ok=True)
+    var_path = os.path.join(out_dir, 'reinforce_baseline_variance_comparison.png')
+    plt.savefig(var_path, dpi=150, bbox_inches='tight')
+    print(f"  Variance comparison plot saved to {var_path}")
+    plt.close()
 
 
 # ==========================================

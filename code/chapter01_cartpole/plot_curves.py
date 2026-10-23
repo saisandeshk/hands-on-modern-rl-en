@@ -22,6 +22,12 @@ def parse_args():
         "--output-dir",
         default=os.path.join(here, "output"),
     )
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="cpu")
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: plot a tiny synthetic curve under runs/",
+    )
     return parser.parse_args()
 
 
@@ -46,9 +52,23 @@ def save(fig, output_dir, filename):
 
 def main():
     args = parse_args()
-    metrics = load_metrics(args.input)
-    steps = metrics["total_timesteps"]
-    seed = int(metrics["seed"][0])
+    if args.smoke:
+        args.output_dir = "runs/smoke_plot_curves"
+        metrics = {
+            "total_timesteps": np.array([256.0, 512.0]),
+            "seed": np.array([float(args.seed)] * 2),
+            "mean_episode_reward": np.array([20.0, 25.0]),
+            "value_loss": np.array([1.0, 0.9]),
+            "entropy": np.array([0.6, 0.55]),
+            "approx_kl": np.array([0.01, 0.012]),
+            "clip_fraction": np.array([0.1, 0.12]),
+        }
+        steps = metrics["total_timesteps"]
+        seed = args.seed
+    else:
+        metrics = load_metrics(args.input)
+        steps = metrics["total_timesteps"]
+        seed = int(metrics["seed"][0])
 
     plt.style.use("seaborn-v0_8-whitegrid")
     plt.rcParams.update({
@@ -74,7 +94,7 @@ def main():
     )
     ax.set_ylim(0, 525)
     ax.legend()
-    save(fig, args.output_dir, "cartpole_reward_seed42.png")
+    save(fig, args.output_dir, f"cartpole_reward_seed{seed}.png")
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 8), sharex=True)
     panels = [
@@ -101,7 +121,7 @@ def main():
         fontsize=15,
     )
     fig.tight_layout()
-    save(fig, args.output_dir, "cartpole_diagnostics_seed42.png")
+    save(fig, args.output_dir, f"cartpole_diagnostics_seed{seed}.png")
 
 
 if __name__ == "__main__":

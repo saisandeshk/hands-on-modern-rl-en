@@ -1,5 +1,5 @@
 """
-Chapter 5: REINFORCE policy gradient algorithm -- CartPole-v1
+Chapter 6: REINFORCE policy gradient algorithm -- CartPole-v1
 Implements the most classic policy gradient method from scratch, illustrating
 "do more of the good actions, do less of the bad ones"
 
@@ -15,14 +15,20 @@ REINFORCE formula:
 
 How to run:
     python reinforce_cartpole.py
+    python reinforce_cartpole.py --smoke   # fast CPU smoke test writing under runs/
 """
 
+import argparse
 import os
+import random
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import gymnasium as gym
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from collections import deque
 
@@ -106,7 +112,7 @@ def compute_returns(rewards, gamma=0.99):
 # ==========================================
 # Part 3: Collect a full episode trajectory
 # ==========================================
-def collect_episode(policy, env):
+def collect_episode(policy, env, device="cpu"):
     """
     Let the policy network run a full episode in the environment and collect
     the trajectory data
@@ -132,7 +138,7 @@ def collect_episode(policy, env):
 
     while not (done or truncated):
         # Convert the state to a tensor
-        state_tensor = torch.FloatTensor(state).unsqueeze(0)  # Add the batch dimension
+        state_tensor = torch.as_tensor(state, dtype=torch.float32, device=device).unsqueeze(0)  # Add the batch dimension
 
         # Get the action probability distribution
         with torch.no_grad():
@@ -159,7 +165,7 @@ def collect_episode(policy, env):
 # ==========================================
 # Part 4: Train on one episode (the core REINFORCE update)
 # ==========================================
-def train_one_episode(policy, optimizer, states, actions, returns):
+def train_one_episode(policy, optimizer, states, actions, returns, device="cpu"):
     """
     The core of REINFORCE: update the network parameters using the policy gradient formula
 
@@ -176,13 +182,14 @@ def train_one_episode(policy, optimizer, states, actions, returns):
         states: list of states
         actions: list of actions
         returns: list of discounted cumulative returns
+        device: torch device for tensors
     Returns:
         loss_value: this round's loss value
     """
     # Convert the data to tensors
-    states_tensor = torch.FloatTensor(np.array(states))
-    actions_tensor = torch.LongTensor(actions)
-    returns_tensor = torch.FloatTensor(returns)
+    states_tensor = torch.as_tensor(np.array(states), dtype=torch.float32, device=device)
+    actions_tensor = torch.as_tensor(actions, dtype=torch.int64, device=device)
+    returns_tensor = torch.as_tensor(returns, dtype=torch.float32, device=device)
 
     # Forward pass: get the action probabilities for each state
     probs = policy(states_tensor)
@@ -209,7 +216,28 @@ def train_one_episode(policy, optimizer, states, actions, returns):
 # ==========================================
 # Part 5: Main training loop
 # ==========================================
-def train():
+def parse_args():
+    parser = argparse.ArgumentParser(description="REINFORCE on CartPole-v1 (Chapter 6)")
+    parser.add_argument("--seed", type=int, default=0, help="Random seed")
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="cpu")
+    parser.add_argument("--num-episodes", type=int, default=500, help="Training episodes")
+    parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
+    parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
+    parser.add_argument("--hidden-dim", type=int, default=128, help="Hidden layer width")
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: tiny CPU run writing only under runs/",
+    )
+    return parser.parse_args()
+
+
+def resolve_device(choice):
+    if choice == "auto":
+        return "cuda" if torch.cuda.is_available() else "cpu"
+    return choice
+
+
+def train(args=None):
     """
     The full REINFORCE training pipeline
 
@@ -219,19 +247,32 @@ def train():
         - learning_rate = 1e-3: learning rate
         - hidden_dim = 128: hidden layer width
     """
+    if args is None:
+        args = parse_args()
     # ---------- Hyperparameters ----------
-    num_episodes = 500
-    gamma = 0.99
-    learning_rate = 1e-3
-    hidden_dim = 128
+    num_episodes = 5 if args.smoke else args.num_episodes
+    gamma = args.gamma
+    learning_rate = args.lr
+    hidden_dim = args.hidden_dim
+
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    device = resolve_device(args.device)
+    if args.smoke:
+        device = "cpu"
+    out_dir = os.path.join("runs", "smoke_reinforce_cartpole") if args.smoke else "output"
+    os.makedirs(out_dir, exist_ok=True)
 
     # ---------- Initialization ----------
     env = gym.make("CartPole-v1")
+    env.reset(seed=args.seed)
+    env.action_space.seed(args.seed)
     policy = PolicyNetwork(
         state_dim=env.observation_space.shape[0],
         action_dim=env.action_space.n,
         hidden_dim=hidden_dim,
-    )
+    ).to(device)
     optimizer = optim.Adam(policy.parameters(), lr=learning_rate)
 
     # Record the training process
@@ -251,13 +292,13 @@ def train():
     # ---------- Training loop ----------
     for episode in range(num_episodes):
         # Step 1: collect a full episode trajectory with the current policy
-        states, actions, rewards, episode_reward = collect_episode(policy, env)
+        states, actions, rewards, episode_reward = collect_episode(policy, env, device)
 
         # Step 2: compute the discounted cumulative returns
         returns = compute_returns(rewards, gamma=gamma)
 
         # Step 3: perform the policy gradient update
-        loss_value = train_one_episode(policy, optimizer, states, actions, returns)
+        loss_value = train_one_episode(policy, optimizer, states, actions, returns, device)
 
         # Record the data
         episode_rewards.append(episode_reward)
@@ -284,13 +325,13 @@ def train():
     print("=" * 60)
 
     # ---------- Plot the training curve ----------
-    plot_training_curve(episode_rewards)
+    plot_training_curve(episode_rewards, out_dir)
 
 
 # ==========================================
 # Part 6: Plot the training curve
 # ==========================================
-def plot_training_curve(episode_rewards):
+def plot_training_curve(episode_rewards, out_dir="output"):
     """
     Plot the reward curve and the moving-average line
 
@@ -319,9 +360,11 @@ def plot_training_curve(episode_rewards):
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig('output/reinforce_cartpole_rewards.png', dpi=150, bbox_inches='tight')
-    print("  Training curve saved to output/reinforce_cartpole_rewards.png")
-    plt.show()
+    os.makedirs(out_dir, exist_ok=True)
+    curve_path = os.path.join(out_dir, 'reinforce_cartpole_rewards.png')
+    plt.savefig(curve_path, dpi=150, bbox_inches='tight')
+    print(f"  Training curve saved to {curve_path}")
+    plt.close()
 
 
 # ==========================================

@@ -1,5 +1,5 @@
 """
-Chapter 13: Multi-Agent Reinforcement Learning (Multi-Agent RL) Experiment
+Chapter 12: Multi-Agent Reinforcement Learning (Multi-Agent RL) Experiment
 ——From independent learning to cooperative learning
 
 This experiment builds a simplified multi-agent resource-collection scenario:
@@ -12,10 +12,15 @@ This experiment builds a simplified multi-agent resource-collection scenario:
 
 How to run:
     python multi_agent_marl.py
+    python multi_agent_marl.py --smoke   # fast smoke test writing under runs/
 """
 
+import argparse
 import os
 import numpy as np
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
@@ -779,7 +784,21 @@ def print_cooperation_statistics(ind_results, shared_results, n_agents):
 # ==========================================
 # Part 5: Main program
 # ==========================================
-def main():
+def parse_args():
+    parser = argparse.ArgumentParser(description="Multi-agent resource collection (Chapter 12)")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="cpu")
+    parser.add_argument("--episodes", type=int, default=800, help="Training episodes per method")
+    parser.add_argument("--output-dir", type=str, default="output",
+                        help="Directory for figures")
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: tiny run writing only under runs/",
+    )
+    return parser.parse_args()
+
+
+def main(args=None):
     """
     Main function: create environment -> train both strategies -> compare -> visualize
 
@@ -790,9 +809,14 @@ def main():
         4. Compare team reward, completion rate, and degree of cooperation for both methods
         5. Visualize the results and agent trajectories
     """
+    if args is None:
+        args = parse_args()
+    n_episodes = 6 if args.smoke else args.episodes
+    out_dir = os.path.join("runs", "smoke_multi_agent_marl") if args.smoke else args.output_dir
+    os.makedirs(out_dir, exist_ok=True)
 
     print("=" * 60)
-    print("  Chapter 13: Multi-Agent Reinforcement Learning (MARL) Experiment")
+    print("  Chapter 12: Multi-Agent Reinforcement Learning (MARL) Experiment")
     print("=" * 60)
     print("  Scenario: multi-agent resource collection")
     print("  Agents: 3 (Independent Q-Learning vs Shared Policy)")
@@ -800,7 +824,7 @@ def main():
     print("-" * 60)
 
     # Set random seed
-    np.random.seed(42)
+    np.random.seed(args.seed)
 
     # ---- Step 1: create the environment ----
     print("\n[Step 1] Create the multi-agent grid world environment")
@@ -813,11 +837,11 @@ def main():
 
     # ---- Step 2: train the independent-learning agents ----
     print("\n[Step 2] Training independent-learning (IQL) agents...")
-    ind_results = train_independent(env, n_episodes=800, max_steps=80)
+    ind_results = train_independent(env, n_episodes=n_episodes, max_steps=80)
 
     # ---- Step 3: train the shared-policy agent ----
     print("\n[Step 3] Training the shared-policy agent...")
-    shared_results = train_shared(env, n_episodes=800, max_steps=80)
+    shared_results = train_shared(env, n_episodes=n_episodes, max_steps=80)
 
     # ---- Step 4: comparative analysis ----
     print("\n[Step 4] Comparative analysis")
@@ -828,13 +852,15 @@ def main():
 
     # Figure 1: training curve comparison
     fig1 = visualize_results(ind_results, shared_results, env.n_agents)
-    fig1.savefig('output/marl_training_comparison.png', dpi=150, bbox_inches='tight')
-    print("  Training curve comparison figure saved to: output/marl_training_comparison.png")
+    fig1.savefig(os.path.join(out_dir, 'marl_training_comparison.png'), dpi=150, bbox_inches='tight')
+    print(f"  Training curve comparison figure saved to: {os.path.join(out_dir, 'marl_training_comparison.png')}")
+    plt.close(fig1)
 
     # Figure 2: agent trajectory visualization
     fig2 = visualize_trajectories(env, shared_results['agent'], max_steps=40)
-    fig2.savefig('output/marl_trajectories.png', dpi=150, bbox_inches='tight')
-    print("  Agent trajectory figure saved to: output/marl_trajectories.png")
+    fig2.savefig(os.path.join(out_dir, 'marl_trajectories.png'), dpi=150, bbox_inches='tight')
+    print(f"  Agent trajectory figure saved to: {os.path.join(out_dir, 'marl_trajectories.png')}")
+    plt.close(fig2)
 
     # ---- Key conclusions ----
     print("\n" + "=" * 60)
@@ -852,8 +878,6 @@ def main():
     print("     - LLM-driven multi-agent cooperation")
     print("     - Multi-agent adaptability in open-ended environments")
     print("=" * 60)
-
-    plt.show()
 
 
 if __name__ == "__main__":

@@ -1,14 +1,19 @@
 """
-Chapter 3: Two-armed bandit experiment -- the classic exploration vs. exploitation comparison
+Chapter 2: Two-armed bandit experiment -- the classic exploration vs. exploitation comparison
 Compare four strategies: random, greedy, epsilon-greedy, UCB
 Evaluate each strategy's performance via cumulative average reward and cumulative regret
 
 How to run:
     python two_armed_bandit.py
+    python two_armed_bandit.py --smoke   # fast CPU smoke test writing under runs/
 """
 
+import argparse
 import os
 import numpy as np
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 # Create output directory
@@ -179,12 +184,34 @@ def strategy_ucb(bandit, n_steps, c=2.0):
 # ==========================================
 # Part 3: Running the experiment and comparing results
 # ==========================================
-def run_experiment():
+def parse_args():
+    parser = argparse.ArgumentParser(description="Two-armed bandit exploration comparison")
+    parser.add_argument("--seed", type=int, default=0, help="Random seed")
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="cpu")
+    parser.add_argument("--n-steps", type=int, default=1000, help="Steps per run")
+    parser.add_argument("--n-runs", type=int, default=200, help="Repeated runs")
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: tiny run writing only under runs/",
+    )
+    return parser.parse_args()
+
+
+def run_experiment(args=None):
     """
     Main experiment: run each strategy n_runs times, n_steps steps each, then average
     """
-    n_steps = 1000  # Number of steps per run
-    n_runs = 200    # Number of repeated runs (for smoother curves)
+    if args is None:
+        args = parse_args()
+    np.random.seed(args.seed)
+    n_steps = 20 if args.smoke else args.n_steps
+    n_runs = 2 if args.smoke else args.n_runs
+    output_path = (
+        "runs/smoke_two_armed_bandit/two_armed_bandit_results.png"
+        if args.smoke
+        else "output/two_armed_bandit_results.png"
+    )
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     # Used to accumulate results for each strategy
     all_rewards = {
@@ -264,9 +291,9 @@ def run_experiment():
     ax2.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig('output/two_armed_bandit_results.png', dpi=150, bbox_inches='tight')
-    print("Figure saved to output/two_armed_bandit_results.png")
-    plt.show()
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    print(f"Figure saved to {output_path}")
+    plt.close()
 
     # ==========================================
     # Part 5: Print the results summary table

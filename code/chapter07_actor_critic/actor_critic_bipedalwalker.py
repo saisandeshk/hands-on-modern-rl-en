@@ -1,11 +1,12 @@
 """
-Chapter 6: Training BipedalWalker-v3 with A2C (Advantage Actor-Critic)
+Chapter 7: Training BipedalWalker-v3 with A2C (Advantage Actor-Critic)
 -- Going from Pendulum's 1-dimensional continuous action to 4-dimensional joint coordination
 
 Usage:
     python actor_critic_bipedalwalker.py
     python actor_critic_bipedalwalker.py --total-timesteps 100000    # quick sanity check
     python actor_critic_bipedalwalker.py --total-timesteps 3000000   # full training
+    python actor_critic_bipedalwalker.py --smoke   # fast CPU smoke test writing under runs/
 
 What BipedalWalker-v3 teaches:
     1. A 24-dimensional state space (10 lidar readings + joint angles + velocities)
@@ -19,11 +20,15 @@ import os
 from pathlib import Path
 
 import gymnasium as gym
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from stable_baselines3 import A2C
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.evaluation import evaluate_policy
+from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import DummyVecEnv
 
 
@@ -40,8 +45,15 @@ def parse_args():
     parser.add_argument("--num-envs", type=int, default=16,
                         help="Number of parallel environments (default 16)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="cpu")
     parser.add_argument("--eval-episodes", type=int, default=20,
                         help="Number of episodes for the final evaluation")
+    parser.add_argument("--output-dir", type=str, default="output",
+                        help="Directory for models and plots")
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: tiny CPU run writing only under runs/",
+    )
     return parser.parse_args()
 
 
@@ -163,14 +175,21 @@ def save_plots(callback, output_dir):
 
 def main():
     args = parse_args()
+    if args.smoke:
+        args.device = "cpu"
+        args.total_timesteps = 256
+        args.num_envs = 1
+        args.eval_episodes = 1
+        args.output_dir = "runs/smoke_actor_critic_bipedalwalker"
 
     print("=" * 50)
-    print("Chapter 6: A2C Training on BipedalWalker-v3")
+    print("Chapter 7: A2C Training on BipedalWalker-v3")
     print("=" * 50)
     print(f"Total timesteps:      {args.total_timesteps:,}")
     print(f"Parallel envs:        {args.num_envs}")
     print("Action space:  continuous 4-dimensional joint torque [-1, 1]")
 
+    set_random_seed(args.seed)
     vec_env = DummyVecEnv([make_env(args.seed, i) for i in range(args.num_envs)])
 
     # A2C hyperparameters: BipedalWalker is much harder than Pendulum, needing more parallel envs and a larger network
@@ -186,6 +205,7 @@ def main():
         max_grad_norm=0.5,
         policy_kwargs=dict(net_arch=[128, 128]),
         seed=args.seed,
+        device=args.device,
         verbose=1,
     )
 
@@ -199,15 +219,16 @@ def main():
 
     callback = TrainingMonitorCallback(checkpoint_steps=checkpoint_steps)
     model.learn(total_timesteps=args.total_timesteps, callback=callback,
-                progress_bar=True)
+                progress_bar=False)
 
     print("-" * 50)
     print("Training complete!")
 
     # Save the model and plots
-    output_dir = Path("output")
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
     model.save(output_dir / "actor_critic_bipedalwalker")
-    print(f"\nModel saved to output/actor_critic_bipedalwalker.zip")
+    print(f"\nModel saved to {output_dir / 'actor_critic_bipedalwalker.zip'}")
     save_plots(callback, output_dir)
 
     # Evaluation

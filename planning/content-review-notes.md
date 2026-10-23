@@ -44,4 +44,5 @@ Status legend: **confirmed** = checked by arithmetic or against the cited paper 
 
 ## Cross-references and numbering
 
+- [x] `chapter05_dqn/visual-game-projects.md` — seven runnable commands/paths used the pre-rename directory `chapter07_dqn/` (requirements installs, `dqn_gym_sb3.py`, `dqn_atari_sb3.py`, `dqn_pokemon_red_pyboy.py` invocations and a GIF output path), but the code lives in `code/chapter05_dqn/`. Fixed to `chapter05_dqn/` (code-classic review follow-up).
 - [ ] Several pages cite chapter numbers from older outlines, e.g. `preface/introduction.md` ("Chapters 8–9" for DPO, "Chapter 8" for Agentic RL), `chapter12_exploration_marl_hierarchical/marl.md` ("PPO since Chapter 7"), `chapter08_ppo/trust-region-clipping.md` ("Chapter 6" for REINFORCE is correct), `chapter08_ppo/gae-reward-model.md` (Chapters 4, 7.1, 14, 15). Check each against the sidebar numbering.

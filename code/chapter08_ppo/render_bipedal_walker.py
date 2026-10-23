@@ -1,10 +1,11 @@
 """
-Chapter 7: Render a playback of a trained PPO agent on BipedalWalker-v3
+Chapter 8: Render a playback of a trained PPO agent on BipedalWalker-v3
 ——Saves each episode as an independent GIF
 
 How to run:
     python render_bipedal_walker.py --model output/ppo_bipedal_walker.zip
     python render_bipedal_walker.py --model output/ppo_bipedal_walker.zip --episodes 5 --seeds 0 1 2 3 4
+    python render_bipedal_walker.py --smoke   # random-action smoke render writing under runs/
 """
 
 import argparse
@@ -45,7 +46,7 @@ def downsample_frames(frames, max_frames):
 
 def main():
     parser = argparse.ArgumentParser(description="Render a BipedalWalker PPO playback")
-    parser.add_argument("--model", type=str, required=True, help="Path to the trained PPO model")
+    parser.add_argument("--model", type=str, default=None, help="Path to the trained PPO model")
     parser.add_argument("--output-dir", type=str, default="output/bipedalwalker_episodes",
                         help="GIF output directory")
     parser.add_argument("--episodes", type=int, default=3, help="Number of episodes to render")
@@ -56,13 +57,50 @@ def main():
                         help="Max steps per episode")
     parser.add_argument("--max-frames", type=int, default=200,
                         help="Max GIF frame count (downsampled evenly if exceeded)")
+    parser.add_argument("--seed", type=int, default=0, help="Default seed")
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="cpu")
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: random actions, few frames, writes only under runs/",
+    )
     args = parser.parse_args()
 
-    print(f"Loading model: {args.model}")
-    model = PPO.load(args.model)
+    if args.smoke:
+        import gymnasium as gym
 
+        args.output_dir = "runs/smoke_render_bipedal_walker_ppo"
+        args.max_steps = 10
+        args.max_frames = 10
+        args.episodes = 1
+        args.seeds = [args.seed]
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.smoke:
+        import gymnasium as gym
+
+        for ep in range(args.episodes):
+            env = gym.make("BipedalWalker-v3", render_mode="rgb_array")
+            seed = (args.seeds or [args.seed])[ep] if (args.seeds or [args.seed]) else args.seed
+            env.action_space.seed(seed)
+            env.reset(seed=seed)
+            frames = [env.render()]
+            for _ in range(args.max_steps - 1):
+                _, _, terminated, truncated, _ = env.step(env.action_space.sample())
+                frames.append(env.render())
+                if terminated or truncated:
+                    break
+            env.close()
+            frames = downsample_frames(frames, args.max_frames)
+            out_path = output_dir / f"bipedalwalker_ep{ep + 1}.gif"
+            imageio.mimsave(out_path, frames, duration=1000 / args.fps, loop=0)
+            print(f"Saved smoke render to {out_path} ({len(frames)} frames)")
+        return
+
+    if args.model is None:
+        raise SystemExit("--model is required without --smoke")
+    print(f"Loading model: {args.model}")
+    model = PPO.load(args.model)
 
     seeds = args.seeds or [None] * args.episodes
 

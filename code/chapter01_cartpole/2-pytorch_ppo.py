@@ -36,7 +36,13 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import gymnasium as gym
-import swanlab
+
+try:
+    import swanlab
+    _SWANLAB_AVAILABLE = True
+except ImportError:
+    swanlab = None
+    _SWANLAB_AVAILABLE = False
 
 from device_utils import describe_device, print_device_report, resolve_torch_device
 
@@ -305,11 +311,21 @@ def parse_args():
         default="local",
         help="SwanLab logging mode; set to disabled to reproduce runs without a dashboard",
     )
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="Smoke-test mode: tiny CPU run writing only under runs/",
+    )
     return parser.parse_args()
 
 
 def train():
     args = parse_args()
+    if args.smoke:
+        args.device = "cpu"
+        args.iterations = 2
+        args.steps_per_rollout = 256
+        args.swanlab_mode = "disabled"
+        args.log_csv = "runs/smoke_2_pytorch_ppo/training_metrics.csv"
     device = resolve_torch_device(args.device)
     print_device_report(device)
 
@@ -347,25 +363,29 @@ def train():
     total_iterations = args.iterations
     steps_per_rollout = args.steps_per_rollout
 
-    # Initialize SwanLab
-    swanlab.init(
-        project="cartpole-pytorch",
-        experiment_name="PPO-PyTorch-CartPole-v1",
-        mode=args.swanlab_mode,
-        config={
-            "algorithm": "PPO",
-            "lr": 3e-4,
-            "total_iterations": total_iterations,
-            "steps_per_rollout": steps_per_rollout,
-            "gamma": 0.99,
-            "gae_lambda": 0.95,
-            "clip_eps": 0.2,
-            "epochs": 10,
-            "batch_size": 64,
-            "seed": args.seed,
-            "device": str(device),
-        },
-    )
+    # Initialize SwanLab (skipped in smoke mode and when swanlab is unavailable)
+    use_swanlab = args.swanlab_mode != "disabled" and _SWANLAB_AVAILABLE
+    if args.swanlab_mode != "disabled" and not _SWANLAB_AVAILABLE:
+        print("Note: swanlab is not installed; continuing without dashboard logging.")
+    if use_swanlab:
+        swanlab.init(
+            project="cartpole-pytorch",
+            experiment_name="PPO-PyTorch-CartPole-v1",
+            mode=args.swanlab_mode,
+            config={
+                "algorithm": "PPO",
+                "lr": 3e-4,
+                "total_iterations": total_iterations,
+                "steps_per_rollout": steps_per_rollout,
+                "gamma": 0.99,
+                "gae_lambda": 0.95,
+                "clip_eps": 0.2,
+                "epochs": 10,
+                "batch_size": 64,
+                "seed": args.seed,
+                "device": str(device),
+            },
+        )
 
     print(f"Starting training on {describe_device(device)} (pure PyTorch PPO + SwanLab)...")
     print("-" * 60)
@@ -436,23 +456,24 @@ def train():
 
         # Log to SwanLab. ep_rew_mean / ep_len_mean use a rolling 100-episode window
         # (SB3's default); *_rollout keep the per-rollout means for teaching.
-        swanlab.log({
-            "rollout/ep_rew_mean": mean_reward,
-            "rollout/ep_len_mean": mean_ep_len,
-            "rollout/ep_rew_mean_rollout": mean_reward_rollout,
-            "rollout/ep_len_mean_rollout": mean_ep_len_rollout,
-            "train/policy_gradient_loss": metrics["policy_loss"],
-            "train/value_loss": metrics["value_loss"],
-            "train/entropy_loss": -metrics["entropy"],
-            "train/approx_kl": metrics["approx_kl"],
-            "train/clip_fraction": metrics["clip_fraction"],
-            "train/clip_range": 0.2,
-            "train/explained_variance": explained_variance,
-            "train/learning_rate": lr,
-            "train/n_updates": (iteration + 1) * 10 * (steps_per_rollout // 64),
-            "time/total_timesteps": total_timesteps,
-            "time/iterations": iteration + 1,
-        }, step=total_timesteps)
+        if use_swanlab:
+            swanlab.log({
+                "rollout/ep_rew_mean": mean_reward,
+                "rollout/ep_len_mean": mean_ep_len,
+                "rollout/ep_rew_mean_rollout": mean_reward_rollout,
+                "rollout/ep_len_mean_rollout": mean_ep_len_rollout,
+                "train/policy_gradient_loss": metrics["policy_loss"],
+                "train/value_loss": metrics["value_loss"],
+                "train/entropy_loss": -metrics["entropy"],
+                "train/approx_kl": metrics["approx_kl"],
+                "train/clip_fraction": metrics["clip_fraction"],
+                "train/clip_range": 0.2,
+                "train/explained_variance": explained_variance,
+                "train/learning_rate": lr,
+                "train/n_updates": (iteration + 1) * 10 * (steps_per_rollout // 64),
+                "time/total_timesteps": total_timesteps,
+                "time/iterations": iteration + 1,
+            }, step=total_timesteps)
 
         metric_rows.append({
             "seed": args.seed,
@@ -493,7 +514,7 @@ def train():
 
     # Final evaluation
     eval_rewards = []
-    for _ in range(20):
+    for _ in range(2 if args.smoke else 20):
         obs, _ = env.reset(seed=args.seed + 10_000 + len(eval_rewards))
         done, truncated, score = False, False, 0
         while not (done or truncated):
@@ -506,19 +527,20 @@ def train():
 
     mean_reward = np.mean(eval_rewards)
     std_reward = np.std(eval_rewards)
-    print(f"\nTraining complete! 20-episode evaluation: {mean_reward:.1f} +/- {std_reward:.1f}")
+    print(f"\nTraining complete! {len(eval_rewards)}-episode evaluation: {mean_reward:.1f} +/- {std_reward:.1f}")
 
-    swanlab.log({
-        "eval/mean_reward": mean_reward,
-        "eval/std_reward": std_reward,
-    })
+    if use_swanlab:
+        swanlab.log({
+            "eval/mean_reward": mean_reward,
+            "eval/std_reward": std_reward,
+        })
 
     # Save the model
     torch.save(model.state_dict(), model_path)
     print(f"Model saved to {model_path}")
 
-    # GUI demo
-    if args.gui:
+    # GUI demo (never in smoke mode: it would open a window)
+    if args.gui and not args.smoke:
         try:
             vis_env = gym.make("CartPole-v1", render_mode="human")
             print("\nDemoing what the agent learned (5 episodes)...")
@@ -540,9 +562,9 @@ def train():
         print("\nTip: add --gui to pop up the cart animation window and watch the demo.")
 
     env.close()
-    swanlab.finish()
-
-    print("SwanLab experiment dashboard: swanlab watch swanlog")
+    if use_swanlab:
+        swanlab.finish()
+        print("SwanLab experiment dashboard: swanlab watch swanlog")
 
 
 if __name__ == "__main__":
