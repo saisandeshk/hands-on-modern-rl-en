@@ -32,10 +32,10 @@ $$
 The POMDP six-tuple: the agent never sees the full environment state, only observations and interaction history.
 
 $$
-J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\left[\sum_{t=0}^{T} \gamma^t R(s_t, a_t)\right]
+J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\left[\sum_{t=0}^{T} \gamma^t r(s_t, a_t)\right]
 $$
 
-The multi-turn objective: maximize expected discounted return over complete trajectories, not over single responses.
+The multi-turn objective: maximize expected discounted return over complete trajectories, not over single responses. ($T$ is the horizon; $r(s_t, a_t)$ is the realized step reward, lowercase as in the notation page.)
 
 $$
 G_t = r_t + \gamma G_{t+1}

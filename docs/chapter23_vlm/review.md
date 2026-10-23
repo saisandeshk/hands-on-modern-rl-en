@@ -21,7 +21,7 @@ This chapter kept the algorithm fixed and changed the input. The policy optimize
 
 ## Key Equations
 
-Group-relative advantage (the GRPO core used in Sections 23.3 and 23.4, with the population standard deviation, ddof = 0, as in DeepSeekMath -- the same convention as the `unbiased=False` in the Section 23.3 snippet and the `numpy.std()` in `code/chapter23_vlm/vlm_grpo_train.py`):
+Group-relative advantage (the GRPO core used in Sections 23.3 and 23.4, with the population standard deviation, ddof = 0, as in DeepSeekMath -- the same convention as the `unbiased=False` in the Section 23.3 snippet and the `numpy.std()` in `code/chapter23_vlm/vlm_grpo_train.py`). Notation bridge: this chapter writes per-response rewards as $R_i$ (the same object as $r_i$ in the notation page), group size as $G$ (the $n$ in the notation page), and estimated advantages as $A_i$ / $A_t$ (the $\hat{A}$ in the notation page).
 
 $$
 A_i = \frac{R_i - \mathrm{mean}(R_1, \dots, R_G)}{\mathrm{std}(R_1, \dots, R_G)}
@@ -35,7 +35,7 @@ $$
 \mathcal{L}(\theta) = -\sum_{t \in \text{response}} A_t \, \log \pi_\theta\left(y_t \mid y_{<t}, x_{\text{text}}, x_{\text{image}}\right)
 $$
 
-Reading: gradients flow only through generated text tokens, but reach the vision encoder through attention -- so freezing versus updating the encoder is an optimizer decision, not a reward decision.
+Reading: gradients flow only through generated text tokens, but reach the vision encoder through attention -- so freezing versus updating the encoder is an optimizer decision, not a reward decision. (Here the prompt is split as $x = (x_{\text{text}}, x_{\text{image}})$ and each response token is $y_t$ of the response $y$ in the notation page.)
 
 GeoQA composite reward (Section 23.4, `r1v.py`):
 

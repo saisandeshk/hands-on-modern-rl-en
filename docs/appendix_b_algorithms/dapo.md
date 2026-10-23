@@ -14,9 +14,9 @@ GRPO training of long-chain reasoning models hits four issues: symmetric clippin
 
 ## Core Variables
 
-- `ratio`: new/old policy probability ratio $r = \exp(\text{new\_logp} - \text{old\_logp})$
-- `advantage`: group-wise z-score $\hat{A}_{i,t} = (R_i - \bar R)/\mathrm{std}(R)$ (same as GRPO)
-- `ε_{low}`, `ε_{high}`: decoupled clipping lower / upper bounds (paper typical 0.2 / 0.28)
+- `ratio`: new/old policy probability ratio $r_t(\theta) = \exp(\text{new\_logp} - \text{old\_logp})$ (per token; same $r_t(\theta)$ as PPO, not a reward)
+- `advantage`: group-wise z-score $\hat{A}_{i,t} = (r_i - \bar r)/\mathrm{std}(r)$ (same as GRPO: lowercase $r$ for rewards)
+- $\epsilon_{\text{low}}$, $\epsilon_{\text{high}}$: decoupled clipping lower / upper bounds (paper typical 0.2 / 0.28)
 - `reward_std`: within-group reward std, used by dynamic sampling filter
 - `max_len`, `buffer_len`, `penalty_factor`: soft overlong threshold, buffer width, max deduction
 
@@ -41,11 +41,11 @@ GRPO training of long-chain reasoning models hits four issues: symmetric clippin
 
 ### Core Problem
 
-Symmetric clipping `clip(r, 1-ε, 1+ε)` uses the same ε on both sides. But good actions with positive advantage deserve larger steps (upper ε should be bigger); bad actions with negative advantage should move more cautiously (lower ε can be smaller). DAPO decouples the two bounds so each direction's exploration strength is tuned independently.
+Symmetric clipping `clip(ratio, 1-eps, 1+eps)` uses the same bound on both sides. But good actions with positive advantage deserve larger steps (upper bound should be bigger); bad actions with negative advantage should move more cautiously (lower bound can be smaller). DAPO decouples the two bounds so each direction's exploration strength is tuned independently.
 
 ### One-Line Memory
 
-> **Same min-clipped as PPO, but with asymmetric $\varepsilon$: wide upper $\varepsilon_{high}$, tight lower $\varepsilon_{low}$.**
+> **Same min-clipped as PPO, but with asymmetric $\epsilon$: wide upper $\epsilon_{high}$, tight lower $\epsilon_{low}$.**
 
 ### Pseudocode
 

@@ -104,9 +104,9 @@ This architecture is consistent with the CTDE approach mentioned above, but has 
 
 **Reward design.** The most effective approach in practice is a **outcome-driven + process-assisted** hybrid reward:
 
-$$R_i = \alpha \cdot R^{\text{outcome}} + (1-\alpha) \cdot R_i^{\text{process}}$$
+$$r_i = \alpha \cdot r^{\text{outcome}} + (1-\alpha) \cdot r_i^{\text{process}}$$
 
-where $R^{\text{outcome}}$ is the shared task outcome reward (did the tests pass? was the issue fixed?), and $R_i^{\text{process}}$ is the process reward for role $i$ (code quality score, review accuracy, etc.). $\alpha$ is typically 0.5-0.7, placing more weight on measurable outcomes. This directly corresponds to the outcome vs. process reward (ORM vs. PRM) credit assignment discussed in Chapter 17 -- only extended from single-agent multi-turn interaction to multi-agent collaboration.
+where $r^{\text{outcome}}$ is the shared task outcome reward (did the tests pass? was the issue fixed?), and $r_i^{\text{process}}$ is the process reward for role $i$ (code quality score, review accuracy, etc.). $\alpha$ is typically 0.5-0.7, placing more weight on measurable outcomes. (Here $\alpha$ is a reward-mixing weight, not the learning-rate $\alpha$.) This directly corresponds to the outcome vs. process reward (ORM vs. PRM) credit assignment discussed in Chapter 17 -- only extended from single-agent multi-turn interaction to multi-agent collaboration.
 
 Another representative work, **MetaGPT**, encodes Standardized Operating Procedures (SOPs) into system prompts. From an RL perspective, SOPs act as a **strong prior constraint** -- restricting the policy space, greatly reducing search difficulty and improving training stability, similar to the KL constraint to the reference model in RLHF (Chapter 13).
 
@@ -146,7 +146,7 @@ The first two architectures have clear task objectives and win/loss conditions, 
 
 From an RL perspective, this brings several unique challenges:
 
-- **Multi-objective reward design**: Not a single "score," but a combination of multiple objectives -- behavioral coherence, social plausibility, goal achievement, etc., similar to Multi-Objective RL: $$R_t = \sum_{m=1}^{M} w_m \cdot r_m(s_t, a_t)$$ The weights $w_m$ of each objective determine the direction of emergent behavior.
+- **Multi-objective reward design**: Not a single "score," but a combination of multiple objectives -- behavioral coherence, social plausibility, goal achievement, etc., similar to Multi-Objective RL: $$r_t = \sum_{m=1}^{M} w_m \cdot r_m(s_t, a_t)$$ The weights $w_m$ of each objective determine the direction of emergent behavior.
 - **Exploration is exploration of social strategies**: Agents explore the social behavior space ("who to interact with," "what to talk about") rather than physical action space. This is similar to Chapter 5's epsilon-greedy exploration in DQN, but exploring a high-dimensional social strategy space.
 - **Evaluation problem**: With no ground truth, how do we judge whether one social strategy is "better"? Currently, evaluation relies primarily on **human assessment + LLM-as-Judge**, but this introduces the "self-loop degradation" risk discussed in [Section 26.1](../self-play-outlook/).
 
@@ -177,9 +177,9 @@ This is consistent with CTDE's global Critic approach -- a "God's-eye view" that
 
 **Practical approach**: Combine process rewards and outcome rewards. Process rewards evaluate each role's intermediate output quality (e.g., code quality score, review accuracy), and outcome rewards check whether the final task was completed. The weighted combination:
 
-$$R_i = \alpha \cdot R^{\text{outcome}} + (1 - \alpha) \cdot R_i^{\text{process}}$$
+$$r_i = \alpha \cdot r^{\text{outcome}} + (1 - \alpha) \cdot r_i^{\text{process}}$$
 
-where $R_i^{\text{process}}$ is the process reward for role $i$, and $R^{\text{outcome}}$ is the shared outcome reward.
+where $r_i^{\text{process}}$ is the process reward for role $i$, and $r^{\text{outcome}}$ is the shared outcome reward.
 
 ### Challenge 3: Memory Mechanisms and Long-Term Strategy
 
@@ -218,9 +218,9 @@ MAPoRL [^maporl] models the collaboration of multiple LLM Agents as a joint poli
 
 Recall GRPO from Chapter 15: the same model generates multiple responses and compares within a group. M-GRPO [^mgrpo] extends this idea to multi-agent scenarios -- multiple groups of outputs from multiple roles are compared together. For example, for the same programming task, generate 3 "Coder-Reviewer-Tester" teams and compare which team has a higher task completion rate.
 
-$$\text{Advantage}_i = \frac{R_i - \text{mean}(R_{1..G})}{\text{std}(R_{1..G})}$$
+$$\hat{A}_i = \frac{r_i - \text{mean}(r_{1..G})}{\text{std}(r_{1..G})}$$
 
-where $R_i$ is the total reward for team $i$. This preserves GRPO's core advantage (no Critic needed) while introducing inter-group competition to drive collaboration capability improvement.
+where $r_i$ is the total reward for team $i$ and $G$ is the group size (the $n$ in the notation page). This preserves GRPO's core advantage (no Critic needed) while introducing inter-group competition to drive collaboration capability improvement.
 
 ### SAGE: Closed-Loop Self-Evolution Multi-Agent Framework
 

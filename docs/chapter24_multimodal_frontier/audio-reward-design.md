@@ -54,12 +54,12 @@ We begin with correctness, which is easiest to implement, then add prosody and l
 
 ### Content Correctness
 
-For a response $a$ and reference answer $a^*$, the simplest reward is binary:
+For a response $y$ and reference answer $y^*$, the simplest reward is binary:
 
 $$
-R_{\mathrm{content}}(a,a^*)=
+R_{\mathrm{content}}(y,y^*)=
 \begin{cases}
-1,&a=a^*,\\
+1,&y=y^*,\\
 0,&\text{otherwise}.
 \end{cases}
 $$
@@ -73,7 +73,7 @@ Prosody includes pitch, rhythm, intensity, and pauses. It has no single correct 
 $$
 \mathcal{L}_{\mathrm{RM}}
 =
--\log\sigma\!\left(R_\phi(y_w)-R_\phi(y_l)\right).
+-\log\sigma\!\left(r_\phi(y_w)-r_\phi(y_l)\right).
 $$
 
 Suppose response A is factually correct but completely monotone, while response B is factually wrong but sounds natural. Different annotators may prioritize content or experience. A single scalar hides which dimension produced the preference.
@@ -168,7 +168,7 @@ The first chain may even hallucinate lyrics. As it grows longer, it compounds re
 
 ### MGRD: Modality-Grounded Reasoning Distillation
 
-**MGRD (Modality-Grounded Reasoning Distillation)** is Step-Audio-R1's central training framework. Across $T$ iterations, it moves the basis of reasoning from textual surrogates to acoustic evidence:
+**MGRD (Modality-Grounded Reasoning Distillation)** is Step-Audio-R1's central training framework. Across $T$ iterations (here $T$ counts MGRD outer-loop iterations, not environment steps), it moves the basis of reasoning from textual surrogates to acoustic evidence:
 
 ```mermaid
 graph TB
@@ -335,17 +335,17 @@ With $c\ne\varnothing$, the evaluator can check a condition such as whether the 
 Given advantages $\hat A_t$, the paper uses a PPO-style objective with a reference-policy KL term:
 
 $$
-\mathcal{J}_{\mathrm{RLHF}}(\theta)
+J_{\mathrm{RLHF}}(\theta)
 =\mathbb{E}_t\!\left[
 \min\!\left(
-\rho_t(\theta)\hat A_t,
-\operatorname{clip}(\rho_t(\theta),1-\epsilon,1+\epsilon)\hat A_t
+r_t(\theta)\hat A_t,
+\operatorname{clip}(r_t(\theta),1-\epsilon,1+\epsilon)\hat A_t
 \right)
 \right]
 -\beta D_{\mathrm{KL}}(\pi_\theta\|\pi_{\mathrm{ref}}).
 $$
 
-Here $\rho_t$ is the new-to-old policy probability ratio. Clipping limits one update, and the KL term keeps the policy near the reference. This objective comes from [Section 3.3 of Step-Audio-R1.5](https://arxiv.org/html/2604.25719#S3.SS3); it should not be described as DPO.
+Here $r_t(\theta)$ is the new-to-old policy probability ratio (the PPO ratio in the notation page). Clipping limits one update, and the KL term keeps the policy near the reference. This objective comes from [Section 3.3 of Step-Audio-R1.5](https://arxiv.org/html/2604.25719#S3.SS3); it should not be described as DPO.
 
 ### Preserving Prosodic Naturalness
 

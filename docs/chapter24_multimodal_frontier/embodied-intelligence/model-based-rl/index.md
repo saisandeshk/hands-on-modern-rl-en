@@ -527,7 +527,7 @@ So MuZero does not learn "what the next frame of pixels looks like." It learns "
 
 $$
 \mathcal{L}_{\text{MuZero}}
-=\sum_{k=0}^{K}
+=\sum_{k=0}^{K_{\text{unroll}}}
 \left(
 \ell^r(u_{t+k}, r_k)
 +\ell^v(z_{t+k}, v_k)
@@ -535,7 +535,7 @@ $$
 \right)
 $$
 
-Here, $K$ is the unroll length. For every step $k$, the loss checks three predictions: the reward prediction $r_k$ should be close to the real or training target $u_{t+k}$; the value prediction $v_k$ should be close to the target value $z_{t+k}$; and the policy prior $p_k$ should be close to the policy $\pi_{t+k}$ produced by MCTS. In other words, MuZero's model only needs to be useful for planning. It does not need to faithfully reconstruct the entire world.
+Here, $K_{\text{unroll}}$ is the unroll length (a different $K$ counts sampled candidates in Section 24.1). For every step $k$, the loss checks three predictions: the reward prediction $r_k$ should be close to the real or training target $u_{t+k}$; the value prediction $v_k$ should be close to the target value $z_{t+k}$; and the policy prior $p_k$ should be close to the policy $\pi_{t+k}$ produced by MCTS. In other words, MuZero's model only needs to be useful for planning. It does not need to faithfully reconstruct the entire world.
 
 ![MuZero Learned Model](./images/paper/muzero-learned-model.png)
 
