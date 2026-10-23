@@ -175,7 +175,7 @@ Do not start with the full NES controller. Begin with `RIGHT_ONLY` or `SIMPLE_MO
 
 ![Sonic / Retro Contest screenshot, source: OpenAI Retro Contest Results](https://images.ctfassets.net/kftzwdyauwt9/1gGJCzTHFTNJn6m4GkROAB/6cb51a280c362510874d3ee15f5da6e8/retro-contest-results.jpg?w=3840&q=90&fm=webp)
 
-The **Retro Contest 2018** focused on generalization: train on one set of levels and evaluate on unseen levels. Human average score was about **7438**, while the official Joint PPO baseline reached only **3128**.
+The **Retro Contest 2018** focused on generalization: train on one set of levels and evaluate on unseen levels. The official Joint PPO baseline reached **4070** — still far below human performance on the held-out test levels.
 
 The winning solution used a key technique: **transfer learning**. It pretrained on training levels and then used PPO to fine-tune on test levels, raising the score to **4692**. That shows both the strength and the limit of PPO: fine-tuning is useful, but cross-level generalization remains far below human play.
 
@@ -291,7 +291,7 @@ In later research, the direction is often not "improve PPO alone," but add hiera
 | Procgen            | generalization versus memorization           | CoinRun test around 8.31 +/- 0.12; train nearly perfect |
 | CarRacing          | continuous-control stability                 | 2M steps around 740-920+; A2C around -90                |
 | Super Mario Bros   | reward design sets ceiling                   | 31/32 levels, much better than A3C                      |
-| Sonic / Gym Retro  | transfer learning                            | winning score 4692; human level around 7438             |
+| Sonic / Gym Retro  | transfer learning                            | winning score 4692; baselines far below human play      |
 | Unity SoccerTwos   | multi-agent self-play                        | ELO around 1600; curriculum can accelerate training     |
 | ViZDoom            | partial observability                        | Basic/Defend succeed; Corridor remains hard             |
 | Pokemon Red        | extreme delay and wrappers                   | reaches Cerulean City; needs anti-loop wrappers         |

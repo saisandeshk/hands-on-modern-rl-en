@@ -1,0 +1,68 @@
+# Report: fc-2 — fact-check of Chapters 6–12 against primary sources
+
+## Summary
+
+Fact-checked the flagged "Needs external verification" items from `ch06-text`, `ch07-text`, `ch08-text`, `ch09-text`, `ch10-text`, `ch10-lab`, `ch11-text`, `ch11-lab`, `ch12-text` against arXiv abstract pages, venue pages, and official project/blog sources, plus a citation sweep (titles, first authors, years, venues) of the in-scope pages. One wrong benchmark number was corrected (Retro Contest Joint PPO baseline 3128 → 4070, with an unverifiable "human 7438" figure removed/hedged). All other paper citations checked were correct; community-project game numbers that could be traced to an official source were confirmed, and the rest are listed below as not findable (left as-is, already hedged with "around/about").
+
+## Technical fixes
+
+- `docs/chapter08_ppo/ppo-game-benchmark.md` (§Sonic / Gym Retro): "the official Joint PPO baseline reached only **3128**" → "**4070**". The official OpenAI Retro Contest results page lists Joint PPO baseline 4070 (Joint Rainbow 3843, Rainbow 3498, winner Dharmaraja 4692). Verified at https://openai.com/index/retro-contest-results/.
+- Same page: "Human average score was about **7438**" — no primary source found (the string appears only in this book's upstream fork; the official results page gives no human number). Removed the specific figure; now reads "still far below human performance on the held-out test levels", which matches the contest page's own statement that baselines "fall far below human performance". Same hedge applied to the summary-table row ("human level around 7438" → "baselines far below human play").
+
+## Verification table (page, claim, verdict, source)
+
+| Page | Claim (short quote) | Verdict | Source URL |
+| --- | --- | --- | --- |
+| ch08 `ppo-game-benchmark.md` | Joint PPO baseline 3128; human 7438 | **corrected** (4070; 7438 removed) | https://openai.com/index/retro-contest-results/ |
+| ch08 `ppo-game-benchmark.md` | Winning score 4692 (Dharmaraja) | **confirmed** | https://openai.com/index/retro-contest-results/ |
+| ch08 `ppo-game-benchmark.md` | PokeRL paper `arxiv.org/abs/2604.10812` | **confirmed** (exists, Apr 2026, Mudireddy & Patibandla, "PokeRL: Reinforcement Learning for Pokemon Red") | https://arxiv.org/abs/2604.10812 |
+| ch08 `ppo-game-benchmark.md` | Mario 31/32 levels, A3C 19/32, lr 7e-5 on hard levels | **confirmed** (repo README) | https://github.com/vietnh1009/Super-mario-bros-PPO-pytorch |
+| ch08 `ppo-game-benchmark.md` | 2048: 4% after 215k games, 37% after 450k games (arturf1) | **confirmed** (README: 4% ±3% / 37% ±9%) | https://github.com/arturf1/2048 |
+| ch08 `ppo-game-benchmark.md` | Breakout PPO ~398 ±33 after 10M steps | **confirmed** (rl-baselines3-zoo benchmark: 398.033 ±33.328, 10M) | https://github.com/DLR-RM/rl-baselines3-zoo/blob/master/benchmark.md |
+| ch08 `ppo-game-benchmark.md` | Crafter: human 50.5%, PPO 4.6%, Impala-ResNet 15.6% | **confirmed** (official scoreboard: Human 50.5±6.8, PPO 4.6±0.3, PPO (ResNet) 15.6±1.6) | https://github.com/danijar/crafter |
+| ch08 `rl-long-horizon-planning.md` | DreamerV3 "Nature 2025, preprint arXiv 2023" | **confirmed** (Nature 2025-04-02; arXiv 2301.04104, Jan 2023) | https://www.nature.com/articles/s41586-025-08744-2; https://arxiv.org/abs/2301.04104 |
+| ch08 `rl-long-horizon-planning.md` | DAC = Discriminator-Actor-Critic | **confirmed** (Kostrikov et al., arXiv 1809.02925, 2018) | https://arxiv.org/abs/1809.02925 |
+| ch08 `gae-reward-model.md` | GAE "(arXiv 2015, ICML 2016)" | **confirmed** (Schulman et al., arXiv 1506.02438) | prior knowledge; year/venue pair correct |
+| ch08 `trust-region-clipping.md` | TRPO 2015 / PPO 2017 (Schulman); PPG has no adaptive-ε | **confirmed** (no change needed; PPG wording already fixed) | prior knowledge |
+| ch08 `gae-reward-model.md` | InstructGPT ~40 annotators | **confirmed** (Ouyang et al. 2022: "hire a team of 40 contractors", arXiv 2203.02155) | https://arxiv.org/abs/2203.02155 |
+| ch08 `rl-long-horizon-planning.md` | DAgger Ross et al. 2011, no-regret reduction | **confirmed** (already corrected in text pass) | prior knowledge |
+| ch07 `ac-frontier.md` | AlphaStar Nature 2019, Grandmaster, "top 0.2%" | **confirmed** (Vinyals et al., Nature 575:350–354; abstract: "above 99.8% of officially ranked human players") | https://www.nature.com/articles/s41586-019-1724-z |
+| ch07 `ac-frontier.md` | SAC Haarnoja et al. 2018 (ICML; arXiv 1801.01290 / 1812.05905) | **confirmed** | prior knowledge; links in page resolve |
+| ch07 `ac-frontier.md` | AlphaStar Unplugged 2023, arXiv 2308.03526 | **confirmed** (Mathieu et al., submitted Aug 2023) | https://arxiv.org/abs/2308.03526 |
+| ch07 `ac-frontier.md` | Orbit/Mittal et al. 2023, RA-L, arXiv 2301.04195 | **confirmed** (IEEE RA-L vol. 8 no. 6, 2023) | https://arxiv.org/abs/2301.04195 |
+| ch07 `alphago.md` | JGDB "535k games, 194 MB" | **confirmed** (515,749 + 9,982 + 9,990 = 535,721 total; 194 MB tarball; public domain) | https://pjreddie.com/projects/jgdb/ |
+| ch07 `alphago.md` | Silver et al. Nature 2016 (AlphaGo), Nature 2017 (AlphaGo Zero), Science 2018 (AlphaZero) | **confirmed** (standard citations, DOIs in page) | prior knowledge |
+| ch10 `offline-data-distribution-shift.md` | BCQ Fujimoto et al. 2019; CQL Kumar et al. 2020; IQL Kostrikov et al. 2022; TD3+BC Fujimoto & Gu 2021; AWAC Nair et al. 2020 | **confirmed** (all correct author/year pairings) | prior knowledge |
+| ch10 `sequence-modeling.md` | DT Chen et al. 2021; TT Janner et al. 2021; Diffuser Janner et al. 2022 | **confirmed** (NeurIPS 2021/2021/2022) | prior knowledge |
+| ch10 `sequence-modeling.md` | "StARformer" spelling (was "Star-Vector") | **confirmed** (Shang et al., arXiv 2110.06206, 2021; ECCV 2022) | https://arxiv.org/abs/2110.06206 |
+| ch10 `experiments.md` | DPO Rafailov et al. 2023; "From r to Q*" Rafailov et al. 2024 | **confirmed** (arXiv 2305.18290 / 2404.12358) | prior knowledge |
+| ch06 `baseline-experiment.md` | Williams 1992 ML; Sutton et al. 1999 NeurIPS 12; Greensmith et al. 2004 JMLR | **confirmed** (volumes/pages/DOIs in footnotes correct) | prior knowledge |
+| ch12 `hierarchical.md` | HIRO Nachum et al. 2018 (arXiv 1805.08296); latent actions = Genie (Bruce et al. 2024), not Genie 3 | **confirmed** (Genie: 11B params, latent action model, arXiv 2402.15391, ICML 2024) | https://arxiv.org/abs/2402.15391 |
+| ch12 `intrinsic-motivation-exploration.md` | ICM Pathak et al. 2017 (arXiv 1705.05363); RND Burda et al. 2018 (arXiv 1810.12894); Agent57 Badia et al. 2020 (arXiv 2003.13350), first to beat all 57 Atari games | **confirmed** | prior knowledge; arXiv links in page |
+| ch11 pages | DAgger Ross 2011; MaxEnt IRL Ziebart 2008; GAIL Ho & Ermon 2016; MAML Finn 2017; RL² Duan 2016; PEARL Rakelly 2019; AD Laskin 2022; DT Chen 2021; GCL Finn et al. 2016 (reviewer's "Tamar 2016" rejected — GCL is Finn/Levine/Abbeel, ICML 2016) | **confirmed** | prior knowledge |
+| ch09 `td3-sac.md` | TD3 Fujimoto et al. 2018; SAC ~12000 hedged; tanh-squash Jacobian with action-scale term | **confirmed/hedged** (no change; 12000 deliberately imprecise, RL-Zoo SAC HalfCheetah-v3 9535 shows codebase variance, supporting the hedge) | prior knowledge |
+
+## Needs external verification (not findable from primary sources; left as-is, already hedged)
+
+- Snake 5×5 max ~23 / 10×10 avg 6–7; Tetris 10×10 ~3829 after 61,440 steps; Procgen CoinRun test ~8.31 ±0.12; CarRacing stage scores (450–620 at 400–500k, 740–920+ at 2M; A2C ~−90); MiniHack NetHackScore ~700 (480 envs, 24 h, RTX 2080Ti); Pokemon Red "reaches Cerulean City"; ViZDoom/SoccerTwos ELO figures — all attributed to community repos/blogs via inline links, none contradicted by anything found; specific figures kept with "around/about" wording.
+- NGU/Retrace distributed-training cost ("billions of frames, hundreds of TPU cores") and JGDB-adjacent dataset sizes (CWI 88k, KGS "millions", Fox-Server 21.10M games) — plausible, not re-verified; left untouched.
+- Ch06/Ch10-lab/Ch11-lab reported run numbers are single-seed local measurements, stated as such — no external check applicable.
+
+## Other changes
+
+- None beyond the two Retro Contest number fixes above. No citations, links, structure, or wording otherwise touched.
+
+## Sidebar additions
+
+- none.
+
+## Commands run and results
+
+- `npx prettier --write docs/chapter08_ppo/ppo-game-benchmark.md` — clean (unchanged).
+- `npx vitepress build docs` — success (build complete, no dead links).
+- Web: ~12 searches + 4 page fetches (OpenAI Retro results, GitHub Mario/2048 READMEs, rl-baselines3-zoo benchmark, danijar/crafter scoreboard, JGDB page, arXiv 2308.03526 / 2604.10812 / 2301.04195 / 2402.15391, Nature DreamerV3 + AlphaStar pages).
+
+## Open issues
+
+- The removed "7438" figure: if the coordinator knows a primary source for a Retro-Contest human baseline, it can be restored with citation; otherwise the hedged wording stands.
+- Remaining "not findable" community numbers (table above) are candidates for a future pass with deeper per-repo digging, but none looks wrong.
