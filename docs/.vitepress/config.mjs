@@ -1239,7 +1239,11 @@ const sidebar = {
               link: '/chapter18_llm_rl_industrial/data-engineering'
             },
             {
-              text: '18.6 Summary and Exercises',
+              text: '18.6 Lab: Rollout Workers, Learner Updates, and Policy Staleness',
+              link: '/chapter18_llm_rl_industrial/lab'
+            },
+            {
+              text: '18.7 Summary and Exercises',
               link: '/chapter18_llm_rl_industrial/review'
             }
           ]

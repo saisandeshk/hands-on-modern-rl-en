@@ -1,8 +1,8 @@
 ---
-title: '18.L Lab: Rollout Workers, Learner Updates, and Policy Staleness'
+title: '18.6 Lab: Rollout Workers, Learner Updates, and Policy Staleness'
 ---
 
-# 18.L Lab: Rollout Workers, Learner Updates, and Policy Staleness
+# 18.6 Lab: Rollout Workers, Learner Updates, and Policy Staleness
 
 > **Section goal**: Build a small actor-learner system with rollout workers and a learner, measure how throughput scales with the number of workers, and see how stale behaviour policies distort learning unless importance weights are truncated.
 
