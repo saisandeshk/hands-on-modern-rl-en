@@ -223,7 +223,7 @@ SPA-RL also adds a grounding signal $g_t$ (whether the action is actually execut
 
 #### AgentPRM: Treating PRM as the Agent's $Q(s,a)$
 
-[AgentPRM](https://arxiv.org/abs/2502.10325) is more aligned with the actor-critic framework in classical RL. It treats the process reward model as a state-action value function:
+[AgentPRM](https://arxiv.org/abs/2502.10325) is more aligned with the actor-critic framework in classical RL. (Note: an unrelated 2025 paper shares the "AgentPRM" name — Xi et al., [arXiv:2511.08325](https://arxiv.org/abs/2511.08325), on Promise-and-Progress step rewards, cited separately in the industrial supplement.) It treats the process reward model as a state-action value function:
 
 $$
 Q^\pi(s_t, a_t) = \mathbb{E}_\pi \left[ \sum_{k=t}^{T} \gamma^{k-t} r(s_k, a_k) \mid s_t, a_t \right]
@@ -251,7 +251,7 @@ During inference, AgentPRM can also perform Best-of-N: at each step, sample $N$ 
 
 #### Web-Shepherd: Domain-Specific PRM
 
-[Web-Shepherd](https://arxiv.org/abs/2505.15277) (NeurIPS 2025 Spotlight) is the first step-level PRM specifically designed for web navigation. It can automatically evaluate whether an agent's action at each step is correct. Experiments show that using Web-Shepherd to provide step-level rewards improves the performance of GPT-4o-mini by 10.9%, while the cost is only 1/10 of using an LLM as a judge. This indicates that PRMs are not just theoretical aspirations — in specific domains, domain-specific PRMs can provide dense, step-level signals at a low cost and high efficiency.
+[Web-Shepherd](https://arxiv.org/abs/2505.15277) (NeurIPS 2025 Spotlight) is the first step-level PRM specifically designed for web navigation. It can automatically evaluate whether an agent's action at each step is correct. Experiments show that using Web-Shepherd as the verifier with GPT-4o-mini as the policy improves WebArena-lite performance by 10.9 percentage points, at about 1/10 the cost of using an LLM as the judge. This indicates that PRMs are not just theoretical aspirations — in specific domains, domain-specific PRMs can provide dense, step-level signals at a low cost and high efficiency.
 
 ### Direction Three: Intrinsic Signal — Finding Signals from the Policy Itself
 

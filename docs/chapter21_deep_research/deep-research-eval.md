@@ -125,7 +125,7 @@ To solve this problem, the model must: (1) identify the match and the scorer fro
 **xbench-DeepSearch** is a Chinese Deep Research benchmark released by Tsinghua University and the University of Hong Kong in 2025, targeting several shortcomings of BrowseComp:
 
 - **Chinese-centric**: BrowseComp is English-focused, while xbench-DeepSearch covers both Chinese and English.
-- **Diverse task types**: BrowseComp consists of single-entity questions, whereas xbench-Deep/Searh includes multi-document synthesis, comparative analysis, and temporal reasoning.
+- **Diverse task types**: BrowseComp consists of single-entity questions, whereas xbench-DeepSearch includes multi-document synthesis, comparative analysis, and temporal reasoning.
 - **Controllable difficulty**: Each question is annotated with a difficulty level (1–5 stars), allowing for the selection of subsets based on model capabilities.
 
 **Task Types**:

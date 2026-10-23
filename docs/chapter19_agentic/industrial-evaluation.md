@@ -119,11 +119,11 @@ Configuring this constraint requires balancing "allowing the policy to explore" 
 
 To encourage the model to finish a task in fewer steps, one can introduce a reward mechanism that decays with the number of steps.
 
-> A length-penalty scheme used in the Kimi-Researcher line of work (sometimes called the Gamma-decay Reward) works as follows. When the model completes the task correctly, the trajectory reward decays exponentially with the number of steps used:
+> A length-penalty scheme used in the Kimi-Researcher line of work (sometimes called the Gamma-decay Reward) works as follows. When the model completes the task correctly, the reward of step $i$ decays exponentially with its distance from the end of the trajectory:
 >
-> $$R = r \times \gamma^{T}, \quad \gamma < 1$$
+> $$r_i = r \times \gamma^{T-i}, \quad \gamma < 1$$
 >
-> Here $r$ is the binary task reward (1 on success) and $T$ is the number of steps the trajectory used. A successful trajectory that finishes in fewer steps keeps more of the reward (for example, with $\gamma = 0.95$, $T = 5$ gives $0.77$ while $T = 20$ gives $0.36$), which guides the model to execute tasks more efficiently [\[Reference\]](https://moonshotai.github.io/Kimi-Researcher/). This $R$ is used directly as the trajectory-level reward (e.g., compared across a GRPO group); do not apply the per-turn discounted-return decomposition of [19.3 Trajectory Credit Assignment](./credit-assignment) on top of it, since that would discount the length penalty a second time.
+> Here $r$ is the binary task reward (1 on success), $T$ is the number of steps the trajectory used, and $i$ is the step index. The final step always keeps the full reward, but the opening steps of a shorter trajectory earn more than those of a longer one (for example, with $\gamma = 0.95$, the first step of a 5-step success earns $0.95^4 \approx 0.81$, while that of a 20-step success earns $0.95^{19} \approx 0.38$), which guides the model to execute tasks more efficiently [\[Reference\]](https://moonshotai.github.io/Kimi-Researcher/). These $r_i$ are already per-step discounted rewards, so do not apply the per-turn discounted-return decomposition of [19.3 Trajectory Credit Assignment](./credit-assignment) on top of them a second time.
 
 ---
 
@@ -941,7 +941,7 @@ The three methods complement one another. Statistical metrics handle daily monit
 
 Each of the three has blind spots, though. Statistical metrics only catch numeric anomalies (too many rewrites), rule checks only catch bad patterns you thought of in advance, and LLM scoring is expensive and unstable. Can we do better?
 
-**Inspiration from AgentPRM: compute a "progress" value for each step.** The statistical metrics above only look at "how many rewrites," and do not judge whether each step really advanced the task. The idea of AgentPRM [^agent-prm] is to use a Q-value to estimate "after this step, how likely is the final success." Inspired by this, we can compute a simplified "progress" for each step of the frontend agent. Instead of a true Q-value (which would need a great deal of sampling), we approximate it with state differences:
+**Inspiration from AgentPRM: compute a "progress" value for each step.** The statistical metrics above only look at "how many rewrites," and do not judge whether each step really advanced the task. The idea of AgentPRM [^agent-prm-pp] is to use a Q-value to estimate "after this step, how likely is the final success." Inspired by this, we can compute a simplified "progress" for each step of the frontend agent. Instead of a true Q-value (which would need a great deal of sampling), we approximate it with state differences:
 
 ```python
 def step_progress(trajectory):
@@ -1234,7 +1234,7 @@ The direction for improvement is to strengthen the agent's planning ability (see
 
 [^visrefiner]: Deng J, Yao K, Zhang L. "[VisRefiner: Learning from Visual Differences for Screenshot-to-Code Generation](https://arxiv.org/abs/2602.05998)." 2026. Uses the visual difference between the rendered screenshot and the reference image as the RL training reward signal.
 
-[^agent-prm]: Xi Z, et al. "[AgentPRM: Process Reward Models for LLM Agents via Step-Wise Promise and Progress](https://arxiv.org/abs/2511.08325)." 2025. Uses the dual signals of Promise (Q-value) and Progress (advantage) to assess the quality of each agent step.
+[^agent-prm-pp]: Xi Z, et al. "[AgentPRM: Process Reward Models for LLM Agents via Step-Wise Promise and Progress](https://arxiv.org/abs/2511.08325)." 2025. Uses the dual signals of Promise and Progress to assess the quality of each agent step. Note: a different paper shares the "AgentPRM" name (Xia et al., [arXiv:2502.10325](https://arxiv.org/abs/2502.10325), an actor-critic PRM-as-Q-function framework cited in [19.3](./credit-assignment)); they are unrelated works.
 
 [^ada-rubric]: Ding L. "[AdaRubric: Task-Adaptive Rubrics for LLM Agent Evaluation](https://arxiv.org/abs/2603.21362)." 2026. Evaluation dimensions are generated dynamically per task, reaching a correlation of r=0.76 with humans on VisualWebArena.
 

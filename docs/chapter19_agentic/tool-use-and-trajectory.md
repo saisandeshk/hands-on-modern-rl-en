@@ -539,7 +539,7 @@ Agent Workflow Memory, AWM, addresses the **memory** problem of Web Agents. AWM 
 
 #### Web-Shepherd: A PRM Built for Web Navigation[^webshepherd2]
 
-In the previous section, we mentioned Web-Shepherd as a real-world case of PRM deployment. Here we discuss its concrete use in Web Agents in more detail. Traditional Web Agent rewards have only one signal: whether the final task was completed. Web-Shepherd assigns a score after each action: "Was this click correct?" "Was this form filled correctly?" It uses a structured checklist to guide evaluation, and a dedicated PRM trained on 40,000 annotated examples. Its evaluation cost is only one-tenth that of using GPT-4o-mini as a judge. This allows Web Agent training to replace sparse episode-level reward with denser step-level reward, greatly improving both training efficiency and final performance.
+In the previous section, we mentioned Web-Shepherd as a real-world case of PRM deployment. Here we discuss its concrete use in Web Agents in more detail. Traditional Web Agent rewards have only one signal: whether the final task was completed. Web-Shepherd assigns a score after each action: "Was this click correct?" "Was this form filled correctly?" It uses a structured checklist to guide evaluation, and a dedicated PRM trained on 40,000 step-level preference pairs. Its evaluation cost is only one-tenth that of using GPT-4o-mini as a judge. This allows Web Agent training to replace sparse episode-level reward with denser step-level reward, greatly improving both training efficiency and final performance.
 
 ### Code Agent RL: Write Code, Debug, and Iterate
 

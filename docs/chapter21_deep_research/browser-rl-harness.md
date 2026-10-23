@@ -294,7 +294,7 @@ Each time standards tighten, the model's previously learned "shortcuts" no longe
 2. **Case retrieval**: For new questions, retrieve the most similar successful cases from memory
 3. **Strategy guidance**: Provide retrieved cases as context to the model, guiding it to adopt similar successful strategies
 
-**Why is this important?** Memento reported strong results on the GAIA validation set, rivaling models that underwent extensive RL training. It powerfully demonstrates: **sometimes "better retrieval" is more effective than "better training."** This also reminds us that RL is not the only path to improving Agent capabilities — external memory and inference-time strategies are equally worthwhile directions. For resource-constrained teams, Memento's approach may offer far better cost-effectiveness than full RL training.
+**Why is this important?** Memento reported 87.88% Pass@3 on the GAIA validation set (79.40% on the test set), rivaling models that underwent extensive RL training. It powerfully demonstrates: **sometimes "better retrieval" is more effective than "better training."** This also reminds us that RL is not the only path to improving Agent capabilities — external memory and inference-time strategies are equally worthwhile directions. For resource-constrained teams, Memento's approach may offer far better cost-effectiveness than full RL training.
 
 ### Step-Level Process Reward: Web-Shepherd
 
@@ -304,7 +304,7 @@ Each time standards tighten, the model's previously learned "shortcuts" no longe
 
 **Key design**: Web-Shepherd's PRM independently evaluates quality at each step in web navigation trajectories, providing denser, more accurate training signals than traditional outcome rewards.
 
-**Experimental results**: PRM brings a 10.9 percentage point performance improvement. This number may seem modest, but considering it comes purely from "more accurate reward signals" rather than any model architecture or data improvements, its practical significance is substantial — it directly proves **the practical value of process-level signals**.
+**Experimental results**: on WebArena-lite, using Web-Shepherd as the verifier with GPT-4o-mini as the policy brings a 10.9 percentage point improvement at about 1/10 the cost of using an LLM as the judge. This number may seem modest, but considering it comes purely from "more accurate reward signals" rather than any model architecture or data improvements, its practical significance is substantial — it directly proves **the practical value of process-level signals**.
 
 **Relationship to other work**: Web-Shepherd's PRM and Atom-Searcher's ATR share similar goals (providing process-level signals) but differ in granularity — PRM scores by step, ATR scores by atomic reasoning unit. The two can be used complementarily.
 
@@ -665,7 +665,7 @@ After completing this section, you will:
 - Build Search-R1's offline Wikipedia retrieval environment from scratch
 - Understand the interleaved reasoning & search rollout mechanism
 - Train 3B-7B models with GRPO or PPO to **autonomously learn** when to search, what to search, and how to use search results
-- Reproduce the paper's reported results of **Qwen2.5-7B +41%, 3B +20%** on 7 QA benchmarks
+- Reproduce the paper's reported results of **Qwen2.5-7B +41%, 3B +20% average relative improvement over RAG baselines** on 7 QA benchmarks
 - Master key engineering details like Retrieved Token Masking, outcome reward, and multi-turn search interaction
 
 Project: [PeterGriffinJin/Search-R1](https://github.com/PeterGriffinJin/Search-R1)
@@ -913,16 +913,16 @@ Search-R1 evaluates on 7 QA benchmarks:
 
 #### Expected Results
 
-Paper's core results (compared with RAG baseline):
+Paper's core results (average relative improvement over the RAG baseline across 7 QA benchmarks):
 
 ![LLaMA3.2-3B-Base learns to call search engines and improves performance after RL training](./images/searchr1_llama3b.webp)
 _Figure: LLaMA3.2-3B-Base performance comparison before and after RL training (Source: [PeterGriffinJin/Search-R1](https://github.com/PeterGriffinJin/Search-R1))_
 
-| Model       | Baseline (RAG) | Search-R1 (RL) | Improvement |
-| ----------- | -------------- | -------------- | ----------- |
-| Qwen2.5-7B  | ~35%           | **~76%**       | **+41%**    |
-| Qwen2.5-3B  | ~30%           | **~50%**       | **+20%**    |
-| LLaMA3.2-3B | ~25%           | **~35%**       | **+10%**    |
+| Model       | Reported gain over RAG baseline |
+| ----------- | ------------------------------- |
+| Qwen2.5-7B  | **+41% relative**               |
+| Qwen2.5-3B  | **+20% relative**               |
+| LLaMA3.2-3B | **+10% relative**               |
 
 ::: details Note: Reproduction Variance
 
