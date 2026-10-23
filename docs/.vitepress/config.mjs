@@ -1431,7 +1431,11 @@ const sidebar = {
               link: '/chapter24_multimodal_frontier/video-generation-modern'
             },
             {
-              text: '24.6 Summary and Exercises',
+              text: '24.6 Lab: DDPO Fine-Tuning of a Tiny Diffusion Model',
+              link: '/chapter24_multimodal_frontier/lab'
+            },
+            {
+              text: '24.7 Summary and Exercises',
               link: '/chapter24_multimodal_frontier/review'
             }
           ]

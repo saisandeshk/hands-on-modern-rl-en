@@ -1,8 +1,8 @@
 ---
-title: '24.L Lab: DDPO Fine-Tuning of a Tiny Diffusion Model'
+title: '24.6 Lab: DDPO Fine-Tuning of a Tiny Diffusion Model'
 ---
 
-# 24.L Lab: DDPO Fine-Tuning of a Tiny Diffusion Model
+# 24.6 Lab: DDPO Fine-Tuning of a Tiny Diffusion Model
 
 In [24.4](./visual-generation-dancegrpo) a denoising chain became a reinforcement-learning
 trajectory: the state is the current latent plus the timestep, the action is the next
