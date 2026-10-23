@@ -33,7 +33,7 @@ code.
 
 2. `code/chapter24_multimodal_frontier/ddpo_toy.py` (`main`, `--skip-nokl`) +
    `docs/chapter24_multimodal_frontier/lab.md` (Exercise 1) — with `--skip-nokl` the script reports
-   the *pretrained* checkpoint as the "no KL" run.
+   the _pretrained_ checkpoint as the "no KL" run.
    `main` executes `model_nokl, hist_nokl, eval_nokl = None, [], eval_pre`, so `eval_nokl` **is** the
    pretrained evaluation. `print_summary_table` then prints a row labelled "rl no-kl" whose numbers
    are a byte-for-byte copy of the "pretrained" row, `summary.json` stores the pretrained metrics
@@ -51,26 +51,25 @@ code.
    prices every step's drift. β × KL is added per denoising step, so moving the whole chain far from
    the reference costs T times the per-step price."
    The implementation does not charge T times the per-step price. `pg_loss` adds `beta * kl.mean()`
-   and `kl` has shape (batch, steps), so the penalty per trajectory is β·mean_t KL_t, not
+   and `kl` has shape (batch, steps), so the penalty per trajectory is β·mean*t KL_t, not
    β·Σ_t KL_t. The page states the correct formula itself a few paragraphs earlier ("plus β times
    the mean per-step KL"), so the two statements contradict each other, and the mechanism sentence
    built on it ("the policy settles where the marginal reward gain equals that price") uses the
    wrong price. What is true is only this: a chain that drifts at all T steps pays T times what a
-   chain that drifts in one step pays, because the penalty is the *average* of the per-step KLs.
+   chain that drifts in one step pays, because the penalty is the \_average* of the per-step KLs.
    — Suggested fix: "the penalty is β times the average per-step KL, so a chain that drifts at every
    step pays T times what a chain that drifts in one step pays, but the price of a chain is
    β·mean_t KL_t, not β·Σ_t KL_t".
 
 4. `planning/reports/ch24-lab.md` — "`.venv/bin/python code/chapter24_multimodal_frontier/ddpo_toy.py
-   --smoke --seed 0 --device cpu` → OK, 1.2 s" (and `code/chapter24_multimodal_frontier/README.md`:
+--smoke --seed 0 --device cpu` → OK, 1.2 s" (and `code/chapter24_multimodal_frontier/README.md`:
    "Smoke: a few seconds on CPU").
    The report contradicts itself: the same report says "`.venv/bin/pytest code/chapter24_multimodal_frontier
-   -q` → 10 passed in ~63 s", and that suite runs exactly that smoke command as a subprocess plus
+-q` → 10 passed in ~63 s", and that suite runs exactly that smoke command as a subprocess plus
    nine unit tests that take < 0.1 s in total (measured: `test_smoke_run_end_to_end` = 42.7 s of the
    45.1 s suite). If the smoke command took 1.2 s, the suite could not take 63 s — on the reference
    machine the smoke run itself is ~60 s.
-   Measured here: the smoke run takes 38–50 s on CPU ("Done in 38.0 s" for seed 1, 39.4 s for seed
-   0) while the full CPU run takes 441 s, i.e. a runtime ratio of 9–12× (the smoke configuration is
+   Measured here: the smoke run takes 38–50 s on CPU ("Done in 38.0 s" for seed 1, 39.4 s for seed 0) while the full CPU run takes 441 s, i.e. a runtime ratio of 9–12× (the smoke configuration is
    dominated by fixed per-call overhead, not by arithmetic: counting sample-forwards the full
    configuration is ≈50× the smoke one — pretraining 4000×512 vs 300×256 = 26.7×, RL 120 iterations
    × 256×30×(1 + 2×3) vs 8 × 64×8×(1+3) ≈ 394×, evaluations 12×2048×30×3 vs 8×512×8×3 ≈ 20× — so the
@@ -85,7 +84,7 @@ code.
 5. `docs/chapter24_multimodal_frontier/lab.md` — "The KL estimate mirrors this: 0.23 per step with
    the penalty versus 6.29 without — a 27-fold gap."
    The table on the same page gives 0.222 for the KL run, and 6.290/0.222 = 28.3, not 27. The "27"
-   comes from the prose's 0.23, which is a *different* measurement of the same checkpoint: 0.23054
+   comes from the prose's 0.23, which is a _different_ measurement of the same checkpoint: 0.23054
    is the last in-training evaluation (iteration 60 of the curve) while 0.22228 is the separate
    final `evaluate()` call in `main` with a fresh 2048-sample rollout — my CPU seed-0 run reproduces
    both exactly. The same mixing appears in the diversity sentence ("falls to 2.21 by iteration 30 and
@@ -115,7 +114,7 @@ code.
 
 8. `docs/chapter24_multimodal_frontier/lab.md` (Exercise 2 hint) — "the KL cost of reaching it is
    smaller now, so the two runs should differ less — a case where alignment and the prior agree."
-   As written this is backwards: (0, −0.3) is the *valley* between the three modes, i.e. exactly
+   As written this is backwards: (0, −0.3) is the _valley_ between the three modes, i.e. exactly
    where the pretrained density is lowest, so the reward and the prior still disagree there. What
    actually changes is the travel distance: the valley lies 2.30 from the nearest mode ((0, 2)),
    2.77 from (−2.5, −1.5) and 2.60 from (2.5, −1), against 3.04 for the original peak (3, 2) from
@@ -129,7 +128,7 @@ code.
 1. `docs/chapter24_multimodal_frontier/lab.md` — "Subtracting the batch mean leaves the expected
    gradient unchanged (the probabilities of all trajectories sum to 1 …)" — the "sum to 1" argument
    is §24.4.3's derivation for a baseline that does not depend on the sampled trajectory (the
-   chapter's b(c)); the lab's baseline is the mean over the *same* batch, and there the identity is
+   chapter's b(c)); the lab's baseline is the mean over the _same_ batch, and there the identity is
    only approximate. With b = (1/N)Σ_j R_j and independent rollouts,
    E[(1/N)Σ_i (R_i − b)∇log p_i] = E[R∇log p] − (1/N)E[R∇log p] = (1 − 1/N)·E[R∇log p]
    (because E[b∇log p_i] = (1/N)E[R_i∇log p_i], the j≠i terms vanishing via E[∇log p_i] = 0). With
@@ -137,13 +136,13 @@ code.
    page's derivation is not the one that applies, and dividing by the batch std adds a further
    batch-dependent scale on top.
 2. `docs/chapter24_multimodal_frontier/lab.md` — "the mean per-step KL to the frozen pretrained
-   model" — this is the per-step *conditional* KL at the policy's own states (a k1-style estimator),
-   not the trajectory-level D_KL(p_θ‖p_ref) that §24.4.4 adds to the loss. In the training loss the
-   KL is moreover evaluated at the *stale* rollout states (one or two updates old), so the penalty is
+   model" — this is the per-step _conditional_ KL at the policy's own states (a k1-style estimator),
+   not the trajectory-level D*KL(p*θ‖p*ref) that §24.4.4 adds to the loss. In the training loss the
+   KL is moreover evaluated at the \_stale* rollout states (one or two updates old), so the penalty is
    an approximation of the distribution-level KL the chapter's formula suggests. The page is
    accurate about the metric it reports, but the reader may carry the stronger reading across.
 3. `docs/chapter24_multimodal_frontier/lab.md` (Exercise 6) — "compare its reward/diversity against
-   the fine-tuned policy's single samples" — diversity here is the mean *pairwise* distance, which is
+   the fine-tuned policy's single samples" — diversity here is the mean _pairwise_ distance, which is
    undefined for a single sample; the reranked arm has to be compared on reward (best-of-32 vs the
    fine-tuned policy's mean reward) and on the diversity of the 32-sample pool, not on a single
    sample's diversity.
@@ -176,7 +175,7 @@ unit tests' hand values all check out (−log 2π, −0.5(2 + 2 log π), exp(−
 advantages, −2.4 / +3.0 for the clipped loss, 0.5 and 2.0 for the Gaussian KL), the DDPM reverse
 mean and the fixed-variance Gaussian log-probability are correct, and every anchor and cross-reference
 on the page points at a heading that exists (the slugs themselves could not be checked, because
-node_modules is not installed in this worktree, so the site cannot be built here). The defects are in
+node*modules is not installed in this worktree, so the site cannot be built here). The defects are in
 the packaging and in a handful of explanation sentences:
 the page is not in the sidebar and carries a section number ("24.L") that the book's numbering and
 `scripts/fix-heading-numbers.mjs` do not support, so it is unreachable and missing from the
@@ -188,6 +187,6 @@ pytest timing and the workload ratio (and the README's "a few seconds" is wrong)
 gap is 28-fold against the page's own table because two different evaluations of the same checkpoint
 are mixed; one bullet on the baseline ends in an unclosed parenthesis; and two exercise hints are
 technically off (ε = 1.0 still clips the ratio at 2, so it is not REINFORCE; the reward peak moved
-into the valley is where the prior agrees *least*). Fix the sidebar entry and the numbering, the
+into the valley is where the prior agrees \_least*). Fix the sidebar entry and the numbering, the
 `--skip-nokl` labelling, the explanation sentences, the timings, and the two hints, and the lab is
 ready to merge.

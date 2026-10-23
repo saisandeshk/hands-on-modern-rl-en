@@ -22,7 +22,7 @@ that broadcasts the terminal reward to every denoising step. The script:
 It saves scatter plots (before/after samples), reward/diversity/KL curves,
 `metrics.csv`, `summary.json`, and prints a summary table.
 
-Main script: `ddpo_toy.py`. Tests: `test_smoke.py` (unit tests for the
+Main script: `ddpo_toy.py`. Tests: `test_ch24_lab.py` (unit tests for the
 Gaussian log-prob, the reward, and the clipped per-step PG loss against
 hand-computed values, plus an end-to-end smoke run).
 

@@ -58,7 +58,7 @@ proc = subprocess.run(
 )
 ```
 
-**The policy and update** ([policy.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter20_swe_agents/policy.py)) keep one logit row per task, $\pi(a \mid t) = \mathrm{softmax}(\theta[t,:])_a$, and apply REINFORCE with a per-task running baseline $b[t]$ that depends on the task but never on the sampled action:
+**The policy and update** ([swe_policy.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter20_swe_agents/swe_policy.py)) keep one logit row per task, $\pi(a \mid t) = \mathrm{softmax}(\theta[t,:])_a$, and apply REINFORCE with a per-task running baseline $b[t]$ that depends on the task but never on the sampled action:
 
 ```python
 advantages = rewards.to(log_probs.device) - baselines.to(log_probs.device)

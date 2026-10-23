@@ -23,7 +23,7 @@ pages were read in full.
    count is fixed at 70): the baseline is $100+70\times3 = 310$ units, the filtered run is
    $70/0.9 + 70\times3 = 287.8$ units, and the faster trainer is $100 + 210\times0.9 = 289$ units,
    i.e. 7.2% versus 6.8% — still a wash. The claim only holds if "saves" is
-   reinterpreted as *useful learning signal per unit of compute* (0.243 vs 0.175 useful groups per
+   reinterpreted as _useful learning signal per unit of compute_ (0.243 vs 0.175 useful groups per
    unit, +39% vs +8% for the faster trainer), which is a different statement.
    — Suggested fix: "cutting the zero-signal fraction from 30% to 10% costs about the same as a
    10% faster trainer (both save ~7.5% of the step), but it buys roughly 39% more useful learning
@@ -66,7 +66,7 @@ pages were read in full.
    halves are wrong. (a) Even colocated, the updated weights must be copied from the training
    workers to the rollout engine, and the rollouts, tool returns and rewards must still travel
    between processes — across the network whenever the cluster has more than one node. What
-   colocation removes is the *inter-pool weight broadcast*, not all transfers. (b) In colocation
+   colocation removes is the _inter-pool weight broadcast_, not all transfers. (b) In colocation
    the same GPUs alternate between the rollout role and the training role, so a GPU cannot work in
    both phases at once: the step time is the **sum** of the two phases, and the overlap that the
    next paragraph advertises for disaggregation ("rollout GPUs produce batch $k+1$ while the trainer
@@ -80,7 +80,7 @@ pages were read in full.
    therefore carries an ID of prompt, policy version, and attempt number: retries after a crash or
    timeout resume under the same ID so they are neither counted twice in advantages and pass rates
    nor mistaken for fresh samples." — self-contradictory: if the attempt number is part of the ID,
-   a retry has a *different* ID and cannot be deduplicated by ID at all; if retries keep the same
+   a retry has a _different_ ID and cannot be deduplicated by ID at all; if retries keep the same
    ID, the attempt number cannot be part of it. The new `review.md` Exercise 8 makes the
    consequence concrete: it asks to "deduplicate retries by `id` (keep first)" and its `drain()`
    skips only on an exact `id` match, so with the ID as defined in 18.4 (prompt + policy version +
@@ -112,7 +112,7 @@ pages were read in full.
    `scripts/fix-heading-numbers.mjs` only rewrites the H1 of pages that are listed in the sidebar,
    so the mismatch will not be reconciled automatically when the entry is added.
    — Suggested fix: add `{ text: '18.6 Summary and Exercises', link:
-   '/chapter18_llm_rl_industrial/review' }` to the Chapter 18 sidebar group and change the front
+'/chapter18_llm_rl_industrial/review' }` to the Chapter 18 sidebar group and change the front
    matter and H1 of `review.md` to "18.6 Summary and Exercises".
 
 8. `docs/chapter18_llm_rl_industrial/modern-industrial-practice.md` (pre-existing, but inside the
@@ -165,7 +165,7 @@ pages were read in full.
    vendor parameters that no reader can check from the text: "about 13K SFT samples, batch size
    32, learning rate 1e-5, and trains for 4 epochs", "about 12K samples for GRPO, 8 rollouts per
    group, batch size 64, learning rate 1e-6 … 128K … 100 tool-call rounds",
-   "R = 0.2 * R_format + R_correct", "5 rounds of evolution and ultimately synthesizes about 40K
+   "R = 0.2 \* R_format + R_correct", "5 rounds of evolution and ultimately synthesizes about 40K
    WebExplorer-QA examples", "more than 10,000 runnable PRs, and more than 140,000 variable
    tasks", Hunyuan-T1's "96.7% of post-training compute", Skywork-OR1's "57.8% to 72.8% for 32B …
    43.6% to 57.5% for 7B", MiMo's "130K verifiable problems", MiniCPM 5's "about 30,000 high-quality
@@ -178,7 +178,7 @@ pages were read in full.
    configuration with a 7B model and a batch of 512 prompts × 8 rollouts, rollout generation
    accounts for 50%–60% of total computation." With the chapter's own FLOP model (rollout = one
    forward pass = $2ND$, actor update = $6ND$, reference forward = $2ND$) the rollout share of
-   FLOPs is $2/(2+6+2) = 20$ percent; 50–60% is reachable only as a *wall-clock* share, because
+   FLOPs is $2/(2+6+2) = 20$ percent; 50–60% is reachable only as a _wall-clock_ share, because
    autoregressive decoding runs at a far lower MFU than training. Since the new §3.3 speaks of
    "total compute" in a cost sense and repeats the same three-bucket split, the ambiguity is now
    load-bearing. It may be worth saying "50%–60% of wall-clock time" explicitly.
@@ -186,7 +186,7 @@ pages were read in full.
 6. `docs/chapter18_llm_rl_industrial/data-engineering.md` — "Store the mask alongside the tokens so
    that rescoring old samples under a new reward version does not silently change what was
    trained." The loss mask is a function of the trajectory, not of the reward version, so
-   re-scoring changes the *rewards*, not the mask; the stated causal link does not hold as written.
+   re-scoring changes the _rewards_, not the mask; the stated causal link does not hold as written.
    The surrounding advice (keep the mask with the tokens, so that a re-scored sample is still
    masked the same way) is sound — only the reason given is muddled.
 

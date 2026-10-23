@@ -101,7 +101,7 @@ def resolve_device(choice: str) -> torch.device:
 
 
 # ---------------------------------------------------------------------------
-# Core RL pieces (also covered by unit tests in test_smoke.py).
+# Core RL pieces (also covered by unit tests in test_ch24_lab.py).
 # ---------------------------------------------------------------------------
 
 

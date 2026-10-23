@@ -45,7 +45,7 @@ import numpy as np
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from policy import SoftmaxPolicy, reinforce_step  # noqa: E402
+from swe_policy import SoftmaxPolicy, reinforce_step  # noqa: E402
 from sandbox import run_candidate  # noqa: E402
 from tasks import ORACLES, TASKS, Task, random_inputs  # noqa: E402
 

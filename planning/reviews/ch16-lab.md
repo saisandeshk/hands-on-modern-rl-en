@@ -4,7 +4,7 @@ Scope: `docs/chapter16_reasoning/lab.md`, `code/chapter16_reasoning/*` (new file
 `w/ch16-lab`), `planning/reports/ch16-lab.md`. Everything below was checked by
 re-running the shipped code on CPU (seed 0) and re-deriving every number; the
 reported tables themselves reproduce exactly, so the problems are in the
-*explanations* attached to the numbers, not in the tables.
+_explanations_ attached to the numbers, not in the tables.
 
 ## Errors
 
@@ -13,10 +13,10 @@ reported tables themselves reproduce exactly, so the problems are in the
    $f=0.1$ and 0.75 at $f=0.3$ — exactly the plateaus in the table." — The arithmetic does not
    follow from the formula the page states. With the page's own pool rate $p \approx 0.52$:
    $0.52/(0.52+0.48\cdot0.1)=0.915$ and $0.52/(0.52+0.48\cdot0.3)=0.783$, i.e. 0.92 and 0.78 —
-   not 0.86 and 0.75. With the *pooled* rate $p=0.474$ (item 3) the formula gives 0.90 and 0.75,
+   not 0.86 and 0.75. With the _pooled_ rate $p=0.474$ (item 3) the formula gives 0.90 and 0.75,
    so only the $f=0.3$ number matches any value of the formula, and no single $p$ reproduces the
    pair (0.86 at $f=0.1$ would require $p\approx0.85$, which makes the $f=0.3$ value 0.95). The
-   quoted numbers are in fact the *empirical* table plateaus (0.859 / 0.746), so the page
+   quoted numbers are in fact the _empirical_ table plateaus (0.859 / 0.746), so the page
    attributes a measured plateau to a formula that does not produce it. Worse, the closed
    form is not the asymptote of the implemented rule ("first accepted sample, else fall back to
    sample 0") for a pool with heterogeneous per-problem difficulty: using the measured per-problem
@@ -38,11 +38,11 @@ reported tables themselves reproduce exactly, so the problems are in the
    problem has the same $p$, whereas here $q_i$ ranges over 0.03…0.95 (20% of the 256 problems
    below 0.25), so the empirical coverage is $\mathbb{E}_i[1-(1-q_i)^N]=0.825$ at N=4, far below
    the i.i.d. value 0.924 (Jensen). — Suggested fix: add the `coverage_theory` column to the
-   table and say that best-of-N equals the *empirical* coverage of the pool, which is below
+   table and say that best-of-N equals the _empirical_ coverage of the pool, which is below
    $1-(1-p)^N$ whenever per-problem difficulty is heterogeneous.
 
 3. `docs/chapter16_reasoning/lab.md` (line 152) — "At T=0.7 (pool rate $p \approx 0.52$)" — the
-   quoted "pool rate" is only the *first* sample of each pool (`p_pool = mean(f[0])` = 0.516, SE
+   quoted "pool rate" is only the _first_ sample of each pool (`p_pool = mean(f[0])` = 0.516, SE
    ≈ 0.031 for 256 problems). The pool's true single-sample rate over all 256×64 = 16384 draws is
    0.474, which is exactly the page's own pass@1 row (0.47); the unbiased estimator with $k=1$ is
    $c_i/64$ per problem, averaged. So the page simultaneously reports a pool rate of 0.52 and a
@@ -73,10 +73,10 @@ reported tables themselves reproduce exactly, so the problems are in the
    (teacher mix removed, RFT lr = training lr = 1e-3, kept traces only) on seed 0 gives greedy
    0.727 → **0.645**, not 0.594.
    (b) The stated mechanism is contradicted by the measurement, and the experiment confounds two
-   changes (mix removed *and* lr raised 5×). Grouping the 256 test problems by the number of
+   changes (mix removed _and_ lr raised 5×). Grouping the 256 test problems by the number of
    carries in the true trace (0/1/2 carries: 60/126/70 problems) and decoding greedily:
    base model = 0.783 / 0.706 / 0.714; after the no-mix full-lr RFT = **0.583** / 0.627 /
-   **0.729**. The *easy* (no-carry) slice is where the model loses the most and the double-carry
+   **0.729**. The _easy_ (no-carry) slice is where the model loses the most and the double-carry
    slice does not degrade at all — the opposite of the page's claim. (For reference, the shipped
    recipe — teacher mix, 0.2× lr — gives 0.800 / 0.722 / 0.771, an improvement in every slice.)
    — Suggested fix: report the reproduced 0.645, do not attribute the drop to a carry-slice
@@ -105,7 +105,7 @@ reported tables themselves reproduce exactly, so the problems are in the
 
 9. `code/chapter16_reasoning/run_lab.py` — `print(f"[lab] train=... gen_len={max_new} vocab=16")`
    — the vocabulary has **17** tokens: `VOCAB = ['<pad>', '<eos>', '0'…'9', '+', '=', '>', 'c',
-   ';']` = 2 + 10 + 5. The model head is `Linear(64, 17)`, and the 73 344 parameter count quoted
+';']` = 2 + 10 + 5. The model head is `Linear(64, 17)`, and the 73 344 parameter count quoted
    on the page depends on that 17 (I verified `sum(p.numel()) == 73344`). The log line is printed
    on every run and is wrong. — Suggested fix: print `len(VOCAB)`.
 
@@ -149,7 +149,7 @@ reported tables themselves reproduce exactly, so the problems are in the
    per-carry-count breakdown, so the slice claim the page asserts is never measured by the lab
    itself.
 3. `code/chapter16_reasoning/arith_cot.py` — `TinyReasoner.generate(self, prompts, prompt_lens,
-   max_new, ...)` takes a `prompt_lens` argument that is never used in the body (the prompt is
+max_new, ...)` takes a `prompt_lens` argument that is never used in the body (the prompt is
    left-padded to a common width instead); the docstring advertises it, so a reader following
    Exercise 4's hint ("reuse `generate` with the trace as prefix") may rely on a parameter that
    does nothing. Also note `max_len = 64` bounds any such re-prompt.

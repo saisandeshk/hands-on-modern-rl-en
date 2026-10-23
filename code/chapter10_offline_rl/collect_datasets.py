@@ -34,7 +34,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from common import (
+from offline_common import (
     QMLP,
     default_outdir,
     evaluate_greedy,

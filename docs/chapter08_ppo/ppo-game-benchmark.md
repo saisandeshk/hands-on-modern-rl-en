@@ -1,5 +1,5 @@
 ---
-title: PPO Game Project Practice Guide
+title: 8.5 PPO Game Project Practice Guide
 description: A PPO game-project selection guide from starter to advanced practice, organized by technical themes rather than vague difficulty labels.
 outline:
   level: [2, 3]

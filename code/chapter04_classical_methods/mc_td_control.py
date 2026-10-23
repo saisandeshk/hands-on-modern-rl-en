@@ -29,7 +29,7 @@ import time
 
 import numpy as np
 
-from common import (
+from tabular_common import (
     FROZENLAKE_ID,
     add_common_args,
     ensure_outdir,

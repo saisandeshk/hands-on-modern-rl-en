@@ -68,7 +68,7 @@ results (seed 0, deterministic):
 .venv/bin/pytest code/chapter25_alignment_failures -q
 ```
 
-`test_smoke.py` runs both scripts in smoke mode as subprocesses (with a
+`test_ch25_lab.py` runs both scripts in smoke mode as subprocesses (with a
 timeout) and checks their artefacts, plus unit tests: IQM against a
 hand-computed trim-then-average, bootstrap CIs on fixed arrays (degenerate
 constant array, coverage of the sample mean), the performance profile
@@ -84,4 +84,4 @@ tiny 3-state MDP solved exactly by value iteration.
 | `stats.py`                    | Mean, median, IQM, stratified-bootstrap CIs, performance profiles from scratch (numpy only) |
 | `run_specification_gaming.py` | Part 1: train under both rewards, compare proxy vs. success, save curves                    |
 | `run_eval_methodology.py`     | Part 2: 12-seed comparison of two settings with robust statistics                           |
-| `test_smoke.py`               | Subprocess smoke tests + exact unit tests                                                   |
+| `test_ch25_lab.py`            | Subprocess smoke tests + exact unit tests                                                   |

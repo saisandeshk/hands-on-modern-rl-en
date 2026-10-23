@@ -24,7 +24,7 @@ import time
 
 import numpy as np
 
-from common import (
+from tabular_common import (
     add_common_args,
     ensure_outdir,
     epsilon_greedy_action,

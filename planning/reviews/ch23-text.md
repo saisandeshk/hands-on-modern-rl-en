@@ -20,7 +20,7 @@ captions do not describe the images they point at.
 
 1. `docs/chapter23_vlm/vlm-grpo-hands-on.md` — §23.3.1 dataset snippet: `img = generate_shape_image(n_tri, n_cir, n_sqr, seed=i)` followed by `train_dataset = generate_dataset(500)` / `val_dataset = generate_dataset(100)` — the "validation" set is almost entirely a copy of the training set.
    `generate_shape_image` calls `random.seed(seed)` on the **global** RNG. Because the seed is the
-   sample index `i`, the i-th sample produced by *any* call to `generate_dataset` is a deterministic
+   sample index `i`, the i-th sample produced by _any_ call to `generate_dataset` is a deterministic
    function of `i` (from the second sample on, the state left by the previous call is re-seeded to
    `i-1`). Reproducing the snippet exactly (PIL 13.0, same code) gives: of the 100 validation
    samples, **91 are byte-identical to a training sample** (same image, same counts, same question);
@@ -50,11 +50,11 @@ captions do not describe the images they point at.
    `plot_training_curves`, not an empirical observation.
    The real mechanism is the opposite of what the solution states in the early phase: at low
    quality a group mixes correct responses (reward ≈ 1.1–1.44) with wrong ones (0–0.44), which is a
-   *larger* spread than the late-phase homogeneous groups (all correct, spread ≈ 0.34 → std ≈ 0.17,
+   _larger_ spread than the late-phase homogeneous groups (all correct, spread ≈ 0.34 → std ≈ 0.17,
    and → 0 once every member is the same template). The std therefore first grows and only then
    collapses.
    — Suggested fix: "(b) The curve is not monotone: with the default seed the within-group reward
-   std first *rises* (epoch 1 → 2, e.g. G=4: 0.494 → 0.586) because early groups mix correct
+   std first _rises_ (epoch 1 → 2, e.g. G=4: 0.494 → 0.586) because early groups mix correct
    (1.1–1.44) and incorrect (0–0.44) responses, and only collapses in the last epochs (0.108 at
    epoch 5) once the policy is good enough that every group member is the same correct template.
    A shrinking std therefore signals group homogeneity, not necessarily a shrinking advantage
@@ -63,7 +63,7 @@ captions do not describe the images they point at.
 3. `docs/chapter23_vlm/review.md` — Exercise 7: "add a length guard that subtracts 0.1 when the response exceeds 300 characters without containing any step keyword", with the solution's expected behaviour "the perfect, short-correct, and reasoning-wrong cases are long-with-keywords or short, so the length guard does not fire" — the guard can never fire on the file's own test set, and the solution discusses only 3 of the 8 cases.
    The eight `test_cases` in `code/chapter23_vlm/multi_modal_reward.py` have lengths
    174, 17, 115, 27, 57, 41, 72 and 108 characters (measured with `len(response)`). The maximum is
-   **174 < 300**, so the length guard contributes 0.0 for *all eight* cases, and the "report which
+   **174 < 300**, so the length guard contributes 0.0 for _all eight_ cases, and the "report which
    cases change score and by how much" part of the exercise has a degenerate answer (no case changes
    at all). The solution's phrasing leaves the reader expecting the guard to fire on some of the
    other five cases; it never does.
@@ -77,7 +77,7 @@ captions do not describe the images they point at.
    GRPO's advantage is $A_i = (R_i - \bar R)/\sigma_R$, and both $\bar R$ and $\sigma_R$ are
    computed **within the group**. Adding a constant $c$ to every reward in a group leaves $A_i$
    unchanged, so a shared negative offset cannot "distort sibling advantages" at all. The real
-   damage comes from the clamp: if the penalty pushes *all* members of a group to 0, the group
+   damage comes from the clamp: if the penalty pushes _all_ members of a group to 0, the group
    becomes degenerate ($\sigma_R = 0$, advantages $0/0$), which destroys exactly the ranking
    information GRPO needs. Clamping at 0 can therefore hide the penalty the exercise is asking the
    student to add.
@@ -105,20 +105,20 @@ captions do not describe the images they point at.
 6. `docs/chapter23_vlm/easyr1-geoqa.md` — §23.4.4 details box: "the original r1v.py's `format_reward` regex `</think\s*>` cannot match `</thinkutan>` (because the Chinese character is not whitespace), so the format reward is always effectively 0" contradicts §23.4.5 and §23.4.7.
    §23.4.5 presents the same file as "The official reward function for GeoQA-8K" with
    `pattern = re.compile(r"<thinkutan>.*?</thinkutan>\s*<answer>.*?</answer>", re.DOTALL)`, i.e. a
-   regex that *does* match the template, and §23.4.7 then shows `reward/format=0.45 → 0.61 → 0.68`
+   regex that _does_ match the template, and §23.4.7 then shows `reward/format=0.45 → 0.61 → 0.68`
    rising during training. Both cannot be true of the same upstream file. The explanation inside
    the parenthesis is also wrong on its own terms: the characters after `think` in `</thinkutan>`
    are the Latin letters "utan", not "the Chinese character"; the regex fails because `\s*` cannot
    consume "utan" and the next character is not `>`.
    — Suggested fix: pick one version of the upstream file and describe it consistently — e.g. keep
-   §23.4.5's working regex, and in the details box say that the *upstream* `r1v.jinja`/`r1v.py`
+   §23.4.5's working regex, and in the details box say that the _upstream_ `r1v.jinja`/`r1v.py`
    pair uses `<think>`/`</think>` while the GeoQA-8K R1-V prompts ask for `<thinkutan>`/`</thinkutan>`
    (or vice versa), so that a user running the official scripts should check which tags the reward
    function matches before trusting `reward/format`. Correct "the Chinese character" to "the letters
    `utan`".
 
 7. `docs/chapter23_vlm/easyr1-geoqa.md` — §23.4.12: "The 3B model has a smaller vision encoder, so its geometry reasoning accuracy ceiling may be lower" — false for the Qwen2.5-VL family.
-   Qwen2.5-VL uses the *same* vision tower (the window-attention ViT, ≈0.67 B parameters) in the 3B
+   Qwen2.5-VL uses the _same_ vision tower (the window-attention ViT, ≈0.67 B parameters) in the 3B
    and 7B checkpoints; only the language model differs (3B vs 7B). The vision encoder is not
    smaller in the 3B model, so the stated reason for the lower ceiling is wrong — the difference,
    if any, comes from the language model that has to interpret the diagram.
@@ -135,7 +135,7 @@ captions do not describe the images they point at.
    page is inconsistent both with the figure and with the geometry it claims to reason about.
    — Suggested fix: align the example with the figure — "the shaded region is one of the four
    triangles, each with area 24/4 = 6 cm²; the dataset's ground-truth answer for this item is 12"
-   (and, if the point is to show a *correct* reasoning trace, use an item whose geometry is
+   (and, if the point is to show a _correct_ reasoning trace, use an item whose geometry is
    unambiguous).
 
 9. `docs/chapter23_vlm/qwen3-vl-reflection.md` — Figure 2 caption: "Visualization of visual grounding in VLM-R1. During reasoning the model explicitly outputs bounding-box coordinates, turning visual evidence into a verifiable trajectory." — the image is a reward curve, not a grounding visualization.
@@ -162,7 +162,7 @@ captions do not describe the images they point at.
     design, not image generation), renumber the figures so that they run 1, 2, 3, 4, and add a
     sentence that refers to the figure.
 
-11. `docs/chapter23_vlm/easyr1-geoqa.md` — §23.4.7 sample log "[Step 1]  train | reward/overall=0.28 | reward/format=0.45 | reward/accuracy=0.11 | kl=0.000 | loss=2.34" and §23.4.8 "Phase 1: Learning format (steps 1-30). `format` quickly rises to 0.8+, while `accuracy` barely moves." — neither matches the figure printed immediately below them.
+11. `docs/chapter23_vlm/easyr1-geoqa.md` — §23.4.7 sample log "[Step 1] train | reward/overall=0.28 | reward/format=0.45 | reward/accuracy=0.11 | kl=0.000 | loss=2.34" and §23.4.8 "Phase 1: Learning format (steps 1-30). `format` quickly rises to 0.8+, while `accuracy` barely moves." — neither matches the figure printed immediately below them.
     `images/easyr1-geoqa-curves.png` (Figure 5) contains four panels — `actor/entropy_loss`,
     `reward/accuracy`, `response_length/mean`, `val/accuracy_reward` — over ~60 steps.
     `reward/accuracy` starts at ≈0.34 at step 1 and rises to ≈0.51 at step 60; there is **no
@@ -201,8 +201,8 @@ captions do not describe the images they point at.
 ## Doubts
 
 1. `docs/chapter23_vlm/qwen3-vl-reflection.md` — footnote `perception_rft`: "Harikrishnan P M, et
-   al., *Stop Thinking, Start Looking: Efficient Post-Training for Multimodal Document Question
-   Answering via Reasoning-Free Alignment* (https://arxiv.org/abs/2607.14682), 2026", used for the
+   al., _Stop Thinking, Start Looking: Efficient Post-Training for Multimodal Document Question
+   Answering via Reasoning-Free Alignment_ (https://arxiv.org/abs/2607.14682), 2026", used for the
    claim that "training without explicit reasoning outperformed the reasoning variant for a 4B
    model". The arXiv identifier (2607 = July 2026) and the result are plausible for the book's
    present date, but I cannot verify the paper offline; the very specific "reasoning-free beats
@@ -240,7 +240,7 @@ captions do not describe the images they point at.
    counts, so the penalty also fires on a perfectly grounded response (case 1's perfect response
    would be penalised for "matching" the swapped labels). The term as specified therefore cannot
    separate prior-guessing from grounding; §23.1's `image_sensitivity_bonus` (penalise when the
-   answer is *unchanged* across the swap) is the operative check and would be the better basis for
+   answer is _unchanged_ across the swap) is the operative check and would be the better basis for
    the exercise.
 
 7. `docs/chapter23_vlm/review.md` — Exercise 6 asks for "the diagnosis in the order of the Section
@@ -249,7 +249,7 @@ captions do not describe the images they point at.
    (task accuracy → no-image control → general visual probe → answer length → format reward →
    IoU/grounding → KL). Relatedly, learning outcome 3 asks the reader to design "a three-part rule
    reward (accuracy + format + grounding)", while §23.3's three-part reward is
-   *correctness + reasoning quality + format* (grounding appears only in the repository script's
+   _correctness + reasoning quality + format_ (grounding appears only in the repository script's
    four-component reward and in §23.1's Visual-RFT discussion).
 
 8. `docs/chapter23_vlm/review.md` — Exercise 7's snippet embeds Chinese literals
@@ -261,7 +261,7 @@ captions do not describe the images they point at.
 
 9. `docs/chapter23_vlm/vlm-challenges.md` — the writer changed the front-matter title to the long
    H1 form ("23.1 Why a VLM Can Guess Right Without Looking: Visual Rewards and Hallucination")
-   while the sidebar entry still reads "23.1 Visual Reward Design", and 23.3/23.4 were aligned *to*
+   while the sidebar entry still reads "23.1 Visual Reward Design", and 23.3/23.4 were aligned _to_
    the sidebar. `scripts/fix-heading-numbers.mjs` only syncs the numeric prefix, so this mismatch
    will persist silently; either keep the front-matter title equal to the sidebar text (the
    convention used by, e.g., `docs/chapter24_multimodal_frontier/embodied-intelligence/index.md`) or

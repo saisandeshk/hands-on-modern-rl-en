@@ -26,7 +26,7 @@ tool-calling agent trained with REINFORCE.
 - `train_research_agent.py` — behavior-cloning warm-start, REINFORCE
   fine-tuning under three reward regimes plus a from-scratch control,
   evaluation, plots, and the summary table.
-- `test_smoke.py` — unit tests and the smoke-run test.
+- `test_ch21_lab.py` — unit tests and the smoke-run test.
 
 ## How to run
 

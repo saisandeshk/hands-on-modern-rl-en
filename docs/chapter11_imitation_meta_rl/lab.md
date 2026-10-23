@@ -14,7 +14,7 @@ GAIL-style discriminator reward of Section 11.2.3.
 Code:
 [bc_dagger_cartpole.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter11_imitation_meta_rl/bc_dagger_cartpole.py) ·
 [gail_discriminator_cartpole.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter11_imitation_meta_rl/gail_discriminator_cartpole.py) ·
-[tests](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter11_imitation_meta_rl/test_smoke.py)
+[tests](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter11_imitation_meta_rl/test_ch11_lab.py)
 
 ## What you will learn
 

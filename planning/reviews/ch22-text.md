@@ -9,7 +9,7 @@ re-derived numerically; all of them reproduce the written numbers. Findings belo
 
 1. `docs/.vitepress/config.mjs` (not modified in this branch) — the writer's report claims "Sidebar additions | Title:
    `22.R Summary and Exercises`, link: `/chapter22_computer_use/review`" — `git diff english-only...w/ch22-text --
-   docs/.vitepress/config.mjs` is empty, and the Chapter 22 block of the sidebar still contains only
+docs/.vitepress/config.mjs` is empty, and the Chapter 22 block of the sidebar still contains only
    `22.1 GUI Agent Training` and `22.2 Prompt Injection and Instruction Hierarchy`. The new page
    `docs/chapter22_computer_use/review.md` is therefore not reachable from the navigation, which violates the repo
    rule in `AGENTS.md` ("Every navigable page must be listed there"). `scripts/generate-sitemap.mjs` scans every
@@ -109,7 +109,7 @@ re-derived numerically; all of them reproduce the written numbers. Findings belo
 4. `docs/chapter22_computer_use/training.md` (new subsection) — "This is rollout distillation in its simplest form — the
    student imitates only the teacher policy's successful, well-formed rollouts" — in the pipeline described in Step 4
    ("verifier-filtered successful trajectories" produced by the current policy and then used for SFT) the teacher and
-   the student are the same model, which Chapter 15 classifies as on-policy *self*-distillation (OPSD) rather than
+   the student are the same model, which Chapter 15 classifies as on-policy _self_-distillation (OPSD) rather than
    teacher-student distillation; the term "teacher policy" needs a qualifier, or a pointer to Ch. 15's OPD/OPSD
    distinction. — Consider: "rejection-sampling fine-tuning; if the rollouts come from a separate stronger policy this
    is off-policy distillation (Chapter 15)".
@@ -127,7 +127,7 @@ re-derived numerically; all of them reproduce the written numbers. Findings belo
    overstates the paper. — Suggest verifying against the abstract before print.
 
 7. `docs/chapter22_computer_use/training.md` (new subsection) — "Deduplicate trajectories by (task, snapshot id, seed)"
-   — that key identifies an *attempt configuration*, not a trajectory: two legitimate attempts of the same task under
+   — that key identifies an _attempt configuration_, not a trajectory: two legitimate attempts of the same task under
    the same seed and snapshot (e.g. from different checkpoints) would collapse into one and a real success could be
    dropped, which is exactly what Exercise 4's arithmetic assumes away. — Consider adding the rollout id / policy
    version to the key.

@@ -44,7 +44,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from common import (
+from offline_common import (
     QMLP,
     default_outdir,
     load_dataset,
@@ -57,7 +57,7 @@ GAMMA = 0.99
 
 
 # ---------------------------------------------------------------------------
-# Pure estimators (unit-tested in test_smoke.py)
+# Pure estimators (unit-tested in test_ch10_lab.py)
 # ---------------------------------------------------------------------------
 
 

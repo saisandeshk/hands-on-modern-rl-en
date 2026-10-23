@@ -29,8 +29,8 @@ PyTorch — no RL libraries. The lab has three steps:
    size (ESS) so poor coverage is visible.
 
 Shared plumbing (seeding, device selection, MLPs, dataset save/load, online
-evaluation) lives in `common.py`. Unit tests plus subprocess smoke runs of
-every script live in `test_smoke.py`.
+evaluation) lives in `offline_common.py`. Unit tests plus subprocess smoke runs of
+every script live in `test_ch10_lab.py`.
 
 ## How to run
 

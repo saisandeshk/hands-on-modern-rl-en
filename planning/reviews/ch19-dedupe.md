@@ -31,7 +31,7 @@ The 7 footnote definitions kept in the new 19.5 are all used and all used ones a
    supposed to be deduped is still duplicated in full.** 19.4 lines 607–672 and the new 19.5 lines
    ~22–88 carry the same material: the same three prompting limits, the same MDP formulation
    (state/action/transition/reward + the `<search>` interaction transcript), the same three "Key
-   Findings", the same "Technical Lineage After SearchR1" table *with the same numbers*
+   Findings", the same "Technical Lineage After SearchR1" table _with the same numbers_
    (SearchR1 819, ToRL 131, ReTool 247, ZeroTIR "NeurIPS 2025"), and the same `search_reward`
    function. The branch even adds to 19.4 the sentence "The deeper treatment of search-augmented RL
    — prompting limits, the SearchR1 MDP, and the work that followed — continues in [Section
@@ -96,7 +96,7 @@ The 7 footnote definitions kept in the new 19.5 are all used and all used ones a
    async Docker client (`aiodocker`, or `docker.from_client()` with `await client.containers.run(...)`).
 
 6. `docs/chapter19_agentic/tool-use-and-trajectory.md` (same snippet) — the container is started with
-   `detach=True, remove=True` (Docker auto-remove) and the code then reads the logs *after* the
+   `detach=True, remove=True` (Docker auto-remove) and the code then reads the logs _after_ the
    container has exited: `result = container.wait(timeout=self.timeout)` then
    `output = container.logs().decode("utf-8")`. With auto-remove, the container is deleted as soon as
    it exits, so the second call typically raises `docker.errors.NotFound: No such container`; at best
@@ -124,7 +124,7 @@ The 7 footnote definitions kept in the new 19.5 are all used and all used ones a
    ```
    `max_searches` is never used. Two consequences: (a) the advertised cap does not exist — with
    `num_searches = 20` the total reward is `1.0 - 1.0 = 0`, and from 21 searches on the total
-   reward is negative, so a *correct* answer can be worth less than a wrong one with fewer
+   reward is negative, so a _correct_ answer can be worth less than a wrong one with fewer
    searches; (b) the page's argument is that "stopping too late wastes resources" and that the
    trade-off "is exactly where RL is useful" — an unbounded linear penalty that can dominate the
    task reward is not the bounded trade-off the text describes. (Note `verify_answer` is also
@@ -137,7 +137,7 @@ The 7 footnote definitions kept in the new 19.5 are all used and all used ones a
 
 1. "The 32B model trained by ToRL[^torl] outperformed a 70B model without tools on mathematical
    reasoning" (19.5 and 19.4 line 664) — ToRL's headline comparison is a 32B tool-integrated model
-   against a larger *no-tool* model on AIME (I believe Qwen2.5-72B-Instruct, hence "70B"), so the
+   against a larger _no-tool_ model on AIME (I believe Qwen2.5-72B-Instruct, hence "70B"), so the
    claim is probably right, but no benchmark, no base model and no baseline name are given, and the
    reader cannot check "32B > 70B" against anything. I cannot verify the exact figures offline.
    — Suggest naming the benchmark and the compared model explicitly (e.g. "on AIME 2024, ToRL-32B

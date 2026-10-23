@@ -23,7 +23,7 @@ Reward is sparse by default (+1 only for a correct submission).
   observation encoding, reward modes).
 - `train_gui_agent.py` -- REINFORCE with a learned value baseline, success
   replay, curriculum scheduler, evaluation, CSV/JSON/PNG outputs.
-- `test_smoke.py` -- unit tests plus a subprocess smoke run.
+- `test_ch22_lab.py` -- unit tests plus a subprocess smoke run.
 
 ## How to run
 

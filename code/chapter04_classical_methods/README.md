@@ -25,7 +25,7 @@ What the lab shows:
    behaviour episodes, compared against the exact DP value (bias,
    variance, RMSE, effective sample size).
 
-Shared helpers live in `common.py`; `test_smoke.py` holds unit tests
+Shared helpers live in `tabular_common.py`; `test_ch04_lab.py` holds unit tests
 (Bellman residual ~0, hand-computed SARSA/Q-learning/Expected-SARSA
 updates, IS estimators on a two-state toy with known answers) plus a
 smoke test that runs every script with `--smoke`.

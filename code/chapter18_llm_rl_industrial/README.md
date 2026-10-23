@@ -102,5 +102,5 @@ mode as subprocesses and assert the CSV/PNG/JSON outputs are written.
 - `rollout_system.py` — the whole lab: policy net, rollout collection,
   learner updates (sync / none / clip / vtrace), version-lag bookkeeping,
   multiprocessing throughput benchmark, deterministic async simulation, CLI.
-- `test_smoke.py` — unit + subprocess smoke tests.
+- `test_ch18_lab.py` — unit + subprocess smoke tests.
 - `requirements.txt` — minimal deps (gymnasium, torch, numpy, matplotlib).

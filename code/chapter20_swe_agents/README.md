@@ -11,7 +11,7 @@ What the lab shows:
 1. **Executable verifiers as rewards.** `sandbox.py` runs each candidate
    against a test suite in a subprocess and returns the pass fraction --
    the toy analogue of the SWE-bench evaluator / RLVR test reward.
-2. **REINFORCE with a baseline.** `policy.py` implements a per-task softmax
+2. **REINFORCE with a baseline.** `swe_policy.py` implements a per-task softmax
    policy and the update `loss = -mean((R - b[t]) * log pi(a|t))` with a
    running per-task baseline `b[t]`.
 3. **Reward hacking.** Under visible-tests-only rewards the policy converges
@@ -75,6 +75,6 @@ visible-optimal arms is a fixed point), but the gap -- train ~1.0 with hidden
 - `tasks.py` -- 14 tasks (visible/hidden tests, candidates, oracles, random
   input generators).
 - `sandbox.py` -- subprocess test runner with timeout and cwd isolation.
-- `policy.py` -- softmax bandit policy + REINFORCE-with-baseline update.
+- `swe_policy.py` -- softmax bandit policy + REINFORCE-with-baseline update.
 - `train.py` -- experiment CLI (REINFORCE under three reward regimes).
-- `test_smoke.py` -- pytest suite described above.
+- `test_ch20_lab.py` -- pytest suite described above.

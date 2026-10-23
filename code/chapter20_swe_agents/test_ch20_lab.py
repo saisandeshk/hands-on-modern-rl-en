@@ -18,7 +18,7 @@ import sys
 
 import torch
 
-import policy
+import swe_policy as policy
 import sandbox
 import tasks
 from tasks import FORBIDDEN_TOKENS, TASKS

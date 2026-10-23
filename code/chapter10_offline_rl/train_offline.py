@@ -52,7 +52,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from common import (
+from offline_common import (
     QMLP,
     PolicyMLP,
     default_outdir,
@@ -79,7 +79,7 @@ def run_seed(base_seed: int, *parts: str) -> int:
 
 
 # ---------------------------------------------------------------------------
-# CQL penalty (unit-tested in test_smoke.py)
+# CQL penalty (unit-tested in test_ch10_lab.py)
 # ---------------------------------------------------------------------------
 
 

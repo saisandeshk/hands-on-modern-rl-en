@@ -17,7 +17,7 @@ numbering in `docs/.vitepress/config.mjs` (13.8 / 15.8 confirmed).
 1. `code/chapter14_dpo/dpo_math_reward.py` — `"return int(match[-1])"` — the English rewrite changed the
    capture groups from `(\d+)` to `([+-]?\d+\.?\d*)` but kept the integer conversion, so any decimal
    answer raises. Verified: `extract_number("The result is 3.5")` → `ValueError: invalid literal for
-   int() with base 10: '3.5'`; same for `"Answer: 12.0"`, `"equals 80.5"`, `"the answer is 3."`
+int() with base 10: '3.5'`; same for `"Answer: 12.0"`, `"equals 80.5"`, `"the answer is 3."`
    (the trailing-dot form also fails `int("3.")`). `evaluate_math()` calls this on **every** generated
    response, so one decimal output (e.g. "56 / 8 = 7.0") aborts the whole before/after evaluation with an
    unhandled `ValueError`. The old Chinese patterns (`(\d+)`) could not produce this crash, so it is a
@@ -30,7 +30,7 @@ numbering in `docs/.vitepress/config.mjs` (13.8 / 15.8 confirmed).
    (sampling) policy … `ratio = exp(log pi_theta - log pi_old)`" — the two are not the same distribution.
    `generate_responses()` samples with `do_sample=True, temperature=0.7, top_p=0.9`, i.e. from the
    temperature/top-p-modified distribution `pi_temp`, but `grpo_policy_update()` builds `old_logp` with
-   the *unmodified* model (`_token_log_probs(model, batch_ids)`), so the denominator is `pi_theta`, not
+   the _unmodified_ model (`_token_log_probs(model, batch_ids)`), so the denominator is `pi_theta`, not
    the distribution the samples actually came from. Consequences: (a) at the first inner epoch the ratio
    is not 1 but `pi_theta/pi_temp`, so the PPO trust region is violated before any update; (b) the
    clipping saturates immediately for tokens whose probability was boosted by the low temperature;
@@ -45,7 +45,7 @@ numbering in `docs/.vitepress/config.mjs` (13.8 / 15.8 confirmed).
    `reward = 1.0` (correct) or `0.0` (wrong) and nothing else, so the branch
    `reward = min(1.0, reward + 0.1)` always evaluates to `min(1.0, 1.1) = 1.0`. The documented
    three-level reward {0, 1.0, 1.1} does not exist; the reward is binary, and the downstream
-   `accuracy = mean(1.0 if r >= 1.0 else 0.0)` is only correct *because* of the cap. The rewrite
+   `accuracy = mean(1.0 if r >= 1.0 else 0.0)` is only correct _because_ of the cap. The rewrite
    re-worded this docstring without noticing that the two statements cancel each other. — Suggested fix:
    either raise the cap to 1.1 (and keep the accuracy test at `r > 0`), or delete the bonus code and
    state that the reward is binary 0/1.
@@ -53,14 +53,14 @@ numbering in `docs/.vitepress/config.mjs` (13.8 / 15.8 confirmed).
 4. `code/chapter15_grpo/grpo_math_reasoning.py` — "How to run (full mode needs a GPU; ~2-4 GB VRAM in
    fp16)" and `--model` help "0.5B fits a 6 GB GPU in fp16" — the arithmetic does not support this for
    the default (non-LoRA) path. Qwen2.5-0.5B is 0.49 B parameters, so in fp16: trainable weights 0.98 GB
-   + frozen `copy.deepcopy(model)` reference 0.98 GB + fp16 gradients 0.98 GB + two AdamW moments
-   (torch keeps `exp_avg`/`exp_avg_sq` in the parameter dtype, verified: fp16) 1.96 GB ≈ **4.9 GB of
-   states before any activation**, plus logits/log-softmax for the group of 4 sequences
-   (4 × 230 tokens × 151 936 vocab × 2 B ≈ 0.28 GB per copy, and `grpo_loss` keeps a second copy for the
-   reference model) and the backward graph. The "~2-4 GB" figure is only reachable in `--lora` mode
-   (no base-model gradients/optimizer state), and even 6 GB is marginal for the default path. — Suggested
-   fix: state the measured peak for the default path (or drop the number and recommend `--lora` /
-   bfloat16 / an 8-12 GB card).
+   - frozen `copy.deepcopy(model)` reference 0.98 GB + fp16 gradients 0.98 GB + two AdamW moments
+     (torch keeps `exp_avg`/`exp_avg_sq` in the parameter dtype, verified: fp16) 1.96 GB ≈ **4.9 GB of
+     states before any activation**, plus logits/log-softmax for the group of 4 sequences
+     (4 × 230 tokens × 151 936 vocab × 2 B ≈ 0.28 GB per copy, and `grpo_loss` keeps a second copy for the
+     reference model) and the backward graph. The "~2-4 GB" figure is only reachable in `--lora` mode
+     (no base-model gradients/optimizer state), and even 6 GB is marginal for the default path. — Suggested
+     fix: state the measured peak for the default path (or drop the number and recommend `--lora` /
+     bfloat16 / an 8-12 GB card).
 
 5. `code/chapter15_grpo/grpo_math_reasoning.py` — `k3_kl_estimate` docstring: "penalizes large deviations
    more steeply than the naive k1 estimator (d itself)". With `d = log pi_ref - log pi_theta`, the k1
@@ -74,16 +74,18 @@ numbering in `docs/.vitepress/config.mjs` (13.8 / 15.8 confirmed).
    denominator is `G` or `G-1`; the book's own page `docs/chapter15_grpo/grpo-practice-and-mechanism.md`
    says exactly that ("DeepSeekMath writes `std` without specifying … the example follows the default
    definition of PyTorch `torch.std` and uses Bessel's correction") and its code map therefore uses the
-   *unbiased* std. So the docstring states more precisely than anyone can know, and the script silently
+   _unbiased_ std. So the docstring states more precisely than anyone can know, and the script silently
    uses a different convention (advantage scale larger by `sqrt(G/(G-1))`) from the chapter it belongs
    to. — Suggested fix: soften to "population std (we use unbiased=False; the paper does not specify)"
    or align with the chapter and use `unbiased=True`.
 
 7. `code/chapter13_rlhf/rlhf_ppo_train.py` — the relevance block now contains the same statement twice:
+
    ```
                overlap = len(prompt_keywords & response_words)
                overlap = len(prompt_keywords & response_words)
    ```
+
    The duplicate was introduced by the English rewrite (a leftover from the edit) and is dead code.
    — Suggested fix: delete one line.
 
@@ -114,7 +116,7 @@ numbering in `docs/.vitepress/config.mjs` (13.8 / 15.8 confirmed).
 ## Doubts
 
 1. `code/chapter15_grpo/grpo_math_reasoning.py` — the "before/after" comparison uses
-   `test_indices = [0, 7, 14]`, which are three of the 20 *training* problems, while
+   `test_indices = [0, 7, 14]`, which are three of the 20 _training_ problems, while
    `docs/chapter15_grpo/rlvr.md` states "The second script requires model dependencies and compute; its
    result must be evaluated on held-out problems." The rewrite kept the in-sample evaluation (and the
    report did not mention it), so the printed "Before/After training comparison" is not a generalization
@@ -142,13 +144,13 @@ numbering in `docs/.vitepress/config.mjs` (13.8 / 15.8 confirmed).
    hand-written PPO, not Stable Baselines3.
 
 5. `planning/reports/code-llm.md` — "Default 256px behavior unchanged" for the geometry generator is not
-   accurate: only the *size* range is unchanged (still 15-30 px); the placement bounds changed from
+   accurate: only the _size_ range is unchanged (still 15-30 px); the placement bounds changed from
    `[size+10, img-size-10]` to `[size+5, img-size-5]`, so images generated with the same seed differ
    from the previous version (and the saved `output/geometry_dataset` of the old version no longer
    matches the generator).
 
 6. `code/chapter15_grpo/rule_based_reward.py` — the new pattern `r'[Ss]o[,.]?\s*(?:the answer is\s*)?([+-]?\d+\.?\d*)'`
-   in `check_answer_correctness` grabs the *first* number after "So", which is often an intermediate
+   in `check_answer_correctness` grabs the _first_ number after "So", which is often an intermediate
    value: for "Step 1: 15 + 27 = 42.\nSo 15 + 27 = 42 apples." it extracts `15` (verified), whereas the
    last-number fallback (Method 4) would have produced the correct `42`. It is only reached when no
    "the answer is / final answer is / the result is" marker is present, so the exposure is limited, but
@@ -172,7 +174,7 @@ numbering in `docs/.vitepress/config.mjs` (13.8 / 15.8 confirmed).
    The visual-grounding keyword list has the same property ("top" matching "topic", "left" matching
    "cleft", etc.).
 
-10. `code/chapter19_agentic/agentic_system/run.py` — `main()` is defined *above* the module-level
+10. `code/chapter19_agentic/agentic_system/run.py` — `main()` is defined _above_ the module-level
     `code_reward` and `prompts` definitions it uses. This works when the file is executed as a script
     (the names are resolved at call time, after the module body has run), but `main()` raises `NameError`
     if it is called from an import, and the file is no longer a linear top-to-bottom script. Moving the

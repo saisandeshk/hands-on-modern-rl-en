@@ -8,7 +8,7 @@ title: '22.3 Lab: Form-Filling GUI Agent'
 >
 > **Learning path**: [19.x Agentic RL](../chapter19_agentic/overview) -> [22.1 GUI Agent Training](./training) -> **22.L Form-Filling GUI Agent** -> [22.2 Prompt Injection](./safety-swarm)
 >
-> **Code and resources**: [gui_env.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter22_computer_use/gui_env.py) · [train_gui_agent.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter22_computer_use/train_gui_agent.py) · [test_smoke.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter22_computer_use/test_smoke.py)
+> **Code and resources**: [gui_env.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter22_computer_use/gui_env.py) · [train_gui_agent.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter22_computer_use/train_gui_agent.py) · [test_ch22_lab.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter22_computer_use/test_ch22_lab.py)
 
 Real GUI benchmarks (OSWorld, AndroidWorld) need virtual machines and GPU-scale models, so this lab distils their structure into a task a laptop can run in minutes: fill a small on-screen form and submit it. The observation is a structured screen description, the actions are Set-of-Mark style `click(element_id)` / `type(element_id, token)`, and the reward is sparse by default. Everything the chapter warns about -- sparse terminal feedback, long-horizon credit assignment, curriculum sampling, progress rewards, and reward hacking -- shows up here in measurable form.
 

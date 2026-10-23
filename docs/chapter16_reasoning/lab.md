@@ -84,7 +84,7 @@ The implementation lives in three files:
   and the §16.3 metrics, all from scratch in torch/numpy.
 - [`run_lab.py`](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter16_reasoning/run_lab.py) —
   the experiment driver (CLI, outputs, plots, summary table).
-- [`test_smoke.py`](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter16_reasoning/test_smoke.py) —
+- [`test_ch16_lab.py`](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter16_reasoning/test_ch16_lab.py) —
   unit tests plus the end-to-end smoke test.
 
 ## Walkthrough of the key code

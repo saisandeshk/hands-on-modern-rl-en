@@ -26,7 +26,7 @@ PYTHON = os.path.join(REPO_ROOT, ".venv", "bin", "python")
 
 sys.path.insert(0, HERE)
 
-from common import load_model  # noqa: E402
+from tabular_common import load_model  # noqa: E402
 from dp_oracle import (  # noqa: E402
     bellman_optimality_residual,
     policy_iteration,

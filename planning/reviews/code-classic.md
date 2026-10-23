@@ -8,7 +8,7 @@ and re-derived every numeric claim I could check in Python.
 
 ## Errors
 
-1. `code/README.md` — "- Sw\n  ...[truncated 911 chars]" — the committed README is **truncated**: the last
+1. `code/README.md` — "- Sw\n ...[truncated 911 chars]" — the committed README is **truncated**: the last
    bullet of the "Notes" section is cut mid-word after `- Sw`, followed by the literal harness
    marker `...[truncated 911 chars]`. `git show w/code-classic:code/README.md | tail -3` returns
    exactly that. The same marker terminates `planning/reports/code-classic.md` (its "Open issues"
@@ -48,7 +48,7 @@ and re-derived every numeric claim I could check in Python.
    `seed+2` while `env.reset(seed=seed+episode)` gives each scenario a different episode-start
    distribution, so the "hacked reward vs. bad shaping vs. correct design" comparison — the whole
    point of the script — is not seed-matched. — Suggested fix: move the three `*.seed(seed)` calls to
-   the top of `train_agent()` (before the agent is built) and use the *same* seed for all three
+   the top of `train_agent()` (before the agent is built) and use the _same_ seed for all three
    scenarios so only the reward function differs.
 
 5. `code/appendix_a_engineering/debug_training_collapse.py` — `results_lr_high = train_scenario(..., seed=seed)`,
@@ -58,9 +58,9 @@ and re-derived every numeric claim I could check in Python.
    and `random`/`np`/`torch` are seeded only once at the top of `run_all_scenarios()`, so the
    ε-greedy action stream continues across scenarios (`select_action` uses the global `random`).
    The comparison is therefore confounded by the initial state, the action noise and the weight
-   init; the new seed plumbing only *looks* like a controlled experiment. — Suggested fix: re-seed
+   init; the new seed plumbing only _looks_ like a controlled experiment. — Suggested fix: re-seed
    inside `train_scenario()` with the same seed for all four scenarios (e.g. `random.seed(seed);
-   np.random.seed(seed); torch.manual_seed(seed)` at the top of the function) and pass the same
+np.random.seed(seed); torch.manual_seed(seed)` at the top of the function) and pass the same
    `seed` to all four calls.
 
 6. `code/chapter01_cartpole/capture_frames.py` — `use_model = os.path.exists(args.model) and not args.smoke` —
@@ -85,7 +85,7 @@ and re-derived every numeric claim I could check in Python.
    for full runs; they are skipped in `--smoke` (20 episodes × 2 seeds cannot reach them)" — **false
    about the code**: in `code/chapter03_value_functions/gridworld_q_learning.py` the two asserts
    `assert abs(values[START] - 0.728537125) < 1e-9` and `assert len(history) - 1 == 7` are
-   unconditional in `main()` and *do* run in smoke mode (they pass: I recomputed
+   unconditional in `main()` and _do_ run in smoke mode (they pass: I recomputed
    `V*(0,0) = 0.7285371249999998` and 7 sweeps). The asserts that are actually skipped in smoke
    mode are `success_rate == 1.0` / `evaluation_steps == 6.0`, which are the ones that do depend on
    episodes × seeds. — Suggested fix: correct the report sentence (or move the two value-iteration
@@ -95,9 +95,9 @@ and re-derived every numeric claim I could check in Python.
    the claim that the column "names the page that links the script" is false for this row: no docs
    page links `code/chapter05_dqn/dqn_pokemon_red_pyboy.py`. `docs/chapter05_dqn/visual-game-projects.md`
    still uses the pre-rename directory in five runnable commands — `pip install -r
-   chapter07_dqn/requirements.txt` (l. 364, 509), `python chapter07_dqn/dqn_gym_sb3.py` (l. 366, 371),
+chapter07_dqn/requirements.txt` (l. 364, 509), `python chapter07_dqn/dqn_gym_sb3.py` (l. 366, 371),
    `python chapter07_dqn/dqn_atari_sb3.py` (l. 392) and `python
-   chapter07_dqn/dqn_pokemon_red_pyboy.py` (l. 515) — i.e. the reader is told to run a directory
+chapter07_dqn/dqn_pokemon_red_pyboy.py` (l. 515) — i.e. the reader is told to run a directory
    that does not exist (`code/chapter07_dqn/`). `npm run verify:code-links` does not catch it because
    the paths sit in bash fences, not markdown links. The branch renumbered the code but left the
    page broken while the README asserts the link exists. — Suggested fix: change `chapter07_dqn/` to
@@ -141,7 +141,7 @@ and re-derived every numeric claim I could check in Python.
 
 5. `code/chapter05_dqn/test_smoke.py` — the skip heuristic
    `if proc.returncode != 0 and ("ROM" in combined or "Atari" in combined or "ale-py" in combined or "ale_py" in combined)`
-   skips *any* failing script whose output mentions Atari/ROM, so an unrelated crash in a script
+   skips _any_ failing script whose output mentions Atari/ROM, so an unrelated crash in a script
    whose traceback mentions "Atari" would be silently skipped instead of failing the suite.
 
 6. `code/chapter01_cartpole/plot_curves.py` — the new `--seed` argument is not used in the output

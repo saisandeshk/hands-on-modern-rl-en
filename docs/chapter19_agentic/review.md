@@ -19,35 +19,51 @@ This chapter moved the training objective from a single response to a complete i
 
 ## Key Equations
 
-$$ \tau = (s_0, a_0, o_1, a_1, o_2, \ldots, a_T) $$
+$$
+\tau = (s_0, a_0, o_1, a_1, o_2, \ldots, a_T)
+$$
 
 A trajectory unifies model tokens, tool calls, and environment observations into the single object that RL optimizes.
 
-$$ \langle S*{\text{agent}},\ A*{\text{agent}},\ P*{\text{agent}},\ R*{\text{agent}},\ \gamma,\ O \rangle $$
+$$
+\langle S_{\text{agent}},\ A_{\text{agent}},\ P_{\text{agent}},\ R_{\text{agent}},\ \gamma,\ O \rangle
+$$
 
 The POMDP six-tuple: the agent never sees the full environment state, only observations and interaction history.
 
-$$ J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\left[\sum_{t=0}^{T} \gamma^t R(s_t, a_t)\right] $$
+$$
+J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\left[\sum_{t=0}^{T} \gamma^t R(s_t, a_t)\right]
+$$
 
 The multi-turn objective: maximize expected discounted return over complete trajectories, not over single responses.
 
-$$ G*t = r_t + \gamma G*{t+1} $$
+$$
+G_t = r_t + \gamma G_{t+1}
+$$
 
 Discounted return: each step's credit is its own reward plus discounted downstream rewards, so $\gamma$ controls how far terminal signal propagates backward.
 
-$$ A_t = R(\tau) - \bar{R}(s_t) $$
+$$
+A_t = R(\tau) - \bar{R}(s_t)
+$$
 
 Step-level advantage in its simplest form: compare this trajectory's return against the baseline return from the same state.
 
-$$ A_i = \frac{r_i - \mathrm{mean}(\mathbf{r})}{\mathrm{std}(\mathbf{r})} $$
+$$
+A_i = \frac{r_i - \mathrm{mean}(\mathbf{r})}{\mathrm{std}(\mathbf{r})}
+$$
 
 GRPO group-relative advantage: within one group of rollouts for the same task, above-average trajectories are reinforced and below-average ones suppressed, with no critic network.
 
-$$ R*{\text{total}} = R*{\text{task}} - \lambda*{\text{efficiency}} \cdot T - \lambda*{\text{format}} \cdot \mathbb{1}(\text{format error}) $$
+$$
+R_{\text{total}} = R_{\text{task}} - \lambda_{\text{efficiency}} \cdot T - \lambda_{\text{format}} \cdot \mathbb{1}(\text{format error})
+$$
 
 Agentic reward with shaping: task completion minus penalties for trajectory length $T$ and malformed tool calls.
 
-$$ \text{update utilization} = \frac{T*{\text{update}}}{T*{\text{rollout}} + T*{\text{verify}} + T*{\text{update}}} $$
+$$
+\text{update utilization} = \frac{T_{\text{update}}}{T_{\text{rollout}} + T_{\text{verify}} + T_{\text{update}}}
+$$
 
 Infrastructure health: the fraction of a training step spent optimizing versus generating rollouts and verifying them; low values mean the learner is starved.
 
@@ -106,15 +122,21 @@ Starting from the trajectory objective $J(\theta) = \mathbb{E}_{\tau \sim \pi_\t
 ::: details Solution
 Write the trajectory probability under the policy as a product over token positions:
 
-$$ \pi*\theta(\tau) = \prod*{t=0}^{T} p*\theta(x_t \mid x*{<t}) $$
+$$
+p_\theta(\tau) = \prod_{t \in a(\tau)} \pi_\theta(x_t \mid x_{<t}) \prod_{t \notin a(\tau)} P_{\text{env}}(x_t \mid x_{<t})
+$$
 
-where $x_t$ ranges over every token in the trajectory, including tool observations. The REINFORCE gradient is:
+where $a(\tau)$ is the set of positions the model generated and $P_{\text{env}}$ covers tool observations and prompts. The environment factors do not depend on $\theta$, so the REINFORCE gradient is:
 
-$$ \nabla*\theta J(\theta) = \mathbb{E}*{\tau \sim \pi*\theta}\left[ R(\tau) \nabla*\theta \log \pi*\theta(\tau) \right] = \mathbb{E}*{\tau \sim \pi*\theta}\left[ R(\tau) \sum*{t=0}^{T} \nabla*\theta \log p*\theta(x*t \mid x*{<t}) \right]. $$
+$$
+\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim p_\theta}\left[ R(\tau) \nabla_\theta \log p_\theta(\tau) \right] = \mathbb{E}_{\tau \sim p_\theta}\left[ R(\tau) \sum_{t \in a(\tau)} \nabla_\theta \log \pi_\theta(x_t \mid x_{<t}) \right].
+$$
 
-Now split positions into model-generated tokens $a(\tau)$ and environment-produced tokens. Environment tokens carry no factor in the trajectory log-probability, so they contribute no term to the gradient; if they are nevertheless fed through the policy network as if self-generated, the implemented loss includes spurious pseudo-gradients that push the policy toward reproducing observations. The action mask $m_t \in \{0, 1\}$ (1 for model tokens, 0 for observations and prompts) corrects the estimator:
+Only model-generated positions contribute. If observation tokens are nevertheless fed through the policy loss as if self-generated, the implemented loss includes spurious pseudo-gradients that push the policy toward reproducing observations. The action mask $m_t \in \{0, 1\}$ (1 for model tokens, 0 for observations and prompts) restricts the implemented sum to the correct positions:
 
-$$ \nabla*\theta J(\theta) = \mathbb{E}*{\tau \sim \pi*\theta}\left[ R(\tau) \sum*{t \in a(\tau)} \nabla*\theta \log p*\theta(x*t \mid x*{<t}) \right], $$
+$$
+\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim p_\theta}\left[ R(\tau) \sum_{t=0}^{T} m_t \, \nabla_\theta \log \pi_\theta(x_t \mid x_{<t}) \right],
+$$
 
 so only decisions the policy controlled are reinforced. This is the same masking used in the action-mask formalism of Section 19.2 and in the rollout code of the chapter's project pages.
 :::
@@ -161,7 +183,9 @@ In the DeepCoder lab, one GRPO group of 4 rollouts for the same problem earns re
 
 1. Mean: $(0 + 1 + 0 + 1)/4 = 0.5$. Squared deviations are each $(0 - 0.5)^2 = 0.25$, so variance $= 0.25$ and population std $= 0.5$. Advantages $A_i = (r_i - 0.5)/0.5$:
 
-$$ \mathbf{A} = [-1.0,\ +1.0,\ -1.0,\ +1.0]. $$
+$$
+\mathbf{A} = [-1.0,\ +1.0,\ -1.0,\ +1.0].
+$$
 
 2. The two successful rollouts (advantage $+1$) are reinforced — the update raises the probability of the decisions that produced them. The two failed rollouts (advantage $-1$) are suppressed. Note the signal exists only because the group is mixed: had all four succeeded or all four failed, the std would be 0 and no relative advantage could be computed, which is why GRPO needs enough samples per group.
 
@@ -225,7 +249,9 @@ Why the last assertion holds: the loop starts with $G = 0$ and processes the fin
 
 1. Initial probabilities are uniform: $p = [1/3, 1/3, 1/3]$. The REINFORCE gradient of the log-probability for a softmax policy is $e_0 - p = [2/3, -1/3, -1/3]$. The update is $\Delta = 0.05 \times 1.0 \times [2/3, -1/3, -1/3] = [0.03333, -0.01667, -0.01667]$, so the new logits are $[0.03333, -0.01667, -0.01667]$. Softmax: $\exp(0.03333) \approx 1.0339$, $\exp(-0.01667) \approx 0.9835$ (twice), sum $\approx 3.0009$, giving:
 
-$$ p(\text{search}) \approx \frac{1.0339}{3.0009} \approx 0.3445. $$
+$$
+p(\text{search}) \approx \frac{1.0339}{3.0009} \approx 0.3445.
+$$
 
 One rewarded trial moves the correct-tool probability from 33.3% to about 34.5% — small steps like this accumulate over the 50 training episodes in the chapter script.
 

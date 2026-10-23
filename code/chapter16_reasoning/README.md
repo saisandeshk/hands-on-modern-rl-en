@@ -79,6 +79,6 @@ already-solved problems and forgets the rest.
   majority vote, exact/noisy best-of-N), all from scratch in torch/numpy.
 - `run_lab.py` — the experiment driver (argparse CLI, CSV/JSON/PNG
   outputs, stdout summary table).
-- `test_smoke.py` — unit tests (pass@k vs brute-force enumeration,
+- `test_ch16_lab.py` — unit tests (pass@k vs brute-force enumeration,
   tie-breaking, parser, splits, a training overfit check) plus a
   subprocess smoke run of the whole pipeline.

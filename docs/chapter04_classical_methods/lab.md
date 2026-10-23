@@ -43,12 +43,12 @@ Full lab (a few minutes on CPU — about 2 minutes measured with `--seed 0`):
 
 Each script accepts `--seed`, `--device {auto,cpu,cuda}`, `--smoke`, and `--outdir` (default `runs/chapter04_classical_methods/`, gitignored). Every script prints a summary table to stdout and writes metrics (JSON/CSV) plus PNG plots under the output directory. The lab code is NumPy-only and implemented from scratch — no RL libraries:
 
-- [common.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter04_classical_methods/common.py) — model loading from `env.unwrapped.P`, epsilon-greedy action selection, greedy evaluation, plotting helpers.
+- [tabular_common.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter04_classical_methods/tabular_common.py) — model loading from `env.unwrapped.P`, epsilon-greedy action selection, greedy evaluation, plotting helpers.
 - [dp_oracle.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter04_classical_methods/dp_oracle.py) — the three DP algorithms.
 - [mc_td_control.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter04_classical_methods/mc_td_control.py) — MC, SARSA, Expected SARSA, Q-learning.
 - [cliffwalking.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter04_classical_methods/cliffwalking.py) — the SARSA/Q-learning cliff comparison.
 - [ope_is.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter04_classical_methods/ope_is.py) — ordinary and weighted importance sampling.
-- [test_smoke.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter04_classical_methods/test_smoke.py) — unit tests plus per-script smoke tests.
+- [test_ch04_lab.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter04_classical_methods/test_ch04_lab.py) — unit tests plus per-script smoke tests.
 
 ## Walkthrough of the Key Code
 

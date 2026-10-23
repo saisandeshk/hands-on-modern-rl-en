@@ -19,34 +19,33 @@ target pages.
    `$$ \nabla*\theta J(\theta) = \mathbb{E}*{\tau \sim \pi*\theta}\left[ R(\tau) \nabla*\theta \log \pi*\theta(\tau) \right] = \mathbb{E}*{\tau \sim \pi*\theta}\left[ R(\tau) \sum*{t=0}^{T} \nabla*\theta \log p*\theta(x*t \mid x*{<t}) \right]. $$`,
    `$$ \nabla*\theta J(\theta) = \mathbb{E}*{\tau \sim \pi*\theta}\left[ R(\tau) \sum*{t \in a(\tau)} \nabla*\theta \log p*\theta(x*t \mid x*{<t}) \right], $$`.
    In KaTeX `*` is the binary operator `\ast`, not a subscript, so these render as
-   "S∗agent, A∗agent, …", "G∗t = r_t + γG∗t+1", "R∗total = R∗task − λ∗efficiency·T − …",
+   "S∗agent, A∗agent, …", "G∗t = r*t + γG∗t+1", "R∗total = R∗task − λ∗efficiency·T − …",
    "T∗update / (T∗rollout + T∗verify + T∗update)", "π∗θ(τ) = ∏∗t=0T p∗θ(x_t | x∗<t)",
    "∇∗θJ(θ) = E∗τ∼π∗θ[…]". In the last three equations the corruption is not cosmetic: the
-   `\prod` loses its limits entirely, the expectation's subscript is gone, and `\nabla*\theta`
-   becomes a product of ∇ and θ. I checked the whole `docs/` tree: this file is the only page with
-   this pattern (the only other `*{` hits are the legitimate `\operatorname*{arg\,max}` in
-   `chapter03_value_functions/value-q.md`), and the repo's own linter
-   `scripts/check-english-quality.mjs` has a check literally named "corrupted reward subscripts"
-   with the pattern `/\bG\*t\b|\br\*\{t\+1\}|\\pi\*|\\phi\*|\bs\*\{?t\b/g` — the new file matches both
-   `\bG\*t\b` and `\\pi\*` (the script currently scans a `docs/en` directory that does not exist in
+   `\prod` loses its limits entirely, the expectation's subscript is gone, and `\nabla*\theta`   becomes a product of ∇ and θ. I checked the whole`docs/`tree: this file is the only page with
+   this pattern (the only other`_{`hits are the legitimate`\operatorname_{arg\,max}`in
+  `chapter03*value_functions/value-q.md`), and the repo's own linter
+   `scripts/check-english-quality.mjs`has a check literally named "corrupted reward subscripts"
+   with the pattern`/\bG\*t\b|\br\*\{t\+1\}|\\pi\*|\\phi\*|\bs\*\{?t\b/g`— the new file matches both
+  `\bG\*t\b`and`\\pi\*`(the script currently scans a`docs/en`directory that does not exist in
    this repository, so the check never fires, but the pattern documents exactly this failure mode).
    The writer's report states the page was rebuilt with "no KaTeX errors",
    which is true (these do not raise KaTeX errors) but the rendered mathematics is wrong.
-   — Suggested fix: replace every `*` used as a subscript with `_` in those seven equations
-   (`S_{\text{agent}}`, `G_t = r_t + \gamma G_{t+1}`, `R_{\text{total}} = R_{\text{task}} - \lambda_{\text{efficiency}}\cdot T - \lambda_{\text{format}}\cdot\mathbb{1}(\text{format error})`,
-   `T_{\text{update}} / (T_{\text{rollout}} + T_{\text{verify}} + T_{\text{update}})`,
-   `\pi_\theta(\tau) = \prod_{t=0}^{T} p_\theta(x_t \mid x_{<t})`, `\nabla_\theta J(\theta) = \mathbb{E}_{\tau\sim\pi_\theta}[\dots]`,
-   `\sum_{t\in a(\tau)} \nabla_\theta \log p_\theta(x_t \mid x_{<t})`).
+   — Suggested fix: replace every`*`used as a subscript with`\_` in those seven equations
+(`S*{\text{agent}}`, `G_t = r_t + \gamma G*{t+1}`, `R*{\text{total}} = R*{\text{task}} - \lambda*{\text{efficiency}}\cdot T - \lambda*{\text{format}}\cdot\mathbb{1}(\text{format error})`,
+`T*{\text{update}} / (T*{\text{rollout}} + T*{\text{verify}} + T*{\text{update}})`,
+`\pi*\theta(\tau) = \prod*{t=0}^{T} p*\theta(x_t \mid x*{<t})`, `\nabla*\theta J(\theta) = \mathbb{E}*{\tau\sim\pi*\theta}[\dots]`,
+`\sum*{t\in a(\tau)} \nabla*\theta \log p*\theta(x*t \mid x*{<t})`).
 
 2. `docs/chapter19_agentic/tool-use-and-trajectory.md` (line 975, new subsection "Staleness, Retries,
    and Recovery: Making Async Rollouts Sound") — "Give each tool call an idempotency key (task id,
    turn index, attempt number) so the environment can deduplicate retries". Including the **attempt
    number** in the key defeats the stated purpose: the second attempt of the same logical action
-   produces a *different* key, so the environment cannot recognise it as a duplicate and will
+   produces a _different_ key, so the environment cannot recognise it as a duplicate and will
    execute the state-changing call a second time — exactly the failure ("a retried order placement
    or file write may execute twice") the sentence is trying to prevent. An idempotency key must be
    stable across retries of the same action (e.g. task id + turn index, or a hash of the action
-   arguments); the attempt counter has to be stored *alongside* the key for backoff/logging, not
+   arguments); the attempt counter has to be stored _alongside_ the key for backoff/logging, not
    inside it.
    — Suggested fix: "Give each tool call an idempotency key that is stable across retries (task id
    and turn index, or a hash of the action arguments) so the environment can deduplicate retries,
@@ -104,7 +103,7 @@ target pages.
    to the chapter-19 sidebar and change the front-matter `title` and the H1 to
    `19.11 Summary and Exercises` (then run `npm run fix:headings`).
 
-7. `docs/chapter19_agentic/credit-assignment.md` (lines 618–624, page 19.3 — *not* touched by this
+7. `docs/chapter19_agentic/credit-assignment.md` (lines 618–624, page 19.3 — _not_ touched by this
    branch, but the writer's report asserts that "the chapter's core technical content (… ORM/PRM
    credit assignment …) is sound" and that "the numeric examples I recomputed are correct") — the
    printed PRM column contradicts the code printed directly above it. `prm_credit` (lines 592–607)
@@ -115,7 +114,7 @@ target pages.
    prints `PRM Credit = 0.656, 0.376, 0.170, -0.500`, which no choice of the code's parameters
    reproduces (inverting the recursion gives immediate rewards `[0.299, 0.215, 0.645, -0.5]`, which
    correspond to no rule in the code); the values `0.656/0.590/0.729/0.810/0.900/1.000` are the
-   *other* example on the same page (the 7-turn turn-discounting table at line 368). The ORM column
+   _other_ example on the same page (the 7-turn turn-discounting table at line 368). The ORM column
    (`0.000` everywhere) and the `-0.857` figure quoted for `orm_negative` do check out
    (`G_0 = 0.95^3·(-1) = -0.8574`). Because the printed table is also what a reader would use to
    read the ORM-vs-PRM contrast, the sign of the third turn's PRM credit (positive `0.170` in the
@@ -144,12 +143,12 @@ target pages.
    sampled from the world (retriever, sandbox), not from $\pi_\theta$, so $\nabla_\theta \log p(x_t
    \mid x_{<t}) = 0$ for them as far as the policy is concerned — yet if they are fed through the
    policy network as if self-generated, the sum includes nonzero pseudo-gradients". The literal
-   statement is false and is contradicted by the clause that follows it: ∇_θ log p_θ(x_t | x_{<t})
-   is *not* zero for an environment token (the network parameters do change that probability).
+   statement is false and is contradicted by the clause that follows it: ∇*θ log p*θ(x*t | x*{<t})
+   is _not_ zero for an environment token (the network parameters do change that probability).
    The correct statement is the one given in 19.2: the trajectory factorization
-   ρ_θ(x|s_0,c) = 𝕀(s_0,x)·∏_{t∈a(x)} p_θ(x_t|·) contains **no factor** for environment
-   positions, so those positions contribute no term to ∇_θ log ρ_θ; the masking is what keeps the
-   implemented loss (which sums log-probs over *all* positions) from adding spurious terms.
+   ρ*θ(x|s_0,c) = 𝕀(s_0,x)·∏*{t∈a(x)} p*θ(x_t|·) contains **no factor** for environment
+   positions, so those positions contribute no term to ∇*θ log ρ*θ; the masking is what keeps the
+   implemented loss (which sums log-probs over \_all* positions) from adding spurious terms.
    — Suggested fix: "…so they carry no factor in the trajectory log-probability and contribute no
    term to the gradient; if they are nevertheless fed through the policy network as if
    self-generated, the implemented loss includes spurious pseudo-gradients…"
@@ -164,8 +163,8 @@ target pages.
 
 5. `docs/chapter19_agentic/review.md` (line 67, Exercise 1 solution) — the solution lists
    `$S$: the true world state — airline database contents, live seat inventory, prices, plus the
-   conversation history so far`. In 19.2 the state is decomposed as `z_t = [s_0, c, x_{1:t}]`, i.e.
-   the *hidden* environment state `s_0` plus the task context `c` plus the token history; mixing
+conversation history so far`. In 19.2 the state is decomposed as `z_t = [s_0, c, x_{1:t}]`, i.e.
+   the _hidden_ environment state `s_0` plus the task context `c` plus the token history; mixing
    "the true world state" and "the conversation history" into one slot is looser than the chapter's
    own decomposition (and the POMDP tuple in 19.1 defines `S_agent` as "the state space jointly
    determined by the environment and the context"). Not wrong, but it is the one place where the

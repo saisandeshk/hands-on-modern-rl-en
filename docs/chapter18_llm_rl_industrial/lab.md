@@ -6,7 +6,7 @@ title: '18.6 Lab: Rollout Workers, Learner Updates, and Policy Staleness'
 
 > **Section goal**: Build a small actor-learner system with rollout workers and a learner, measure how throughput scales with the number of workers, and see how stale behaviour policies distort learning unless importance weights are truncated.
 
-> **Code**: [rollout_system.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter18_llm_rl_industrial/rollout_system.py) · [test_smoke.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter18_llm_rl_industrial/test_smoke.py) · [README](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter18_llm_rl_industrial/README.md)
+> **Code**: [rollout_system.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter18_llm_rl_industrial/rollout_system.py) · [test_ch18_lab.py](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter18_llm_rl_industrial/test_ch18_lab.py) · [README](https://github.com/saisandeshk/hands-on-modern-rl-en/blob/main/code/chapter18_llm_rl_industrial/README.md)
 
 ## What you will learn
 

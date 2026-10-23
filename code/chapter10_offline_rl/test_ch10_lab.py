@@ -84,7 +84,7 @@ def test_wis_matches_hand_computation():
 
 def test_dataset_loader_shapes(tmp_path):
     """Loader accepts a well-formed dataset and rejects inconsistent ones."""
-    from common import load_dataset, save_dataset
+    from offline_common import load_dataset, save_dataset
 
     n, sd, ad = 64, 4, 2
     arrays = {
