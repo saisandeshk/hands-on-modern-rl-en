@@ -192,7 +192,7 @@ Safety cannot be solved merely by "reviewing the thinking content," and control 
 
 ### The Reasoning Text and the Final Answer Must Be Consistent
 
-Existing research (for example [this 2025 work](https://arxiv.org/abs/2511.18397)) systematically compared whether the intermediate text a model generates is consistent with its final behavior, and found mismatches:
+Existing research on chain-of-thought faithfulness (for example [Lanham et al., 2023](https://arxiv.org/abs/2307.13702)) systematically compared whether the intermediate text a model generates is consistent with its final behavior, and found mismatches:
 
 - The intermediate text says "I should use method A," but the model ends up using method B.
 - The explanation spells out how each step came about, but the tool logs show an entirely different computation was actually executed.

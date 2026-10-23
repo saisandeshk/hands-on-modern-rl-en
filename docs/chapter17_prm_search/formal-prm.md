@@ -188,7 +188,7 @@ DeepSeek automatically generated a large number of Lean4 theorems and proofs for
 
 ### Prover-V2's Results
 
-The paper reports that the 671B model reaches 82.4% on MiniF2F-test with Pass@32, and 88.9% when the candidate budget is raised to Pass@8192; it also solves 47 of the 658 problems in PutnamBench. The candidate counts here differ by two orders of magnitude, so 88.9% cannot be read as a single-attempt proof success rate.
+The paper reports that the 671B model reaches 82.4% on MiniF2F-test with Pass@32, and 88.9% when the candidate budget is raised to Pass@8192; it also solves 49 of the 658 problems in PutnamBench. The candidate counts here differ by two orders of magnitude, so 88.9% cannot be read as a single-attempt proof success rate.
 
 We need to be clear about what Pass@k means: it measures the probability that "at least one of $k$ independent attempts succeeds." If the single-attempt success rate is $p$, then
 
