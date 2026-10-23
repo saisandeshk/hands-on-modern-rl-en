@@ -1,8 +1,8 @@
 ---
-title: 11.R Summary and Exercises
+title: 11.4 Summary and Exercises
 ---
 
-# 11.R Summary and Exercises
+# 11.4 Summary and Exercises
 
 ## What You Should Now Be Able to Do
 

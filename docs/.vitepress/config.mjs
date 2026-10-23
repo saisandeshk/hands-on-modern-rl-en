@@ -985,6 +985,10 @@ const sidebar = {
             {
               text: '11.3 Meta-RL and In-Context Adaptation',
               link: '/chapter11_imitation_meta_rl/meta-rl'
+            },
+            {
+              text: '11.4 Summary and Exercises',
+              link: '/chapter11_imitation_meta_rl/review'
             }
           ]
         },
