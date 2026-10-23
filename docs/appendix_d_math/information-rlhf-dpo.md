@@ -1,5 +1,5 @@
 ---
-title: D.4.3 RLHF and DPO
+title: D.4.3 Information Theory in PPO, RLHF, and DPO
 ---
 
 # D.4.3 Information Theory in PPO, RLHF, and DPO

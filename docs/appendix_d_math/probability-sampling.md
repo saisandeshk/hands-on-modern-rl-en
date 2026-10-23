@@ -68,11 +68,11 @@ $$
 
 This "skeleton" appears throughout RL. Compare a few concrete examples:
 
-| Algorithm   | Update formula                                        | Skeleton correspondence                                |
-| ----------- | ----------------------------------------------------- | ------------------------------------------------------ |
-| Monte Carlo | $V(s)\leftarrow V(s)+\frac{1}{N}[G-V(s)]$             | Step size $1/N$, target $G$                            |
-| TD(0)       | $V(s)\leftarrow V(s)+\alpha[r+\gamma V(s')-V(s)]$     | Step size $\alpha$, target $r+\gamma V(s')$            |
-| Q-learning  | $Q(s,a)\leftarrow Q(s,a)+\alpha[r+\gamma\max Q-V(s)]$ | Step size $\alpha$, target $r+\gamma\max_{a'}Q(s',a')$ |
+| Algorithm   | Update formula                                                     | Skeleton correspondence                                |
+| ----------- | ------------------------------------------------------------------ | ------------------------------------------------------ |
+| Monte Carlo | $V(s)\leftarrow V(s)+\frac{1}{N}[G-V(s)]$                          | Step size $1/N$, target $G$                            |
+| TD(0)       | $V(s)\leftarrow V(s)+\alpha[r+\gamma V(s')-V(s)]$                  | Step size $\alpha$, target $r+\gamma V(s')$            |
+| Q-learning  | $Q(s,a)\leftarrow Q(s,a)+\alpha[r+\gamma\max_{a'}Q(s',a')-Q(s,a)]$ | Step size $\alpha$, target $r+\gamma\max_{a'}Q(s',a')$ |
 
 The shared idea is: **move the old estimate a small step toward the target**. The difference is how the target is built. Monte Carlo uses the full return, TD uses one-step bootstrapping, and Q-learning uses the maximum action value. Later, GAE will interpolate between these kinds of targets.
 

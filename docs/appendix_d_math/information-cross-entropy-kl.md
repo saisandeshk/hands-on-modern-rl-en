@@ -1,5 +1,5 @@
 ---
-title: D.4.2 Cross-Entropy and KL
+title: D.4.2 Cross-Entropy and KL Divergence
 ---
 
 # D.4.2 Cross-Entropy and KL Divergence

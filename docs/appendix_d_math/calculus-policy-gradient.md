@@ -1,5 +1,5 @@
 ---
-title: D.3.2 Policy Gradient
+title: D.3.2 Policy Gradients and Advantage Functions
 ---
 
 # D.3.2 Policy Gradients and Advantage Functions
@@ -43,19 +43,19 @@ $$
 V(s)=8.
 $$
 
-This action received return $10$. It is not merely "good"; it is $2$ better than the average level:
+This action received return $10$. It is not merely "good"; it is $2$ better than the average level. Treating the sampled return as a one-sample estimate of $Q(s, a)$:
 
 $$
-A(s,a)=10-8=2.
+A(s,a)\approx10-8=2.
 $$
 
 If another action receives $6$, then even though the return is still positive, it is below average:
 
 $$
-A(s,a)=6-8=-2.
+A(s,a)\approx6-8=-2.
 $$
 
-The advantage function answers the question: **relative to the average level in the current state, is this action better or worse?**
+The advantage function answers the question: **relative to the average level in the current state, is this action better or worse?** The definition is $A(s,a)=Q(s,a)-V(s)$; the numbers above are one-sample estimates with the sampled return in place of $Q(s,a)$.
 
 In policy gradients, we often replace $G_t$ with an advantage estimate $\hat{A}_t$, so the information about "how much better" or "how much worse" becomes more precise:
 
@@ -74,9 +74,9 @@ This page applied gradient tools to policy optimization:
 | Concept             | Formula                                                                      | Role                                              |
 | ------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------- |
 | Policy gradient     | $\nabla_\theta J \approx G_t \nabla_\theta\log\pi_\theta(a_t\mid s_t)$       | Good outcomes increase the probability of actions |
-| Advantage function  | $A(s,a)=R-V(s)$                                                              | Turns "absolute quality" into "relative quality"  |
+| Advantage function  | $A(s,a)=Q(s,a)-V(s)$                                                         | Turns "absolute quality" into "relative quality"  |
 | Advantage weighting | $\nabla_\theta J \approx \hat{A}_t \nabla_\theta\log\pi_\theta(a_t\mid s_t)$ | Actions better than average are strengthened      |
 
 Policy gradients provide the direction, and advantage functions make the signal more precise. But one unresolved question remains: how large should each update step be? The next page discusses how PPO clipping and the Adam optimizer control update size.
 
-> **Next**: [D.3.3 PPO Clipping and Adam](./calculus-ppo), which controls policy update size and gradient noise.
+> **Next**: [D.3.3 PPO Clipping, Adam, and Update Stability](./calculus-ppo), which controls policy update size and gradient noise.

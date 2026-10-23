@@ -1,5 +1,5 @@
 ---
-title: D.3.4 Derivation Tools
+title: D.3.4 Policy Gradient, Taylor, and GRPO Derivations
 ---
 
 # D.3.4 Policy Gradient, Taylor, and GRPO Derivations
@@ -42,7 +42,7 @@ $$
 J(\theta)=\sum_a \pi_\theta(a\mid s)Q^\pi(s,a).
 $$
 
-When taking the gradient with respect to the parameters, $Q^\pi(s,a)$ does not depend on $\theta$; only $\pi_\theta$ contains $\theta$:
+When taking the gradient with respect to the parameters, we hold $Q^\pi(s,a)$ fixed in this simplified one-state derivation (the full policy gradient theorem shows the $\theta$-dependence of the state visitation distribution cancels against the $\theta$-dependence of $Q^\pi$, so only the explicit $\pi_\theta$ dependence survives):
 
 $$
 \nabla_\theta J(\theta)
@@ -138,8 +138,8 @@ $$
 f(\theta+\Delta\theta)
 \approx
 f(\theta)
-\nabla f(\theta)^\top\Delta\theta
-\frac{1}{2}\Delta\theta^\top H\Delta\theta.
++ \nabla f(\theta)^\top\Delta\theta
++ \frac{1}{2}\Delta\theta^\top H\Delta\theta.
 $$
 
 The trust-region idea behind PPO and TRPO is exactly the concern that when parameter updates are too large, first-order approximations are no longer reliable and the second-order curvature term begins to matter. If we still take large steps based only on first-order information, we may damage the policy.
@@ -158,9 +158,9 @@ $$
 r_t(\theta)
 \approx
 1
-+\nabla_\theta r_t^\top(\theta-\theta_{old})
++\nabla_\theta r_t\big|_{\theta=\theta_{old}}^\top(\theta-\theta_{old})
 +\frac{1}{2}(\theta-\theta_{old})^\top
-\nabla_\theta^2 r_t
+\nabla_\theta^2 r_t\big|_{\theta=\theta_{old}}
 (\theta-\theta_{old}).
 $$
 
@@ -200,16 +200,16 @@ $$
 =\sqrt{5}.
 $$
 
-The standardized advantage of the fourth answer is
+The standardized advantage of the fourth answer is (with a small $\epsilon$ for numerical stability, omitted here since $\sigma > 0$):
 
 $$
-\hat{A}_4=\frac{8-5}{\sqrt{5}}\approx1.34.
+\hat{A}_4=\frac{8-5}{\sqrt{5}+\epsilon}\approx1.34.
 $$
 
 The general form is
 
 $$
-\hat{A}_i=\frac{r_i-\mu}{\sigma}.
+\hat{A}_i=\frac{r_i-\mu}{\sigma+\epsilon}.
 $$
 
 The whole calculation has two steps:
@@ -229,8 +229,8 @@ This page introduced three derivation tools:
 | ------------------------ | ------------------------------------------------ | ---------------------------------------------------------------------- |
 | Log-derivative trick     | $\nabla\pi = \pi\nabla\log\pi$                   | Turns probability gradients into sampleable log form                   |
 | Taylor expansion         | $f(x+h)\approx f(x)+f'(x)h+\frac{1}{2}f''(x)h^2$ | Explains PPO trust regions and clipping through second-order intuition |
-| GRPO group normalization | $\hat{A}_i=(r_i-\mu)/\sigma$                     | Replaces the Critic with relative comparison inside a group            |
+| GRPO group normalization | $\hat{A}_i=(r_i-\mu)/(\sigma+\epsilon)$          | Replaces the Critic with relative comparison inside a group            |
 
 These three tools correspond to the derivation skeleton of policy gradients, the theoretical basis for limiting update size, and an alternative to using a Critic. The next page organizes them into a complete formula reference.
 
-> **Next**: [D.3.5 Complete Optimization Formulas](./calculus-advanced-formulas), a formula reference for PG, DQN, GAE, PPO, and GRPO.
+> **Next**: [D.3.5 Complete Formulas for PG, DQN, GAE, PPO, and GRPO](./calculus-advanced-formulas), a formula reference for PG, DQN, GAE, PPO, and GRPO.

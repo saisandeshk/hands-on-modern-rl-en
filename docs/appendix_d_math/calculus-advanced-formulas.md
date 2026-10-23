@@ -1,5 +1,5 @@
 ---
-title: D.3.5 Complete Formulas
+title: D.3.5 Complete Formulas for PG, DQN, GAE, PPO, and GRPO
 ---
 
 # D.3.5 Complete Formulas for PG, DQN, GAE, PPO, and GRPO
@@ -76,7 +76,7 @@ $$
 y_t=r_{t+1}+\gamma\max_{a'}Q_{\theta^-}(s_{t+1},a').
 $$
 
-Here $\theta^-$ denotes the target-network parameters. The loss function is
+Here $\theta^-$ denotes the target-network parameters. The target $y_t$ is treated as fixed when differentiating (it is not differentiated with respect to $\theta$). The loss function is
 
 $$
 L(\theta)=\frac{1}{2}\left(Q_\theta(s_t,a_t)-y_t\right)^2.
@@ -198,4 +198,4 @@ This page summarized all core formulas in module D.3:
 
 When you encounter an unfamiliar symbol, return to this page for reference. The next page uses exercises to check your understanding of these formulas.
 
-> **Next**: [D.3.6 Formula Reference and Exercises](./calculus-formulas-exercises), which summarizes all formulas in this module and checks understanding through exercises.
+> **Next**: [D.3.6 Calculus and Optimization Formula Reference and Exercises](./calculus-formulas-exercises), which summarizes all formulas in this module and checks understanding through exercises.

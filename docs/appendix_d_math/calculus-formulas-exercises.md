@@ -1,5 +1,5 @@
 ---
-title: D.3.6 Formulas and Exercises
+title: D.3.6 Calculus and Optimization Formula Reference and Exercises
 ---
 
 # D.3.6 Calculus and Optimization Formula Reference and Exercises
@@ -24,7 +24,7 @@ The previous pages moved from one-dimensional derivatives all the way to PPO cli
 | PPO probability ratio         | $r_t=\frac{\pi_\theta(a_t\mid s_t)}{\pi_{old}(a_t\mid s_t)}$                           | Measures the change between old and new policies         |
 | Second-order Taylor expansion | $f(\theta+\Delta)\approx f(\theta)+\nabla f^\top\Delta+\frac{1}{2}\Delta^\top H\Delta$ | Understands curvature and trust regions                  |
 | PPO clipping term             | $\min(r_t\hat{A}_t,\mathrm{clip}(r_t,1-\epsilon,1+\epsilon)\hat{A}_t)$                 | Prevents overly large policy updates                     |
-| GRPO group advantage          | $\hat{A}_i=\frac{r_i-\mu}{\sigma}$                                                     | Replaces a Critic with relative rewards inside the group |
+| GRPO group advantage          | $\hat{A}_i=\frac{r_i-\mu}{\sigma+\epsilon}$                                            | Replaces a Critic with relative rewards inside the group |
 
 ---
 

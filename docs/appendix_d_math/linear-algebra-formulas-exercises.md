@@ -50,7 +50,7 @@ Chapter 3's Q-Learning stores one number for every state-action pair. From the l
 
 ### Policy Gradient Updates: The Stage for Norms and Trust Regions
 
-Chapter 2 defined a policy objective $J(\theta)$. When updating parameters, gradient clipping limits $\|\boldsymbol{g}\|_2 \leq c$, and the trust-region constraint $\Delta\theta^\top F\,\Delta\theta \leq \delta$ keeps training safe. These are all uses of linear algebra tools for stability.
+The policy-gradient chapters define a policy objective $J(\theta)$. When updating parameters, gradient clipping limits $\|\boldsymbol{g}\|_2 \leq c$, and the trust-region constraint $\Delta\theta^\top F\,\Delta\theta \leq \delta$ keeps training safe. These are all uses of linear algebra tools for stability.
 
 ---
 

@@ -1,5 +1,5 @@
 ---
-title: D.4.1 Entropy and Exploration
+title: D.4.1 Self-Information, Entropy, and Exploration
 ---
 
 # D.4.1 Self-Information, Entropy, and Exploration

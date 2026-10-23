@@ -1,5 +1,5 @@
 ---
-title: D.3.3 PPO and Adam
+title: D.3.3 PPO Clipping, Adam, and Update Stability
 ---
 
 # D.3.3 PPO Clipping, Adam, and Update Stability
@@ -64,4 +64,4 @@ This page discussed two ways to control update stability:
 
 Used together, PPO limits policy drift at a macroscopic level, while Adam smooths gradient noise at a microscopic level. The next page examines the derivation skeleton behind policy gradients and PPO.
 
-> **Next**: [D.3.4 Derivation Tools: Log Trick and Taylor](./calculus-derivations), which explains the derivation skeleton behind policy gradients and PPO.
+> **Next**: [D.3.4 Policy Gradient, Taylor, and GRPO Derivations](./calculus-derivations), which explains the derivation skeleton behind policy gradients and PPO.
