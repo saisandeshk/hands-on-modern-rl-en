@@ -511,31 +511,31 @@ MuZero's model can be decomposed into three parts:
 
 $$
 s_0=h_\theta(o_{1:t}),\qquad
-r_{k+1},s_{k+1}=g_\theta(s_k,a_k),\qquad
+r_k,s_k=g_\theta(s_{k-1},a_{k-1})\quad(k\ge 1),\qquad
 p_k,v_k=f_\theta(s_k)
 $$
 
 This formula can be split into three small models:
 
-| Module     | Input                               | Output                                        | Role                                                                            |
-| ---------- | ----------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------- |
-| $h_\theta$ | Observation history $o_{1:t}$       | Initial latent state $s_0$                    | Compress real observations into a plannable state                               |
-| $g_\theta$ | Latent state $s_k$ and action $a_k$ | Next latent state $s_{k+1}$, reward $r_{k+1}$ | Take one step forward mentally                                                  |
-| $f_\theta$ | Latent state $s_k$                  | Policy prior $p_k$, value $v_k$               | Tell search which actions are worth trying and how good the current position is |
+| Module     | Input                                                  | Output                                | Role                                                                            |
+| ---------- | ------------------------------------------------------ | ------------------------------------- | ------------------------------------------------------------------------------- |
+| $h_\theta$ | Observation history $o_{1:t}$                          | Initial latent state $s_0$            | Compress real observations into a plannable state                               |
+| $g_\theta$ | Latent state $s_{k-1}$ and action $a_{k-1}$ ($k\ge 1$) | Next latent state $s_k$, reward $r_k$ | Take one step forward mentally                                                  |
+| $f_\theta$ | Latent state $s_k$                                     | Policy prior $p_k$, value $v_k$       | Tell search which actions are worth trying and how good the current position is |
 
 So MuZero does not learn "what the next frame of pixels looks like." It learns "the next latent state, reward, value, and action prior that I need for search." The training loss is also organized around these three objects:
 
 $$
 \mathcal{L}_{\text{MuZero}}
-=\sum_{k=0}^{K_{\text{unroll}}}
+=\sum_{k=1}^{K_{\text{unroll}}}\ell^r(u_{t+k}, r_k)
++\sum_{k=0}^{K_{\text{unroll}}}
 \left(
-\ell^r(u_{t+k}, r_k)
-+\ell^v(z_{t+k}, v_k)
+\ell^v(z_{t+k}, v_k)
 +\ell^p(\pi_{t+k}, p_k)
 \right)
 $$
 
-Here, $K_{\text{unroll}}$ is the unroll length (a different $K$ counts sampled candidates in Section 24.1). For every step $k$, the loss checks three predictions: the reward prediction $r_k$ should be close to the real or training target $u_{t+k}$; the value prediction $v_k$ should be close to the target value $z_{t+k}$; and the policy prior $p_k$ should be close to the policy $\pi_{t+k}$ produced by MCTS. In other words, MuZero's model only needs to be useful for planning. It does not need to faithfully reconstruct the entire world.
+Here, $K_{\text{unroll}}$ is the unroll length (a different $K$ counts sampled candidates in Section 24.1). The value and policy heads are checked at every step $k\ge 0$, while the reward head is checked only for $k\ge 1$: the root state $s_0$ has no preceding action and therefore no reward target $r_0$. For each $k\ge 1$, the reward prediction $r_k$ should be close to the real or training target $u_{t+k}$; the value prediction $v_k$ should be close to the target value $z_{t+k}$; and the policy prior $p_k$ should be close to the policy $\pi_{t+k}$ produced by MCTS. In other words, MuZero's model only needs to be useful for planning. It does not need to faithfully reconstruct the entire world.
 
 ![MuZero Learned Model](./images/paper/muzero-learned-model.png)
 

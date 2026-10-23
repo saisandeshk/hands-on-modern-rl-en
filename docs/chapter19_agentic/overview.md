@@ -57,7 +57,7 @@ Agentic RL instead maximizes the cumulative return of the entire trajectory. Wha
 
 $$J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\left[\sum_{t=0}^{T} \gamma^t r(s_t, a_t)\right]$$
 
-The notation $\tau \sim \pi_\theta$ means that the trajectory is sampled by letting the current policy interact with the environment. The factor $\gamma^t$ discounts delayed rewards, $r(s_t,a_t)$ is the realized step reward produced by the action at step $t$ (lowercase $r$, as in the notation page), $T$ is the horizon (number of steps), and any final task reward is assigned back to the responsible steps. The training objective is now to **increase the total return of the interaction process**.
+The notation $\tau \sim \pi_\theta$ means that the trajectory is sampled by letting the current policy interact with the environment. The factor $\gamma^t$ discounts delayed rewards, $r(s_t,a_t)$ is the realized step reward produced by the action at step $t$ (lowercase $r$, as in the notation page), $T$ is the final step index (so indices $0,\ldots,T$ give $T+1$ steps), and any final task reward is assigned back to the responsible steps. The training objective is now to **increase the total return of the interaction process**.
 
 Trajectory return tells us what to optimize, but it does not yet tell us how each step should learn. A successful booking does not make every preceding action useful: the model may have taken a long detour and recovered only at the end. A failed booking does not make every action wrong either: the model may have found the correct flight and then supplied an invalid parameter when placing the order. Training needs to assign the final outcome back to individual steps so that it can strengthen useful actions and correct harmful ones.
 

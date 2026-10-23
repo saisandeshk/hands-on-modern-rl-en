@@ -29,7 +29,7 @@ This chapter moved RL from text and game simulators into audio, bodies, and pixe
 - World model: $\hat p_\phi(s_{t+1},r_t,d_t\mid s_t,a_t)$. Reading: given state and action, predict what the world does next.
 - Probabilistic dynamics (PETS): $p_{\phi_i}(\Delta s_t,r_t\mid s_t,a_t)=\mathcal{N}(\mu_{\phi_i},\Sigma_{\phi_i})$. Reading: predict a mean change plus honest uncertainty.
 - DDPO objective and gradient: $J(\theta)=\mathbb{E}_{\tau\sim p_\theta}[R(\tau,c)]$, $\nabla_\theta J=\mathbb{E}[R(\tau,c)\sum_t\nabla_\theta\log p_\theta(x_{t-1}\mid x_t,t,c)]$. Reading: one terminal image score updates every denoising step.
-- PPO-style clip: $L^{CLIP}=-\mathbb{E}[\min(r_t(\theta)\hat A_t,\mathrm{clip}(r_t(\theta),1-\epsilon,1+\epsilon)\hat A_t)]$. Reading: encourage better actions without letting one update move too far.
+- PPO-style clip: $L^{CLIP}=-\mathbb{E}[\min(r_t(\theta)\hat A_t,\mathrm{clip}(r_t(\theta),1-\epsilon,1+\epsilon)\hat A_t)]$. Reading: encourage better actions without letting one update move too far. (The same ratio is written $\rho_t$ in §24.4; both spellings are listed as variants in the notation page.)
 - Video reward split (teaching template): $R=\lambda_qR_{\mathrm{quality}}+\lambda_aR_{\mathrm{alignment}}+\lambda_tR_{\mathrm{temporal}}+\lambda_pR_{\mathrm{physics}}$. Reading: keep the four failure layers as separate signals.
 - Causal order check: $t_{\mathrm{approach}}<t_{\mathrm{contact}}<t_{\mathrm{fall}}$. Reading: the fall must come after contact, however good each frame looks.
 

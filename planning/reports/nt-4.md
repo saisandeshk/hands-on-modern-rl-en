@@ -65,11 +65,27 @@ consistent and defined at first use); Ch.20 review, Ch.23 hands-on GeoQA config,
 
 - none (no new pages).
 
+## Review response
+
+- Error 1 (MuZero $r_k$ vs $r_{k+1}$): accepted. Re-derived: $g$ outputs $r_{k+1}$ but the loss used $r_k$, leaving $r_0$ undefined. Changed dynamics to $r_k,s_k=g_\theta(s_{k-1},a_{k-1})$ ($k\ge 1$) and split the loss into a $k\ge 1$ reward sum plus $k\ge 0$ value/policy sums, with an explicit no-reward-target note for the root $s_0$.
+- Error 2 (19.11 $39.0\%$ vs 20/50): accepted. Recomputed $20/50=40.0\%$ and $40.0-30.0=10$ points. Changed both the exercise stem and solution to 40.0% / 10-point gain.
+- Error 3 (DAPO "lower bound can be smaller" caution): accepted. A smaller $1-\epsilon_{\text{low}}$ loosens clipping and permits a stronger downward move. Reworded to upper bound raised / lower bound stays tight, with the direction stated explicitly.
+- Error 4 ($T$ horizon vs $T$ task tuple): accepted. Renamed the 50-step task tuple to $\tau=(s_0,a_1,s_1,\dots)$ in `chapter22_computer_use/training.md`; horizon $T$ untouched.
+- Error 5 ($r_{\text{progress}}(o_t,o_{t+1})$ vs code $s_t,s_{t+1}$): accepted. Reverted both equations (`training.md`, `review.md`) to $r_{\text{progress}}(s_t,s_{t+1})$ to match the code and $\mathcal{S}=\{\text{screenshots}\}$; no code changed.
+- Error 6 (audio $r_t(\theta)$ triple meaning): accepted. Reverted `audio-reward-design.md` ratio to $\rho_t(\theta)$ with a bridge note to $r_t(\theta)$ in the notation page / Appendix B, keeping $r$ for the reasoning trace and GRM scalar.
+- Error 7 (DAPO table bare-$r$ clip): accepted. Changed table to `clip(ratio, 1-eps_low, 1+eps_high)` and the pitfalls row to `min(ratio*A, clip(ratio,lo,hi)*A)`.
+- Doubt 1 ($G^S$/$G_k^H$ vs $G_t$): accepted as a note. Added one-line disambiguations (superscript = group set, subscript = return) rather than a $\mathcal{G}$ rename to keep the GiGPO/HGPO paper link.
+- Doubt 2 ($\phi$ encoder vs $Q_\phi$): accepted as a note. Added "(this encoder $\phi$ is distinct from the PRM parameters $\phi$ in $Q_\phi$ below)".
+- Doubt 3 ($T$ horizon with $\sum_{0}^{T}$): accepted. Changed both `overview.md` and `review.md` parentheticals to "$T$ is the final step index (so $T+1$ steps)".
+- Doubt 4 (MDP vs POMDP): accepted as a note. Added "strictly a POMDP; the MDP tuple is a teaching shorthand" alongside the history-conditioned policy; no full tuple rewrite.
+- Doubt 5 (review $r_t(\theta)$ vs §24.4 $\rho_t$): accepted as a note. Added "(same ratio written $\rho_t$ in §24.4; both are notation-page variants)" to the review key equation; left §24.4 spelling intact.
+- Doubt 6 (Ch.26 comment `R_i`): accepted. Changed the code comment to lowercase `r_i`.
+- Doubt 7 (pass@8 "between 3 and 6"): accepted. Reworded to "3 to 6 of the 8 samples pass (not a pass@k rate)".
+
 ## Commands run and results
 
-- `npx prettier --write <16 changed pages>` — all formatted (15 unchanged, 1 reflowed).
-- `npx vitepress build docs` — succeeded, build complete in ~18 s, no dead links.
-- `git diff --stat` — 16 files, 63 insertions / 63 deletions (symmetric rename-level diff).
+- `npx prettier --write` on the 10 changed pages + report — clean (2 reflowed, rest unchanged).
+- `npx vitepress build docs` — FAILED on an out-of-scope pre-existing error in `docs/chapter18_llm_rl_industrial/modern-industrial-practice.md:60` (unquoted attribute value; untouched by this worktree, see `git status`). No dead links or errors in the touched Chapters 19/22/24/26 or Appendices B files were reported before the build aborted at the Ch.18 page.
 - No test command was named in the task, and no code files were modified, so no test suite was run.
 
 ## Open issues

@@ -30,7 +30,7 @@ GRPO training of long-chain reasoning models hits four issues: symmetric clippin
 
 | Modification     | GRPO                                      | DAPO                                                                            |
 | ---------------- | ----------------------------------------- | ------------------------------------------------------------------------------- |
-| clipping         | symmetric `clip(r, 1-ε, 1+ε)`             | decoupled `clip(r, 1-ε_{low}, 1+ε_{high})`, looser upper bound                  |
+| clipping         | symmetric `clip(ratio, 1-eps, 1+eps)`     | decoupled `clip(ratio, 1-eps_low, 1+eps_high)`, looser upper bound              |
 | sampling         | keep all prompts                          | filter prompts whose within-group reward variance is 0                          |
 | loss granularity | sequence-level (token-mean then seq-mean) | token-level (sum all tokens, divide by total token count)                       |
 | overlong answer  | reward=0 (binary cliff)                   | soft penalty: linear deduction past soft threshold, capped at `-penalty_factor` |
@@ -41,7 +41,7 @@ GRPO training of long-chain reasoning models hits four issues: symmetric clippin
 
 ### Core Problem
 
-Symmetric clipping `clip(ratio, 1-eps, 1+eps)` uses the same bound on both sides. But good actions with positive advantage deserve larger steps (upper bound should be bigger); bad actions with negative advantage should move more cautiously (lower bound can be smaller). DAPO decouples the two bounds so each direction's exploration strength is tuned independently.
+Symmetric clipping `clip(ratio, 1-eps, 1+eps)` uses the same bound on both sides. But good actions with positive advantage deserve larger steps (the upper bound is raised); the lower bound stays tight at its symmetric value. Note the direction: lowering $1-\epsilon_{\text{low}}$ (a larger $\epsilon_{\text{low}}$) permits a stronger downward move on bad actions, not a more cautious one. DAPO decouples the two bounds so each direction's update strength is tuned independently.
 
 ### One-Line Memory
 
@@ -246,7 +246,7 @@ loss = policy_loss  # DAPO objective; add + kl_coeff * kl only to recover the GR
 
 | Pitfall                                   | Explanation                                                                             |
 | ----------------------------------------- | --------------------------------------------------------------------------------------- |
-| Decoupled clipping ≠ no clipping          | Still PPO's `min(r*A, clip(r,lo,hi)*A)`, just with asymmetric ε                         |
+| Decoupled clipping ≠ no clipping          | Still PPO's `min(ratio*A, clip(ratio,lo,hi)*A)`, just with asymmetric ε                 |
 | Each sign of advantage binds only one ε   | For A>0 the lower bound is inactive; for A<0 the upper bound is inactive (eaten by min) |
 | Dynamic sampling criterion                | Not "reward below threshold", but "**within-group reward variance is 0**"               |
 | Token-level loss is the fourth key change | GRPO aggregates at sequence level, DAPO at token level — long answers carry more weight |

@@ -232,7 +232,7 @@ $$
 The 0.8/0.2 split has experimental support. Removing the 0.2 format reward reduces reasoning length from 2,800 to 1,500 tokens and MMAU accuracy from 77.7 to 76.5. RL naturally favors a token-efficient shortcut—skip reasoning and emit the answer—so the training signal must explicitly preserve the reasoning process.
 
 ::: details MGRD data selection: pass@8 in [3, 6]
-The RL dataset contains only 5,000 examples and is tightly filtered. The previous policy samples each question eight times, and training keeps questions with pass@8 between 3 and 6. Easier questions offer little learning signal; questions below that range are more likely to be ambiguous.
+The RL dataset contains only 5,000 examples and is tightly filtered. The previous policy samples each question eight times, and training keeps questions where 3 to 6 of the 8 samples pass (not a pass@k rate; easy questions offer little learning signal while questions below that range are more likely to be ambiguous).
 
 ![Data-selection reward](./images/data-selection-reward.png)
 
@@ -338,14 +338,14 @@ $$
 J_{\mathrm{RLHF}}(\theta)
 =\mathbb{E}_t\!\left[
 \min\!\left(
-r_t(\theta)\hat A_t,
-\operatorname{clip}(r_t(\theta),1-\epsilon,1+\epsilon)\hat A_t
+\rho_t(\theta)\hat A_t,
+\operatorname{clip}(\rho_t(\theta),1-\epsilon,1+\epsilon)\hat A_t
 \right)
 \right]
 -\beta D_{\mathrm{KL}}(\pi_\theta\|\pi_{\mathrm{ref}}).
 $$
 
-Here $r_t(\theta)$ is the new-to-old policy probability ratio (the PPO ratio in the notation page). Clipping limits one update, and the KL term keeps the policy near the reference. This objective comes from [Section 3.3 of Step-Audio-R1.5](https://arxiv.org/html/2604.25719#S3.SS3); it should not be described as DPO.
+Here $\rho_t(\theta)$ is the new-to-old policy probability ratio (the same PPO ratio written $r_t(\theta)$ in the notation page and Appendix B; $\rho_t$ is kept here so it is not confused with the reasoning trace $r$ and the GRM scalar $r$ on this page). Clipping limits one update, and the KL term keeps the policy near the reference. This objective comes from [Section 3.3 of Step-Audio-R1.5](https://arxiv.org/html/2604.25719#S3.SS3); it should not be described as DPO.
 
 ### Preserving Prosodic Naturalness
 

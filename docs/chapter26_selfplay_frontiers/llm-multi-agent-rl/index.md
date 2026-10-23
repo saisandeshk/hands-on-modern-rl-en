@@ -321,7 +321,7 @@ class FreezeRotateTrainer:
 
             # Combined reward (outcome weight alpha = 0.6, matching the text).
             # Returns one shared scalar per trajectory; the per-role split
-            # of Section 26.3.2 (distinct R_i per role) is not implemented here.
+            # of Section 26.3.2 (distinct r_i per role) is not implemented here.
             total_reward = 0.6 * outcome_reward + 0.4 * sum(
                 process_rewards.values()
             ) / max(len(process_rewards), 1)

@@ -93,7 +93,7 @@ $$
 G^S(s) = \{(a_t^{(i)}, G_t^{(i)}) \mid s_t^{(i)} = s\}
 $$
 
-Here, $G_t^{(i)}$ is not the total reward of the entire trajectory, but the discounted return starting from this step:
+Here, $G_t^{(i)}$ is not the total reward of the entire trajectory, but the discounted return starting from this step (here $G^S$ denotes a sample set in state $s$, distinct from the return $G_t$; superscripts mark groups, subscripts mark time):
 
 $$
 G_t^{(i)} = \sum_{k=t}^{T} \gamma^{k-t} r_k^{(i)}
@@ -155,7 +155,7 @@ $$
 G_k^H(s_t^{(i)}) = \{(j, n) : \mathcal{C}_k(s_t^{(i)}) = \mathcal{C}_k(s_n^{(j)})\}
 $$
 
-These groups are nested: $G_0^H \supseteq G_1^H \supseteq \cdots \supseteq G_K^H$. $G_0^H$ is the large group that only considers the current page (more samples but more mixed), while $G_K^H$ requires a longer history to be consistent (more fair but fewer samples).
+These groups are nested: $G_0^H \supseteq G_1^H \supseteq \cdots \supseteq G_K^H$ (again $G_k^H$ denotes a sample group, not the return $G_t$). $G_0^H$ is the large group that only considers the current page (more samples but more mixed), while $G_K^H$ requires a longer history to be consistent (more fair but fewer samples).
 
 In each group layer, we compute the relative advantage within the group:
 
@@ -199,7 +199,7 @@ $$
 \hat c_t = \text{MLP}(h_t), \qquad h_t = f_{\phi}(s_t, a_t)
 $$
 
-Here, a large language model (LLM) with encoder parameters $\phi$ encodes the current state-action pair, and a lightweight MLP outputs a scalar contribution. During training, the model is supervised by the final rewards from multiple exploration trajectories:
+Here, a large language model (LLM) with encoder parameters $\phi$ encodes the current state-action pair (this encoder $\phi$ is distinct from the PRM parameters $\phi$ in $Q_\phi$ below), and a lightweight MLP outputs a scalar contribution. During training, the model is supervised by the final rewards from multiple exploration trajectories:
 
 $$
 \mathcal{L}_{\text{PE}} = \frac{1}{|\mathcal{D}| M} \sum_i \sum_j (\hat R_{i,j} - R_{i,j})^2
