@@ -16,7 +16,7 @@ Handwritten pseudo-code helps you internalize the principles; veRL helps you run
 
 ## 13.8.1 An Introduction to veRL
 
-[veRL](https://github.com/volcengine/verl) (Volcano Engine Reinforcement Learning), initiated by ByteDance's Seed team, is one of the most active LLM RL training frameworks in the community (10k+ GitHub stars). Its paper, _HybridFlow_, was published at EuroSys 2025.
+[veRL](https://github.com/volcengine/verl) (Volcano Engine Reinforcement Learning), initiated by ByteDance's Seed team, is one of the most widely used open-source LLM RL training frameworks in the community. Its paper, _HybridFlow: A Flexible and Efficient RLHF Framework_ ([arXiv:2409.19256](https://arxiv.org/abs/2409.19256)), was published at EuroSys 2025.
 
 Compared with the small-model TRL experiments we mentioned in Section 13.4, veRL's main value-adds are:
 

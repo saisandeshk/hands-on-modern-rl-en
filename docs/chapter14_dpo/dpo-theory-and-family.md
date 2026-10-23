@@ -180,7 +180,7 @@ Putting the two sides next to each other makes the difference clearer:
 
 So the "Direct" in DPO does not mean there is no mathematics. It means DPO **no longer explicitly follows the engineering route of "online sampling -> RM scoring -> Critic value estimation -> PPO update"**. It directly turns a preference pair into a differentiable comparison objective.
 
-The real TRL source code has this same structure. When checking the Hugging Face TRL main branch on 2026-05-01, three things can be seen in [`DPOTrainer`](https://github.com/huggingface/trl/blob/main/trl/trainer/dpo_trainer.py):
+The real TRL source code has this same structure. When checking the Hugging Face TRL main branch on 2026-10-23, three things can be seen in [`DPOTrainer`](https://github.com/huggingface/trl/blob/main/trl/trainer/dpo_trainer.py):
 
 1. The data collator `DataCollatorForPreference` expects samples to contain `prompt_ids`, `chosen_ids`, and `rejected_ids`. It places chosen examples in the first half of the batch and rejected examples in the second half.
 2. Reference probabilities can be precomputed and stored in `ref_chosen_logps` and `ref_rejected_logps`, or they can be computed by the reference model during training.
