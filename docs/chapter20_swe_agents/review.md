@@ -1,8 +1,8 @@
 ---
-title: 20.4 Summary and Exercises
+title: 20.5 Summary and Exercises
 ---
 
-# 20.4 Summary and Exercises
+# 20.5 Summary and Exercises
 
 This chapter treated repository repair as a trainable trajectory: an agent reads an issue, explores a codebase, edits, runs tests, and RL raises the probability of trajectories that pass held-out verification. Section 20.1 built the SWE-bench task format, the RLVR test reward, and the rollout pipeline; the supplementary reading showed the SWE-RL recipe (GRPO plus a binary test reward); Section 20.2 separated environment-trajectory modeling (CWM) from long-horizon pure RL with test-time scaling (DeepSWE); Section 20.3 closed the data loop with self-play defect injection and repair (SSR).
 

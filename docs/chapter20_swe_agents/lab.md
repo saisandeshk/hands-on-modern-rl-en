@@ -1,8 +1,8 @@
 ---
-title: '20.L Lab: Reward Hacking in a Toy Code Agent'
+title: '20.4 Lab: Reward Hacking in a Toy Code Agent'
 ---
 
-# 20.L Lab: Reward Hacking in a Toy Code Agent
+# 20.4 Lab: Reward Hacking in a Toy Code Agent
 
 Chapter 20 argues that executable tests turn software repair into a reinforcement-learning problem -- and warns that the reward is only as faithful as the verifier behind it. This lab lets you watch both halves of that claim happen in a few minutes on a laptop: a policy trained with verifiable rewards learns to solve small coding tasks, and the same policy trained on an incomplete verifier learns to game it.
 
@@ -19,7 +19,7 @@ Read [20.1 Foundations of SWE-RL](/chapter20_swe_agents/swe-bench-and-rlvr) firs
 
 - Each toy task has **visible tests** (the analogue of the repository tests the agent may run) and **hidden tests** (the analogue of the held-out evaluation tests). The chapter's split between "tests the agent can call" and "tests that decide the result" is implemented literally as two lists per task.
 - The training reward is the chapter's pass fraction $R_{\text{test}}(\tau) = \frac{1}{m}\sum_i z_i$, and the headline evaluation metric is its binary sibling $R_{\text{resolved}}$, reported here as the fraction of tasks whose greedy pick passes every hidden test.
-- The shortcut candidates implement the chapter's second failure mode -- hardcoding answers to the public examples -- plus one shallow heuristic per tricky task (first/last-character match for palindromes, digital root for digit sums) that passes the visible tests while missing the real requirement. The "wrong" arms are often *almost* right (for example the binary-search `first_ge` fallback passes 3 of 4 hidden tests), which is why even the hidden regime's residual error stays above zero.
+- The shortcut candidates implement the chapter's second failure mode -- hardcoding answers to the public examples -- plus one shallow heuristic per tricky task (first/last-character match for palindromes, digital root for digit sums) that passes the visible tests while missing the real requirement. The "wrong" arms are often _almost_ right (for example the binary-search `first_ge` fallback passes 3 of 4 hidden tests), which is why even the hidden regime's residual error stays above zero.
 - The fixes mirror the chapter's prescriptions: evaluate on tests the agent cannot modify (the `hidden` regime), and broaden test coverage with freshly randomized inputs (the `randomized` regime).
 
 For context on how the same test-reward idea scales to real repositories, see the [supplementary reading on Meta SWE-RL](/chapter20_swe_agents/meta-swe-rl) (GRPO with a binary test reward) and [20.3 Self-Play SWE-RL](/chapter20_swe_agents/self-play-ssr-and-summary) (what happens when even the tasks must be generated). The multi-step agent loop that this lab deliberately compresses into a single decision is covered in [19.1 Agentic RL Basics](/chapter19_agentic/overview).

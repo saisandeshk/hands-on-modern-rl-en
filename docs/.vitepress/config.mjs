@@ -1321,7 +1321,11 @@ const sidebar = {
               link: '/chapter20_swe_agents/self-play-ssr-and-summary'
             },
             {
-              text: '20.4 Summary and Exercises',
+              text: '20.4 Lab: Reward Hacking in a Toy Code Agent',
+              link: '/chapter20_swe_agents/lab'
+            },
+            {
+              text: '20.5 Summary and Exercises',
               link: '/chapter20_swe_agents/review'
             }
           ]
