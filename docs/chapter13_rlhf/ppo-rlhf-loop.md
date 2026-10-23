@@ -18,7 +18,7 @@ $$
 r_t =
 \begin{cases}
 -\beta(\log \pi_\theta(y_t\mid s_t)-\log \pi_{ref}(y_t\mid s_t)), & t<T \\
-r_{RM}(x,y)-\beta(\log \pi_\theta(y_t\mid s_t)-\log \pi_{ref}(y_t\mid s_t)), & t=T
+r_{\phi}(x,y)-\beta(\log \pi_\theta(y_t\mid s_t)-\log \pi_{ref}(y_t\mid s_t)), & t=T
 \end{cases}
 \quad \text{(RLHF token reward: per-step KL, RM score at the end)}
 $$
@@ -99,7 +99,7 @@ $$
 \pi_\theta(a_t\mid s_t)=P_\theta(y_t\mid x,y_{<t})
 $$
 
-Unlike CartPole, LLMs usually do not receive a human reward for every token. The Reward Model typically produces a single score $r_{RM}(x,y)$ after the full response is complete. To enable token-level PPO updates, engineering practice splits the reward into two parts:
+Unlike CartPole, LLMs usually do not receive a human reward for every token. The Reward Model typically produces a single score $r_{\phi}(x,y)$ after the full response is complete. To enable token-level PPO updates, engineering practice splits the reward into two parts:
 
 1. Every token gets a KL penalty to prevent drift from the reference.
 2. The final token or EOS position receives the RM's sequence-level reward.
@@ -348,7 +348,7 @@ If you only maximize RM score, the Actor will quickly drift away from the SFT mo
 The Reference provides a "do not stray too far from the original assistant" constraint:
 
 $$
-R_{total}(x, y) = r_{RM}(x, y) - \beta D_{KL}(\pi_\theta(y|x) \| \pi_{ref}(y|x))
+R_{total}(x, y) = r_{\phi}(x, y) - \beta D_{KL}(\pi_\theta(y|x) \| \pi_{ref}(y|x))
 $$
 
 Here $\pi_{ref}$ is usually the frozen SFT model. Larger $\beta$ makes it harder for the Actor to drift from SFT; smaller $\beta$ allows more exploration but also more reward hacking.

@@ -57,7 +57,7 @@ r_t(\theta)=\frac{\pi_\theta(a_t\mid s_t)}
 {\pi_{\text{old}}(a_t\mid s_t)}.
 $$
 
-$\hat A_t$ measures how much better action $a_t$ is than the current baseline, and $\epsilon$ controls the allowed deviation from 1. If the old policy assigns probability $0.20$ and the new policy assigns $0.24$, then $r_t=1.2$, exactly the upper boundary when $\epsilon=0.2$.
+$\hat A_t$ measures how much better action $a_t$ is than the current baseline, and $\epsilon$ controls the allowed deviation from 1. If the old policy assigns probability $0.20$ and the new policy assigns $0.24$, then $r_t(\theta)=1.2$, exactly the upper boundary when $\epsilon=0.2$.
 
 This calculation assumes that the denominator is the policy that generated the action. If the response came from $\pi_{\text{rollout}}$ while the trainer recomputed $\pi_{\text{old}}$ along a different numerical path, the ratio is wrong before any update begins. Clipping can limit parameter movement; it cannot reconcile probabilities computed by two engines.
 

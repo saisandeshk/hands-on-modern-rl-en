@@ -73,13 +73,13 @@ When an anomaly appears at this layer, compare the old policy at sampling time w
 Finally, here are the full definitions of the two metrics, which will be used repeatedly in the following sections:
 
 $$
-D_{\mathrm{KL}}\bigl(\pi_\theta\,\|\,\pi_{\mathrm{ref}}\bigr)
-= \sum_a \pi_\theta(a)\ln\frac{\pi_\theta(a)}{\pi_{\mathrm{ref}}(a)},
+D_{\mathrm{KL}}\bigl(\pi_\theta\,\|\,\pi_{\text{ref}}\bigr)
+= \sum_a \pi_\theta(a)\ln\frac{\pi_\theta(a)}{\pi_{\text{ref}}(a)},
 \qquad
 H(\pi_\theta) = -\sum_a \pi_\theta(a)\ln \pi_\theta(a)
 $$
 
-In the KL formula, $\pi_\theta$ is the output distribution of the current policy, and $\pi_{\mathrm{ref}}$ is the reference policy, usually the SFT model before RL starts. $\ln\frac{\pi_\theta(a)}{\pi_{\mathrm{ref}}(a)}$ is the log probability ratio of the same action under the two policies. $D_{\mathrm{KL}}$ is a sum weighted by the current policy's probabilities. It is 0 when the two distributions are identical and grows as the deviation grows.
+In the KL formula, $\pi_\theta$ is the output distribution of the current policy, and $\pi_{\text{ref}}$ is the reference policy, usually the SFT model before RL starts. $\ln\frac{\pi_\theta(a)}{\pi_{\text{ref}}(a)}$ is the log probability ratio of the same action under the two policies. $D_{\mathrm{KL}}$ is a sum weighted by the current policy's probabilities. It is 0 when the two distributions are identical and grows as the deviation grows.
 
 The entropy $H(\pi_\theta)$ is the uncertainty of the output distribution: the more uniform the distribution, with action probabilities close to each other, the larger the entropy, and the more concentrated on a few actions, the smaller the entropy. A rapid fall in entropy shows that the model is stopping exploration too early and concentrating probability on a few response patterns.
 

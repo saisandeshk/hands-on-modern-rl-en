@@ -19,7 +19,7 @@ This chapter moved from single-machine RL scripts to the systems that train prod
 ## Key Equations
 
 - **GPU-hours estimate:** $\text{GPU-hours} \approx 6 N_{\text{active}} N_{\text{tokens}} / (\text{GPU\_FLOPS} \cdot \text{MFU} \cdot 3600)$ — total FLOPs divided by realized throughput.
-- **PPO clipped objective:** $\mathcal{L}^{\text{CLIP}} = \mathbb{E}[\min(r_t \hat A_t, \text{clip}(r_t, 1-\epsilon, 1+\epsilon)\hat A_t)]$ with $r_t = \pi_\theta / \pi_{\text{old}}$ — limit how far one update moves the policy.
+- **PPO clipped objective:** $\mathcal{L}^{\text{CLIP}} = \mathbb{E}[\min(r_t(\theta) \hat A_t, \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)\hat A_t)]$ with $r_t(\theta) = \pi_\theta / \pi_{\text{old}}$ — limit how far one update moves the policy.
 - **Stale-policy correction ratio:** $\rho_t^{\text{stale}} = \pi_\theta(a_t \mid s_t) / \pi_{\theta_{\text{gen}}}(a_t \mid s_t)$ — down-weight experience from old policy versions.
 - **GRPO group advantage:** $\hat A_i = (r_i - \mu_{\text{group}}) / \sigma_{\text{group}}$ — a response is good only relative to its siblings; all-equal groups give zero signal.
 - **Domain reward normalization:** $\tilde r = (r - \mu_{\text{domain}}) / \sigma_{\text{domain}}$ — put heterogeneous rewards on one scale before mixing.

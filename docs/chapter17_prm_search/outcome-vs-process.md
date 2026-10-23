@@ -130,7 +130,7 @@ Back to the nine-step proof: an ORM gives the whole response $r=1$, while a PRM 
 
 ### Outcome Reward Model
 
-An ORM takes a problem $q$ and a complete response $o$ and outputs a scalar score:
+An ORM takes a problem $q$ and a complete response $o$ and outputs a scalar score (this chapter writes prompt and response as $q$ and $o$, the DeepSeekMath/GRPO convention, for Appendix D's $x$ and $y$):
 
 $$\text{ORM}(q, o) \in \mathbb{R}$$
 

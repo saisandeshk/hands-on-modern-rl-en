@@ -28,7 +28,7 @@ $$
 
 $$
 \rho_{reward,length}
-= \mathrm{corr}(r_{RM}(x,y),\ |y|)
+= \mathrm{corr}(r_{\phi}(x,y),\ |y|)
 \quad \text{(length correlation: a simple hacking detector)}
 $$
 

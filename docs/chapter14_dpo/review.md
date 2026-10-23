@@ -18,7 +18,7 @@ This chapter replaced the RLHF loop (train a reward model, then run PPO) with a 
 
 ## Key Equations
 
-$$\max_{\pi_\theta}\ \mathbb{E}_{x,y\sim\pi_\theta}[r(x,y)] - \beta\,D_{\mathrm{KL}}(\pi_\theta(\cdot\mid x)\,\|\,\pi_{\mathrm{ref}}(\cdot\mid x))$$
+$$\max_{\pi_\theta}\ \mathbb{E}_{x,y\sim\pi_\theta}[r(x,y)] - \beta\,D_{\mathrm{KL}}(\pi_\theta(\cdot\mid x)\,\|\,\pi_{\text{ref}}(\cdot\mid x))$$
 
 The KL-regularized RLHF objective: earn reward without straying from the reference model; $\beta$ sets the leash length (larger $\beta$ means a shorter leash).
 

@@ -233,6 +233,8 @@ $$
 
 Consequently, the original GRPO computes $\exp(\ell^{\mathrm{new}}_{i,t}-\ell^{\mathrm{old}}_{i,t})$ separately at every token. Exponentiating the sum instead produces $\prod_t r_{i,t}$, introduces response-length dependence, and clips the whole response only once. Equation (4) likewise defines the KL estimate token by token. The formulas and code below use those original definitions as the acceptance criterion. [DeepSeekMath equations](https://arxiv.org/html/2402.03300#S3.SS1)
 
+In this chapter's own notation, the paper's $q$, $o_i$, and $r_{i,t}(\theta)$ above are the prompt $x_j$, the response $y_{j,i}$, and the token ratio $\rho_{j,i,t}$.
+
 ### TRL implementation comparison
 
 The current TRL source preserves this token dimension. When checking the Hugging Face TRL main branch on 2026-08-28, the following correspondences can be seen in [`GRPOTrainer`](https://github.com/huggingface/trl/blob/main/trl/trainer/grpo_trainer.py):
@@ -262,7 +264,7 @@ The symbols mean:
 - $x_j$: the $j$-th prompt, namely a problem or question.
 - $G$: the group size, meaning how many answers each prompt generates. `num_generations=8` in code means $G=8$.
 - $y_{j,i}$: the $i$-th answer generated under the $j$-th prompt.
-- $\pi_{\text{old}}$: the old policy used to generate this batch of answers. It is responsible for sampling data.
+- $\pi_{\theta_{\text{old}}}$: the old policy used to generate this batch of answers. It is responsible for sampling data.
 - $\pi_\theta$: the new policy being updated. It is responsible for learning so that good answers become more likely.
 
 The sampling process can be written as:
@@ -270,12 +272,12 @@ The sampling process can be written as:
 $$
 y_{j,i}
 \sim
-\pi_{\text{old}}(\cdot \mid x_j),
+\pi_{\theta_{\text{old}}}(\cdot \mid x_j),
 \qquad
 i=1,\ldots,G
 $$
 
-The symbol $\sim$ means "sample from a distribution". The dot $\cdot$ in $\pi_{\text{old}}(\cdot \mid x_j)$ means "the position of all possible answers": given prompt $x_j$, the old policy assigns probabilities to all possible answers, and we draw $G$ answers from that distribution.
+The symbol $\sim$ means "sample from a distribution". The dot $\cdot$ in $\pi_{\theta_{\text{old}}}(\cdot \mid x_j)$ means "the position of all possible answers": given prompt $x_j$, the old policy assigns probabilities to all possible answers, and we draw $G$ answers from that distribution.
 
 In the code, this corresponds to **[A] group sampling**:
 
@@ -559,7 +561,7 @@ flowchart TD
     end
 
     subgraph update ["Step 4: PPO Clip update"]
-        A1 --> Clip["L = min(r_t * A_i, clip(r_t, 1-eps, 1+eps) * A_i)"]
+        A1 --> Clip["L = min(rho * A_hat, clip(rho, 1-epsilon, 1+epsilon) * A_hat)"]
         A2 --> Clip
         A3 --> Clip
         Clip --> Update["Update policy network theta"]

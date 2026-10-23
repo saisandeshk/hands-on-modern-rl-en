@@ -111,7 +111,7 @@ parse_answer("3+8=11>1c1 no answer")        # None
 ```
 
 **Pass@k is estimated, not just counted.** With $n$ samples of which $c$
-are correct, the lab uses the unbiased Chen et al. estimator
+are correct (here $n$ is the pool size, written $N$ in Section 16.3, and $k$ the shortlist size), the lab uses the unbiased Chen et al. estimator
 $1 - \binom{n-c}{k}/\binom{n}{k}$ rather than the raw fraction of pools
 containing a hit, and the test suite checks it against brute-force subset
 enumeration:

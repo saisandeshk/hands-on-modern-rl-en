@@ -72,7 +72,7 @@ For step $i$, the model outputs probabilities for good, bad, and neutral. Traini
 
 $$\mathcal{L}_{\text{PRM}} = -\sum_{i} \sum_{c \in \{good, bad, neutral\}} y_{i,c} \log p_\theta(c \mid q, o_{\leq i}, s_i)$$
 
-Here $y_{i,c}$ is the human-annotated one-hot label. If step $i$ is labeled good, only the position for good equals 1 and all others are 0, so the sum keeps a single term $-\log p_\theta(\text{good} \mid \cdots)$. The closer the model's probability for good is to 1, the smaller the loss.
+Here $y_{i,c}$ is the human-annotated one-hot label, and $s_i$ denotes the text of step $i$ itself (as distinct from the prefix $o_{\leq i}$ leading up to it). If step $i$ is labeled good, only the position for good equals 1 and all others are 0, so the sum keeps a single term $-\log p_\theta(\text{good} \mid \cdots)$. The closer the model's probability for good is to 1, the smaller the loss.
 
 A few concrete probabilities give a feel for the size of the loss. When the label is good, the loss is $-\log p_\theta(\text{good})$:
 
@@ -252,7 +252,7 @@ The weighted combination is
 
 $$r = \alpha r_{\text{process}} + \beta r_{\text{outcome}},$$
 
-where $r_{\text{process}}$ is the aggregated step score, $r_{\text{outcome}}$ is the final outcome score, and $\alpha$ and $\beta$ are weights. This formula does not tell us the best weights. It is a reminder to monitor separately "has the process score gone up?" and "has the task actually been completed?", so that the evaluator's bias is not amplified by the policy model.
+where $r_{\text{process}}$ is the aggregated step score, $r_{\text{outcome}}$ is the final outcome score, and $\alpha$ and $\beta$ are local combination weights (unrelated to the KL coefficient $\beta$ used in RLHF/DPO). This formula does not tell us the best weights. It is a reminder to monitor separately "has the process score gone up?" and "has the task actually been completed?", so that the evaluator's bias is not amplified by the policy model.
 
 ## Section Summary
 

@@ -25,7 +25,7 @@ Two chapter sections carry this lab:
 
 The lab shrinks that stack to one CPU: CartPole-v1 replaces LLM rollouts, a two-layer MLP replaces the Actor, and Python multiprocessing replaces the GPU pools. The systems questions stay the same: who generates, who updates, how versions move, and what stale data costs.
 
-Notation matches the chapter: states $s$, actions $a$, policy $\pi_\theta$, behaviour policy $\pi_{\theta_{\text{gen}}}$, staleness ratio $\rho_t^{\text{stale}}$, advantage $A_t$, return $G_t$.
+Notation matches the chapter: states $s$, actions $a$, policy $\pi_\theta$, behaviour policy $\pi_{\theta_{\text{gen}}}$, staleness ratio $\rho_t^{\text{stale}}$, advantage $\hat A_t$, return $G_t$.
 
 ## Setup and how to run
 
