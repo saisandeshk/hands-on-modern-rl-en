@@ -130,7 +130,7 @@ Titans distinguishes three kinds of information:
 - Long-term memory: the neural memory module is updated continuously at test time.
 - Persistent memory: stores task-related parameters that are fixed after training.
 
-The paper uses "surprise" to decide which inputs are worth writing into long-term memory. The surprise here comes from the memory model's loss or gradient signal on the current sample. It is a test-time learning rule and not an RL reward given by an environment. The original paper reports that Titans outperforms the Transformer and linear recurrent baselines it compares against on language modeling, commonsense reasoning, genomics, and time series tasks, including strong needle-in-a-haystack performance at very long contexts.
+The paper uses "surprise" to decide which inputs are worth writing into long-term memory. The surprise here comes from the memory model's loss or gradient signal on the current sample. It is a test-time learning rule and not an RL reward given by an environment. The original paper reports that Titans outperforms the Transformer and linear recurrent baselines it compares against on language modeling, commonsense reasoning, genomics, and time series tasks, including strong needle-in-a-haystack performance at very long contexts, scaling to larger than 2M context window size.
 
 The connection between Titans and the main thread of this chapter occurs at the system level: a long-running agent can use this kind of memory to store information across episodes, and RL then learns how to use the observations formed from memory. The memory module itself is updated by gradients, which does not automatically make it a reinforcement learning algorithm.
 

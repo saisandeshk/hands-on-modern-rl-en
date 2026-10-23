@@ -838,7 +838,7 @@ Read this formula as follows: first, the target encoder $E_{\bar{\theta}}$ encod
   <em>Figure 9: Video-JEPA's joint-embedding predictive architecture predicts target video-segment embeddings in representation space. Source: Bardes et al., "Revisiting Feature Prediction for Learning Visual Representations from Video", Fig. 2[^vjepa].</em>
 </div>
 
-Here, $x$ is the visible context, $y$ is the masked or future target, $c$ may contain position, time, or action conditions, $\mathrm{sg}$ denotes stop-gradient, and $\Omega$ is a regularizer that prevents representation collapse. Compared with pixel generation, it does not require the model to recover every texture detail. Compared with traditional MBRL, it also does not necessarily output reward directly. As one reported example of this route moving closer to embodied control, the 2026 LeWorldModel paper presents JEPA trained from raw pixels as an end-to-end world model for autonomous driving[^lewm]; the extent to which it supports closed-loop control should be checked against what that report actually demonstrates.
+Here, $x$ is the visible context, $y$ is the masked or future target, $c$ may contain position, time, or action conditions, $\mathrm{sg}$ denotes stop-gradient, and $\Omega$ is a regularizer that prevents representation collapse. Compared with pixel generation, it does not require the model to recover every texture detail. Compared with traditional MBRL, it also does not necessarily output reward directly. As one reported example of this route moving closer to embodied control, the 2026 LeWorldModel paper presents JEPA trained from raw pixels as a stable end-to-end world model evaluated on control tasks[^lewm]; the extent to which it supports closed-loop control should be checked against what that report actually demonstrates.
 
 In one sentence: **MBRL world models lean toward "control engineering," while LeCun's world model leans toward "general intelligence architecture"; the former asks how the world changes after an action, while the latter asks how an agent can learn abstract world representations that are predictable and plannable.**
 
@@ -1056,4 +1056,4 @@ As a next step, return to the [main embodied intelligence article](../) and conn
 
 [^vjepa]: Bardes, A. et al. (2024). Revisiting Feature Prediction for Learning Visual Representations from Video. <https://arxiv.org/abs/2404.08471>
 
-[^lewm]: Maes, J. et al. (2026). LeWorldModel: A Unified End-to-End World Model for Autonomous Driving. <https://arxiv.org/abs/2603.19312>
+[^lewm]: Maes, L. et al. (2026). LeWorldModel: Stable End-to-End Joint-Embedding Predictive Architecture from Pixels. <https://arxiv.org/abs/2603.19312>
