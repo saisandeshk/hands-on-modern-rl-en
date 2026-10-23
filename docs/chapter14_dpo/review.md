@@ -18,7 +18,7 @@ This chapter replaced the RLHF loop (train a reward model, then run PPO) with a 
 
 ## Key Equations
 
-$$\max_{\pi_\theta}\ \mathbb{E}_{x,y\sim\pi_\theta}[r(x,y)] - \beta\,D_{\mathrm{KL}}(\pi_\theta(\cdot\mid x)\,\|\,\pi_{\mathrm{ref}}(\cdot\mid x))$$
+$$\max_{\pi_\theta}\ \mathbb{E}_{x,y\sim\pi_\theta}[r(x,y)] - \beta\,D_{\mathrm{KL}}(\pi_\theta(\cdot\mid x)\,\|\,\pi_{\text{ref}}(\cdot\mid x))$$
 
 The KL-regularized RLHF objective: earn reward without straying from the reference model; $\beta$ sets the leash length (larger $\beta$ means a shorter leash).
 
@@ -101,12 +101,12 @@ Form the Lagrangian $\mathcal{L} = \sum_y q(y)r(x,y) - \beta\sum_y q(y)\log\frac
 
 ### 5. The normalizer cancels; labels flip the sign
 
-(a) From $r(x,y) = \beta\log(\pi^*(y\mid x)/\pi_{\text{ref}}(y\mid x)) + \beta\log Z(x)$, prove the Bradley-Terry probability $P(y_w \succ y_l\mid x) = \sigma(r(x,y_w) - r(x,y_l))$ does not involve $Z(x)$. (b) Show swapping $y_w, y_l$ maps margin $u \mapsto -u$, loss $\ell(u) = -\log\sigma(u)$ to $\ell(-u)$, and batch accuracy $a \mapsto 1 - a$.
+(a) From $r(x,y) = \beta\log(\pi^*(y\mid x)/\pi_{\text{ref}}(y\mid x)) + \beta\log Z(x)$, prove the Bradley-Terry probability $P(y_w \succ y_l\mid x) = \sigma(r(x,y_w) - r(x,y_l))$ does not involve $Z(x)$. (b) Show swapping $y_w, y_l$ maps margin $u \mapsto -u$, loss $\ell(u) = -\log\sigma(u)$ to $\ell(-u)$, and batch accuracy $a \mapsto 1 - a$ (for batches with no zero margins; ties stay incorrect in both orientations).
 
 ::: details Solution
 (a) Subtracting, $r(x,y_w) - r(x,y_l) = \beta\log\frac{\pi^*(y_w\mid x)}{\pi_{\text{ref}}(y_w\mid x)} - \beta\log\frac{\pi^*(y_l\mid x)}{\pi_{\text{ref}}(y_l\mid x)} + \beta\log Z(x) - \beta\log Z(x)$. The two $\beta\log Z(x)$ terms are identical (same prompt $x$) and cancel, leaving only policy ratios inside $\sigma$.
 
-(b) The margin $u = \beta(\Delta_w - \Delta_l)$ is antisymmetric in $(w, l)$, so swapping gives $-u$. The loss becomes $-\log\sigma(-u) = \ell(-u)$, and since $\sigma(-u) = 1 - \sigma(u)$, a pair ranked correctly ($u > 0$) becomes ranked incorrectly and vice versa; each pair's 0/1 correctness flips, so the batch mean maps $a \mapsto 1 - a$. This is the fixed-batch swap test from Section 14.2.
+(b) The margin $u = \beta(\Delta_w - \Delta_l)$ is antisymmetric in $(w, l)$, so swapping gives $-u$. The loss becomes $-\log\sigma(-u) = \ell(-u)$, and since $\sigma(-u) = 1 - \sigma(u)$, a pair ranked correctly ($u > 0$) becomes ranked incorrectly and vice versa (for $u \neq 0$; ties at $u = 0$ stay incorrect in both orientations since the accuracy uses a strict $> 0$ threshold); each non-tied pair's 0/1 correctness flips, so the batch mean maps $a \mapsto 1 - a$. This is the fixed-batch swap test from Section 14.2.
 :::
 
 ### 6. Summed versus length-normalized: a sign flip

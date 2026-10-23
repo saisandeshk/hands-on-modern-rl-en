@@ -36,7 +36,7 @@ $$
 PPO-RLHF improves the preference reward while the frozen reference anchors the policy; $\beta$ sets how far the actor may drift.
 
 $$
-r_t = -\beta(\log \pi_\theta(y_t\mid s_t) - \log \pi_{ref}(y_t\mid s_t)) + \mathbf{1}[t = T]\, r_{RM}(x, y)
+r_t = -\beta(\log \pi_\theta(y_t\mid s_t) - \log \pi_{ref}(y_t\mid s_t)) + \mathbf{1}[t = T]\, r_{\phi}(x, y)
 $$
 
 Each token pays a KL cost for drifting; only the final position collects the sequence-level judge score, which the critic then distributes backward as advantages.

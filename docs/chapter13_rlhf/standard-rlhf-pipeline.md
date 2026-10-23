@@ -214,7 +214,7 @@ flowchart LR
 
 $$R_{mix} = R_{RM} + \alpha \cdot R_{format} + \beta \cdot R_{length} + \gamma \cdot R_{correctness}$$
 
-where $\alpha, \beta, \gamma$ are tunable hyperparameters. $R_{format}$ checks formatting, $R_{length}$ penalizes overly long or short answers, and $R_{correctness}$ checks questions with objective answers (math, code). The trade-offs:
+where $\alpha, \beta, \gamma$ are local mixture weights for this hybrid only (not the KL coefficient $\beta$ or the discount factor $\gamma$ used elsewhere in this chapter). $R_{format}$ checks formatting, $R_{length}$ penalizes overly long or short answers, and $R_{correctness}$ checks questions with objective answers (math, code). The trade-offs:
 
 |                    | Rule rewards                                 | Model rewards (RM)                   |
 | ------------------ | -------------------------------------------- | ------------------------------------ |

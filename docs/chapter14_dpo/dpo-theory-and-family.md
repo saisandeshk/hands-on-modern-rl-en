@@ -79,7 +79,7 @@ r(x,y)
 -
 \beta
 D_{\mathrm{KL}}
-(\pi_\theta(\cdot\mid x)\|\pi_{\mathrm{ref}}(\cdot\mid x))
+(\pi_\theta(\cdot\mid x)\|\pi_{\text{ref}}(\cdot\mid x))
 \right]
 $$
 
@@ -91,7 +91,7 @@ DPO enters from a different angle. The DPO paper first points out that RLHF is o
 
 Read the figure this way:
 
-- The left side is the shared starting point of all these methods: the language model policy $\pi_\theta$ wants high reward while being constrained by $\pi_{\mathrm{ref}}$.
+- The left side is the shared starting point of all these methods: the language model policy $\pi_\theta$ wants high reward while being constrained by $\pi_{\text{ref}}$.
 - The middle is the PPO / RLHF route: generate answers online, score them with a reward model, estimate advantages with a Critic, and update with PPO-Clip.
 - The right side is the DPO route: use offline preference pairs and the closed-form solution of the KL-regularized objective to rewrite "reward difference" as a probability ratio between Policy and Reference.
 
@@ -284,7 +284,7 @@ flowchart TD
 
 The original RLHF optimization objective is:
 
-$$\max_{\pi_\theta} \; \mathbb{E}_{x \sim \mathcal{D}, y \sim \pi_\theta} \left[ r(x,y) - \beta \cdot D_{\text{KL}}(\pi_\theta \| \pi_{\text{ref}}) \right]$$
+$$\max_{\pi_\theta} \; \mathbb{E}_{x \sim \mathcal{D}, y \sim \pi_\theta} \left[ r(x,y) - \beta \cdot D_{\mathrm{KL}}(\pi_\theta \| \pi_{\text{ref}}) \right]$$
 
 First unpack every symbol:
 
@@ -292,13 +292,13 @@ First unpack every symbol:
 - $x \sim \mathcal{D}$: prompt $x$ comes from the training dataset $\mathcal{D}$.
 - $y \sim \pi_\theta$: answer $y$ is sampled from the current policy model $\pi_\theta$.
 - $r(x,y)$: the score assigned to the answer by the reward model. A higher score means the answer better matches human preference.
-- $D_{\text{KL}}(\pi_\theta \| \pi_{\text{ref}})$: the distance between the new policy $\pi_\theta$ and the reference policy $\pi_{\text{ref}}$.
+- $D_{\mathrm{KL}}(\pi_\theta \| \pi_{\text{ref}})$: the distance between the new policy $\pi_\theta$ and the reference policy $\pi_{\text{ref}}$.
 - $\beta$: the weight of the KL penalty. The larger $\beta$ is, the less the model dares to move away from the reference model.
 
 Here the KL divergence can be written as:
 
 $$
-D_{\text{KL}}(\pi_\theta \| \pi_{\text{ref}})
+D_{\mathrm{KL}}(\pi_\theta \| \pi_{\text{ref}})
 =
 \mathbb{E}_{y\sim \pi_\theta}
 \left[
@@ -686,7 +686,7 @@ The meaning of implicit reward is this: **DPO does not lack a reward model; it h
 <details>
 <summary>Question: What is the relationship between DPO's implicit reward $r(x,y) = \beta \log(\pi_\theta / \pi_{\text{ref}})$ (up to a prompt-only constant) and the KL penalty in [Chapter 8 PPO](../chapter08_ppo/trust-region-clipping)?</summary>
 
-They are two sides of the same object. PPO's objective includes the term $-\beta \cdot D_{\text{KL}}(\pi_\theta \| \pi_{\text{ref}})$, which prevents the policy from moving too far away from the reference model. DPO's implicit reward $\beta \log(\pi_\theta / \pi_{\text{ref}})$ is exactly the logarithmic term inside the KL divergence. It is the "pointwise version" of the KL divergence.
+They are two sides of the same object. PPO's objective includes the term $-\beta \cdot D_{\mathrm{KL}}(\pi_\theta \| \pi_{\text{ref}})$, which prevents the policy from moving too far away from the reference model. DPO's implicit reward $\beta \log(\pi_\theta / \pi_{\text{ref}})$ is exactly the logarithmic term inside the KL divergence. It is the "pointwise version" of the KL divergence.
 
 PPO explicitly computes KL divergence during training and penalizes drift. DPO uses mathematical derivation to build this constraint into the loss function. When you optimize the DPO loss, the KL constraint is naturally respected. This is one of the mathematical appeals of the DPO derivation: no extra penalty term is needed, because the constraint is already implicit in the formula's structure.
 

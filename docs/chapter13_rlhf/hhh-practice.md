@@ -120,7 +120,7 @@ The only difference is that $\mathcal{D}_{AI}$ comes from an AI judge, whereas i
 After obtaining $r_\phi$, we run the standard RLHF-PPO:
 
 $$
-R_{\text{RLAIF}}(x, y) = r_\phi(x, y) - \beta \, D_{KL}\big(\pi_\theta(\cdot \mid x) \,\|\, \pi_{\text{ref}}(\cdot \mid x)\big)
+R_{\text{RLAIF}}(x, y) = r_\phi(x, y) - \beta \, D_{KL}\big(\pi_\theta(\cdot \mid x) \,\|\, \pi_{ref}(\cdot \mid x)\big)
 $$
 
 This step is identical to that in [Chapter 8 on PPO](../chapter08_ppo/ppo-bipedal-walker). The KL coefficient $\beta$ still prevents the policy from drifting too far.
@@ -205,7 +205,7 @@ flowchart TB
 Formally: given a prompt $x$, the model generates $N$ candidate responses $\{y_1, \ldots, y_N\}$, and then evaluates them using an "LLM-as-Judge" prompt to obtain scores $\{s_1, \ldots, s_N\}$. The highest-scoring response $y_w$ and the lowest-scoring response $y_l$ are selected to form a preference pair, which is fed into [DPO](../chapter14_dpo/dpo-theory-and-family):
 
 $$
-\mathcal{L}_{\text{DPO}}(\theta) = -\log \sigma\Big(\beta \log \frac{\pi_\theta(y_w \mid x)}{\pi_{\text{ref}}(y_w \mid x)} - \beta \log \frac{\pi_\theta(y_l \mid x)}{\pi_{\text{ref}}(y_l \mid x)}\Big)
+\mathcal{L}_{\text{DPO}}(\theta) = -\log \sigma\Big(\beta \log \frac{\pi_\theta(y_w \mid x)}{\pi_{ref}(y_w \mid x)} - \beta \log \frac{\pi_\theta(y_l \mid x)}{\pi_{ref}(y_l \mid x)}\Big)
 $$
 
 **Key Observation:** DPO does not require an explicit RM (as proved in Chapter 14, [DPO Theory and Family](../chapter14_dpo/dpo-theory-and-family)), so the **entire process is self-contained** — the model simultaneously acts as a generator, a judge, and a learner.
@@ -218,9 +218,9 @@ Meta used Llama 2-70B to perform three rounds of self-rewarding (M1 → M2 → M
 - **Reward-modeling pairwise accuracy on held-out human rankings:** M1 78.7% → M2 80.4% → M3 81.7% (from a 65.1% SFT baseline trained on instruction data alone)
 
 ::: details Why Self-Rewarding Converges
-Theoretically, self-rewarding could fall into a "self-praise" trap — the model learns how to make the judge satisfied, and the judge is itself. Meta's experiments show that the first three rounds are still effective, but **after the fourth round, performance typically plateaus**. There are two main reasons:
+Theoretically, self-rewarding could fall into a "self-praise" trap — the model learns how to make the judge satisfied, and the judge is itself. Meta's experiments show that the first three rounds are still effective; the paper reports gains through M3 and does not test a fourth round, so a later plateau is an expectation, not a measured result. There are two main reasons:
 
-1. DPO's reference model $\pi_{\text{ref}}$ is updated every round, which acts as a soft KL constraint, limiting drift;
+1. DPO's reference model $\pi_{ref}$ is updated every round, which acts as a soft KL constraint, limiting drift;
 2. A certain proportion of real SFT data is mixed in to prevent capability collapse.
 
 Intuitively, iteration helps only while the judge improves alongside the generator; if the judge stalls while the generator keeps optimizing against it, the loop collapses into self-reinforcement ("reward hacking"). This is why self-rewarding must be combined with **external validation signals** (such as RLVR) to be effective.

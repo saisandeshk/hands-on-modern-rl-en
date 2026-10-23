@@ -157,7 +157,7 @@ This is a **one-directional** objective: make the probability of good responses 
 
 DPO's training objective introduces a **contrastive structure**:
 
-$$\mathcal{L}_{DPO} = -\ln \sigma \left( \beta \ln \frac{\pi_\theta(y_w | x)}{\pi_{ref}(y_w | x)} - \beta \ln \frac{\pi_\theta(y_l | x)}{\pi_{ref}(y_l | x)} \right)$$
+$$\mathcal{L}_{DPO} = -\ln \sigma \left( \beta \ln \frac{\pi_\theta(y_w | x)}{\pi_{\text{ref}}(y_w | x)} - \beta \ln \frac{\pi_\theta(y_l | x)}{\pi_{\text{ref}}(y_l | x)} \right)$$
 
 The formula contains both $y_w$ and $y_l$, and the minus sign in the middle means the model must make the probability of the good response rise **relative to** the bad one. This is a stronger requirement than simply raising the probability of good responses: even if $\pi_\theta(y_w | x)$ increases, if $\pi_\theta(y_l | x)$ also increases simultaneously (e.g., the model becomes more "talkative," raising the probability of both good and bad responses), the loss function will not decrease.
 
@@ -196,9 +196,9 @@ To understand why this is possible, recall the implicit constraint during PPO tr
 Rafailov et al. (2023) found that solving for the optimal policy under this KL constraint yields a concise relationship:
 
 <!-- prettier-ignore -->
-$$r(x,y) = \beta \ln\frac{\pi_\theta(y\mid x)}{\pi_{\mathrm{ref}}(y\mid x)} + \mathrm{const}(x)$$
+$$r(x,y) = \beta \ln\frac{\pi_\theta(y\mid x)}{\pi_{\text{ref}}(y\mid x)} + \mathrm{const}(x)$$
 
-That is, a response's reward score $r(x,y)$ equals $\beta$ times the log-ratio of "the current model's probability of generating that response" to "the original model's probability of generating that response", up to a constant that depends only on the prompt $x$ (it cancels when two responses to the same prompt are compared). This relationship is not approximate; it is the exact closed-form solution of the KL-regularized objective derived in Exercise 4 below. It means the reward difference can be computed directly from the probability ratios of two models, and training a separate reward model is no longer necessary -- just keep the original model $\pi_{ref}$ as a reference and compare the probability changes of the training model $\pi_\theta$.
+That is, a response's reward score $r(x,y)$ equals $\beta$ times the log-ratio of "the current model's probability of generating that response" to "the original model's probability of generating that response", up to a constant that depends only on the prompt $x$ (it cancels when two responses to the same prompt are compared). This relationship is not approximate; it is the exact closed-form solution of the KL-regularized objective derived in Exercise 4 below. It means the reward difference can be computed directly from the probability ratios of two models, and training a separate reward model is no longer necessary -- just keep the original model $\pi_{\text{ref}}$ as a reference and compare the probability changes of the training model $\pi_\theta$.
 
 Based on this insight, DPO takes preference data (a good and a bad response to the same question) and directly adjusts model parameters to increase the probability of the good response and decrease the probability of the bad one. The entire process requires only one language model plus a static copy of the reference model, skipping the reward model training and PPO's reinforcement learning loop, reducing the problem to optimizing a contrastive loss function.
 
@@ -213,14 +213,14 @@ trainer = DPOTrainer(
 )
 ```
 
-Only one model is passed in; there is no reward model. `DPOTrainer` internally creates a frozen copy of `model` as the reference model $\pi_{ref}$, and at each training step compares the output probabilities of $\pi_\theta$ and $\pi_{ref}$. The $\beta$ coefficient was set to 0.1 in `DPOConfig` -- we will mention it repeatedly when deriving the loss function below.
+Only one model is passed in; there is no reward model. `DPOTrainer` internally creates a frozen copy of `model` as the reference model $\pi_{\text{ref}}$, and at each training step compares the output probabilities of $\pi_\theta$ and $\pi_{\text{ref}}$. The $\beta$ coefficient was set to 0.1 in `DPOConfig` -- we will mention it repeatedly when deriving the loss function below.
 
 ### 14.1.4.2 Loss Function Derivation
 
 DPO's final loss function is:
 
 <!-- prettier-ignore -->
-$$ \mathcal{L}_{DPO} = -\ln \sigma \left( \beta \ln \frac{\pi_\theta(y_w | x)}{\pi_{ref}(y_w | x)} - \beta \ln \frac{\pi_\theta(y_l | x)}{\pi_{ref}(y_l | x)} \right) $$
+$$ \mathcal{L}_{DPO} = -\ln \sigma \left( \beta \ln \frac{\pi_\theta(y_w | x)}{\pi_{\text{ref}}(y_w | x)} - \beta \ln \frac{\pi_\theta(y_l | x)}{\pi_{\text{ref}}(y_l | x)} \right) $$
 
 The formula looks complex, but its structure is clear: inside the parentheses is the difference of two ratios, wrapped in a sigmoid and $-\ln$. Let us first identify the symbols, then explain the origin of each term step by step.
 
@@ -236,24 +236,24 @@ The symbols in the formula mean:
 
 **Step 1: Conditional probability.** A language model generates text token by token. Given prompt $x$, the model gives a probability for each token in response $y$ in sequence; multiplying these probabilities gives the conditional probability $\pi_\theta(y | x)$ of the full response. In DPO, we care about two probabilities: $\pi_\theta(y_w | x)$ is the current model's probability of generating the good response, and $\pi_\theta(y_l | x)$ is the probability of generating the bad response.
 
-**Step 2: Introduce the reference model, use ratios instead of absolute probabilities.** Intuitively, we want $\pi_\theta(y_w | x)$ to increase and $\pi_\theta(y_l | x)$ to decrease. But directly optimizing absolute probabilities may cause the model to drift away from a reasonable output distribution. The solution is to introduce the pre-fine-tuning model $\pi_{ref}$ as a reference. $\pi_{ref}$ is a snapshot of the model at the start of training; its parameters remain unchanged throughout DPO. Instead of directly optimizing $\pi_\theta(y_w | x)$, we optimize its ratio with $\pi_{ref}(y_w | x)$:
+**Step 2: Introduce the reference model, use ratios instead of absolute probabilities.** Intuitively, we want $\pi_\theta(y_w | x)$ to increase and $\pi_\theta(y_l | x)$ to decrease. But directly optimizing absolute probabilities may cause the model to drift away from a reasonable output distribution. The solution is to introduce the pre-fine-tuning model $\pi_{\text{ref}}$ as a reference. $\pi_{\text{ref}}$ is a snapshot of the model at the start of training; its parameters remain unchanged throughout DPO. Instead of directly optimizing $\pi_\theta(y_w | x)$, we optimize its ratio with $\pi_{\text{ref}}(y_w | x)$:
 
 <!-- prettier-ignore -->
-$$ \frac{\pi_\theta(y_w | x)}{\pi_{ref}(y_w | x)} $$
+$$ \frac{\pi_\theta(y_w | x)}{\pi_{\text{ref}}(y_w | x)} $$
 
 This ratio design is inevitable: when two models compute probabilities for the same response, they are both affected by that response's inherent "generation difficulty" -- responses containing rare words receive low probabilities from both models; responses with common words receive high probabilities from both. After division, the generation-difficulty factor cancels out, leaving only the change due to training. That is, this ratio measures how many times more (or less) likely the model is to generate this response relative to before training.
 
 **Step 3: Good-vs-bad comparison, take the logarithm.** There is a similar ratio for the bad response $y_l$:
 
 <!-- prettier-ignore -->
-$$ \frac{\pi_\theta(y_l | x)}{\pi_{ref}(y_l | x)} $$
+$$ \frac{\pi_\theta(y_l | x)}{\pi_{\text{ref}}(y_l | x)} $$
 
-DPO's goal is to make the good response ratio higher than the bad response ratio -- that is, the difference inside the parentheses should be positive and as large as possible. If the difference is negative, the model actually considers the bad response more likely to be generated than the good one, which contradicts our objective. Since language model probabilities are products of token probabilities, directly computing ratios can cause numerical underflow. Taking $\log$ solves this problem: after taking the logarithm, division becomes subtraction ($\log \frac{a}{b} = \log a - \log b$), products become sums, and numerics are more stable. In machine learning and information theory, $\log$ defaults to natural logarithm $\ln$ (base $e$) unless $\log_2$ or $\log_{10}$ is specified. Multiplying by a coefficient $\beta$ to control how much the model deviates from $\pi_{ref}$ (larger $\beta$ means the model is more constrained from deviating from original behavior), we get the core reward margin:
+DPO's goal is to make the good response ratio higher than the bad response ratio -- that is, the difference inside the parentheses should be positive and as large as possible. If the difference is negative, the model actually considers the bad response more likely to be generated than the good one, which contradicts our objective. Since language model probabilities are products of token probabilities, directly computing ratios can cause numerical underflow. Taking $\log$ solves this problem: after taking the logarithm, division becomes subtraction ($\log \frac{a}{b} = \log a - \log b$), products become sums, and numerics are more stable. In machine learning and information theory, $\log$ defaults to natural logarithm $\ln$ (base $e$) unless $\log_2$ or $\log_{10}$ is specified. Multiplying by a coefficient $\beta$ to control how much the model deviates from $\pi_{\text{ref}}$ (larger $\beta$ means the model is more constrained from deviating from original behavior), we get the core reward margin:
 
 <!-- prettier-ignore -->
-$$ \text{margin} = \beta \ln \frac{\pi_\theta(y_w | x)}{\pi_{ref}(y_w | x)} - \beta \ln \frac{\pi_\theta(y_l | x)}{\pi_{ref}(y_l | x)} $$
+$$ \text{margin} = \beta \ln \frac{\pi_\theta(y_w | x)}{\pi_{\text{ref}}(y_w | x)} - \beta \ln \frac{\pi_\theta(y_l | x)}{\pi_{\text{ref}}(y_l | x)} $$
 
-When $\ln \frac{\pi_\theta}{\pi_{ref}} > 0$, the model is more inclined than before training to generate that text; when it is less than 0, the opposite. DPO's goal is to make the value corresponding to the good response greater than that of the bad response.
+When $\ln \frac{\pi_\theta}{\pi_{\text{ref}}} > 0$, the model is more inclined than before training to generate that text; when it is less than 0, the opposite. DPO's goal is to make the value corresponding to the good response greater than that of the bad response.
 
 **Step 4: Construct the loss function.** Finally, we need to convert this "larger is better" margin into a "smaller is better" loss function. The tool used here is the sigmoid function:
 
@@ -271,7 +271,7 @@ The figure has two curves: blue is the sigmoid $\sigma(x)$, red is the loss $-\l
 Combining the above steps, we get DPO's loss function:
 
 <!-- prettier-ignore -->
-$$ \mathcal{L}_{DPO} = -\ln \sigma \left( \beta \ln \frac{\pi_\theta(y_w | x)}{\pi_{ref}(y_w | x)} - \beta \ln \frac{\pi_\theta(y_l | x)}{\pi_{ref}(y_l | x)} \right) $$
+$$ \mathcal{L}_{DPO} = -\ln \sigma \left( \beta \ln \frac{\pi_\theta(y_w | x)}{\pi_{\text{ref}}(y_w | x)} - \beta \ln \frac{\pi_\theta(y_l | x)}{\pi_{\text{ref}}(y_l | x)} \right) $$
 
 The following diagram shows the data flow inside the model during DPO training:
 
@@ -327,9 +327,9 @@ Earlier we mentioned "the reward score is proportional to the log of the probabi
 
 When PPO aligns a language model, the goal is to maximize reward while adding a constraint: the policy must not drift too far from the original model. This constraint is measured by KL divergence and can be written as the following optimization problem:
 
-$$\max_{\pi_\theta} \; \mathbb{E}_{x, y \sim \pi_\theta}\left[r(x, y)\right] - \beta \, D_{\text{KL}}\left(\pi_\theta(\cdot|x) \;\|\; \pi_{\text{ref}}(\cdot|x)\right)$$
+$$\max_{\pi_\theta} \; \mathbb{E}_{x, y \sim \pi_\theta}\left[r(x, y)\right] - \beta \, D_{\mathrm{KL}}\left(\pi_\theta(\cdot|x) \;\|\; \pi_{\text{ref}}(\cdot|x)\right)$$
 
-where $r(x,y)$ is the reward model's score for the response, $\beta$ controls constraint strength, and $D_{\text{KL}}$ measures the difference between two distributions.
+where $r(x,y)$ is the reward model's score for the response, $\beta$ controls constraint strength, and $D_{\mathrm{KL}}$ measures the difference between two distributions.
 
 ---
 
@@ -337,7 +337,7 @@ where $r(x,y)$ is the reward model's score for the response, $\beta$ controls co
 
 The definition of KL divergence is:
 
-$$D_{\text{KL}}(\pi_\theta \| \pi_{\text{ref}}) = \mathbb{E}_{y \sim \pi_\theta}\left[\log \frac{\pi_\theta(y|x)}{\pi_{\text{ref}}(y|x)}\right]$$
+$$D_{\mathrm{KL}}(\pi_\theta \| \pi_{\text{ref}}) = \mathbb{E}_{y \sim \pi_\theta}\left[\log \frac{\pi_\theta(y|x)}{\pi_{\text{ref}}(y|x)}\right]$$
 
 Substituting into the optimization objective and merging expectations:
 

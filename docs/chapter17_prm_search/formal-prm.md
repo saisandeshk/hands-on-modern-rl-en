@@ -188,18 +188,15 @@ DeepSeek automatically generated a large number of Lean4 theorems and proofs for
 
 ### Prover-V2's Results
 
-The paper reports that the 671B model reaches 82.4% on MiniF2F-test with Pass@32, and 88.9% when the candidate budget is raised to Pass@8192; it also solves 49 of the 658 problems in PutnamBench. The candidate counts here differ by two orders of magnitude, so 88.9% cannot be read as a single-attempt proof success rate.
+The paper reports that the 671B model reaches 82.4% on MiniF2F-test with Pass@32, and 88.9% when the candidate budget is raised to Pass@8192; it also solves 49 of the 658 problems in PutnamBench. The candidate counts here differ by two orders of magnitude, so 88.9% cannot be read as a single-attempt proof success rate. The two figures come from different reported settings and cannot be treated as two points on one same-model budget-scaling curve.
 
-We need to be clear about what Pass@k means: it measures the probability that "at least one of $k$ independent attempts succeeds." If the single-attempt success rate is $p$, then
+We need to be clear about what Pass@k means: it measures the probability that "at least one of $k$ independent attempts succeeds." (Here $k$ is the candidate count, written $N$ in Section 17.2.) If the single-attempt success rate is $p$, then
 
 $$\text{Pass}@k = 1-(1-p)^k$$
 
-This is exactly the coverage formula from Section 16.3. Working backward, here are the single-attempt success rates implied by these numbers:
+This is exactly the coverage formula from Section 16.3. Because the two reported Pass@k figures belong to different settings, working them backward into a single $p$ is not valid, so no single-attempt rates are derived here.
 
-- Pass@32 = 82.4%: the single-attempt success rate is about $p=5.3\%$ (since $(1-0.053)^{32}\approx0.175$, so $1-0.175\approx0.825$)
-- Pass@8192 = 88.9%: the single-attempt success rate needs to be only about $p=0.027\%$ (since $(1-0.000268)^{8192}\approx0.111$, so $1-0.111=0.889$)
-
-The two settings differ by more than 100 times. When reporting formal proving results, the candidate budget must be stated, or the number has no meaning. These numbers also show that increasing the search budget for formal proofs does cover more problems, but the compute cost grows linearly with the number of candidates.
+When reporting formal proving results, the candidate budget must be stated, or the number has no meaning. Larger candidate budgets can cover more problems, but the compute cost grows linearly with the number of candidates.
 
 ## Where Formal Verification Can Be Used
 

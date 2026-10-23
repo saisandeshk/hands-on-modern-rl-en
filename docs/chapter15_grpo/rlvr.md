@@ -133,7 +133,7 @@ flowchart TD
 
 Concretely:
 
-- **Rollout phase**: for each math problem, the model samples $G$ answers under the current policy $π_θ$, for example $G=4$. Each answer contains a reasoning process and a final answer in `\boxed{}` format.
+- **Rollout phase**: for each math problem, the model samples $G$ answers under the current policy $\pi_\theta$, for example $G=4$. Each answer contains a reasoning process and a final answer in `\boxed{}` format.
 - **Reward phase**: the verifier extracts the answer inside `\boxed{}` and compares it with the ground truth. A correct answer gets reward 1; a wrong answer, or an answer that cannot be extracted, gets reward 0.
 - **Train phase**: use GRPO within-group normalization to compute the advantage, then perform a policy gradient update.
 

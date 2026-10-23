@@ -233,6 +233,8 @@ $$
 
 Consequently, the original GRPO computes $\exp(\ell^{\mathrm{new}}_{i,t}-\ell^{\mathrm{old}}_{i,t})$ separately at every token. Exponentiating the sum instead produces $\prod_t r_{i,t}$, introduces response-length dependence, and clips the whole response only once. Equation (4) likewise defines the KL estimate token by token. The formulas and code below use those original definitions as the acceptance criterion. [DeepSeekMath equations](https://arxiv.org/html/2402.03300#S3.SS1)
 
+In this chapter's own notation, the paper's $q$, $o_i$, and $r_{i,t}(\theta)$ above are the prompt $x_j$, the response $y_{j,i}$, and the token ratio $\rho_{j,i,t}$.
+
 ### TRL implementation comparison
 
 The current TRL source preserves this token dimension. When checking the Hugging Face TRL main branch on 2026-08-28, the following correspondences can be seen in [`GRPOTrainer`](https://github.com/huggingface/trl/blob/main/trl/trainer/grpo_trainer.py):
@@ -262,7 +264,7 @@ The symbols mean:
 - $x_j$: the $j$-th prompt, namely a problem or question.
 - $G$: the group size, meaning how many answers each prompt generates. `num_generations=8` in code means $G=8$.
 - $y_{j,i}$: the $i$-th answer generated under the $j$-th prompt.
-- $\pi_{\text{old}}$: the old policy used to generate this batch of answers. It is responsible for sampling data.
+- $\pi_{\theta_{\text{old}}}$: the old policy used to generate this batch of answers. It is responsible for sampling data.
 - $\pi_\theta$: the new policy being updated. It is responsible for learning so that good answers become more likely.
 
 The sampling process can be written as:
@@ -270,12 +272,12 @@ The sampling process can be written as:
 $$
 y_{j,i}
 \sim
-\pi_{\text{old}}(\cdot \mid x_j),
+\pi_{\theta_{\text{old}}}(\cdot \mid x_j),
 \qquad
 i=1,\ldots,G
 $$
 
-The symbol $\sim$ means "sample from a distribution". The dot $\cdot$ in $\pi_{\text{old}}(\cdot \mid x_j)$ means "the position of all possible answers": given prompt $x_j$, the old policy assigns probabilities to all possible answers, and we draw $G$ answers from that distribution.
+The symbol $\sim$ means "sample from a distribution". The dot $\cdot$ in $\pi_{\theta_{\text{old}}}(\cdot \mid x_j)$ means "the position of all possible answers": given prompt $x_j$, the old policy assigns probabilities to all possible answers, and we draw $G$ answers from that distribution.
 
 In the code, this corresponds to **[A] group sampling**:
 
@@ -483,7 +485,7 @@ $$
 s_j=\operatorname{std}(r_{j,1},\ldots,r_{j,G}).
 $$
 
-DeepSeekMath writes `std` without specifying whether the denominator is $G$ or $G-1$. This book uses the sample standard deviation with Bessel's correction (divide by $G-1$), following the [default definition of PyTorch `torch.std`](https://pytorch.org/docs/stable/generated/torch.std.html); the NumPy teaching snippet below therefore uses `rewards.std(ddof=1)` to match. With a fixed group size, this changes the overall advantage scale but not the sign or ordering of answers inside a group.
+DeepSeekMath writes `std` without specifying whether the denominator is $G$ or $G-1$. This chapter uses the sample standard deviation with Bessel's correction (divide by $G-1$), following the [default definition of PyTorch `torch.std`](https://pytorch.org/docs/stable/generated/torch.std.html); the NumPy teaching snippet below therefore uses `rewards.std(ddof=1)` to match. With a fixed group size, this changes the overall advantage scale but not the sign or ordering of answers inside a group. Note this differs from Chapters 16 and 18, which use the population standard deviation (`np.std` default, `ddof=0`); the same rewards therefore get different advantage scales in different chapters.
 
 Here:
 
@@ -533,8 +535,8 @@ flowchart TD
         Q --> G2["Answer 2: answer=12 (wrong)"]
         Q --> G3["Answer 3: answer=7 (correct)"]
         Q --> G4["Answer 4: answer=8 (wrong)"]
-        Q --> G5["... (k answers total)"]
-        Q --> Gk["Answer k: answer=7 (correct)"]
+        Q --> G5["... (G answers total)"]
+        Q --> Gk["Answer G: answer=7 (correct)"]
     end
 
     subgraph scoring ["Step 2: rule scoring"]
@@ -559,7 +561,7 @@ flowchart TD
     end
 
     subgraph update ["Step 4: PPO Clip update"]
-        A1 --> Clip["L = min(r_t * A_i, clip(r_t, 1-eps, 1+eps) * A_i)"]
+        A1 --> Clip["L = min(rho * A_hat, clip(rho, 1-epsilon, 1+epsilon) * A_hat)"]
         A2 --> Clip
         A3 --> Clip
         Clip --> Update["Update policy network theta"]
@@ -706,12 +708,12 @@ The core innovation of GRPO is replacing the Critic with within-group normalizat
 Early training (Episode 10):
   8 answers to the problem "15 - 3 - 5 = ?": [3, 7, 12, 7, 15, 7, 8, 10]
   Within-group variance: high (answers vary widely)
-  Normalized advantages: [-1.2, +0.1, +0.8, +0.1, +1.5, +0.1, -0.3, +0.6]
+  Illustrative advantages (schematic, not exact normalized outputs, which always sum to zero): [-1.2, +0.1, +0.8, +0.1, +1.5, +0.1, -0.3, +0.6]
 
 Middle training (Episode 100):
   8 answers to the same problem: [7, 7, 7, 8, 7, 7, 7, 7]
   Within-group variance: low (most answers are correct)
-  Normalized advantages: [0, 0, 0, -0.5, 0, 0, 0, 0]
+  Illustrative advantages (schematic): [0, 0, 0, -0.5, 0, 0, 0, 0]
 
 Late training (Episode 300):
   8 answers to the same problem: [7, 7, 7, 7, 7, 7, 7, 7]
@@ -721,11 +723,11 @@ Late training (Episode 300):
 
 When within-group variance falls to zero, all advantages become zero, and there is no gradient signal. The model has "graduated" on this problem. This is exactly what we want: the training signal naturally shifts toward problems that the model has not yet mastered.
 
-### Choosing k
+### Choosing G
 
-The group size $k$ is the most important hyperparameter in GRPO. It directly affects the quality of within-group normalization:
+The group size $G$ is the most important hyperparameter in GRPO. It directly affects the quality of within-group normalization:
 
-| k value | Sampling cost                   | Normalization quality                          | Suitable setting           |
+| G value | Sampling cost                   | Normalization quality                          | Suitable setting           |
 | ------- | ------------------------------- | ---------------------------------------------- | -------------------------- |
 | 2       | Low; only 2 samples per problem | Poor; mean and standard deviation are unstable | Quick validation           |
 | 4       | Medium                          | Acceptable                                     | Limited resources          |
@@ -754,7 +756,7 @@ advantages = grpo_group_normalize(rewards)
 <details>
 <summary>Reflection question: when does GRPO within-group normalization fail?</summary>
 
-1. **k is too small**: with $k=2$, the mean and standard deviation are extremely unstable, so the statistics are unreliable.
+1. **G is too small**: with $G=2$, the mean and standard deviation are extremely unstable, so the statistics are unreliable.
 2. **The reward distribution is skewed**: when most answers receive zero reward, a few high-reward answers dominate the gradient signal.
 3. **All answers have the same quality**: variance is zero, all advantages are zero, and there is no gradient signal. This is the late-training "graduation" phenomenon.
 4. **The reward signal is discontinuous**: with only 0/1 values, normalized advantages are discrete and the gradient signal is not fine-grained enough.
@@ -771,9 +773,9 @@ GRPO mitigates these problems through DAPO's "dynamic sampling" improvement: fil
 | Advantage computation | $A = R - V(s)$ or GAE              | $A_i = (r_i - \bar{r}) / \sigma_r$          |
 | Number of models      | 4 (Actor + Critic + Ref + RM)      | 2 (Actor + Ref)                             |
 | Clipping mechanism    | PPO Clip                           | Same PPO Clip                               |
-| Sampling method       | Online interaction                 | Group sampling; sample k answers per prompt |
+| Sampling method       | Online interaction                 | Group sampling; sample G answers per prompt |
 | Memory                | High                               | 30-40% lower                                |
-| Baseline quality      | Depends on Critic training quality | Depends on group size $k$                   |
+| Baseline quality      | Depends on Critic training quality | Depends on group size $G$                   |
 | Baseline update speed | Requires retraining the Critic     | Updates automatically with each batch       |
 
 It is worth noting that GRPO inherits PPO's clipping mechanism but does not inherit GAE. The reason is that GRPO usually receives only one reward signal at the end of the sequence, such as correct or wrong, rather than a reward at every token. In this situation, multi-step TD in GAE degenerates into a single-step estimate and is not fundamentally different from subtracting the mean from the final reward.

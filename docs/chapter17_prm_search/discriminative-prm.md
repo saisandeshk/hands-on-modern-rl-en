@@ -6,7 +6,7 @@ This is the core idea of the discriminative PRM: turn "can we continue from this
 
 New questions follow immediately. How do we cut a complete piece of reasoning into steps that can be labeled? What does it cost to label 800,000 steps? Will a classifier trained in one domain (say, math) still work in another (say, code)? This section walks along one complete data production line: first collect labeled data, then train the classifier, then see how the scores are used, and finally discuss where things can go wrong.
 
-A discriminative PRM rewrites step-by-step checking as a classification task. The input is the problem $q$ together with the reasoning prefix $o_{\leq i}$ up to the current step, and the output is the probability of each of the classes good, bad, and neutral. Why must the prefix be included? Because the sentence "so $p$ is even" means nothing in isolation. Whether it is right depends entirely on which conditions were derived before it. Since the output is a probability, the step scores can be aggregated into a ranking score for the whole answer, or used directly as a step-level reward in RL.
+A discriminative PRM rewrites step-by-step checking as a classification task. The input is the problem $q$ together with the steps before the current one $o_{<i}$ and the text of step $i$ itself $s_i$, and the output is the probability of each of the classes good, bad, and neutral. Why must the prefix be included? Because the sentence "so $p$ is even" means nothing in isolation. Whether it is right depends entirely on which conditions were derived before it. Since the output is a probability, the step scores can be aggregated into a ranking score for the whole answer, or used directly as a step-level reward in RL.
 
 <img src="./images/discriminative-prm-pipeline.svg" alt="A discriminative PRM pipeline from step segmentation and annotation to training, reranking, and reinforcement learning">
 
@@ -70,9 +70,9 @@ The public paper focuses on comparing process supervision with outcome supervisi
 
 For step $i$, the model outputs probabilities for good, bad, and neutral. Training uses the cross-entropy loss, whose goal is to make the probability of the human-labeled class as high as possible:
 
-$$\mathcal{L}_{\text{PRM}} = -\sum_{i} \sum_{c \in \{good, bad, neutral\}} y_{i,c} \log p_\theta(c \mid q, o_{\leq i}, s_i)$$
+$$\mathcal{L}_{\text{PRM}} = -\sum_{i} \sum_{c \in \{good, bad, neutral\}} y_{i,c} \log p_\theta(c \mid q, o_{<i}, s_i)$$
 
-Here $y_{i,c}$ is the human-annotated one-hot label. If step $i$ is labeled good, only the position for good equals 1 and all others are 0, so the sum keeps a single term $-\log p_\theta(\text{good} \mid \cdots)$. The closer the model's probability for good is to 1, the smaller the loss.
+Here $y_{i,c}$ is the human-annotated one-hot label, $o_{<i}$ denotes the steps before step $i$, and $s_i$ denotes the text of step $i$ itself. If step $i$ is labeled good, only the position for good equals 1 and all others are 0, so the sum keeps a single term $-\log p_\theta(\text{good} \mid \cdots)$. The closer the model's probability for good is to 1, the smaller the loss.
 
 A few concrete probabilities give a feel for the size of the loss. When the label is good, the loss is $-\log p_\theta(\text{good})$:
 
@@ -160,7 +160,7 @@ The aggregation rule directly determines which candidate is chosen. Here is a co
 
 Mean picks A (0.70 > 0.60), min picks B (0.6 > 0.2), and product ties them (both are 0.1296). Step three of A scores only 0.2. Is that a slip of the pen or a fatal error? The choice of aggregation is the system's answer to that question.
 
-In the math experiments mentioned above, the minimum step score (min) worked best. The logical chain of a mathematical proof is tight, and a single wrong equation ruins the whole proof. Open-ended writing has no such strict logical dependencies, so min cannot be carried over directly. The aggregation rule should be measured on the validation set of the target task.
+In some math setups the minimum step score (min) is reported to work well. The logical chain of a mathematical proof is tight, and a single wrong equation ruins the whole proof. Open-ended writing has no such strict logical dependencies, so min cannot be carried over directly. The aggregation rule should be measured on the validation set of the target task.
 
 ### Using Step Scores for RL Training
 
@@ -252,7 +252,7 @@ The weighted combination is
 
 $$r = \alpha r_{\text{process}} + \beta r_{\text{outcome}},$$
 
-where $r_{\text{process}}$ is the aggregated step score, $r_{\text{outcome}}$ is the final outcome score, and $\alpha$ and $\beta$ are weights. This formula does not tell us the best weights. It is a reminder to monitor separately "has the process score gone up?" and "has the task actually been completed?", so that the evaluator's bias is not amplified by the policy model.
+where $r_{\text{process}}$ is the aggregated step score, $r_{\text{outcome}}$ is the final outcome score, and $\alpha$ and $\beta$ are local combination weights (unrelated to the KL coefficient $\beta$ used in RLHF/DPO). This formula does not tell us the best weights. It is a reminder to monitor separately "has the process score gone up?" and "has the task actually been completed?", so that the evaluator's bias is not amplified by the policy model.
 
 ## Section Summary
 

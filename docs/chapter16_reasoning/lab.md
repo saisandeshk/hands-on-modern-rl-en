@@ -111,7 +111,7 @@ parse_answer("3+8=11>1c1 no answer")        # None
 ```
 
 **Pass@k is estimated, not just counted.** With $n$ samples of which $c$
-are correct, the lab uses the unbiased Chen et al. estimator
+are correct (here $n$ is the pool size, an estimator detail with no counterpart in Section 16.3, $c$ the number correct in the pool, and $k$ the candidate count, written $N$ in Section 16.3), the lab uses the unbiased Chen et al. estimator
 $1 - \binom{n-c}{k}/\binom{n}{k}$ rather than the raw fraction of pools
 containing a hit, and the test suite checks it against brute-force subset
 enumeration:
@@ -131,7 +131,7 @@ verifier accepts precisely the correct samples, which is why its curve
 equals the empirical coverage.
 
 **Rejection sampling mixes, not replaces.** The fine-tuning round trains
-on verified self-generated traces _plus_ an equal number of original
+on verified self-generated traces _plus_ a smaller number of original
 teacher traces at a reduced learning rate — pure self-training skews
 toward already-solved problems, as the results below show.
 
@@ -149,8 +149,8 @@ price of correctness:
 | -------- | ----- | ----- | ----- | ----- | ----- |
 | accuracy | 0.727 | 0.664 | 0.512 | 0.320 | 0.113 |
 
-At T=0.7 (pool rate $p \approx 0.52$) the N-scaling reproduces the §16.3
-picture quantitatively:
+At T=0.7 (first-sample rate $p \approx 0.52$; the 64-sample pool average is 0.47) the N-scaling reproduces the §16.3
+picture qualitatively (exact-verifier selection sits below the independent-sampling curve because samples from the same prompt are correlated, so the curve is an upper bound):
 
 | N   | pass@k | majority | best-of-N exact | best-of-N FP=0.1 | best-of-N FP=0.3 |
 | --- | ------ | -------- | --------------- | ---------------- | ---------------- |
@@ -163,7 +163,7 @@ picture quantitatively:
 | 64  | 1.00   | 0.71     | 1.00            | 0.86             | 0.75             |
 
 The rejection-sampling round kept 4000 verified self-traces (keep rate
-0.25 at T=0.8), mixed them 1:1 with teacher traces, and fine-tuned 2
+0.25 at T=0.8), mixed them with the 2000 teacher traces (2:1, the teacher pool is the limit), and fine-tuned 2
 epochs at 0.2× learning rate: greedy accuracy rose 0.727 → 0.754 and
 T=0.7 accuracy rose 0.512 → 0.605. The guardrails matter — an early trial
 that fine-tuned on kept traces alone at full learning rate _dropped_
@@ -177,7 +177,7 @@ where the model is usually right, permanently wrong where its most common
 output is a systematic error (here, mostly mishandled carries). The vote
 therefore plateaus near 0.71. Best-of-N with an exact verifier only needs
 _one_ correct sample in the pool, so it follows the coverage curve
-$1-(1-p)^N$ all the way to 1.00. This is the §16.3 distinction between
+$1-(1-p)^N$ qualitatively toward 1.00 (from below, since same-prompt samples are correlated rather than independent). This is the §16.3 distinction between
 "the correct answer appears" and "the system picks it": voting approximates
 picking by popularity, verification picks by checking.
 

@@ -30,10 +30,12 @@ $$
 $$
 
 $$
-R_{PPO}(x,y)
+R_{total}(x,y)
 =r_\phi(x,y)-\beta D_{KL}(\pi_\theta(\cdot\mid x)\|\pi_{ref}(\cdot\mid x))
 \quad \text{(PPO-RLHF: optimize reward, but stay close to SFT)}
 $$
+
+Notation used in this chapter: the reference model is written $\pi_{ref}$ throughout; Appendix D writes the same object $\pi_{\text{ref}}$.
 
 ## Why These Formulas Matter
 
