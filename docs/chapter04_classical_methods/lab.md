@@ -92,28 +92,28 @@ All numbers below come from the full run (`--seed 0`, CPU). Re-run the scripts t
 
 On slippery 4x4 FrozenLake with $\gamma = 1$ and stopping threshold $\theta = 10^{-6}$:
 
-| Method                            | Sweeps / work                   | Bellman residual      | $V^\star(s_0)$ |
-| --------------------------------- | ------------------------------- | --------------------- | -------------- |
-| Policy evaluation (uniform $\pi$) | 40 sweeps                       | —                     | —              |
-| Policy iteration                  | 617 eval sweeps, 2 improvements | $6.56 \times 10^{-7}$ | 0.823512       |
-| Value iteration                   | 431 sweeps                      | $9.61 \times 10^{-7}$ | 0.823506       |
+| Method                            | Sweeps / work                   | Bellman residual      | $V^*(s_0)$ |
+| --------------------------------- | ------------------------------- | --------------------- | ---------- |
+| Policy evaluation (uniform $\pi$) | 40 sweeps                       | —                     | —          |
+| Policy iteration                  | 617 eval sweeps, 2 improvements | $6.56 \times 10^{-7}$ | 0.823512   |
+| Value iteration                   | 431 sweeps                      | $9.61 \times 10^{-7}$ | 0.823506   |
 
-Policy iteration and value iteration agree to $1.12 \times 10^{-5}$ in max norm. The start-state value $0.8235$ equals the known textbook answer $14/17$: the optimal policy reaches the goal with probability $14/17$. Its $Q^\star$ table is saved as the exact oracle for the next experiments.
+Policy iteration and value iteration agree to $1.12 \times 10^{-5}$ in max norm. The start-state value $0.8235$ equals the known textbook answer $14/17$: the optimal policy reaches the goal with probability $14/17$. Its $Q^*$ table is saved as the exact oracle for the next experiments.
 
 ### Experiment 2: MC and TD control against the oracle
 
 Four methods, epsilon-greedy behaviour ($\epsilon = 0.1$), 10 seeds $\times$ 20,000 episodes on slippery FrozenLake. The three TD methods use $\alpha = 0.1$; first-visit MC uses no step size — it updates each first visit toward its full return with the incremental sample mean $Q \mathrel{+}= (G - Q) / N(s, a)$:
 
-| Method         | Final greedy return | Final max $\|Q - Q^\star\|$ | Online return (last 10%) |
-| -------------- | ------------------- | --------------------------- | ------------------------ |
-| MC first-visit | $0.1400 \pm 0.118$  | 0.8516                      | 0.0734                   |
-| SARSA          | $0.3800 \pm 0.384$  | 0.7957                      | 0.1932                   |
-| Expected SARSA | $0.3800 \pm 0.384$  | 0.8486                      | 0.1960                   |
-| Q-learning     | $0.2300 \pm 0.353$  | 0.7071                      | 0.1337                   |
+| Method         | Final greedy return | Final max $\|Q - Q^*\|$ | Online return (last 10%) |
+| -------------- | ------------------- | ----------------------- | ------------------------ |
+| MC first-visit | $0.1400 \pm 0.118$  | 0.8516                  | 0.0734                   |
+| SARSA          | $0.3800 \pm 0.384$  | 0.7957                  | 0.1932                   |
+| Expected SARSA | $0.3800 \pm 0.384$  | 0.8486                  | 0.1960                   |
+| Q-learning     | $0.2300 \pm 0.353$  | 0.7071                  | 0.1337                   |
 
-The honest headline is that with a constant $\epsilon = 0.1$ and $\alpha = 0.1$ none of the four tables converges in 20,000 episodes: greedy-policy success plateaus between $0.14$ and $0.51$ (far below the optimal $0.82$), and the max-norm oracle error falls from $0.94$ to a $0.55$–$0.85$ plateau rather than to zero. Q-learning's table gets closest to $Q^\star$ (0.71), yet its greedy policy is fragile: on some seeds (e.g. seed 2) the learned $Q$ overestimates one start-state action ($0.89$ versus the true $0.82$), so the greedy policy walks into the wall forever and its exact success probability, evaluated with the DP oracle, is $0.0$.
+The honest headline is that with a constant $\epsilon = 0.1$ and $\alpha = 0.1$ none of the four tables converges in 20,000 episodes: greedy-policy success plateaus between $0.14$ and $0.51$ (far below the optimal $0.82$), and the max-norm oracle error falls from $0.94$ to a $0.55$–$0.85$ plateau rather than to zero. Q-learning's table gets closest to $Q^*$ (0.71), yet its greedy policy is fragile: on some seeds (e.g. seed 2) the learned $Q$ overestimates one start-state action ($0.89$ versus the true $0.82$), so the greedy policy walks into the wall forever and its exact success probability, evaluated with the DP oracle, is $0.0$.
 
-Read the shared $\|Q - Q^\star\|$ column with care: it is a genuine convergence measure only for Q-learning, whose target is $Q^\star$. The other three methods evaluate the $\epsilon$-greedy behaviour policy, so they converge toward $Q^{\epsilon\text{-greedy}}$, not $Q^\star$ — and that target sits $0.5057$ away from $Q^\star$ in max norm (its start value is $V^{\epsilon\text{-greedy}}(s_0) = 0.4175$, computed with the same DP code). The on-policy curves therefore have a floor of about $0.51$ by construction; the observed $0.80$–$0.85$ values are that floor plus estimation noise. For SARSA, Expected SARSA and MC, the online return is the fairer progress metric — it sits near $0.07$–$0.20$, below the optimal $0.82$, exactly because the behaviour policy keeps exploring.
+Read the shared $\|Q - Q^*\|$ column with care: it is a genuine convergence measure only for Q-learning, whose target is $Q^*$. The other three methods evaluate the $\epsilon$-greedy behaviour policy, so they converge toward $Q^{\epsilon\text{-greedy}}$, not $Q^*$ — and that target sits $0.5057$ away from $Q^*$ in max norm (its start value is $V^{\epsilon\text{-greedy}}(s_0) = 0.4175$, computed with the same DP code). The on-policy curves therefore have a floor of about $0.51$ by construction; the observed $0.80$–$0.85$ values are that floor plus estimation noise. For SARSA, Expected SARSA and MC, the online return is the fairer progress metric — it sits near $0.07$–$0.20$, below the optimal $0.82$, exactly because the behaviour policy keeps exploring.
 
 One asymmetry to keep in mind: a time-limit truncation is handled differently by the four methods. The TD updates bootstrap past it (the episode did not really end), while first-visit MC treats the truncated partial return as a complete episode with no bootstrap available — a small downward bias on MC's estimates that the TD methods do not share.
 
@@ -140,7 +140,7 @@ The SARSA map travels high (rows 0–1, away from the cliff) while the Q-learnin
 
 ### Experiment 4: ordinary vs. weighted importance sampling
 
-Target policy: the DP-optimal greedy policy on FrozenLake (exact $V^\pi(s_0) = 0.823529$). Behaviour policy: $\epsilon$-greedy around $Q^\star$ with $\epsilon = 0.1$. 100 trials $\times$ 2,000 behaviour episodes each:
+Target policy: the DP-optimal greedy policy on FrozenLake (exact $V^\pi(s_0) = 0.823529$). Behaviour policy: $\epsilon$-greedy around $Q^*$ with $\epsilon = 0.1$. 100 trials $\times$ 2,000 behaviour episodes each:
 
 | Estimator   | Mean   | Std    | Bias      | RMSE   |
 | ----------- | ------ | ------ | --------- | ------ |
@@ -150,7 +150,7 @@ Target policy: the DP-optimal greedy policy on FrozenLake (exact $V^\pi(s_0) = 0
 ## What to Look For and Why It Happens
 
 - **DP agreement is exactness, not luck.** All three DP methods solve the same Bellman equations from the same model; the residual rule just decides when the digits stop changing. Policy iteration needs only 2 improvements here because FrozenLake's optimal policy is found almost immediately — most of its sweeps go into evaluating intermediate policies, which is why its total sweep count exceeds value iteration's.
-- **The oracle error separates "still learning" from "unlucky" — but only against the right target.** A flat greedy-return curve could mean the policy stopped improving or that evaluation is noisy. The max-norm error to a table has no sampling noise on one side of the comparison, so a shrinking error means the table itself is converging — provided the reference table is the method's actual target. That is $Q^\star$ for Q-learning only; SARSA, Expected SARSA and MC aim at $Q^{\epsilon\text{-greedy}}$, whose distance to $Q^\star$ is $0.5057$, so judge them by the online return instead.
+- **The oracle error separates "still learning" from "unlucky" — but only against the right target.** A flat greedy-return curve could mean the policy stopped improving or that evaluation is noisy. The max-norm error to a table has no sampling noise on one side of the comparison, so a shrinking error means the table itself is converging — provided the reference table is the method's actual target. That is $Q^*$ for Q-learning only; SARSA, Expected SARSA and MC aim at $Q^{\epsilon\text{-greedy}}$, whose distance to $Q^*$ is $0.5057$, so judge them by the online return instead.
 - **On-policy vs. off-policy is visible in the cliff paths.** SARSA's backup uses the next behaviour action, which near the cliff is sometimes a random step into $-100$. Its action values therefore price in the wobble, and the greedy policy extracted from them keeps its distance. Q-learning's backup uses the greedy next action, so its values describe the optimal policy even while its behaviour keeps falling in — better destination, bumpier road.
 - **Importance weights collapse over long horizons.** The behaviour policy matches the deterministic target at each step with probability around $0.925$, so a 30-step episode matches fully with probability $0.925^{30} \approx 0.1$. Most episodes get weight exactly zero; a few get huge weights. Ordinary IS is unbiased for full episodes but jumps around (variance) — and here it also carries a small downward bias ($-0.05$, roughly two standard errors over the 100 trials) because gymnasium cuts every episode at 100 steps and the collection code does not bootstrap the missing tail, while the target policy's longer trajectories are the ones most likely to be cut. Self-normalising (weighted IS) calms the estimates down at the price of finite-sample bias. Watch the mean effective-sample-size fraction: only about $2\%$ of each batch effectively counts.
 
@@ -158,7 +158,7 @@ Target policy: the DP-optimal greedy policy on FrozenLake (exact $V^\pi(s_0) = 0
 
 1. **Stopping threshold vs. sweep count.** Re-run `dp_oracle.py` with `--theta 1e-2` down to `--theta 1e-10` and plot sweeps against the final Bellman residual. _Hint: value iteration's error shrinks steadily (the per-sweep ratio is not a constant, but it stays below 1 throughout); the iteration count grows only logarithmically in $1/\theta$ — about 95–100 extra sweeps per decade._
 2. **Step-size sensitivity.** Train Q-learning on FrozenLake with `--alpha 0.01, 0.1, 0.5` and compare the oracle-error curves. _Hint: small $\alpha$ learns slowly but steadily; large $\alpha$ bounces around the optimum — the max-norm error makes the bouncing visible._
-3. **First-visit vs. every-visit MC.** Modify `train_mc` to update every visit instead of the first visit and compare. _Hint: the two estimate slightly different quantities on continuing revisits; on this episodic task they should nearly coincide — check whether they do._
+3. **First-visit vs. every-visit MC.** Modify `train_mc` to update every visit instead of the first visit and compare. _Hint: the two weight revisits differently (every-visit averages one return per visit, first-visit one return per episode); on this episodic task both estimate $V^\pi$ and should nearly coincide — check whether they do._
 4. **Break the OPE demo.** Raise `--eps-behavior` to 0.3 and 0.5 and watch the ESS fraction and the RMSE of both estimators. _Hint: as epsilon grows the ESS fraction collapses by two to three orders of magnitude, and occasional batches contain no trajectory matching the target at all, in which case weighted IS returns exactly 0 — the guard in `weighted_is` exists for this case._
 5. **Deterministic FrozenLake.** Gymnasium's `FrozenLake-v1` is slippery; create it with `is_slippery=False`, re-run DP and Q-learning, and compare iteration counts and learning speed. _Hint: the model becomes deterministic, so DP converges in a handful of sweeps and TD needs far fewer samples._
 6. **Evaluate a uniform policy by OPE.** Change the target to the uniform-random policy (exact value from `iterative_policy_evaluation`) with behaviour $\epsilon$-greedy around it, and repeat Experiment 4. _Hint: behaviour and target now overlap heavily, so ESS stays high — the bias/variance gap between the estimators should nearly vanish._

@@ -175,7 +175,7 @@ When $\alpha=0$, $P(i)$ reduces to uniform sampling;
 when $\alpha=1$, the sampling probability is proportional to the priority.
 In practice a value between the two is usually chosen,
 so that the model sees high-TD-error samples more often
-while still retaining some coverage.
+while still retaining some coverage. (This PER $\alpha$ is distinct from the learning-rate $\alpha$ in Section 5.1; context disambiguates.)
 
 Non-uniform sampling, however, changes the distribution of the training data.
 To reduce the bias this introduces,
@@ -186,7 +186,7 @@ w_i = \left(\frac{1}{N P(i)}\right)^\beta,
 $$
 
 and often divides $w_i$ by the largest weight in the current batch to keep the values numerically stable.
-The parameter $\beta$ controls the strength of the correction.
+The parameter $\beta$ controls the strength of the correction. (This PER $\beta$ is distinct from the KL-penalty $\beta$ in later LLM chapters and the intrinsic-reward weight $\beta$ below; context disambiguates.)
 During training, the loss can be written as
 
 $$
@@ -254,7 +254,7 @@ W = \mu_W + \sigma_W \odot \epsilon_W.
 $$
 
 Here $\mu_W$ and $\sigma_W$ are learnable parameters,
-$\epsilon_W$ is random noise,
+$\epsilon_W$ is random noise (unrelated to the exploration rate $\epsilon$),
 and $\odot$ denotes element-wise multiplication.
 Because the noise acts directly on the parameters,
 the same noise sample produces a consistent behavioral preference across many states,
@@ -316,7 +316,7 @@ But if the agent never visits the key states,
 even a perfectly accurate value estimate cannot learn from the missing data.
 This is the exploration problem.
 
-Epsilon-greedy is the simplest way to explore:
+Epsilon-greedy is the simplest way to explore ($\epsilon$ here is the same exploration rate written $\varepsilon$ in Section 5.2; only the glyph differs):
 with probability $\epsilon$ it picks an action at random,
 and with probability $1-\epsilon$ it picks the action with the largest current Q value.
 Its advantage is simplicity,

@@ -27,7 +27,7 @@ This chapter built the modeling language of reinforcement learning. Section 2.1 
 - MDP tuple: $\mathcal{M} = (\mathcal{S}, \mathcal{A}, P, R, \gamma)$. Reading: the situation set, the action set, the dynamics, the scoring rule, and the patience parameter.
 - Discounted return: $G_t = \sum_{k=0}^{\infty} \gamma^k r_{t+k} = r_t + \gamma G_{t+1}$. Reading: future rewards summed with shrinking weights; the tail is summarized by the next return.
 - Return bound: $G_t \le R_{\max}/(1-\gamma)$. Reading: discounting keeps infinite-horizon returns finite, with effective horizon $H = 1/(1-\gamma)$.
-- Optimal policy: $\pi^* = \arg\max_\pi \mathbb{E}_\pi[\sum_{t=0}^{\infty} \gamma^t R(s_t, a_t)]$. Reading: the decision rule with the largest expected long-term return.
+- Optimal policy: $\pi^* = \arg\max_\pi \mathbb{E}_\pi[\sum_{t=0}^{\infty} \gamma^t R_{t+1}]$. Reading: the decision rule with the largest expected long-term return.
 - State and action values: $V^\pi(s) = \mathbb{E}_\pi[G_t \mid s_t = s]$, $Q^\pi(s,a) = \mathbb{E}_\pi[G_t \mid s_t = s, a_t = a]$. Reading: the average future return from a state, and from a state plus a fixed first action.
 - Value-action link: $V^\pi(s) = \sum_a \pi(a \mid s)\, Q^\pi(s,a)$. Reading: a state's value is the policy-weighted average of its action values.
 - Advantage: $A^\pi(s,a) = Q^\pi(s,a) - V^\pi(s)$. Reading: how much better this action is than the policy's average choice.
@@ -99,7 +99,7 @@ Arm A has true payout 0.6 and arm B 0.4, each tried 10 times.
 
 ::: details Solution
 (a) $V^\pi(s) = \mathbb{E}_\pi[G_t \mid s_t = s]$. The first action $a_t$ is drawn from $\pi(\cdot \mid s)$, so group the expectation by its value using the law of total expectation: $\mathbb{E}_\pi[G_t \mid s_t = s] = \sum_a \pi(a \mid s)\, \mathbb{E}_\pi[G_t \mid s_t = s, a_t = a]$. Each inner expectation is $Q^\pi(s,a)$ by definition, giving $V^\pi(s) = \sum_a \pi(a \mid s)\, Q^\pi(s,a)$.
-(b) $V^\pi(s) = 0.25 \times 70 + 0.75 \times 110 = 17.5 + 82.5 = 100$. Advantages: $A(\text{left}) = 70 - 100 = -30$, $A(\text{right}) = 110 - 100 = +10$. Weighted sum: $0.25 \times (-30) + 0.75 \times 10 = -7.5 + 7.5 = 0$, as must hold since $V$ is the weighted average of $Q$.
+(b) $V^\pi(s) = 0.25 \times 70 + 0.75 \times 110 = 17.5 + 82.5 = 100$. Advantages: $A^\pi(s,\text{left}) = 70 - 100 = -30$, $A^\pi(s,\text{right}) = 110 - 100 = +10$. Weighted sum: $0.25 \times (-30) + 0.75 \times 10 = -7.5 + 7.5 = 0$, as must hold since $V$ is the weighted average of $Q$.
 :::
 
 ### Exercise 7: CartPole Returns, Horizons, and Endings

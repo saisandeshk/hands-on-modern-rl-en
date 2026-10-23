@@ -134,9 +134,9 @@ If we pass `torch.tensor([0.00, 0.00, 0.08, 0.15])` to this network, the first l
 
 Once policies have been defined, we need a way to compare them. Suppose policy A controls CartPole for $100$ episodes and survives for $180$ steps on average, while policy B survives for $420$ steps on average. Because CartPole gives $+1$ for each surviving step, policy B has the larger average long-term return.
 
-The policy with the largest expected long-term return among all candidates is called an **optimal policy**, written $\pi^*$:
+The policy with the largest expected long-term return among all candidates is called an **optimal policy**, written $\pi^*$ (on this page the reward after step $t$ is $R_{t+1}$; lowercase $r$ below marks realized values on a concrete trajectory):
 
-$$\pi^* = \arg\max_\pi \mathbb{E}_{\pi}\left[\sum_{t=0}^{\infty} \gamma^t R(s_t, a_t)\right]$$
+$$\pi^* = \arg\max_\pi \mathbb{E}_{\pi}\left[\sum_{t=0}^{\infty} \gamma^t R_{t+1}\right]$$
 
 The star $*$ marks an optimal quantity. $\arg\max_\pi$ means “find the policy $\pi$ that makes the expression on the right as large as possible,” and $\mathbb{E}_\pi$ means averaging over the different outcomes that the policy may produce. DQN, PPO, and SAC represent and update policies differently, but all aim to improve this expected return.
 
@@ -148,7 +148,7 @@ $$
 \tau=(s_0,a_0,r_1,s_1,a_1,r_2,s_2,a_2,r_3,s_3).
 $$
 
-$\tau$ is the Greek letter tau and denotes the whole trajectory. The subscripts $0,1,2$ on states and actions mark decision times; $r_1$ is the feedback received after the action at time $0$. One complete run from the initial state to a terminal state is usually called an episode.
+$\tau$ is the Greek letter tau and denotes the whole trajectory. The subscripts $0,1,2$ on states and actions mark decision times; $r_1$ is the realized value of $R_1$, the feedback received after the action at time $0$. One complete run from the initial state to a terminal state is usually called an episode.
 
 This page writes the reward after step $t$ as $R_{t+1}$ (the convention of Sutton and Barto), while Section 2.2 wrote it as $r_t$. The two notations describe the same sequence of rewards; only the index shifts by one, so $G_t = R_{t+1} + \gamma R_{t+2} + \cdots$ here is the same object as $G_t = r_t + \gamma r_{t+1} + \cdots$ there.
 
@@ -309,7 +309,7 @@ The full equation also accounts for every action the policy may choose and every
 Policies, returns, and value functions are three core concepts in an MDP:
 
 1. **Policy $\pi$**: the agent's decision rule; the stochastic policy $a \sim \pi(\cdot \mid s)$ is the most general form
-2. **Return $G_t$**: the discounted cumulative reward from time step $t$ onward, $\sum \gamma^k r$
-3. **Value functions**: $V^\pi(s)$ is the state value and $Q^\pi(s, a)$ is the action value; the advantage $A = Q - V$ measures relative quality
+2. **Return $G_t$**: the discounted cumulative reward from time step $t$ onward, $\sum \gamma^k R_{t+k+1}$
+3. **Value functions**: $V^\pi(s)$ is the state value and $Q^\pi(s, a)$ is the action value; the advantage $A^\pi(s,a) = Q^\pi(s,a) - V^\pi(s)$ measures relative quality
 
 These objects can describe what happens along a trajectory, but return $G_t$ is available only after the trajectory unfolds. When an agent must act from an intermediate state, it needs to estimate the long-term outcome in advance. Chapter 3 begins with this problem and develops value functions and Bellman equations as the solution.

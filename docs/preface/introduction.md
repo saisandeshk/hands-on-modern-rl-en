@@ -89,6 +89,8 @@ With a discount factor, future rewards are discounted when they are added up, an
 
 $$G_t = r_{t+1} + \gamma\, r_{t+2} + \gamma^2\, r_{t+3} + \cdots = \sum_{k=0}^{\infty} \gamma^k\, r_{t+k+1}$$
 
+> **Notation:** this page writes the reward after step $t$ as $r_{t+1}$ (the Sutton and Barto indexing). Later chapters often write the same per-step reward as $r_t$; only the index shifts by one.
+
 The formula looks a bit long, but it is intuitive once taken apart:
 
 - $r_{t+1}$ is the reward obtained immediately, with **no discount** (multiplied by $\gamma^0 = 1$).
