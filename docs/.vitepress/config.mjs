@@ -833,6 +833,10 @@ const sidebar = {
             {
               text: '6.6 Hands-on: Policy Gradient with a Value Baseline',
               link: '/chapter06_policy_gradient/cartpole-baseline'
+            },
+            {
+              text: '6.7 Summary and Exercises',
+              link: '/chapter06_policy_gradient/review'
             }
           ]
         },
