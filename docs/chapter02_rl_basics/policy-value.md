@@ -136,7 +136,7 @@ Once policies have been defined, we need a way to compare them. Suppose policy A
 
 The policy with the largest expected long-term return among all candidates is called an **optimal policy**, written $\pi^*$:
 
-$$\pi^* = \arg\max_\pi \mathbb{E}_{\pi}\left[\sum_{t=0}^{\infty} \gamma^t R(s_t, a_t)\right]$$
+$$\pi^* = \arg\max_\pi \mathbb{E}_{\pi}\left[\sum_{t=0}^{\infty} \gamma^t R_{t+1}\right]$$
 
 The star $*$ marks an optimal quantity. $\arg\max_\pi$ means “find the policy $\pi$ that makes the expression on the right as large as possible,” and $\mathbb{E}_\pi$ means averaging over the different outcomes that the policy may produce. DQN, PPO, and SAC represent and update policies differently, but all aim to improve this expected return.
 
@@ -310,6 +310,6 @@ Policies, returns, and value functions are three core concepts in an MDP:
 
 1. **Policy $\pi$**: the agent's decision rule; the stochastic policy $a \sim \pi(\cdot \mid s)$ is the most general form
 2. **Return $G_t$**: the discounted cumulative reward from time step $t$ onward, $\sum \gamma^k r$
-3. **Value functions**: $V^\pi(s)$ is the state value and $Q^\pi(s, a)$ is the action value; the advantage $A = Q - V$ measures relative quality
+3. **Value functions**: $V^\pi(s)$ is the state value and $Q^\pi(s, a)$ is the action value; the advantage $A^\pi(s,a) = Q^\pi(s,a) - V^\pi(s)$ measures relative quality
 
 These objects can describe what happens along a trajectory, but return $G_t$ is available only after the trajectory unfolds. When an agent must act from an intermediate state, it needs to estimate the long-term outcome in advance. Chapter 3 begins with this problem and develops value functions and Bellman equations as the solution.

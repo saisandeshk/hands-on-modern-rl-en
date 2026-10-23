@@ -27,7 +27,7 @@ This chapter ran a first end-to-end reinforcement learning experiment: PPO on Ca
 - TD error: $\delta_t = r_t + \gamma V(s_{t+1}) - V(s_t)$ — how much better the step turned out than the Critic expected.
 - GAE advantage: $A_t = \delta_t + \gamma\lambda\delta_{t+1} + (\gamma\lambda)^2\delta_{t+2} + \cdots$ — a smoothed credit signal blending the current and future TD errors.
 - Probability ratio: $r_t(\theta) = \pi_\theta(a_t \mid s_t) / \pi_{\theta_{\mathrm{old}}}(a_t \mid s_t)$ — how far the new policy has moved from the policy that collected the data.
-- Clipped objective: $L = -\min(r_t A_t,\ \mathrm{clip}(r_t, 0.8, 1.2)\, A_t)$ — raise probabilities of above-baseline actions, but stop pushing once the ratio leaves $[0.8, 1.2]$.
+- Clipped objective: $L = -\min(r_t A_t,\ \mathrm{clip}(r_t, 0.8, 1.2)\, A_t)$ — raise probabilities of above-baseline actions, but stop pushing once the ratio leaves $[0.8, 1.2]$. (Here $r_t$ abbreviates the ratio $r_t(\theta)$ above, and $r_i$ in the next line likewise abbreviates $r_i(\theta)$.)
 - Value loss: $L_V = \frac{1}{|B|}\sum_{i \in B}(V(s_i) - \hat{G}_i)^2$ — the Critic's mean squared error against its return targets on a mini-batch.
 - Clip fraction: $\mathrm{clipfrac} = \frac{1}{|B|}\sum_{i \in B}\mathbf{1}[|r_i - 1| > 0.2]$ — the share of samples hitting the clipping boundary.
 

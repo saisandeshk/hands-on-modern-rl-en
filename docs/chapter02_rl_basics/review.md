@@ -99,7 +99,7 @@ Arm A has true payout 0.6 and arm B 0.4, each tried 10 times.
 
 ::: details Solution
 (a) $V^\pi(s) = \mathbb{E}_\pi[G_t \mid s_t = s]$. The first action $a_t$ is drawn from $\pi(\cdot \mid s)$, so group the expectation by its value using the law of total expectation: $\mathbb{E}_\pi[G_t \mid s_t = s] = \sum_a \pi(a \mid s)\, \mathbb{E}_\pi[G_t \mid s_t = s, a_t = a]$. Each inner expectation is $Q^\pi(s,a)$ by definition, giving $V^\pi(s) = \sum_a \pi(a \mid s)\, Q^\pi(s,a)$.
-(b) $V^\pi(s) = 0.25 \times 70 + 0.75 \times 110 = 17.5 + 82.5 = 100$. Advantages: $A(\text{left}) = 70 - 100 = -30$, $A(\text{right}) = 110 - 100 = +10$. Weighted sum: $0.25 \times (-30) + 0.75 \times 10 = -7.5 + 7.5 = 0$, as must hold since $V$ is the weighted average of $Q$.
+(b) $V^\pi(s) = 0.25 \times 70 + 0.75 \times 110 = 17.5 + 82.5 = 100$. Advantages: $A^\pi(s,\text{left}) = 70 - 100 = -30$, $A^\pi(s,\text{right}) = 110 - 100 = +10$. Weighted sum: $0.25 \times (-30) + 0.75 \times 10 = -7.5 + 7.5 = 0$, as must hold since $V$ is the weighted average of $Q$.
 :::
 
 ### Exercise 7: CartPole Returns, Horizons, and Endings

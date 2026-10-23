@@ -102,7 +102,7 @@ $$
 
 > **TD Target:**
 >
-> - $r$: the immediate reward actually observed at this step.
+> - $r$: the immediate reward actually observed at this step (shorthand for the per-step reward $r_t$ used in Section 5.2).
 > - $\gamma\max_{a'}Q(s',a')$: the optimal future value, according to the current table estimate, starting from the next state $s'$.
 > - The two parts add up to the target value that $Q(s,a)$ should approach in this update.
 

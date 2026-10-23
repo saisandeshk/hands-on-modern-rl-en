@@ -296,6 +296,8 @@ $$
 R_t \sim R_{A_t}
 $$
 
+Here $R_t$ is the bandit round reward, the same per-step reward object later sections write $r_t$ (or $R_{t+1}$ in Section 2.3); only the round index differs.
+
 The true expected reward of each arm is denoted:
 
 $$
@@ -409,7 +411,7 @@ class EpsilonDecaying:
         self.q[arm] += (reward - self.q[arm]) / self.n[arm]
 ```
 
-This schedule expresses a common training rhythm: explore more early, and trust existing experience more later. We will meet this idea again when we study DQN. In early training DQN commonly uses a large ε to collect diverse experience, and then lowers ε step by step so that the policy uses the action values it has learned more.
+This schedule expresses a common training rhythm: explore more early, and trust existing experience more later. We will meet this idea again when we study DQN. In early training DQN commonly uses a large $\epsilon$ to collect diverse experience, and then lowers $\epsilon$ step by step so that the policy uses the action values it has learned more.
 
 ## More Targeted Exploration
 
@@ -579,7 +581,7 @@ The **regret bound** is the fundamental metric for evaluating an algorithm. A go
 
 ### $\epsilon$-Greedy and Decay Schedules
 
-The text above already implemented fixed ε and decaying ε. Here we use regret to look at the long-run difference between the two schedules.
+The text above already implemented fixed $\epsilon$ and decaying $\epsilon$. Here we use regret to look at the long-run difference between the two schedules.
 
 #### The $\epsilon$-Greedy Algorithm
 
@@ -589,21 +591,21 @@ $$
 0.1\times\frac{1}{2}\times(0.8-0.5)=0.015.
 $$
 
-After $1000$ rounds, this part alone produces about $15$ points of regret. A fixed ε keeps guarding against early misjudgment, but even when the estimates have stabilized, the loss keeps accumulating.
+After $1000$ rounds, this part alone produces about $15$ points of regret. A fixed $\epsilon$ keeps guarding against early misjudgment, but even when the estimates have stabilized, the loss keeps accumulating.
 
 #### Decay Schedules
 
 A decay schedule lowers the exploration probability as data increases. For example, starting from $\epsilon_0=1.0$ and multiplying by $0.995$ each round, the value is about $0.61$ at round $100$, about $0.082$ at round $500$, and about $0.0067$ at round $1000$. If a floor of $0.01$ is set, $1\%$ random exploration is kept late in the run.
 
-This schedule expresses a clear assumption: early on the estimation error is large and exploration is more valuable, and later the estimates tend to stabilize and the opportunities to act should be used more for earning reward. If the decay is too fast, the early lock-in of pure greedy reappears, and if it is too slow, it approaches the persistent loss of a fixed ε.
+This schedule expresses a clear assumption: early on the estimation error is large and exploration is more valuable, and later the estimates tend to stabilize and the opportunities to act should be used more for earning reward. If the decay is too fast, the early lock-in of pure greedy reappears, and if it is too slow, it approaches the persistent loss of a fixed $\epsilon$.
 
 ::: details Supplement: Theoretical Properties of $\epsilon$-Greedy
 
-A fixed $\epsilon$-greedy policy keeps random exploration permanently, so even when it already knows which action is best, it still chooses other actions with probability ε. This guards against early misjudgment but produces a persistent loss in the long run, so the cumulative regret of a fixed ε usually grows at a linear rate.
+A fixed $\epsilon$-greedy policy keeps random exploration permanently, so even when it already knows which action is best, it still chooses other actions with probability $\epsilon$. This guards against early misjudgment but produces a persistent loss in the long run, so the cumulative regret of a fixed $\epsilon$ usually grows at a linear rate.
 
-If ε is made to decrease over time, for example decaying from a larger initial value to a very small one, the agent explores more early and exploits more later. A suitable decay strategy can bring the long-run regret down to sublinear, and under some stricter settings a regret bound close to logarithmic can be obtained.
+If $\epsilon$ is made to decrease over time, for example decaying from a larger initial value to a very small one, the agent explores more early and exploits more later. A suitable decay strategy can bring the long-run regret down to sublinear, and under some stricter settings a regret bound close to logarithmic can be obtained.
 
-PAC sample complexity poses a different question: it no longer asks how much is lost in total over the first $T$ rounds, but asks "how many trials are needed to find, with probability at least $1-\delta$, an action within $\epsilon$ of the optimum." This viewpoint is mainly used in theoretical analysis, and this course only needs you to know that it measures "the number of samples needed to learn a sufficiently good policy."
+PAC sample complexity poses a different question: it no longer asks how much is lost in total over the first $T$ rounds, but asks "how many trials are needed to find, with probability at least $1-\delta$, an action within $\epsilon$ of the optimum." (Here $\delta$ and $\epsilon$ are the PAC accuracy parameters, not the TD error $\delta_t$ or a separate exploration rate.) This viewpoint is mainly used in theoretical analysis, and this course only needs you to know that it measures "the number of samples needed to learn a sufficiently good policy."
 
 :::
 

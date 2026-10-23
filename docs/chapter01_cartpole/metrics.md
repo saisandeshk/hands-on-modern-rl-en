@@ -129,7 +129,7 @@ The policy can output action probabilities, but from the single-step reward of $
 
 PPO adds a second network for this, called the **Critic**.
 
-The Critic takes the state $s_t$ and outputs the state value $V(s_t)$. This number says how much discounted return we can still expect to earn if we continue to act under the current policy from the current state.
+The Critic takes the state $s_t$ and outputs the state value $V(s_t)$. This number says how much discounted return we can still expect to earn if we continue to act under the current policy from the current state. (The $\pi$ superscript is omitted here; $V$ means $V^\pi$ for the current policy.)
 
 The code puts the two networks in the same `ActorCritic` class:
 
@@ -181,7 +181,7 @@ $$
 
 $V(s_t)$ is the expectation the Critic gave before the action was executed, and $r_t+\gamma V(s_{t+1})$ is the new estimate obtained after executing the action. If $\delta_t>0$, the result of this step is higher than the Critic's original expectation.
 
-Using the error of a single step is easily affected by bias in the Critic's estimates. The code uses GAE, which combines the TD errors of the current step and several following steps into the advantage $A_t$:
+Using the error of a single step is easily affected by bias in the Critic's estimates. The code uses GAE, which combines the TD errors of the current step and several following steps into the advantage $A_t$ (the GAE estimate written $\hat{A}_t$ in Appendix D; $\lambda \in [0,1]$ is the GAE decay):
 
 $$
 A_t=\delta_t+\gamma\lambda\delta_{t+1}
@@ -194,7 +194,7 @@ When the advantage is positive, PPO raises the probability of this action in the
 
 With the advantage in hand, we still need an update rule to adjust the policy. There is a problem here: the same rollout data comes from the old policy before the update. If the new policy could deviate from the old one freely, a single update might push the policy into a very poor region.
 
-To compare the new and old policies, PPO computes the probability ratio of the sampled action:
+To compare the new and old policies, PPO computes the probability ratio of the sampled action (the same new-over-old ratio Appendix D also writes $\rho_t$):
 
 $$
 r_t(\theta)=

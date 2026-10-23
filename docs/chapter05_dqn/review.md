@@ -59,6 +59,8 @@ $$
 P(i) = \frac{p_i^\alpha}{\sum_k p_k^\alpha}, \qquad w_i = \left(\frac{1}{NP(i)}\right)^\beta, \qquad p_i = |\delta_i| + \epsilon
 $$
 
+(Here $\epsilon$ is the small PER priority floor, not the exploration rate $\varepsilon$; $\alpha$ is the PER exponent, not the learning rate.)
+
 Prioritized replay: sample by TD-error priority, then correct the bias with importance weights.
 
 $$

@@ -112,18 +112,18 @@ Of course, in practice, a policy does not have to be defined this way. During tr
 
 **Mathematical definition**
 
-To define it precisely, the action-value function under policy $\pi$ is:
+To define it precisely, the action-value function under policy $\pi$ is (uppercase $S_t, A_t$ denote the random state and action; lowercase $s_t, a_t$ elsewhere are their realized values):
 
 $$
 Q^\pi(s,a)
 = \mathbb{E}_\pi \bigl[G_t \mid S_t=s, A_t=a\bigr]
-= \mathbb{E}_\pi \bigl[R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \cdots \mid S_t=s, A_t=a\bigr].
+= \mathbb{E}_\pi \bigl[r_t + \gamma r_{t+1} + \gamma^2 r_{t+2} + \cdots \mid S_t=s, A_t=a\bigr].
 $$
 
 The condition $S_t=s, A_t=a$ means: we fix the starting state and the first action. Therefore, $Q^\pi(s,a)$ means: in state $s$, take action $a$ first; then, from the next step onward, follow policy $\pi$; what is the expected future return? Written out, that future return is:
 
 $$
-R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \cdots .
+r_t + \gamma r_{t+1} + \gamma^2 r_{t+2} + \cdots .
 $$
 
 ## Advantage: How Much Better Than Average?
