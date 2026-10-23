@@ -22,9 +22,9 @@ This chapter turned the Actor-Critic of Chapter 7 into a stable, reusable algori
 - $\nabla_\theta J(\theta) = \mathbb{E}_t\left[\nabla_\theta \log \pi_\theta(a_t \mid s_t)\,\hat{A}_t\right]$ — shift probability toward actions that beat the baseline.
 - $\delta_t = r_t + \gamma V(s_{t+1}) - V(s_t)$ — the one-step surprise; GAE's building block.
 - $\hat{A}_t^{\mathrm{GAE}} = \sum_{k=0}^{\infty}(\gamma\lambda)^k\,\delta_{t+k}$, computed backward as $\hat{A}_t = \delta_t + \gamma\lambda\hat{A}_{t+1}$ — propagate credit back with exponential decay.
-- $r_t(\theta) = \pi_\theta(a_t \mid s_t) / \pi_{\mathrm{old}}(a_t \mid s_t)$ — how much the new policy changed its mind about a sampled action.
-- $L^{\mathrm{CLIP}}(\theta) = \mathbb{E}_t\left[\min\left(r_t A_t,\ \mathrm{clip}(r_t, 1-\varepsilon, 1+\varepsilon)\,A_t\right)\right]$ — improve the surrogate, but only inside the trust interval.
-- $L^{\mathrm{PPO}} = L^{\mathrm{CLIP}} + c_1 L^{\mathrm{VF}} - c_2 H[\pi_\theta]$ — actor direction, critic accuracy, and exploration in one backward pass.
+- $r_t(\theta) = \pi_\theta(a_t \mid s_t) / \pi_{\text{old}}(a_t \mid s_t)$ — how much the new policy changed its mind about a sampled action.
+- $L^{\text{CLIP}}(\theta) = \mathbb{E}_t\left[\min\left(r_t A_t,\ \text{clip}(r_t, 1-\varepsilon, 1+\varepsilon)\,A_t\right)\right]$ — improve the surrogate, but only inside the trust interval ($A_t$ is the estimated advantage $\hat{A}_t$).
+- $L^{\text{PPO}} = L^{\text{CLIP}} + c_1 L^{\text{VF}} - c_2 H[\pi_\theta]$ — actor direction, critic accuracy, and exploration in one backward pass.
 - $P(y_w \succ y_l \mid x) = \sigma(r(x, y_w) - r(x, y_l))$ — turn a pairwise human preference into a score gap the reward model can fit.
 
 ## Common Pitfalls
@@ -74,7 +74,7 @@ Let $A_t = -2$ and $\varepsilon = 0.2$. For $r_t \in \{0.7, 2.0\}$, compute both
 
 ### Exercise 4 — KL check on the running example
 
-In Section 8.2, $\pi_{\mathrm{old}}(a_1) = 0.6$ and an update pushes $\pi_\theta(a_1) = 0.99$ (two actions). Compute $D_{\mathrm{KL}}(\pi_{\mathrm{old}} \| \pi_\theta)$ and say whether TRPO with $\delta = 0.01$ accepts the update.
+In Section 8.2, $\pi_{\text{old}}(a_1) = 0.6$ and an update pushes $\pi_\theta(a_1) = 0.99$ (two actions). Compute $D_{\mathrm{KL}}(\pi_{\text{old}} \| \pi_\theta)$ and say whether TRPO with $\delta = 0.01$ accepts the update.
 
 ::: details Solution
 $$D_{\mathrm{KL}} = 0.6 \ln\frac{0.6}{0.99} + 0.4 \ln\frac{0.4}{0.01}.$$

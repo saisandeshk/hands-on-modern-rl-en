@@ -133,7 +133,7 @@ We discuss them in the same picture in order to compare the shared problem of "h
 
 ## 5. Off-Policy Evaluation: Grading a Policy You Cannot Deploy
 
-Offline training usually produces several candidate policies — different algorithms, seeds, or checkpoints — and we must pick one. Deploying each candidate to compare them is exactly what the offline setting forbids. **Off-policy evaluation (OPE)** solves this selection problem: estimate each candidate's return $J(\pi) = \mathbb{E}_\pi\left[\sum_t \gamma^t r_t\right]$ using only trajectories logged by some fixed **logging policy** $\mu$ (which plays the same role as the behavior policy $\pi_\beta$ in Section 10.1). The core difficulty is identical to the rest of this chapter: actions the candidate would take but the logger never tried are **unsupported**, and their outcomes are impossible counterfactuals that no estimator can recover — OPE can only reweight what was actually logged.
+Offline training usually produces several candidate policies — different algorithms, seeds, or checkpoints — and we must pick one. Deploying each candidate to compare them is exactly what the offline setting forbids. **Off-policy evaluation (OPE)** solves this selection problem: estimate each candidate's return $J(\pi) = \mathbb{E}_\pi\left[\sum_t \gamma^{t-1} r_t\right]$ (with $t$ starting at $1$) using only trajectories logged by some fixed **logging policy** $\mu$ (which plays the same role as the behavior policy $\pi_\beta$ in Section 10.1). The core difficulty is identical to the rest of this chapter: actions the candidate would take but the logger never tried are **unsupported**, and their outcomes are impossible counterfactuals that no estimator can recover — OPE can only reweight what was actually logged.
 
 ### 5.1 Importance Sampling: Reweighting Logged Returns
 
@@ -149,7 +149,7 @@ This ordinary importance-sampling estimator is unbiased provided $\mu$ covers $\
 
 Then $\hat{J}_{\text{IS}} = (4\cdot10 + 0 + 0)/3 = 40/3 \approx 13.3$: a single trajectory carries the whole estimate. **Per-decision importance sampling (PDIS)** removes part of the noise by noticing that a reward at time $t$ only depends on actions up to $t$, so later ratios should not scale it:
 
-$$\hat{J}_{\text{PDIS}} = \frac{1}{N}\sum_i \sum_t \gamma^t \rho_{1:t}^{(i)}\, r_{i,t}, \qquad \rho_{1:t} = \prod_{k=1}^{t} \frac{\pi(a_k \mid s_k)}{\mu(a_k \mid s_k)}$$
+$$\hat{J}_{\text{PDIS}} = \frac{1}{N}\sum_i \sum_t \gamma^{t-1} \rho^{(i)}_{1:t}\, r_{i,t}, \qquad \rho^{(i)}_{1:t} = \prod_{k=1}^{t} \frac{\pi(a_{i,k} \mid s_{i,k})}{\mu(a_{i,k} \mid s_{i,k})}$$
 
 PDIS stays unbiased and never has higher variance than trajectory-wise IS, but long horizons still hurt.
 
@@ -169,9 +169,9 @@ For our three trajectories, $\text{ESS} = 16/16 = 1$: three logged episodes carr
 
 Reweighting alone ignores everything we know about the environment's structure. The **direct method** instead learns a reward/dynamics model (or a $Q$-function) from the logs and evaluates $\pi$ inside it: low variance, but biased by model error. The **doubly robust (DR)** estimator gets the best of both by using the model as a baseline and IS-weighting only its residuals:
 
-$$\hat{J}_{\text{DR}} = \frac{1}{N}\sum_i\left[\hat{V}(s_1) + \sum_t \gamma^t \rho_{1:t}\left(r_t + \gamma\hat{V}(s_{t+1}) - \hat{Q}(s_t, a_t)\right)\right]$$
+$$\hat{J}_{\text{DR}} = \frac{1}{N}\sum_i\left[\hat{V}(s_{i,1}) + \sum_t \gamma^{t-1} \rho^{(i)}_{1:t}\left(r_{i,t} + \gamma\hat{V}(s_{i,t+1}) - \hat{Q}(s_{i,t}, a_{i,t})\right)\right]$$
 
-Read it inside out: start from the model's guess $\hat{V}(s_1)$, then add each step's surprise (actual reward plus next-state value minus what the model predicted), reweighted onto $\pi$'s distribution. It is unbiased if _either_ the model _or_ the ratios are correct — hence "doubly" robust — and its variance collapses when the model is good. (Written here with the cumulative weight $\rho_{1:t}$; Jiang & Li 2016 state the standard form with the per-decision weight at step $t$, which the same telescoping identity justifies.)
+Read it inside out: start from the model's guess $\hat{V}(s_1)$, then add each step's surprise (actual reward plus next-state value minus what the model predicted), reweighted onto $\pi$'s distribution. It is unbiased if _either_ the model _or_ the ratios are correct — hence "doubly" robust — and its variance collapses when the model is good. (Written here with the cumulative weight $\rho^{(i)}_{1:t}$; Jiang & Li 2016 state the standard form with the per-decision weight at step $t$, which the same telescoping identity justifies.)
 
 **Fitted Q Evaluation (FQE)** takes the regression route: fit $Q^\pi$ by iterating $Q_{k+1} = \arg\min_Q\, \mathbb{E}_{\mathcal{D}}[(Q(s,a) - (r + \gamma\,\mathbb{E}_{a' \sim \pi}[Q_k(s',a')]))^2]$ on the fixed data, then average $Q(s_0, \pi(s_0))$ over logged start states. Notice there is no $\max$ over actions anywhere — FQE evaluates the candidate's own actions, so it never queries maximizing OOD actions the way offline Q-learning does. That makes it calmer than training a full offline agent, though a candidate that strays far from the logs still forces the regressor to extrapolate.
 

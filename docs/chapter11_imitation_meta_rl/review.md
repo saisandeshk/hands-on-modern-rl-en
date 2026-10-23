@@ -24,7 +24,7 @@ title: 11.5 Summary and Exercises
 - **GAIL discriminator:** $\max_\phi\,\mathbb{E}_{\text{expert}}[\log D_\phi] + \mathbb{E}_{\pi_\theta}[\log(1-D_\phi)]$ — binary classifier for expert versus policy state-action pairs.
 - **GAIL policy and optimal discriminator:** $\min_\theta\,\mathbb{E}_{\pi_\theta}[\log(1-D_\phi)] - \lambda\mathcal{H}(\pi_\theta)$ with $D^*(s,a) = p_{\text{expert}}/(p_{\text{expert}}+p_{\pi})$ — the implicit reward $-\log(1-D)$ is high where the expert goes and the policy does not.
 - **MAML:** inner $\theta_i' = \theta - \alpha\nabla\mathcal{L}_{T_i}(\theta)$; outer $\min_\theta \mathbb{E}_{T_i}[\mathcal{L}_{T_i}(\theta_i')]$ — optimize the initialization for post-adaptation loss, backpropagating through the inner step.
-- **PEARL:** $\mathcal{L} = -\mathbb{E}_{z\sim q_\phi}[\sum_t r(s_t,a_t,z)] + \beta D_{\mathrm{KL}}(q_\phi(z\mid\tau)\|p(z))$ — infer a task variable from context, regularized toward the prior.
+- **PEARL:** $\mathcal{L} = -\mathbb{E}_{z\sim q_\phi}[\sum_t r(s_t,a_t,z)] + \beta D_{\mathrm{KL}}(q_\phi(z\mid\tau)\|p(z))$ — infer a task variable from context, regularized toward the prior ($\beta$ here is the KL weight, not the DAgger mixing schedule).
 - **SFT $=$ BC:** $\mathcal{L}_{\text{SFT}} = -\sum_t \log\pi_\theta(y_t\mid x, y_{<t})$ — next-token likelihood is BC with tokens as actions.
 
 ## Common Pitfalls

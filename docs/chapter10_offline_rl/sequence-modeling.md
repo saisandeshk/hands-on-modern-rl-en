@@ -23,7 +23,7 @@ All the methods in the previous section stabilize the Bellman update by constrai
 
 ### 1.1 Using Return-to-Go as a Condition
 
-Let's first recall what a trajectory looks like: $\tau=(s_1,a_1,r_1,s_2,a_2,r_2,\ldots,s_T,a_T,r_T)$, triples of state, action, and reward arranged in time order.
+Let's first recall what a trajectory looks like: $\tau=(s_1,a_1,r_1,s_2,a_2,r_2,\ldots,s_T,a_T,r_T)$, triples of state, action, and reward arranged in time order (this chapter numbers steps from 1, so $s_1$ is the initial state).
 
 Traditional RL looks backward from the future: at time t, you estimate how much reward you will receive in the future (the Q-value) and then pick the action that maximizes it. DT reverses this logic. It looks forward: at step t, in addition to the current state, the model is directly told "**from now until the end of the episode, how much total return I want to obtain**", and it is then asked to predict which action was actually taken in the historical data in that situation.
 

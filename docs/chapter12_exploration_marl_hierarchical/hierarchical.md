@@ -24,7 +24,7 @@ Let's use Montezuma's Revenge again. The agent must first pick up a key, then op
 
 **Hierarchical reinforcement learning** (HRL) decomposes decision-making into two or more levels:
 
-- **High-level policy**: it does not decide at every step. Only once every $c$ steps it outputs a decision, either choosing a "subgoal" or choosing an "option" (a temporally extended action).
+- **High-level policy**: it does not decide at every step. Only once every $c$ steps it outputs a decision, either choosing a "subgoal" or choosing an "option" (a temporally extended action). (Here $c$ is the high-level decision interval, not the gradient-clipping threshold.)
 - **Low-level policy**: guided by the subgoal given by the high level, it outputs a primitive action at every step until the subgoal is completed or time runs out.
 
 What is the benefit? The high level does not need to care about details such as "how to walk to the key". It only has to decide "go and get the key now" and hand this goal to the low level, which figures out how to walk there. The high level only makes decisions at the sparse "subgoal completed" nodes, which cuts a horizon of hundreds or thousands of steps into many short horizons of only $c$ steps. Gradient signals can propagate effectively within each sub-level: the low level only cares about "reaching the subgoal within these $c$ steps", and the high level only cares about "which subgoal maximizes the team's return".
@@ -47,7 +47,7 @@ Let's look at them one by one:
 
 - **Initiation set** $\mathcal{I}_\omega$: in which states can this option be started? For the "go to the door" option, you must be inside the house to start it. If you are already outside, you do not need it.
 - **Intra-option policy** $\pi_\omega$: the policy followed while the option runs, that is, the concrete policy for "how to walk to the door".
-- **Termination function** $\beta_\omega(s)$: after reaching state $s$, with what probability does the option terminate? At the door the termination probability is close to 1, and before reaching it the probability is close to 0.
+- **Termination function** $\beta_\omega(s)$: after reaching state $s$, with what probability does the option terminate? At the door the termination probability is close to 1, and before reaching it the probability is close to 0. (This termination $\beta_\omega$ is unrelated to the exploration weight $\beta$ in §12.1.)
 
 You may ask: since an option may run for $T$ consecutive steps, how should the Q-function be written when the high level learns to choose among options? Ordinary Q-learning looks at only one step at a time, but now one step corresponds to $T$ steps inside an option.
 
@@ -59,6 +59,7 @@ Let's take this expression apart:
 
 - $s$: the state when the option is started
 - $\omega$: the option currently chosen
+- $\mu$: the policy over options (which option to pick in each state)
 - $T$: the number of steps the option actually runs (possibly random, depending on the termination function)
 - $s_T$: the state when the option terminates
 - The first term, the sum $\sum_{t=0}^{T-1} \gamma^t r_t$: the discounted sum of all rewards received while the option runs

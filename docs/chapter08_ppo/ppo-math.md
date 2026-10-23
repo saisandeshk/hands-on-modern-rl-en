@@ -10,7 +10,7 @@ We trained BipedalWalker with PPO, watched curves such as reward, entropy, and c
 This section derives PPO-Clip step by step, starting from the policy gradient update. For smoother reading, you should already have met the following concepts. If they are unfamiliar, read the [appendix](#appendix-deriving-policy-gradients-and-advantage-from-scratch) at the end of this section first and then return to the main text:
 
 - **Policy gradient theorem**: $\nabla_\theta J(\theta) = \mathbb{E}_t[\nabla_\theta \log \pi_\theta(a_t\mid s_t)\hat{A}_t]$
-- **Advantage function $A_t$**: measures how much better an action is than average, with the baseline provided by the Critic
+- **Advantage function $A_t$**: the estimated advantage $\hat{A}_t$ (the hat is dropped inside the PPO objectives); measures how much better an action is than average, with the baseline provided by the Critic
 - **Actor-Critic framework**: the Actor chooses actions, and the Critic estimates state values
   :::
 
@@ -555,14 +555,14 @@ TRPO (Trust Region Policy Optimization) and PPO solve the same problem: the poli
 $$
 \max_\theta L^{\text{IS}}(\theta)
 \quad \text{s.t.} \quad
-\bar{D}_{\text{KL}}(\theta_{\text{old}}, \theta) \leq \delta
+\bar{D}_{\mathrm{KL}}(\theta_{\text{old}}, \theta) \leq \delta
 $$
 
 The surrogate objective may be optimized, but the average KL divergence between the old and new policies cannot exceed the threshold $\delta$. This is elegant in theory, but the implementation needs constrained optimization, conjugate gradients, and other complicated steps.
 
 PPO approximates a similar effect by clipping the policy ratio, which is much simpler to implement. The PPO paper also proposes a variant called **PPO-Penalty**, which adds the KL constraint to the objective directly as a penalty term:
 
-$$L^{\text{KL}}(\theta) = \mathbb{E}_t \left[ r_t(\theta) \cdot A_t - \beta \cdot D_{\text{KL}}(\pi_{\text{old}}, \pi_\theta) \right]$$
+$$L^{\text{KL}}(\theta) = \mathbb{E}_t \left[ r_t(\theta) \cdot A_t - \beta \cdot D_{\mathrm{KL}}(\pi_{\text{old}}, \pi_\theta) \right]$$
 
 $\beta$ is an adaptive coefficient. PPO-Penalty works better in some settings, but it is more complex to implement than PPO-Clip, and PPO-Clip is more common in practice.
 
@@ -670,7 +670,7 @@ Given a policy $\pi_\theta$, the probability of this trajectory can be written a
 
 $$
 p_\theta(\tau)
-= \rho_0(s_0)
+= p_0(s_0)
 \prod_{t=0}^{T-1}
 \pi_\theta(a_t\mid s_t)
 P(s_{t+1}\mid s_t,a_t)
@@ -724,7 +724,7 @@ $$
 \nabla_\theta J(\theta) = \mathbb{E}_{\tau\sim\pi_\theta}\left[\nabla_\theta \log p_\theta(\tau)R(\tau)\right]
 $$
 
-After expanding $\log p_\theta(\tau)$, differentiating with respect to $\theta$ makes the environment transition $P$ and the initial distribution $\rho_0$ vanish, which gives the REINFORCE gradient:
+After expanding $\log p_\theta(\tau)$, differentiating with respect to $\theta$ makes the environment transition $P$ and the initial distribution $p_0$ vanish, which gives the REINFORCE gradient:
 
 $$
 \nabla_\theta J(\theta) = \mathbb{E}_{\tau\sim\pi_\theta}\left[\sum_{t=0}^{T-1}\nabla_\theta \log \pi_\theta(a_t\mid s_t)G_t\right]
@@ -931,7 +931,7 @@ Importance sampling solves pain point one, and the surrogate objective becomes $
 TRPO in 2015 formulated pain point two as a constrained optimization:
 
 $$
-\max_\theta \; \mathbb{E}_t[r_t(\theta) \cdot A_t] \quad \text{s.t.} \quad \bar{D}_{\text{KL}}(\pi_{\text{old}} \| \pi_\theta) \leq \delta
+\max_\theta \; \mathbb{E}_t[r_t(\theta) \cdot A_t] \quad \text{s.t.} \quad \bar{D}_{\mathrm{KL}}(\pi_{\text{old}} \| \pi_\theta) \leq \delta
 $$
 
 The objective is still the importance sampling surrogate, with the extra requirement that the KL divergence between the new and old policies not exceed $\delta$ (usually 0.01). $\delta$ defines a **trust region**: the policy may move freely inside this region, and an update that crosses the boundary is rejected.

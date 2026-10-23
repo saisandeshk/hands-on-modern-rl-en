@@ -132,7 +132,7 @@ If the entropy falls too fast (say from 5.8 straight down to 1.0), the policy ha
 
 ### Clip Fraction
 
-Clip fraction is the most central monitoring metric of PPO. It is the fraction of action probability ratios $r_t(\theta) = \pi_{new}(a|s) / \pi_{old}(a|s)$ that fall outside the range $[1-\varepsilon, 1+\varepsilon]$ in one policy update (here $\varepsilon = 0.2$).
+Clip fraction is the most central monitoring metric of PPO. It is the fraction of action probability ratios $r_t(\theta) = \pi_\theta(a|s) / \pi_{\text{old}}(a|s)$ that fall outside the range $[1-\varepsilon, 1+\varepsilon]$ in one policy update (here $\varepsilon = 0.2$).
 
 ![PPO BipedalWalker-v3 clip fraction curve: fluctuating early in training and gradually converging to around 0.1](./images/ppo_bipedal_walker_clip.png)
 
@@ -152,7 +152,7 @@ If the clip fraction stays at 0, there are two possibilities: the learning rate 
 
 ### Approximate KL Divergence
 
-The KL divergence $D_{KL}(\pi_{old} \| \pi_{new})$ measures the difference between the old and new policies. The clipped objective of PPO limits the change of the probability ratio, which indirectly reduces the policy shift caused by one update.
+The KL divergence $D_{\mathrm{KL}}(\pi_{\text{old}} \| \pi_\theta)$ measures the difference between the old and new policies. The clipped objective of PPO limits the change of the probability ratio, which indirectly reduces the policy shift caused by one update.
 
 ![PPO BipedalWalker-v3 approximate KL divergence curve: below 0.016 most of the time and stable overall](./images/ppo_bipedal_walker_kl.png)
 

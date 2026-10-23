@@ -307,7 +307,7 @@ NGU leaves one problem behind: the weight $\beta$ of the intrinsic reward is fix
 
 What can we do? We surely cannot tune $\beta$ separately for each of the 57 games. **Agent57** solves this with a clever method, an **adaptive policy scheduler**:
 
-- It maintains **a family of policies** $\pi_i$, each with different exploration parameters $(\beta_i, \gamma_i, c_i)$, with the parameters covering a range from "pure exploitation, no exploration" to "pure exploration, ignore the score"
+- It maintains **a family of policies** $\pi_i$, each with different exploration parameters $(\beta_i, \gamma_i)$, with the parameters covering a range from "pure exploitation, no exploration" to "pure exploration, ignore the score"
 - A meta-controller estimates the relative return of each policy online and preferentially samples well-performing policies to collect data
 - During training, all policies share the same replay buffer and Q-network, so the data is common to all
 

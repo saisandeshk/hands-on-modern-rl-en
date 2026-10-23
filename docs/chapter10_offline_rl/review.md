@@ -20,14 +20,14 @@ After working through Sections 10.1–10.3, you should be able to:
 
 - Bellman target with the dangerous max: $y = r + \gamma \max_{a'} Q(s', a')$ — offline, the max may select an action the data never tried, whose Q-value is pure extrapolation.
 - Error amplification: $\|Q_T - Q^\pi\| \lesssim \epsilon_{\text{ood}} / (1 - \gamma)$ — with $\gamma = 0.99$, each unit of per-step OOD error compounds into about 100 units.
-- Constrained offline objective: $\max_\theta\, \mathbb{E}_{s \sim \mathcal{D}}[Q(s, \pi_\theta(s))]$ subject to $D(\pi_\theta \| \pi_\beta) \le \epsilon$ — improve, but stay near the data support.
+- Constrained offline objective: $\max_\theta\, \mathbb{E}_{s \sim \mathcal{D}}[Q(s, \pi_\theta(s))]$ subject to $D(\pi_\theta \| \pi_\beta) \le \epsilon$ — improve, but stay near the data support ($D$ is any divergence, e.g. KL or MMD; see §10.1).
 - CQL regularizer: $\alpha\,(\mathbb{E}_s[\log\sum_a \exp Q(s,a)] - \mathbb{E}_{(s,a) \sim \mathcal{D}}[Q(s,a)])$ — push down Q everywhere (including OOD actions), pull it back up on data actually seen.
 - IQL expectile loss: $L_2^\tau(x) = |\tau - \mathbb{1}(x < 0)|\,x^2$ with $x = Q(s,a) - V(s)$ — an asymmetric square that makes $V$ lean toward the best in-data actions without ever maximizing over OOD actions.
 - Advantage-weighted policy loss: $-\mathbb{E}_{(s,a) \sim \mathcal{D}}[\exp(\beta A(s,a)) \log \pi_\theta(a \mid s)]$ — clone the data selectively, imitating high-advantage actions exponentially more.
 - TD3+BC actor: $\mathcal{L} = -\lambda\,\mathbb{E}[Q(s, \mu(s))] + \mathbb{E}[(\mu(s) - a)^2]$, $\lambda = \alpha / \text{mean}|Q(s, \mu(s))|$ over the batch — scale the Q-term (not the BC term) so both forces stay balanced at any reward scale.
 - Return-to-go: $\hat{R}_t = \sum_{t'=t}^{T} r_{t'}$ — the remaining return, used by Decision Transformer as the prompt that steers generation toward good or bad behavior.
 - Trajectory IS: $\hat{J}_{\text{IS}} = \frac{1}{N}\sum_i \rho_i G_i$, $\rho_i = \prod_t \pi(a_t\mid s_t)/\mu(a_t\mid s_t)$ — unbiased reweighting of logged returns, with variance that explodes in horizon.
-- Per-decision IS: $\hat{J}_{\text{PDIS}} = \frac{1}{N}\sum_i \sum_t \gamma^t \rho_{1:t}^{(i)} r_{i,t}$ — scale each reward only by the action ratios that precede it.
+- Per-decision IS: $\hat{J}_{\text{PDIS}} = \frac{1}{N}\sum_i \sum_t \gamma^{t-1} \rho_{1:t}^{(i)} r_{i,t}$ — scale each reward only by the action ratios that precede it (the sum starts at $t=1$, so the first reward is undiscounted).
 - WIS and trust meter: $\hat{J}_{\text{WIS}} = \sum_i \rho_i G_i / \sum_i \rho_i$, $\text{ESS} = (\sum_i \rho_i)^2 / \sum_i \rho_i^2$ — self-normalize for stability, and distrust any ranking built on a single-digit ESS.
 - FQE backup: $Q_{k+1} \leftarrow \arg\min_Q\, \mathbb{E}_{\mathcal{D}}[(Q(s,a) - (r + \gamma\,\mathbb{E}_{a' \sim \pi}[Q_k(s',a')]))^2]$ — evaluate $\pi$'s own actions by regression, with no max over OOD actions.
 

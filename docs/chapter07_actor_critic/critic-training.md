@@ -326,13 +326,13 @@ The price is introducing **bias**: $V_\phi(s')$ is itself an estimate, not the t
 
 One-step TD and full-episode MC are two ends of a spectrum. The $n$-step return fills in everything between: look $n$ real rewards ahead, then bootstrap from the Critic after that:
 
-$$G_{t:t+n} = r_{t+1} + \gamma r_{t+2} + \cdots + \gamma^{n-1} r_{t+n} + \gamma^n V(s_{t+n})$$
+$$G_{t:t+n} = r_{t} + \gamma r_{t+1} + \cdots + \gamma^{n-1} r_{t+n-1} + \gamma^n V(s_{t+n})$$
 
-so that $n = 1$ recovers the TD target $r_{t+1} + \gamma V(s_{t+1})$ and $n \to \infty$ (run to termination, where $V = 0$) recovers the MC return $G_t$. Subtracting the baseline gives the $n$-step advantage:
+so that $n = 1$ recovers the TD target $r_{t} + \gamma V(s_{t+1})$ and $n \to \infty$ (run to termination, where $V = 0$) recovers the MC return $G_t$. Subtracting the baseline gives the $n$-step advantage:
 
 $$A^{(n)}_t = G_{t:t+n} - V(s_t) = \sum_{k=0}^{n-1} \gamma^k \delta_{t+k} \tag{7.5}$$
 
-where $\delta_{t+k} = r_{t+k+1} + \gamma V(s_{t+k+1}) - V(s_{t+k})$ is the one-step TD error at each step. In words, the $n$-step advantage is the discounted sum of the next $n$ TD errors: each $\delta$ reports the one-step surprise, and adding more of them extends how far ahead the estimate looks.
+where $\delta_{t+k} = r_{t+k} + \gamma V(s_{t+k+1}) - V(s_{t+k})$ is the one-step TD error at each step. In words, the $n$-step advantage is the discounted sum of the next $n$ TD errors: each $\delta$ reports the one-step surprise, and adding more of them extends how far ahead the estimate looks.
 
 A concrete check, reusing the 3-step episode from Section 7.1 ($\gamma = 0.9$; rewards $+3, +1, +2$; values $2.0, 4.0, 1.0, 0.0$; TD errors $+4.6, -2.1, +1.0$):
 

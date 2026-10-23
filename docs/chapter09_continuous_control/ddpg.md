@@ -192,7 +192,7 @@ $$
 \theta'\leftarrow\tau\theta+(1-\tau)\theta'.
 $$
 
-With $\tau=0.005$, the target moves only 0.5% of the distance toward the online network at each step. Consequently, the TD target changes slowly.
+Here $\tau$ is the soft-update (Polyak averaging) coefficient, not a trajectory. With $\tau=0.005$, the target moves only 0.5% of the distance toward the online network at each step. Consequently, the TD target changes slowly.
 
 During data collection, `select_action` adds Gaussian noise $\mathcal{N}(0,0.1^2)$ to the deterministic action. The replay buffer therefore contains data from a noisy behavior policy, while the actor being optimized remains deterministic. This separation of behavior and target policies is the practical benefit of off-policy learning.
 
@@ -216,6 +216,8 @@ The original DDPG paper used an Ornstein-Uhlenbeck (OU) process rather than inde
 $$
 x_{t+1}=x_t+\vartheta(\mu-x_t)+\sigma\epsilon_t.
 $$
+
+(Here $\mu$ and $\sigma$ are the OU process's own mean-reversion level and volatility — unrelated to the policy mean $\mu_\theta$ and standard deviation $\sigma_\theta$ used elsewhere in this chapter.)
 
 OU noise is temporally correlated, so an exploratory movement has inertia from one step to the next. This property was intended to suit physical-control tasks. Later work, including TD3, found that independent Gaussian noise works at least as well in common benchmarks. Modern implementations therefore usually prefer the simpler Gaussian choice.
 :::
