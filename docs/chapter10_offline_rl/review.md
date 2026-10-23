@@ -27,7 +27,7 @@ After working through Sections 10.1–10.3, you should be able to:
 - TD3+BC actor: $\mathcal{L} = -\lambda\,\mathbb{E}[Q(s, \mu(s))] + \mathbb{E}[(\mu(s) - a)^2]$, $\lambda = \alpha / \text{mean}|Q(s, \mu(s))|$ over the batch — scale the Q-term (not the BC term) so both forces stay balanced at any reward scale.
 - Return-to-go: $\hat{R}_t = \sum_{t'=t}^{T} r_{t'}$ — the remaining return, used by Decision Transformer as the prompt that steers generation toward good or bad behavior.
 - Trajectory IS: $\hat{J}_{\text{IS}} = \frac{1}{N}\sum_i \rho_i G_i$, $\rho_i = \prod_t \pi(a_t\mid s_t)/\mu(a_t\mid s_t)$ — unbiased reweighting of logged returns, with variance that explodes in horizon.
-- Per-decision IS: $\hat{J}_{\text{PDIS}} = \frac{1}{N}\sum_i \sum_t \gamma^t \rho_{1:t}^{(i)} r_{i,t}$ — scale each reward only by the action ratios that precede it.
+- Per-decision IS: $\hat{J}_{\text{PDIS}} = \frac{1}{N}\sum_i \sum_t \gamma^{t-1} \rho_{1:t}^{(i)} r_{i,t}$ — scale each reward only by the action ratios that precede it (the sum starts at $t=1$, so the first reward is undiscounted).
 - WIS and trust meter: $\hat{J}_{\text{WIS}} = \sum_i \rho_i G_i / \sum_i \rho_i$, $\text{ESS} = (\sum_i \rho_i)^2 / \sum_i \rho_i^2$ — self-normalize for stability, and distrust any ranking built on a single-digit ESS.
 - FQE backup: $Q_{k+1} \leftarrow \arg\min_Q\, \mathbb{E}_{\mathcal{D}}[(Q(s,a) - (r + \gamma\,\mathbb{E}_{a' \sim \pi}[Q_k(s',a')]))^2]$ — evaluate $\pi$'s own actions by regression, with no max over OOD actions.
 

@@ -95,7 +95,7 @@ $$D_{\mathrm{KL}}(\pi_{\text{old}} \| \pi_\theta) = 0.6 \ln\frac{0.6}{0.99} + 0.
 
 The result is approximately 1.18, far exceeding $\delta = 0.01$. TRPO would reject this update outright and pull the policy back inside the trust region.
 
-$\delta$ is typically 0.01, meaning the policy's behavior distribution may change by at most 1% per update. This defines a **trust region**: the policy may move freely within it, but any update that crosses the boundary is rejected.
+$\delta$ is typically 0.01. This bounds the average KL divergence in nats and defines a small trust region the policy may move within; it is not a 1% bound on action probabilities. This defines a **trust region**: the policy may move freely within it, but any update that crosses the boundary is rejected.
 
 Elegant in theory, but difficult in practice. Solving this constrained optimization requires the Hessian matrix (second derivatives of the parameters). For a network with millions of parameters, the Hessian's dimension is the square of the parameter count and cannot fit in memory. In the LLM setting, the policy itself is a 70B-parameter language model; computing its Hessian is entirely infeasible. TRPO approximates the solution via conjugate gradient, but it remains slow and complex to implement. **The cost of strict constraints is computational expense.**
 
@@ -408,7 +408,7 @@ TRPO requires second-order machinery (Hessian-vector products). On large models 
 
 The PPO paper (2017) also shows empirically that PPO matches TRPO and often performs as well or better across many tasks. One reason is that TRPO’s own second-order approximations introduce error; solving the constrained problem precisely does not necessarily outperform PPO’s simple heuristic clipping.
 
-This tradeoff becomes even clearer in the LLM era. For a 70B-parameter policy, second-order optimization is simply not practical. OpenAI’s alignment training in InstructGPT and GPT-4 uses PPO rather than TRPO for exactly these reasons.
+This tradeoff becomes even clearer in the LLM era. For a 70B-parameter policy, second-order optimization is simply not practical. OpenAI's alignment training in InstructGPT uses PPO rather than TRPO for exactly these reasons.
 
 </details>
 

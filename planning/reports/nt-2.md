@@ -122,3 +122,20 @@ succeeds (no dead links).
    $L_2^\tau$ expectile level vs trajectory $\tau$; $G_i$ trajectory return vs
    $G_t$; $\tau_1$ trajectory index; $d_{\text{expert}}$, $d_{\pi_\theta}$
    lowercase state distributions (notation-page $d^\pi$ analogues).
+
+## Review response
+
+All 10 reviewer findings accepted; all fixes are inside the original scope (Chapters 8–12 pages, no meaning/number/code changes beyond correcting the flagged technical claims).
+
+- Error 1 (§10.1 CQL dual direction): accepted — gradient of $\mathcal{L}(\alpha) = -\alpha(g - \xi)$ is $\xi - g$, so descent raises $\alpha$ when the gap exceeds $\xi$. Fixed "below" to "exceeds".
+- Error 2 (§10.3 DR baseline index): accepted — $\hat{V}(s_1)$ inside $\sum_i$ is unindexed. Fixed to $\hat{V}(s_{i,1})$ and $\rho^{(i)}_{1:t}$ (also indexed the PDIS product as $\pi(a_{i,k} \mid s_{i,k})/\mu(a_{i,k} \mid s_{i,k})$).
+- Error 3 (§10.3/§10.5 PDIS-DR-J discount off-by-one): accepted — chapter numbers steps from 1 ($s_1$ initial) but wrote $\gamma^t$. Fixed to $\gamma^{t-1}$ in $J(\pi)$, PDIS, DR (both pages), noting the sum starts at $t=1$. No numeric examples change (they use undiscounted $G_i$).
+- Error 4 (§8.3 GAE venue): accepted — GAE is ICLR 2016, not ICML 2016. Fixed.
+- Error 5 (§8.2 $\delta = 0.01$ gloss): accepted — KL is in nats, not a 1% probability bound. Reworded to "bounds the average KL in nats; small trust-region radius".
+- Error 6 (§12.2 MAPPO entropy sign): accepted — `-mean(logp)` estimates positive entropy, so `policy_loss + 0.01 * entropy_bonus` minimizes entropy. Fixed to minus.
+- Doubt 1 (§9.5 Ex. 6 $\mu$ overload): accepted — same sentence used $\mu$ for the mean value and the density. Fixed stem to mean $\mu_\theta(s) = 0$ and density $\log \mathcal{N}(u; \mu, \sigma^2)$ (solution likewise).
+- Doubt 2 (§12.4 Ex. 5 wording): accepted — "does not clip updates that move a bad action's probability down" overgeneralizes (same-direction $r < 1-\epsilon$, $A < 0$ moves are clipped). Qualified to "this recovery move back toward the trust interval", noting same-direction moves are still clipped. Closes prior open issue 4.
+- Doubt 3 (§12.1 Agent57 $c_i$): accepted — $c_i$ never defined and collides with §12.3 $c$. Dropped the third symbol to $(\beta_i, \gamma_i)$, matching the Agent57 $(\beta, \gamma)$ family.
+- Doubt 4 (§8.2 GPT-4 PPO claim): accepted — GPT-4 RL details undisclosed. Limited claim to InstructGPT.
+
+Verification: re-derived the CQL dual step, the $\gamma^{t-1}$ first-term check ($\gamma^0 = 1$), the two-action KL example ($\approx 0.0098$ at the quoted shift, vs $\approx 1.18$ for $0.6 \to 0.99$), and the entropy-sign argument; re-read each edited page. `npx prettier --write` on all 9 changed files — clean (all unchanged). `npx vitepress build docs` — succeeds, no dead links.

@@ -120,7 +120,7 @@ For the same 5-step episode, TD gives the early steps an advantage of only 0.1, 
 
 ## The Bias-Variance Tradeoff
 
-Schulman et al. proposed GAE (arXiv 2015, ICML 2016), which uses a single parameter $\lambda$ to interpolate between TD and MC by exponential weighting:
+Schulman et al. proposed GAE (arXiv 2015, ICLR 2016), which uses a single parameter $\lambda$ to interpolate between TD and MC by exponential weighting:
 
 $$\hat{A}_t^{\text{GAE}(\gamma, \lambda)} = \sum_{k=0}^{\infty} (\gamma \lambda)^k \delta_{t+k}$$
 

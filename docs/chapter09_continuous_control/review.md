@@ -86,10 +86,10 @@ Unroll once: $e_1 \le \epsilon$. Then $e_2 \le L\epsilon + \epsilon$, $e_3 \le L
 
 ### Exercise 6 — Squashed Log-Probability by Hand
 
-A 1-D SAC policy outputs $\mu = 0$, $\sigma = 1.0$, samples pre-action $u = -1.0$, and squashes with $a = \tanh(u)$ ($a_{\max} = 1$). Compute (a) the executed action, (b) the Gaussian log-density $\log \mu(u \mid s)$, (c) the squashing correction, and (d) the final $\log \pi(a \mid s)$.
+A 1-D SAC policy outputs mean $\mu_\theta(s) = 0$, $\sigma_\theta(s) = 1.0$, samples pre-action $u = -1.0$, and squashes with $a = \tanh(u)$ ($a_{\max} = 1$). Compute (a) the executed action, (b) the Gaussian log-density $\log \mathcal{N}(u; \mu, \sigma^2)$, (c) the squashing correction, and (d) the final $\log \pi(a \mid s)$.
 
 ::: details Solution
-(a) $a = \tanh(-1.0) \approx -0.762$, inside $(-1, 1)$. (b) $\log \mu(-1.0) = -\tfrac{1}{2}(-1.0)^2 - \log\sqrt{2\pi} \approx -0.5 - 0.9189 = -1.4189$. (c) $-\log(1 - \tanh^2(-1.0)) = -\log(1 - 0.5803) = -\log(0.4197) \approx +0.8676$. (d) $\log \pi(a \mid s) \approx -1.4189 + 0.8676 = -0.551$. (Here $a_{\max} = 1$, so the $-\log a_{\max}$ term is zero.) Note the correction is positive and large here: near saturation $\tanh$ compresses a wide range of $u$ into a narrow range of $a$, so the squashed action is far more likely than the raw Gaussian density suggests. Dropping the correction would overstate the policy's entropy and corrupt both the actor loss and temperature tuning.
+(a) $a = \tanh(-1.0) \approx -0.762$, inside $(-1, 1)$. (b) $\log \mathcal{N}(-1.0; 0, 1) = -\tfrac{1}{2}(-1.0)^2 - \log\sqrt{2\pi} \approx -0.5 - 0.9189 = -1.4189$. (c) $-\log(1 - \tanh^2(-1.0)) = -\log(1 - 0.5803) = -\log(0.4197) \approx +0.8676$. (d) $\log \pi(a \mid s) \approx -1.4189 + 0.8676 = -0.551$. (Here $a_{\max} = 1$, so the $-\log a_{\max}$ term is zero.) Note the correction is positive and large here: near saturation $\tanh$ compresses a wide range of $u$ into a narrow range of $a$, so the squashed action is far more likely than the raw Gaussian density suggests. Dropping the correction would overstate the policy's entropy and corrupt both the actor loss and temperature tuning.
 :::
 
 ### Exercise 7 — Coding: PPO vs TD3 vs SAC on the Same Budget

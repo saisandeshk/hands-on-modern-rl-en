@@ -89,7 +89,7 @@ a telescoping sum where every interior term cancels. Hence $G' = G - \Phi(s_0)$:
 With $\epsilon = 0.2$: (a) ratio $r = 1.5$, advantage $A = +2$; (b) ratio $r = 1.5$, advantage $A = -1$. Compute the per-sample clipped objective $\min(rA, \text{clip}(r)A)$ in each case and say which term the $\min$ picks.
 
 ::: details Solution
-(a) Unclipped: $1.5 \times 2 = 3$. Clipped: $\text{clip}(1.5) = 1.2$, $1.2 \times 2 = 2.4$. $\min(3, 2.4) = 2.4$ — the clip binds, stopping the overshooting update. (b) Unclipped: $-1.5$. Clipped: $1.2 \times (-1) = -1.2$. $\min(-1.5, -1.2) = -1.5$ — the $\min$ picks the unclipped term, i.e. PPO does not clip updates that move a bad action's probability down (for $A < 0$ the pessimistic bound is the more negative one).
+(a) Unclipped: $1.5 \times 2 = 3$. Clipped: $\text{clip}(1.5) = 1.2$, $1.2 \times 2 = 2.4$. $\min(3, 2.4) = 2.4$ — the clip binds, stopping the overshooting update. (b) Unclipped: $-1.5$. Clipped: $1.2 \times (-1) = -1.2$. $\min(-1.5, -1.2) = -1.5$ — the $\min$ picks the unclipped term, i.e. PPO does not clip this recovery move back toward the trust interval (for $A < 0$ the pessimistic bound is the more negative one; same-direction moves with $r < 1-\epsilon$ are still clipped).
 :::
 
 ### Exercise 6 — Why CTDE, and why not one super-agent? (conceptual)

@@ -219,7 +219,7 @@ def mappo_update(actors, critic, buffer, n_agents, clip_eps=0.2):
                 s2 = torch.clamp(ratio, 1 - clip_eps, 1 + clip_eps) * adv[i]
                 policy_loss = -torch.min(s1, s2).mean()
                 entropy_bonus = -new_logp_list[i].mean()
-                update(actors[i], policy_loss + 0.01 * entropy_bonus)
+                update(actors[i], policy_loss - 0.01 * entropy_bonus)
             # Finally update the shared critic
             value_loss = F.mse_loss(values, ret)
             update(critic, value_loss)

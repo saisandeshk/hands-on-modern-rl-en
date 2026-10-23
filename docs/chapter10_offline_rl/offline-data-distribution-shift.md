@@ -150,7 +150,7 @@ In practice α does not need to be tuned by hand. Automatic adjustment with Lagr
 
 $$\mathcal{L}(\alpha) = -\alpha \cdot \left(\mathbb{E}_s\left[\log\sum_a \exp(\hat{Q}(s, a))\right] - \mathbb{E}_{(s, a) \sim \mathcal{D}}[\hat{Q}(s, a)] - \xi\right)$$
 
-Here ξ is the target gap we want (about 5.0 in the paper) — a different ξ from the BCQ perturbation bound in §2.1. When the actual gap is below ξ, α is increased to strengthen the conservative penalty. Otherwise α is decreased so that the Q-values are learned more accurately. In this way the gap stabilizes automatically near the target.
+Here ξ is the target gap we want (about 5.0 in the paper) — a different ξ from the BCQ perturbation bound in §2.1. When the actual gap exceeds ξ, α is increased to strengthen the conservative penalty. Otherwise α is decreased so that the Q-values are learned more accurately. In this way the gap stabilizes automatically near the target.
 
 Here is a simplified code implementation (based on the SAC framework):
 
