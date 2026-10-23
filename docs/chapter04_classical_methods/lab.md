@@ -1,8 +1,8 @@
 ---
-title: '4.L Lab: Tabular Methods Against Exact Oracles'
+title: '4.4 Lab: Tabular Methods Against Exact Oracles'
 ---
 
-# 4.L Lab: Tabular Methods Against Exact Oracles
+# 4.4 Lab: Tabular Methods Against Exact Oracles
 
 ## What You Will Learn
 

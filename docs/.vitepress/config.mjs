@@ -765,7 +765,11 @@ const sidebar = {
               link: '/chapter04_classical_methods/reward-design'
             },
             {
-              text: '4.4 Summary and Exercises',
+              text: '4.4 Lab: Tabular Methods Against Exact Oracles',
+              link: '/chapter04_classical_methods/lab'
+            },
+            {
+              text: '4.5 Summary and Exercises',
               link: '/chapter04_classical_methods/review'
             }
           ]

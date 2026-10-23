@@ -1,8 +1,8 @@
 ---
-title: 4.4 Summary and Exercises
+title: 4.5 Summary and Exercises
 ---
 
-# 4.4 Summary and Exercises
+# 4.5 Summary and Exercises
 
 This chapter built classical tabular RL from one shared idea: maintain a value table and repeatedly move each entry toward a target built from rewards plus future value. Dynamic programming (DP) computes the target from a known model, Monte Carlo (MC) from complete sampled returns, and temporal-difference (TD) learning from one-step rewards plus the current next-state estimate. Control extends the same loop to action values with SARSA, Expected SARSA, and Q-learning; data-source distinctions (on/off-policy, online/offline) with importance sampling decide which data each update may legally use; and reward design decides what all of this machinery optimizes.
 
