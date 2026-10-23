@@ -9,7 +9,7 @@ This chapter built the Actor-Critic architecture: a Critic that learns state val
 ## What you should now be able to do
 
 1. Define the advantage $A^\pi(s,a) = Q^\pi(s,a) - V^\pi(s)$ and explain in plain terms why it gives a lower-variance policy-gradient signal than the raw return $G_t$.
-2. Derive the one-step TD advantage $\delta_t = r_{t+1} + \gamma V(s_{t+1}) - V(s_t)$ from the definition of $Q^\pi$, and compute it by hand on a short trajectory.
+2. Derive the one-step TD advantage $\delta_t = r_{t} + \gamma V(s_{t+1}) - V(s_t)$ from the definition of $Q^\pi$, and compute it by hand on a short trajectory.
 3. Train a Critic with DP, MC, and TD targets, and state for each whether it bootstraps, whether it is biased, and whether it must wait for the episode to end.
 4. Write down the one-step Actor-Critic update (Actor loss $-\log \pi(a|s)\,\delta$, Critic loss $\delta^2$) and explain why $\delta$ is detached in the Actor loss but differentiated in the Critic loss.
 5. Compute $n$-step advantages $A^{(n)}_t = \sum_{k=0}^{n-1} \gamma^k \delta_{t+k}$ and GAE $A^{\text{GAE}}_t = \sum_l (\gamma\lambda)^l \delta_{t+l}$, and describe how $\gamma$ sets the horizon and $\lambda$ trades bias against variance.
@@ -20,7 +20,7 @@ This chapter built the Actor-Critic architecture: a Critic that learns state val
 
 - **Advantage:** $A^\pi(s,a) = Q^\pi(s,a) - V^\pi(s)$ — "how much better is this action than this state's average?"
 - **Policy gradient with advantage:** $\nabla_\theta J \approx \nabla_\theta \log \pi_\theta(a_t|s_t)\,\hat{A}_t$ — the Actor climbs toward actions with positive estimated advantage.
-- **TD advantage:** $\hat{A}_t = \delta_t = r_{t+1} + \gamma V(s_{t+1}) - V(s_t)$ — a one-step, low-variance, slightly biased advantage estimate.
+- **TD advantage:** $\hat{A}_t = \delta_t = r_{t} + \gamma V(s_{t+1}) - V(s_t)$ — a one-step, low-variance, slightly biased advantage estimate.
 - **$n$-step advantage:** $A^{(n)}_t = \sum_{k=0}^{n-1} \gamma^k \delta_{t+k}$ — looking $n$ real rewards ahead interpolates between TD ($n=1$) and MC ($n \to \infty$).
 - **GAE:** $A^{\text{GAE}}_t = \sum_{l=0}^{\infty} (\gamma\lambda)^l \delta_{t+l}$ — $\lambda = 0$ is pure TD, $\lambda = 1$ is pure MC; $\lambda \approx 0.95$ is the usual compromise.
 - **Actor loss:** $L_{\text{actor}} = -\log \pi(a|s)\,\delta.\text{detach}()$ — gradient descent on this loss equals policy-gradient ascent.
@@ -93,10 +93,10 @@ Prove that with $\lambda = 1$ and an episode ending at step $T$ (so $V(s_T) = 0$
 $$\sum_{l=0}^{T-t-1} \gamma^l \delta_{t+l} = G_t - V(s_t).$$
 
 ::: details Solution
-Write out the first two terms with $\delta_{t+k} = r_{t+k+1} + \gamma V(s_{t+k+1}) - V(s_{t+k})$:
-$$\sum_{l=0}^{T-t-1} \gamma^l \delta_{t+l} = \big[r_{t+1} + \gamma V(s_{t+1}) - V(s_t)\big] + \gamma\big[r_{t+2} + \gamma V(s_{t+2}) - V(s_{t+1})\big] + \cdots$$
+Write out the first two terms with $\delta_{t+k} = r_{t+k} + \gamma V(s_{t+k+1}) - V(s_{t+k})$:
+$$\sum_{l=0}^{T-t-1} \gamma^l \delta_{t+l} = \big[r_{t} + \gamma V(s_{t+1}) - V(s_t)\big] + \gamma\big[r_{t+1} + \gamma V(s_{t+2}) - V(s_{t+1})\big] + \cdots$$
 The $\gamma V(s_{t+1})$ from the first bracket cancels the $-\gamma V(s_{t+1})$ from the second; likewise every intermediate $\gamma^{k}V(s_{t+k})$ cancels between consecutive brackets. Only $-V(s_t)$ and the reward terms survive, plus the final $\gamma^{T-t}V(s_T) = 0$:
-$$= -V(s_t) + \sum_{k=0}^{T-t-1} \gamma^k r_{t+k+1} = G_t - V(s_t).$$
+$$= -V(s_t) + \sum_{k=0}^{T-t-1} \gamma^k r_{t+k} = G_t - V(s_t).$$
 So $\lambda = 1$ recovers exactly the unbiased MC advantage, while $\lambda = 0$ keeps only $\delta_t$.
 :::
 

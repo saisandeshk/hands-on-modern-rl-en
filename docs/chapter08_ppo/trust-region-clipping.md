@@ -67,6 +67,8 @@ The new policy makes $a_1$ 1.65× more likely. Incorporating this ratio into the
 
 $$L^{\text{IS}}(\theta) = \mathbb{E}_t \left[ r_t(\theta) \cdot A_t \right]$$
 
+Here $A_t$ is the estimated advantage $\hat{A}_t$ (computed with GAE in Section 8.3); the PPO objectives write it without the hat.
+
 In form, old data can now evaluate the new policy. But the value 1.65 also exposes a problem: **the gradient is amplified 1.65×**. If the policy pushes $\pi(a_1 \mid s)$ more aggressively to 0.999, then $r_t = 1.665$; at 0.9999, $r_t = 1.6665$. The larger $r_t$ becomes, the larger the next update, which in turn drives $r_t$ even higher — a **positive feedback loop**.
 
 Importance sampling solves the data-reuse problem but provides no guarantee of safe usage.
@@ -77,19 +79,19 @@ Importance sampling solves the data-reuse problem but provides no guarantee of s
 
 In 2015, Schulman et al. proposed TRPO (Trust Region Policy Optimization). Its core idea: **constrain the distance between the old and new policies directly**. The standard tool for measuring the difference between two probability distributions is KL divergence (Kullback-Leibler divergence), written here as a hard constraint:
 
-$$\max_\theta \; \mathbb{E}_t \left[ r_t(\theta) \cdot A_t \right] \quad \text{s.t.} \quad \mathbb{E}_t \left[ D_{\text{KL}}(\pi_{\text{old}} \| \pi_\theta) \right] \leq \delta$$
+$$\max_\theta \; \mathbb{E}_t \left[ r_t(\theta) \cdot A_t \right] \quad \text{s.t.} \quad \mathbb{E}_t \left[ D_{\mathrm{KL}}(\pi_{\text{old}} \| \pi_\theta) \right] \leq \delta$$
 
-This optimization problem has two parts: the left side $\max_\theta \; \mathbb{E}_t[r_t(\theta) \cdot A_t]$ is the objective to be maximized — the importance-sampled objective, pursuing higher cumulative advantage; the right side $\mathbb{E}_t[D_{\text{KL}}(\pi_{\text{old}} \| \pi_\theta)] \leq \delta$ is the constraint that must be satisfied. "s.t." reads "subject to."
+This optimization problem has two parts: the left side $\max_\theta \; \mathbb{E}_t[r_t(\theta) \cdot A_t]$ is the objective to be maximized — the importance-sampled objective, pursuing higher cumulative advantage; the right side $\mathbb{E}_t[D_{\mathrm{KL}}(\pi_{\text{old}} \| \pi_\theta)] \leq \delta$ is the constraint that must be satisfied. "s.t." reads "subject to."
 
 KL divergence measures the difference between two probability distributions, defined as:
 
-$$D_{\text{KL}}(P \| Q) = \sum_i P(i) \log \frac{P(i)}{Q(i)}$$
+$$D_{\mathrm{KL}}(P \| Q) = \sum_i P(i) \log \frac{P(i)}{Q(i)}$$
 
-When the two distributions are identical, $D_{\text{KL}} = 0$; the greater the difference, the larger $D_{\text{KL}}$ (always non-negative). Here $\pi_{\text{old}}$ is the policy before the update and $\pi_\theta$ is the policy after, so $D_{\text{KL}}(\pi_{\text{old}} \| \pi_\theta)$ measures how much a single update changes the policy distribution. The constraint requires this change to not exceed $\delta$.
+When the two distributions are identical, $D_{\mathrm{KL}} = 0$; the greater the difference, the larger $D_{\mathrm{KL}}$ (always non-negative). Here $\pi_{\text{old}}$ is the policy before the update and $\pi_\theta$ is the policy after, so $D_{\mathrm{KL}}(\pi_{\text{old}} \| \pi_\theta)$ measures how much a single update changes the policy distribution. The constraint requires this change to not exceed $\delta$.
 
 Returning to the running example. With $\pi_{\text{old}}(a_1) = 0.6$ and $\pi_\theta(a_1) = 0.99$:
 
-$$D_{\text{KL}}(\pi_{\text{old}} \| \pi_\theta) = 0.6 \ln\frac{0.6}{0.99} + 0.4 \ln\frac{0.4}{0.01} \approx 0.6 \times (-0.50) + 0.4 \times 3.69 \approx 1.18$$
+$$D_{\mathrm{KL}}(\pi_{\text{old}} \| \pi_\theta) = 0.6 \ln\frac{0.6}{0.99} + 0.4 \ln\frac{0.4}{0.01} \approx 0.6 \times (-0.50) + 0.4 \times 3.69 \approx 1.18$$
 
 The result is approximately 1.18, far exceeding $\delta = 0.01$. TRPO would reject this update outright and pull the policy back inside the trust region.
 

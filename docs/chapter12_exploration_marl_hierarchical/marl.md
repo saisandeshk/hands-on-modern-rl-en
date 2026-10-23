@@ -196,7 +196,7 @@ Why is PPO especially suited to multiple agents? Recall the core of PPO, the **c
 
 $$L^{\text{CLIP}}(\theta) = \mathbb{E}\left[\min\left(r_t(\theta) A_t,\ \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon) A_t\right)\right]$$
 
-where the policy ratio is $r_t(\theta) = \frac{\pi_\theta(a_t \mid s_t)}{\pi_{\theta_{\text{old}}}(a_t \mid s_t)}$.
+where the policy ratio is $r_t(\theta) = \frac{\pi_\theta(a_t \mid s_t)}{\pi_{\text{old}}(a_t \mid s_t)}$ and $A_t$ is the estimated advantage (see §8.3).
 
 In the multi-agent setting this policy ratio is **computed independently for each agent**. Agent i only needs the ratio of its own new policy to its old policy and does not have to care about the other agents. PPO's clip mechanism naturally prevents any single agent's policy from being updated too aggressively and collapsing the distribution of the joint policy. This is much more stable than the off-policy deterministic update of DDPG.
 

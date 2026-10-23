@@ -52,7 +52,7 @@ Take discount factor $\gamma = 0.99$.
 
 $$
 \begin{aligned}
-G_t &= r_{t+1} + \gamma r_{t+2} + \gamma^2 r_{t+3} + \gamma^3 r_{t+4} + \gamma^4 r_{t+5} \\
+G_t &= r_{t} + \gamma r_{t+1} + \gamma^2 r_{t+2} + \gamma^3 r_{t+3} + \gamma^4 r_{t+4} \\
     &= 1.0 + 0.99 \times 1.0 + 0.99^2 \times 1.0 + 0.99^3 \times 1.0 + 0.99^4 \times 1.0 \\
     &= 1.0 + 0.99 + 0.9801 + 0.9703 + 0.9606 \\
     &= 4.9010.
@@ -82,11 +82,11 @@ The problem: on a different trajectory, $G_t$ could be 1.0 (the pole fell after 
 > | $r_{t+k}$                                 | Immediate reward received at time $t+k$                                                         |
 > | $\gamma$                                  | Discount factor, controlling how fast future rewards decay                                      |
 
-**Actor-Critic computation.** Actor-Critic does not wait for the episode to end. Suppose the Critic estimates $V(s_t) = 2.0$ and $V(s_{t+1}) = 3.0$ for the current and next states. After one step, the immediate reward $r_{t+1} = 1.0$ is received, and the TD Error can be computed immediately:
+**Actor-Critic computation.** Actor-Critic does not wait for the episode to end. Suppose the Critic estimates $V(s_t) = 2.0$ and $V(s_{t+1}) = 3.0$ for the current and next states. After one step, the immediate reward $r_{t} = 1.0$ is received, and the TD Error can be computed immediately:
 
 $$
 \begin{aligned}
-\delta &= r_{t+1} + \gamma V(s_{t+1}) - V(s_t) \\
+\delta &= r_{t} + \gamma V(s_{t+1}) - V(s_t) \\
        &= 1.0 + 0.99 \times 3.0 - 2.0 \\
        &= 1.0 + 2.97 - 2.0 \\
        &= 1.97.
@@ -107,19 +107,19 @@ Using the same $\log \pi(\text{right}|s_t) \approx -0.5108$, the gradient is of 
 > | ----------------------------------------- | ----------------------------------------------------------------------------------- |
 > | $\nabla_\theta \log \pi_\theta(a_t\|s_t)$ | Log-probability gradient w.r.t. policy parameters $\theta$                          |
 > | $\delta$                                  | TD Error, serving as a one-step estimate of the advantage $A(s,a)$                  |
-> | $r_{t+1}$                                 | Immediate reward received in this step                                              |
+> | $r_{t}$                                   | Immediate reward received in this step                                              |
 > | $\gamma V(s_{t+1})$                       | Discounted value estimate of the next state (the Critic's prediction of the future) |
 > | $V(s_t)$                                  | Critic's value estimate for the current state (used as the baseline)                |
 
 The core differences between the two methods can be summarized in a single comparison table:
 
-| Computation step             | REINFORCE                                       | Actor-Critic                                     |
-| ---------------------------- | ----------------------------------------------- | ------------------------------------------------ |
-| Update precondition          | episode ends, full trajectory available         | one step taken, $r_{t+1}$ and $s_{t+1}$ obtained |
-| Advantage estimate           | $G_t = 4.9010$ (5-step cumulative return)       | $\delta = 1.97$ (one-step TD Error)              |
-| Gradient weight              | affected by randomness of the entire trajectory | affected by randomness of a single step only     |
-| Additional components needed | none                                            | Critic providing $V(s_t)$ and $V(s_{t+1})$       |
-| Per-step computation         | small (no network forward pass)                 | larger (Critic requires an extra forward pass)   |
+| Computation step             | REINFORCE                                       | Actor-Critic                                   |
+| ---------------------------- | ----------------------------------------------- | ---------------------------------------------- |
+| Update precondition          | episode ends, full trajectory available         | one step taken, $r_{t}$ and $s_{t+1}$ obtained |
+| Advantage estimate           | $G_t = 4.9010$ (5-step cumulative return)       | $\delta = 1.97$ (one-step TD Error)            |
+| Gradient weight              | affected by randomness of the entire trajectory | affected by randomness of a single step only   |
+| Additional components needed | none                                            | Critic providing $V(s_t)$ and $V(s_{t+1})$     |
+| Per-step computation         | small (no network forward pass)                 | larger (Critic requires an extra forward pass) |
 
 ## Actor-Critic Architecture
 
@@ -158,7 +158,7 @@ Both networks share the same input (state $s$) but perform different tasks:
 | Actor   | select actions  | state $s$ | action probabilities $\pi(a\|s)$ | maximize cumulative reward       |
 | Critic  | evaluate states | state $s$ | value estimate $V(s)$            | predict future return accurately |
 
-The Critic update $V(s) \leftarrow V(s) + \alpha\delta$ is the [TD-learning](../chapter04_classical_methods/dp-mc-td) update from Chapter 4 with a neural function approximator. The Critic learns the [value function $V(s)$](../chapter03_value_functions/value-bellman), while the Actor represents the [policy $\pi(a\mid s)$](../chapter02_rl_basics/policy-value) and changes its behavior using the Critic's evaluation.
+The Critic update $V(s) \leftarrow V(s) + \alpha\delta$ is the [TD-learning](../chapter04_classical_methods/dp-mc-td) update from Chapter 4 with a neural function approximator (here $\alpha$ is the step size, as in Chapters 4 and 6). The Critic learns the [value function $V(s)$](../chapter03_value_functions/value-bellman), while the Actor represents the [policy $\pi(a\mid s)$](../chapter02_rl_basics/policy-value) and changes its behavior using the Critic's evaluation.
 
 Two function approximators work in concert -- the Critic helps the Actor judge "how much better this action is than average," the Actor adjusts its policy accordingly, and the new policy generates new data that helps the Critic learn better. This is where the name Actor-Critic comes from.
 

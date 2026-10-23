@@ -135,12 +135,12 @@ A medical consultation follows exactly this procedure: the two or three symptoms
 
 Training requires the policy to obtain high return and also restricts the posterior from deviating from the prior without constraint:
 
-$$\mathcal{L} = -\mathbb{E}_{z \sim q_\phi}\left[\sum_t r(s_t, a_t, z)\right] + \beta \cdot D_{\text{KL}}\left(q_\phi(z \mid \tau) \,\|\, p(z)\right)$$
+$$\mathcal{L} = -\mathbb{E}_{z \sim q_\phi}\left[\sum_t r(s_t, a_t, z)\right] + \beta \cdot D_{\mathrm{KL}}\left(q_\phi(z \mid \tau) \,\|\, p(z)\right)$$
 
 Let's take this objective apart:
 
 - First term: negative return. Minimizing it improves the policy's performance under the inferred $z$.
-- Second term: KL divergence regularization, which keeps the posterior $q(z|\tau)$ from straying too far from the prior $p(z)$. $\beta$ controls the strength of the compression of task information, like the KL weight in a VAE.
+- Second term: KL divergence regularization, which keeps the posterior $q(z|\tau)$ from straying too far from the prior $p(z)$. $\beta$ controls the strength of the compression of task information, like the KL weight in a VAE (unrelated to the DAgger expert-mixing $\beta$ in §11.1).
 
 The benefit of PEARL is that it separates "task inference" from "policy learning", and it is off-policy (experience replay can be used), so its sample efficiency is much higher than MAML and RL². The actual adaptation speed depends on the task distribution, the context length, and the implementation, and cannot be judged from the method name alone.
 

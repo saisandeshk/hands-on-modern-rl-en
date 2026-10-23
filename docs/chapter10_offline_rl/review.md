@@ -20,7 +20,7 @@ After working through Sections 10.1–10.3, you should be able to:
 
 - Bellman target with the dangerous max: $y = r + \gamma \max_{a'} Q(s', a')$ — offline, the max may select an action the data never tried, whose Q-value is pure extrapolation.
 - Error amplification: $\|Q_T - Q^\pi\| \lesssim \epsilon_{\text{ood}} / (1 - \gamma)$ — with $\gamma = 0.99$, each unit of per-step OOD error compounds into about 100 units.
-- Constrained offline objective: $\max_\theta\, \mathbb{E}_{s \sim \mathcal{D}}[Q(s, \pi_\theta(s))]$ subject to $D(\pi_\theta \| \pi_\beta) \le \epsilon$ — improve, but stay near the data support.
+- Constrained offline objective: $\max_\theta\, \mathbb{E}_{s \sim \mathcal{D}}[Q(s, \pi_\theta(s))]$ subject to $D(\pi_\theta \| \pi_\beta) \le \epsilon$ — improve, but stay near the data support ($D$ is any divergence, e.g. KL or MMD; see §10.1).
 - CQL regularizer: $\alpha\,(\mathbb{E}_s[\log\sum_a \exp Q(s,a)] - \mathbb{E}_{(s,a) \sim \mathcal{D}}[Q(s,a)])$ — push down Q everywhere (including OOD actions), pull it back up on data actually seen.
 - IQL expectile loss: $L_2^\tau(x) = |\tau - \mathbb{1}(x < 0)|\,x^2$ with $x = Q(s,a) - V(s)$ — an asymmetric square that makes $V$ lean toward the best in-data actions without ever maximizing over OOD actions.
 - Advantage-weighted policy loss: $-\mathbb{E}_{(s,a) \sim \mathcal{D}}[\exp(\beta A(s,a)) \log \pi_\theta(a \mid s)]$ — clone the data selectively, imitating high-advantage actions exponentially more.

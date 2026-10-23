@@ -304,7 +304,7 @@ log_probs = dist.log_prob(u).sum(-1, keepdim=True) \
 # Note: with action bounds [-1, 1] the log action_max term is zero.
 ```
 
-A quick check in one dimension with $a_{\max} = 1$, $\mu_0 = 0$, $\sigma = 0.5$, and a sampled $u = 0.5$: the executed action is $\tanh(0.5) \approx 0.462$, safely inside the bound. The Gaussian log-density at $u = 0.5$ is about $-0.726$, and the squashing correction is $-\log(1 - \tanh^2(0.5)) \approx +0.240$, giving $\log \pi(a \mid s) \approx -0.486$. Near saturation ($|u|$ large) the correction grows, correctly reporting that the squashed policy has lower entropy there than the raw Gaussian suggests.
+A quick check in one dimension with $a_{\max} = 1$, $\mu = 0$, $\sigma = 0.5$, and a sampled $u = 0.5$: the executed action is $\tanh(0.5) \approx 0.462$, safely inside the bound. The Gaussian log-density at $u = 0.5$ is about $-0.726$, and the squashing correction is $-\log(1 - \tanh^2(0.5)) \approx +0.240$, giving $\log \pi(a \mid s) \approx -0.486$. Near saturation ($|u|$ large) the correction grows, correctly reporting that the squashed policy has lower entropy there than the raw Gaussian suggests.
 
 ### The Advantages of SAC
 

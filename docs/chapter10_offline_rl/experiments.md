@@ -169,7 +169,7 @@ For our three trajectories, $\text{ESS} = 16/16 = 1$: three logged episodes carr
 
 Reweighting alone ignores everything we know about the environment's structure. The **direct method** instead learns a reward/dynamics model (or a $Q$-function) from the logs and evaluates $\pi$ inside it: low variance, but biased by model error. The **doubly robust (DR)** estimator gets the best of both by using the model as a baseline and IS-weighting only its residuals:
 
-$$\hat{J}_{\text{DR}} = \frac{1}{N}\sum_i\left[\hat{V}(s_1) + \sum_t \gamma^t \rho_{1:t}\left(r_t + \gamma\hat{V}(s_{t+1}) - \hat{Q}(s_t, a_t)\right)\right]$$
+$$\hat{J}_{\text{DR}} = \frac{1}{N}\sum_i\left[\hat{V}(s_1) + \sum_t \gamma^t \rho_{1:t}\left(r_{i,t} + \gamma\hat{V}(s_{i,t+1}) - \hat{Q}(s_{i,t}, a_{i,t})\right)\right]$$
 
 Read it inside out: start from the model's guess $\hat{V}(s_1)$, then add each step's surprise (actual reward plus next-state value minus what the model predicted), reweighted onto $\pi$'s distribution. It is unbiased if _either_ the model _or_ the ratios are correct — hence "doubly" robust — and its variance collapses when the model is good. (Written here with the cumulative weight $\rho_{1:t}$; Jiang & Li 2016 state the standard form with the per-decision weight at step $t$, which the same telescoping identity justifies.)
 

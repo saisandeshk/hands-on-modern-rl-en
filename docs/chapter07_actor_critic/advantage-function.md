@@ -83,11 +83,11 @@ $$s_0 \xrightarrow{r=+2} s_1 \xrightarrow{r=+3} s_2 \xrightarrow{r=+1} s_3\ (\te
 
 Computing the discounted return $G_t$ from each time step:
 
-$$G_0 = r_1 + \gamma r_2 + \gamma^2 r_3 = 2 + 0.9 \times 3 + 0.9^2 \times 1 = 2 + 2.7 + 0.81 = 5.51$$
+$$G_0 = r_0 + \gamma r_1 + \gamma^2 r_2 = 2 + 0.9 \times 3 + 0.9^2 \times 1 = 2 + 2.7 + 0.81 = 5.51$$
 
-$$G_1 = r_2 + \gamma r_3 = 3 + 0.9 \times 1 = 3.9$$
+$$G_1 = r_1 + \gamma r_2 = 3 + 0.9 \times 1 = 3.9$$
 
-$$G_2 = r_3 = 1$$
+$$G_2 = r_2 = 1$$
 
 Now suppose the Critic provides value estimates for each state:
 
@@ -145,7 +145,7 @@ The theoretical definition of the advantage is $A = Q - V$, but in practice we r
 
 Begin with $A^\pi(s,a) = Q^\pi(s,a) - V^\pi(s)$. The [action-value function](../chapter03_value_functions/value-q) is defined as:
 
-$$Q^\pi(s,a) = \mathbb{E}\left[R_{t+1} + \gamma V^\pi(S_{t+1}) \mid S_t = s, A_t = a\right]$$
+$$Q^\pi(s,a) = \mathbb{E}\left[r_t + \gamma V^\pi(s_{t+1}) \mid s_t = s, a_t = a\right]$$
 
 This expectation represents: after taking action $a$ in state $s$, the immediate reward plus the value of the next state. If we take a single sample (without completing the entire episode or averaging over all possible transitions), we obtain a one-step estimate of $Q$:
 

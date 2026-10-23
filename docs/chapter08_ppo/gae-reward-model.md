@@ -124,6 +124,8 @@ Schulman et al. proposed GAE (arXiv 2015, ICML 2016), which uses a single parame
 
 $$\hat{A}_t^{\text{GAE}(\gamma, \lambda)} = \sum_{k=0}^{\infty} (\gamma \lambda)^k \delta_{t+k}$$
 
+(Elsewhere in this chapter the same estimate is written without the hat as $A_t$, e.g. $A_t^{\text{TD}}$, $A_t^{\text{MC}}$, and the $A_t$ in the PPO objectives.)
+
 Here $\delta_t = r_t + \gamma V(s_{t+1}) - V(s_t)$ is the TD error. The three typical values of $\lambda$ are:
 
 - $\lambda = 0$: $\hat{A}_t = \delta_t$, which reduces to one-step TD

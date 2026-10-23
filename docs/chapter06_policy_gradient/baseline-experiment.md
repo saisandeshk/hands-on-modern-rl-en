@@ -49,7 +49,7 @@ $$
 In this section, **Value Baseline** refers to approximating $V(s)$ with a value network, and replacing the original signal $G_t$ with
 
 $$
-A_t = G_t - V(s_t).
+\hat{A}_t = G_t - V(s_t).
 $$
 
 So, more precisely, the experiment here is not “adding an arbitrary baseline,” but “using a learned value function as the baseline.”
@@ -88,7 +88,7 @@ Vanilla REINFORCE uses the discounted return starting from time step $t$, namely
 With a value baseline, we first estimate the expected return from the current state, $V(s_t)$, and compute the advantage
 
 $$
-A_t = G_t - V(s_t).
+\hat{A}_t = G_t - V(s_t).
 $$
 
 In words, the policy update now depends on the difference between “what actually happened” and “what we would normally expect from this state.”
