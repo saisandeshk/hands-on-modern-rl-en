@@ -1,0 +1,73 @@
+# Report: fc-6 — Fact-check of Chapters 23–26 against primary sources
+
+## Summary
+
+Checked every "Needs external verification" item from `ch23-text`, `ch24-text`, `ch24-lab`, `ch25-text`, `ch25-lab`, `ch26-text`, `ch26-lab` against primary sources (arXiv abstract pages, official GitHub repos, Hugging Face dataset pages, official model/blog pages, web search for paper-reported numbers). Made 4 minimal corrections (wrong first-author attributions ×3 papers, wrong LeWorldModel title/scope, wrong FlexMARL first author, restored two source-backed precise claims). Everything else was confirmed or is already safely hedged. `npx prettier --write` clean; `npx vitepress build docs` succeeds.
+
+## Technical fixes
+
+1. `docs/chapter25_alignment_failures/modern-incidents.md` — wrong first author "Yang et al." for arXiv:2507.10532 (References bullet + `[^reasoning-memorization]`). Correction: "Wu et al." (first author Mingqi Wu). Verified: https://arxiv.org/abs/2507.10532 lists Wu, Zhang, Dong, …; title "Reasoning or Memorization? Unreliable Results of Reinforcement Learning Due to Data Contamination" matches.
+2. Same file — wrong first author "Denison et al." for arXiv:2511.18397 (References bullet + `[^natural-misalignment]`). Correction: "MacDiarmid et al." (first author Monte MacDiarmid; Denison is 11th). Verified: https://arxiv.org/abs/2511.18397 author list; title matches.
+3. `docs/chapter24_multimodal_frontier/embodied-intelligence/model-based-rl/index.md` — wrong title and scope for LeWorldModel. Correction: "Maes, J. et al. … LeWorldModel: A Unified End-to-End World Model for Autonomous Driving" → "Maes, L. et al. (2026). LeWorldModel: Stable End-to-End Joint-Embedding Predictive Architecture from Pixels"; body "for autonomous driving" → "evaluated on control tasks". Verified: https://arxiv.org/abs/2603.19312 (Maes, Le Lidec, Scieur, LeCun, Balestriero; JEPA from pixels, ~15M params, 2D/3D control + physical probing — not autonomous driving).
+4. `docs/chapter26_selfplay_frontiers/llm-multi-agent-rl/index.md` — wrong first author "Li J, et al." for FlexMARL (References bullet + `[^flexmarl]`). Correction: "Jiang Z, et al." (first author Zhida Jiang). Verified: https://arxiv.org/abs/2602.09578 author list; title "Rollout-Training Co-Design for Efficient LLM-Based Multi-Agent Reinforcement Learning" matches. Also restored the paper's own qualified "first end-to-end training framework … for large-scale LLM-based MARL" wording (abstract: "we propose FlexMARL, the first end-to-end training framework that holistically optimizes rollout, training, and their orchestration"), attributed as "in the paper's own claim".
+5. `docs/chapter26_selfplay_frontiers/alphaevolve/index.md` — restored the softened Titans figure: "at very long contexts" → "at very long contexts, scaling to larger than 2M context window size". Verified: https://arxiv.org/abs/2501.00663 abstract explicitly states "scale to larger than 2M context window size". Authors (Behrouz, Zhong, Mirrokni, 2024) and title already correct.
+
+## Verification table (flagged claims → verdict)
+
+| Page | Claim (short quote) | Verdict | Source URL |
+| --- | --- | --- | --- |
+| `vlm-challenges.md` | Visual-RFT "24.3 pp (1-shot classification) / 21.9 pp (COCO 2-shot) over SFT" | confirmed (kept "percentage points" wording; abstract reports 24.3% 1-shot, 21.9 COCO 2-shot, 15.4 LVIS) | https://arxiv.org/abs/2503.01785 |
+| `qwen3-vl-reflection.md` | Qwen3-VL report arXiv 2511.21631, Nov 2025, sizes 2B/4B/8B/32B + 30B-A3B/235B-A22B, 256K context | confirmed, no edit | https://arxiv.org/abs/2511.21631 |
+| `qwen3-vl-reflection.md` | DeepStack / interleaved-MRoPE / text-timestamp claims | confirmed (all three in abstract) | https://arxiv.org/abs/2511.21631 |
+| `qwen3-vl-reflection.md` | Perception-RFT arXiv 2607.14682 "reasoning-free beats reasoning for 4B" | confirmed (Qwen3-VL-4B, >60% token reduction, reasoning-enabled RL underperforms perception-only) | https://arxiv.org/abs/2607.14682 |
+| `vlm-frameworks.md` | VeRL-Omni "~25% higher throughput than flow_grpo" | confirmed as project-reported; kept existing attribution ("The project reports … see the project's own benchmark page") | https://github.com/verl-project/verl-omni, https://vllm.ai/blog/2026-05-14-verl-omni |
+| `easyr1-geoqa.md` | EasyR1 "about 5k stars", veRL-based, Qwen2-VL/Qwen3-VL support | confirmed (5.2k stars; fork of veRL; supports Qwen2-VL/2.5-VL/3-VL; Docker `hiyouga/verl:ngc-th2.8.0-cu12.9-vllm0.11.0` matches README) | https://github.com/hiyouga/EasyR1 |
+| `easyr1-geoqa.md` | GEOQA_8K_R1V train/test splits | confirmed (train 8.03k, test 754) | https://huggingface.co/datasets/leonardPKU/GEOQA_8K_R1V |
+| `audio-reward-design.md`, `audio-agents.md` | Step-Audio-R1 arXiv 2511.15848; format reward 76.5→77.7, 2800→1500 tokens; MGRD | confirmed | https://arxiv.org/abs/2511.15848, https://arxiv.org/html/2511.15848v2 (76.5→77.7 via search excerpt) |
+| `audio-reward-design.md` | Step-Audio-R1.5 arXiv 2604.25719; "verifiable-reward trap"; 77.97 vs 72.50 over 8 benchmarks | confirmed (abstract: verifiable-reward trap; 77.97 avg, +5.47 over R1's 72.50) | https://arxiv.org/abs/2604.25719 |
+| `audio-reward-design.md` | Realtime 96.1 @ 0.92s; GPT Realtime 0825 83 @ 0.98s; Big Bench Audio 98.7; Step-Audio 2 arXiv 2507.16632; Mind-Paced Speaking 2510.09592 | confirmed | search excerpts of https://arxiv.org/html/2511.15848v1; https://arxiv.org/abs/2507.16632; https://arxiv.org/abs/2510.09592 |
+| `visual-generation-dancegrpo.md` | DanceGRPO 2505.07818, Xue et al. 2025, up to 181%, 3 tasks/4 models, diffusion+rectified flow | confirmed | https://arxiv.org/abs/2505.07818 |
+| `visual-generation-dancegrpo.md` | GPU recipes "SD 8, FLUX 16, Hunyuan/SkyReels more" H800s | confirmed (README: SD 8; FLUX 16, or 8 slower; Hunyuan 16/32; SkyReels 32) | https://github.com/XueZeyue/DanceGRPO |
+| `video-generation-modern.md` | Timestep-segment ablation "early segment contributes most, yet training only it is worse" | hedged already ("paper's reported result; check against arXiv:2505.07818") — left as is | https://arxiv.org/abs/2505.07818 |
+| `video-generation-modern.md` | Seedance 1.0 2506.09113, multi-reward RLHF; LongCat-Video 2510.22200, 13.6B, Meituan, multi-reward RLHF, coarse-to-fine, sparse attention; Seedance=ByteDance vs LongCat=Meituan | confirmed | https://arxiv.org/abs/2506.09113; https://arxiv.org/abs/2510.22200 |
+| `model-based-rl/index.md` | LeWorldModel citation | corrected (see fix 3) | https://arxiv.org/abs/2603.19312 |
+| `modern-incidents.md` | 2507.10532 / 2511.18397 citations | corrected authors (see fixes 1–2) | https://arxiv.org/abs/2507.10532; https://arxiv.org/abs/2511.18397 |
+| `modern-incidents.md` | Claude 4 blackmail stress-test anecdote | confirmed as deliberately-constructed stress test (well-known Claude 4 Opus system-card result; page already caveats "deliberately constructed stress test, not a live deployment incident") — no edit | page's cited system-card PDF |
+| `rl-evaluation.md` §25.5.7 | Opus 4.6 figures/34× etc. | hedged already (figures removed earlier; "check the current card"); Opus 4.6 + card existence confirmed | https://www.anthropic.com/news/claude-opus-4-6 |
+| `sleeper-and-faking.md` | Alignment faking 14% free-tier vs ~never paid; RL → 78% | confirmed (abstract: 14% compliance free vs almost never paid; RL increases alignment-faking reasoning to 78%; Greenblatt first author 2024) — page's "roughly 12%–14%" hedge retained | https://arxiv.org/abs/2412.14093 |
+| `rl-scaling-outlook.md` | Lightman et al. "Let's Verify Step by Step" 2023, PRM800K | confirmed; PRM-vs-ORM table stays schematic/hedged | https://arxiv.org/abs/2305.20050 |
+| `rl-scaling-outlook.md` | RLMT 2509.20357, Bhaskar/Ye/Chen | confirmed (title, RLMT expansion, 2025) | https://arxiv.org/abs/2509.20357 |
+| `alphaevolve/index.md` | Genie 3 720p, 20–24 FPS, 2025 | confirmed | https://deepmind.google/models/genie/ |
+| `alphaevolve/index.md` | Titans 2M context | restored precise figure (see fix 5) | https://arxiv.org/abs/2501.00663 |
+| `alphaevolve/index.md` | M-GRPO 2511.13288, Hong/Yin et al. 2025 | confirmed | https://arxiv.org/abs/2511.13288 |
+| `llm-multi-agent-rl/index.md` | MAPoRL 2502.18439, Park/Han et al. | confirmed (first author Chanwoo Park; page's "Park C, Han S" correct) | https://arxiv.org/abs/2502.18439 |
+| `llm-multi-agent-rl/index.md` | SAGE 2603.15255, Peng et al. 2026 | confirmed | https://arxiv.org/abs/2603.15255 |
+| `llm-multi-agent-rl/index.md` | KD-MARL 2604.06691 full author list | confirmed verbatim | https://arxiv.org/abs/2604.06691 |
+| `llm-multi-agent-rl/index.md` | FlexMARL citation | corrected (see fix 4) | https://arxiv.org/abs/2602.09578 |
+| `llm-multi-agent-rl/index.md` | MARTI ICLR 2026, Zhang K et al. | confirmed | https://openreview.net/forum?id=E7jZqo0A50; https://github.com/TsinghuaC3I/MARTI |
+| `llm-multi-agent-rl/index.md` | ChatDev 2307.07924, softened affiliation | confirmed as hedged (arXiv page: Qian et al., ACL 2024; affiliation claim stays softened) | https://arxiv.org/abs/2307.07924 |
+
+## Other changes
+
+None. No new claims added; all edits are corrections/restorations toward primary sources in the existing style.
+
+## Needs external verification
+
+- Step-Audio exact table values (Spoken MQA 95.2, MMSU 75.9, MMAU 77.7, Wild Speech 70.6, MMAU-family avg 83.6 vs Gemini 2.5 Pro 81.5 / Gemini 3 Pro 85.1, Realtime Gemini 2.5 Flash 92 @ 0.63s, 118% motion gain, HPS threshold 0.28): verified only via secondary excerpts/search snippets, not the full paper HTML. Pages already hedge these as "reported … evaluation configuration" / "paper's reported result" — acceptable, but a full-text pass could tighten them.
+- Codec history (SoundStream/EnCodec/SpeechTokenizer/WavTokenizer/Mimi years, rates, layer counts), VLA product claims (RT-2, Gemini Robotics), simulator claims: carried as cited-report claims; landmark facts consistent with solid knowledge but not individually source-checked this pass.
+- Claude 4 blackmail percentages and Opus 4.6 per-task figures: deliberately left hedged; confirm against the current cards before citing numbers.
+- DanceGRPO timestep-segment ablation ranking: left hedged per existing caveat.
+
+## Sidebar additions
+
+None (no new pages created).
+
+## Commands run and results
+
+- `npx prettier --write` on the 4 changed files — clean (unchanged).
+- `npx vitepress build docs` — success ("build complete in 21.65s"; a SIGSEGV abort appeared after the completion message during process teardown, no page errors, no dead links).
+
+## Open issues
+
+- ch24-lab and ch25-lab reports list no external claims (verified tooling/derivation content only) — nothing to check.
+- The FlexMARL "first" restoration repeats the paper's own self-characterization; if the coordinator prefers the softer wording, revert fix-4's sentence only (author fix stands regardless).

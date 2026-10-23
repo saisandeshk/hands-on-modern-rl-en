@@ -376,7 +376,7 @@ Multi-agent self-play does not require manually designing role divisions -- let 
 
 **Proposer vs Solver**: The Proposer generates problems, and the Solver tries to solve them. A good Proposer should generate problems that are "just beyond the Solver's current capability" -- too hard and the Solver learns nothing; too easy and there is no challenge. This "difficulty-adaptive" capability is also learned through RL.
 
-The core challenge of self-play is **avoiding mode collapse** -- two models may converge to a fixed strategy equilibrium and stop evolving. A mitigation is maintaining a **strategy pool** (Population): instead of two models playing against each other, randomly pair from a pool containing 10-20 historical strategies. FlexMARL [^flexmarl] is an end-to-end framework that jointly optimizes sampling, training, and orchestration for multi-agent systems, addressing such parallel scheduling problems at the engineering level.
+The core challenge of self-play is **avoiding mode collapse** -- two models may converge to a fixed strategy equilibrium and stop evolving. A mitigation is maintaining a **strategy pool** (Population): instead of two models playing against each other, randomly pair from a pool containing 10-20 historical strategies. FlexMARL [^flexmarl] is, in the paper's own claim, the first end-to-end training framework that jointly optimizes rollout, training, and orchestration for large-scale LLM-based MARL, addressing such parallel scheduling problems at the engineering level.
 
 ## 26.3.5 Multi-Agent RL Infrastructure
 
@@ -662,9 +662,9 @@ Multi-agent in PettingZoo means "multiple RL agents in the same environment." Ag
 - Zhang G, et al. "[The Landscape of Agentic Reinforcement Learning for LLMs: A Survey](https://arxiv.org/abs/2509.02547)." 2025. -- Agentic RL survey, including multi-agent collaboration section.
 - Tran K-T, et al. "[Multi-Agent Collaboration Mechanisms: A Survey of LLMs](https://arxiv.org/abs/2501.06322)." 2025. -- LLM multi-agent collaboration survey, covering cooperation/competition/coopetition classification, communication protocols, and evaluation methods.
 - Jin W, et al. "[A Comprehensive Survey on Multi-Agent Cooperative Decision-Making](https://arxiv.org/abs/2503.13415)." 2025. -- Panoramic survey from traditional MARL to LLM-driven multi-agent collaboration.
-- Li J, et al. "[FlexMARL: Rollout-Training Co-Design for Efficient LLM-Based Multi-Agent Reinforcement Learning](https://arxiv.org/abs/2602.09578)." 2026. -- An end-to-end framework that jointly optimizes sampling, training, and orchestration for multi-agent systems.
+- Jiang Z, et al. "[FlexMARL: Rollout-Training Co-Design for Efficient LLM-Based Multi-Agent Reinforcement Learning](https://arxiv.org/abs/2602.09578)." 2026. -- An end-to-end framework that jointly optimizes sampling, training, and orchestration for multi-agent systems.
 - Pavel M I, Hu S, Masum M A, Pratama M, Kowalczyk R, Cao Z J. "[KD-MARL: Resource-Aware Knowledge Distillation in Multi-Agent Reinforcement Learning](https://arxiv.org/abs/2604.06691)." 2026. -- Transferring centralized coordination behavior to lightweight decentralized agents through knowledge distillation.
 
-[^flexmarl]: Li J, et al. "[FlexMARL: Rollout-Training Co-Design for Efficient LLM-Based Multi-Agent Reinforcement Learning](https://arxiv.org/abs/2602.09578)." 2026. -- An end-to-end framework that jointly optimizes sampling, training, and orchestration for multi-agent systems.
+[^flexmarl]: Jiang Z, et al. "[FlexMARL: Rollout-Training Co-Design for Efficient LLM-Based Multi-Agent Reinforcement Learning](https://arxiv.org/abs/2602.09578)." 2026. -- An end-to-end framework that jointly optimizes sampling, training, and orchestration for multi-agent systems.
 
 [^kdmarl]: Pavel M I, Hu S, Masum M A, Pratama M, Kowalczyk R, Cao Z J. "[KD-MARL: Resource-Aware Knowledge Distillation in Multi-Agent Reinforcement Learning](https://arxiv.org/abs/2604.06691)." 2026. -- Transferring centralized coordination behavior to lightweight decentralized agents through knowledge distillation.

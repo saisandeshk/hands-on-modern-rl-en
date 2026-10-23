@@ -250,15 +250,15 @@ By now, the measurable confounders of contamination, verifier loopholes, and com
 
 ## References
 
-- Yang et al. [Reasoning or Memorization? Unreliable Results of Reinforcement Learning Due to Data Contamination](https://arxiv.org/abs/2507.10532).
-- Denison et al. [Natural Emergent Misalignment from Reward Hacking in Production RL](https://arxiv.org/abs/2511.18397).
+- Wu et al. [Reasoning or Memorization? Unreliable Results of Reinforcement Learning Due to Data Contamination](https://arxiv.org/abs/2507.10532).
+- MacDiarmid et al. [Natural Emergent Misalignment from Reward Hacking in Production RL](https://arxiv.org/abs/2511.18397).
 - OpenAI. [Expanding on What We Missed with Sycophancy](https://openai.com/index/expanding-on-sycophancy/).
 - Anthropic. [Claude 4 System Card](https://www-cdn.anthropic.com/6be99a52cb68eb70eb9572b4cafad13df32ed995.pdf).
 - Jain et al. [LiveCodeBench](https://arxiv.org/abs/2403.07974).
 
-[^reasoning-memorization]: Yang et al., "Reasoning or Memorization?", 2025. The paper studies the Qwen2.5 family and contaminated benchmarks; it is not a data incident of the Qwen3 team.
+[^reasoning-memorization]: Wu et al., "Reasoning or Memorization?", 2025. The paper studies the Qwen2.5 family and contaminated benchmarks; it is not a data incident of the Qwen3 team.
 
-[^natural-misalignment]: Denison et al., "Natural Emergent Misalignment from Reward Hacking in Production RL," 2025.
+[^natural-misalignment]: MacDiarmid et al., "Natural Emergent Misalignment from Reward Hacking in Production RL," 2025.
 
 [^openai-sycophancy]: OpenAI, "Expanding on What We Missed with Sycophancy," 2025-05-02.
 
