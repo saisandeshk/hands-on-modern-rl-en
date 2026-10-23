@@ -1,8 +1,8 @@
 ---
-title: '11.L Lab: Behavior Cloning versus DAgger'
+title: '11.4 Lab: Behavior Cloning versus DAgger'
 ---
 
-# 11.L Lab: Behavior Cloning versus DAgger
+# 11.4 Lab: Behavior Cloning versus DAgger
 
 This lab turns Sections [11.1](./bc-dagger) and [11.2](./irl-gail) into
 running code. You will train behavior-cloning policies from a handful of

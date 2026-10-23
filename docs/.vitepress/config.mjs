@@ -991,7 +991,11 @@ const sidebar = {
               link: '/chapter11_imitation_meta_rl/meta-rl'
             },
             {
-              text: '11.4 Summary and Exercises',
+              text: '11.4 Lab: Behavior Cloning versus DAgger',
+              link: '/chapter11_imitation_meta_rl/lab'
+            },
+            {
+              text: '11.5 Summary and Exercises',
               link: '/chapter11_imitation_meta_rl/review'
             }
           ]
