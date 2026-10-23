@@ -1,3 +1,7 @@
+---
+title: 21.2 Evaluation Benchmarks and Open-Source Projects
+---
+
 # 21.2 Evaluation Benchmarks and Open-Source Projects
 
 [21.1](./browser-rl-harness) represented search, reading, and answer submission as an executable trajectory. The next question is whether two trajectories that produce the same answer have equal research quality.
@@ -94,9 +98,9 @@ This is easier to interpret than “accuracy per token”: first set a limit suc
 
 ## Mainstream Evaluation Benchmarks
 
-### BrowseComp (Meta, 2025)
+### BrowseComp (OpenAI, 2025)
 
-**BrowseComp** is a browser agent benchmark released by Meta in 2025, specifically designed to test an agent's ability to find information on the open web.
+**BrowseComp** is a browser agent benchmark released by OpenAI in 2025, specifically designed to test an agent's ability to find information on the open web.
 
 **Design Philosophy**:
 
@@ -104,27 +108,17 @@ This is easier to interpret than “accuracy per token”: first set a limit suc
 - **Unique and Verifiable Answer**: Each question has a clear and precise answer that can be matched by string comparison.
 - **Anti-Google**: Direct Google search cannot find the answer, requiring multi-step navigation.
 
-**Example**:
+**Example** (two-hop shape, not a verbatim benchmark item):
 
-> Q: "In the 1998 French World Cup 1/4 final, the player who scored the only goal for Argentina, where did he work as a youth coach after retiring?"
+> Q: "The player who scored Argentina's goal in a specific 1998 World Cup knockout match — where did he later work as a youth coach?"
 >
-> A: "Argentinos Juniors" (exact string match)
+> A: a club name (exact string match)
 
-To solve this problem, the model must: (1) Find the player who scored the only goal for Argentina in the 1998 World Cup 1/4 final → Batistuta; (2) Find where Batistuta worked as a youth coach after retiring; (3) Find the specific team. At least 3-5 steps of browser navigation are required.
+To solve this problem, the model must: (1) identify the match and the scorer from a match record; (2) find that player's post-retirement coaching history; (3) return the specific club. At least 3–5 steps of browser navigation are required, and each hop must be checked against its own source rather than guessed from memory.
 
 **Metrics**: Exact Match Accuracy (EMA).
 
-**State-of-the-Art Performance** (as of June 2026):
-
-| System              | BrowseComp | Notes                          |
-| ------------------- | ---------- | ------------------------------ |
-| GPT-5 + Browser     | 38.2%      | OpenAI Operator upgrade        |
-| Claude Opus 4.6     | 35.7%      | Anthropic internal             |
-| Kimi K2.5 Swarm     | 72.1%      | Multi-agent collaboration      |
-| Tongyi DeepResearch | 51.4%      | Alibaba, March 2026            |
-| Human Expert        | 87.5%      | Single person, 30-minute limit |
-
-Note that Kimi K2.5 Swarm outperforms single-agent systems by over 30 percentage points — this is practical evidence of [19.7 Multi-Agent Collaboration](../chapter19_agentic/multi-agent-swarm).
+**State of the art.** Published results move quickly, so treat any leaderboard snapshot as perishable: compare systems only on the same benchmark version, with the same tool budget and the same number of allowed attempts. As a qualitative pattern, multi-agent systems tend to score higher than single-agent systems on BrowseComp-style tasks at a substantially higher token cost — which is exactly why [Section 21.2 cost accounting](#layer-4-cost-and-reliability) must accompany any accuracy claim. This cost–accuracy trade-off is practical evidence for the coordination overhead discussed in [19.7 Multi-Agent Collaboration](../chapter19_agentic/multi-agent-swarm).
 
 ### xbench-DeepSearch (Tsinghua University, 2025)
 
@@ -150,9 +144,9 @@ Note that Kimi K2.5 Swarm outperforms single-agent systems by over 30 percentage
 - **Efficiency**: Average steps / Minimum steps
 - **Citation Quality**: Whether reliable sources are cited
 
-### GAIA (Meta + HuggingFace, 2024)
+### GAIA (2023)
 
-**GAIA** (General AI Assistants) is an earlier benchmark, but it remains one of the standard test sets for Deep Research. GAIA defines three difficulty levels:
+**GAIA** (General AI Assistants), proposed by researchers at Meta, Hugging Face, and AutoGPT, is an earlier benchmark, but it remains one of the standard test sets for Deep Research. GAIA defines three difficulty levels:
 
 | Level   | Task Complexity | Average Steps | Example                                   |
 | ------- | --------------- | ------------- | ----------------------------------------- |
@@ -196,11 +190,11 @@ An agent may not actually browse, but instead generate answers that appear reaso
 
 - **References must be clickable**: During evaluation, check whether the URLs provided by the agent are real
 - **Web snapshots**: Save snapshots of the pages accessed by the agent during evaluation for later review
-- BrowseComp designs a "reverse verification" mechanism: deliberately ask questions whose answers are random strings, which the agent cannot guess
+- BrowseComp-style items resist guessing by requiring hard-to-guess, precisely specified answers that can only be found through multi-step navigation
 
 ### Cost Contamination
 
-The token cost of different agents can vary by 10–30 times (as mentioned in [19.7](../chapter19_agentic/multi-agent-swarm), Kimi K2.5 Swarm is 15× more expensive than a single-agent system). Simply comparing accuracy will favor more expensive systems.
+The token cost of different agents can vary by an order of magnitude or more (as discussed in [19.7](../chapter19_agentic/multi-agent-swarm), multi-agent swarms issue far more tool calls than a single-agent system). Simply comparing accuracy will favor more expensive systems.
 
 **Solutions**:
 
